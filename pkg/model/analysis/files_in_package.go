@@ -3,6 +3,7 @@ package analysis
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -38,8 +39,82 @@ func (d *currentPackageLimitingDirectory[TReference, TDirectory, TFile]) Close()
 	return nil
 }
 
-func (currentPackageLimitingDirectory[TReference, TDirectory, TFile]) ReadDir() ([]filesystem.FileInfo, error) {
-	return nil, errors.New("TODO: Implement ReadDir()")
+func (d *currentPackageLimitingDirectory[TReference, TDirectory, TFile]) ReadDir() ([]filesystem.FileInfo, error) {
+	leaves, err := model_filesystem.DirectoryGetLeaves(
+		d.options.context,
+		d.options.directoryReaders.Leaves,
+		d.directory,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Iterate over all children in sorted order. As the individual
+	// lists of directories, files and symlinks are already sorted,
+	// we merely need to merge them.
+	directories := d.directory.Message.Directories
+	files := leaves.Message.Files
+	symlinks := leaves.Message.Symlinks
+	fileInfos := make([]filesystem.FileInfo, 0, len(directories)+len(files)+len(symlinks))
+	for len(directories) > 0 || len(files) > 0 || len(symlinks) > 0 {
+		if len(directories) > 0 {
+			entry := directories[0]
+			if (len(files) == 0 || strings.Compare(entry.Name, files[0].Name) < 0) &&
+				(len(symlinks) == 0 || strings.Compare(entry.Name, symlinks[0].Name) < 0) {
+				// Report directory if it is not a package.
+				childDirectory, err := model_filesystem.DirectoryNodeGetContents(
+					d.options.context,
+					d.options.directoryReaders.Directory,
+					model_core.NewNestedMessage(d.directory, entry),
+				)
+				if err != nil {
+					return nil, fmt.Errorf("failed to get contents for directory %#v: %w", entry.Name, err)
+				}
+
+				isPackage, err := directoryIsPackage(
+					d.options.context,
+					d.options.directoryReaders.Leaves,
+					childDirectory,
+				)
+				if err != nil {
+					return nil, err
+				}
+				if !isPackage {
+					name, ok := path.NewComponent(entry.Name)
+					if !ok {
+						return nil, fmt.Errorf("invalid name for directory %#v", entry.Name)
+					}
+					fileInfos = append(fileInfos, filesystem.NewFileInfo(name, filesystem.FileTypeDirectory, false))
+				}
+				directories = directories[1:]
+				continue
+			}
+		}
+
+		if len(files) > 0 {
+			entry := files[0]
+			if len(symlinks) == 0 || strings.Compare(entry.Name, symlinks[0].Name) < 0 {
+				// Report regular file.
+				name, ok := path.NewComponent(entry.Name)
+				if !ok {
+					return nil, fmt.Errorf("invalid name for file %#v", entry.Name)
+				}
+				fileInfos = append(fileInfos, filesystem.NewFileInfo(name, filesystem.FileTypeRegularFile, entry.Properties.GetIsExecutable()))
+				files = files[1:]
+				continue
+			}
+		}
+
+		// Report symbolic link.
+		entry := symlinks[0]
+		name, ok := path.NewComponent(entry.Name)
+		if !ok {
+			return nil, fmt.Errorf("invalid name for symbolic link %#v", entry.Name)
+		}
+		fileInfos = append(fileInfos, filesystem.NewFileInfo(name, filesystem.FileTypeSymlink, false))
+		symlinks = symlinks[1:]
+	}
+	return fileInfos, nil
 }
 
 func (d *currentPackageLimitingDirectory[TReference, TDirectory, TFile]) Readlink(name path.Component) (path.Parser, error) {
