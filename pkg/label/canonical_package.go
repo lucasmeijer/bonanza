@@ -30,18 +30,24 @@ var (
 )
 
 var (
-	invalidCanonicalPackagePattern = errors.New("canonical package name must match " + validCanonicalPackagePattern)
-	invalidLabelPattern            = errors.New("label must match (" + validApparentOrAbsoluteLabelPattern + "|" + validRelativeTargetNameLabelPattern + ")")
-	invalidTargetPatternPattern    = errors.New("target pattern must match (" + validApparentOrAbsoluteTargetPatternPattern + "|" + validRelativeTargetNameTargetPatternPattern + ")")
+	errInvalidCanonicalPackage = errors.New("canonical package name must match " + validCanonicalPackagePattern)
+	errInvalidLabel            = errors.New("label must match (" + validApparentOrAbsoluteLabelPattern + "|" + validRelativeTargetNameLabelPattern + ")")
+	errInvalidTargetPattern    = errors.New("target pattern must match (" + validApparentOrAbsoluteTargetPatternPattern + "|" + validRelativeTargetNameTargetPatternPattern + ")")
 )
 
+// NewCanonicalPackage validates that the provided string value is a
+// canonical package name. If so, an instance of CanonicalPackage is
+// returned that wraps the value.
 func NewCanonicalPackage(value string) (CanonicalPackage, error) {
 	if !validCanonicalPackageRegexp.MatchString(value) {
-		return CanonicalPackage{}, invalidCanonicalPackagePattern
+		return CanonicalPackage{}, errInvalidCanonicalPackage
 	}
 	return CanonicalPackage{value: value}, nil
 }
 
+// MustNewCanonicalPackage is the same as NewCanonicalPackage, except
+// that it panics if the provided value is not a valid canonical package
+// name.
 func MustNewCanonicalPackage(value string) CanonicalPackage {
 	p, err := NewCanonicalPackage(value)
 	if err != nil {
@@ -50,6 +56,8 @@ func MustNewCanonicalPackage(value string) CanonicalPackage {
 	return p
 }
 
+// GetCanonicalRepo returns the name of the canonical repo that contains
+// this package.
 func (p CanonicalPackage) GetCanonicalRepo() CanonicalRepo {
 	repo := p.value[2:]
 	if offset := strings.IndexByte(repo, '/'); offset >= 0 {
@@ -58,6 +66,8 @@ func (p CanonicalPackage) GetCanonicalRepo() CanonicalRepo {
 	return CanonicalRepo{value: repo}
 }
 
+// GetPackagePath returns the path of the package, relative to the root
+// of this repo. For the root package the empty string is returned.
 func (p CanonicalPackage) GetPackagePath() string {
 	if offset := strings.IndexByte(p.value, '/'); offset >= 0 {
 		return p.value[offset+2:]
@@ -127,7 +137,7 @@ func (p CanonicalPackage) AppendLabel(value string) (ApparentLabel, error) {
 	if validRelativeTargetNameLabelRegexp.MatchString(value) {
 		return newValidApparentLabel(p.concatenateRelative(value, false)), nil
 	}
-	return ApparentLabel{}, invalidLabelPattern
+	return ApparentLabel{}, errInvalidLabel
 }
 
 // AppendTargetName appends a target name to a canonical package name,
@@ -156,12 +166,12 @@ func (p CanonicalPackage) AppendTargetPattern(value string) (ApparentTargetPatte
 		forceHasPackage := value == "..." || strings.HasSuffix(value, "/...")
 		return newValidApparentTargetPattern(p.concatenateRelative(value, forceHasPackage)), nil
 	}
-	return ApparentTargetPattern{}, invalidTargetPatternPattern
+	return ApparentTargetPattern{}, errInvalidTargetPattern
 }
 
 var validNonEmptyPackageNameRegexp = regexp.MustCompile("^" + validNonEmptyPackageNamePattern + "$")
 
-var invalidNonEmptyPackageNamePattern = errors.New("non-empty package name must match " + validNonEmptyPackageNamePattern)
+var errInvalidNonEmptyPackageName = errors.New("non-empty package name must match " + validNonEmptyPackageNamePattern)
 
 // ToRecursiveTargetPatternBelow appends a relative package path to a
 // canonical package name, and subsequently converts it to a recursive
@@ -171,7 +181,7 @@ var invalidNonEmptyPackageNamePattern = errors.New("non-empty package name must 
 // to split up work, so that subpackages can be traversed in parallel.
 func (p CanonicalPackage) ToRecursiveTargetPatternBelow(pathBelow string, includeFileTargets bool) (CanonicalTargetPattern, error) {
 	if !validNonEmptyPackageNameRegexp.MatchString(pathBelow) {
-		return CanonicalTargetPattern{}, invalidNonEmptyPackageNamePattern
+		return CanonicalTargetPattern{}, errInvalidNonEmptyPackageName
 	}
 
 	midfix := "/"

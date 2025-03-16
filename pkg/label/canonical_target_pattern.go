@@ -27,7 +27,7 @@ const (
 
 var validCanonicalTargetPatternRegexp = regexp.MustCompile("^" + validCanonicalTargetPatternPattern + "$")
 
-var invalidCanonicalTargetPatternPattern = errors.New("canonical target pattern must match " + validCanonicalTargetPatternPattern)
+var errInvalidCanonicalTargetPattern = errors.New("canonical target pattern must match " + validCanonicalTargetPatternPattern)
 
 // removeTargetPatternTargetNameIfRedundant checks whether the target
 // name contained in a target pattern is identical to the last component
@@ -75,7 +75,7 @@ func removeTargetPatternTargetNameIfRedundant(targetPattern string) string {
 // on the provided target pattern value.
 func NewCanonicalTargetPattern(value string) (CanonicalTargetPattern, error) {
 	if !validCanonicalTargetPatternRegexp.MatchString(value) {
-		return CanonicalTargetPattern{}, invalidCanonicalTargetPatternPattern
+		return CanonicalTargetPattern{}, errInvalidCanonicalTargetPattern
 	}
 	return newValidCanonicalTargetPattern(value), nil
 }
@@ -84,6 +84,9 @@ func newValidCanonicalTargetPattern(value string) CanonicalTargetPattern {
 	return CanonicalTargetPattern{value: removeTargetPatternTargetNameIfRedundant(value)}
 }
 
+// MustNewCanonicalTargetPattern is the same as
+// NewCanonicalTargetPattern, except that it panics if the provided
+// string is not a valid canonical target pattern.
 func MustNewCanonicalTargetPattern(value string) CanonicalTargetPattern {
 	tp, err := NewCanonicalTargetPattern(value)
 	if err != nil {

@@ -44,7 +44,7 @@ const (
 
 var validCanonicalLabelRegexp = regexp.MustCompile("^" + validCanonicalLabelPattern + "$")
 
-var invalidCanonicalLabelPattern = errors.New("canonical label must match " + validCanonicalLabelPattern)
+var errInvalidCanonicalLabelPattern = errors.New("canonical label must match " + validCanonicalLabelPattern)
 
 // removeLabelTargetNameIfRedundant checks whether the target name
 // contained in a label is identical to the last component of the repo
@@ -80,7 +80,7 @@ func removeLabelTargetNameIfRedundant(label string) string {
 // label value.
 func NewCanonicalLabel(value string) (CanonicalLabel, error) {
 	if !validCanonicalLabelRegexp.MatchString(value) {
-		return CanonicalLabel{}, invalidCanonicalLabelPattern
+		return CanonicalLabel{}, errInvalidCanonicalLabelPattern
 	}
 	return newValidCanonicalLabel(value), nil
 }
@@ -89,6 +89,8 @@ func newValidCanonicalLabel(value string) CanonicalLabel {
 	return CanonicalLabel{value: removeLabelTargetNameIfRedundant(value)}
 }
 
+// MustNewCanonicalLabel is the same as NewCanonicalLabel, except that
+// it panics if the provided value is not a valid canonical label.
 func MustNewCanonicalLabel(value string) CanonicalLabel {
 	l, err := NewCanonicalLabel(value)
 	if err != nil {
@@ -106,6 +108,8 @@ func (l CanonicalLabel) GetCanonicalPackage() CanonicalPackage {
 	return CanonicalPackage{value: l.value}
 }
 
+// GetCanonicalRepo returns the name of the canonical repo that is
+// embedded in the label.
 func (l CanonicalLabel) GetCanonicalRepo() CanonicalRepo {
 	repo := l.value[2:]
 	if offset := strings.IndexByte(repo, '/'); offset >= 0 {
@@ -156,13 +160,17 @@ func (l CanonicalLabel) String() string {
 	return l.value
 }
 
+// AppendStarlarkIdentifier appends a Starlark identifier to a label,
+// resulting in the canonical name of a Starlark identifier.
 func (l CanonicalLabel) AppendStarlarkIdentifier(identifier StarlarkIdentifier) CanonicalStarlarkIdentifier {
 	return CanonicalStarlarkIdentifier{
 		value: l.value + "%" + identifier.value,
 	}
 }
 
+// AsResolved converts a canonical label to a resolved label. As
+// canonical labels can always be resolved successfully, this function
+// leaves the value as is.
 func (l CanonicalLabel) AsResolved() ResolvedLabel {
-	// All canonical labels are also valid resolved labels.
 	return ResolvedLabel{value: l.value}
 }

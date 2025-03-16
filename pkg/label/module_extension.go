@@ -19,15 +19,21 @@ const validModuleExtensionPattern = validModuleInstancePattern + `\+` + validSta
 
 var validModuleExtensionRegexp = regexp.MustCompile("^" + validModuleExtensionPattern + "$")
 
-var invalidModuleExtensionPattern = errors.New("module extension must match " + validModuleExtensionPattern)
+var errInvalidModuleExtension = errors.New("module extension must match " + validModuleExtensionPattern)
 
+// NewModuleExtension validates that the provided string is a valid
+// module extension name. If so, a ModuleExtension is returned that
+// wraps the provided value.
 func NewModuleExtension(value string) (ModuleExtension, error) {
 	if !validModuleExtensionRegexp.MatchString(value) {
-		return ModuleExtension{}, invalidModuleExtensionPattern
+		return ModuleExtension{}, errInvalidModuleExtension
 	}
 	return ModuleExtension{value: value}, nil
 }
 
+// MustNewModuleExtension is the same as NewModuleExtension, except that
+// it panics if the provided string is not a valid module extension
+// name.
 func MustNewModuleExtension(value string) ModuleExtension {
 	me, err := NewModuleExtension(value)
 	if err != nil {
@@ -40,10 +46,14 @@ func (me ModuleExtension) String() string {
 	return me.value
 }
 
+// GetModuleInstance returns the leading module instance name that was
+// used to construct the name of this module extension.
 func (me ModuleExtension) GetModuleInstance() ModuleInstance {
 	return ModuleInstance{value: me.value[:strings.LastIndexByte(me.value, '+')]}
 }
 
+// GetCanonicalRepoWithModuleExtension returns the canonical repo name
+// of a repo that was created as part of this module extension.
 func (me ModuleExtension) GetCanonicalRepoWithModuleExtension(repo ApparentRepo) CanonicalRepo {
 	return CanonicalRepo{value: me.value + "+" + repo.value}
 }

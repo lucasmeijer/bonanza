@@ -5,6 +5,8 @@ import (
 	"regexp"
 )
 
+// StarlarkIdentifier corresponds to an identifier of a Starlark
+// function, variable or constant.
 type StarlarkIdentifier struct {
 	value string
 }
@@ -15,15 +17,21 @@ const (
 
 var validStarlarkIdentifierRegexp = regexp.MustCompile("^" + validStarlarkIdentifierPattern + "$")
 
-var invalidStarlarkIdentifierPattern = errors.New("Starlark identifier must match " + validStarlarkIdentifierPattern)
+var errInvalidStarlarkIdentifier = errors.New("Starlark identifier must match " + validStarlarkIdentifierPattern)
 
+// NewStarlarkIdentifier validates that a string containing a Starlark
+// identifier is valid. If so, an instance of StarlarkIdentifier that
+// wraps the value is returned.
 func NewStarlarkIdentifier(value string) (StarlarkIdentifier, error) {
 	if !validStarlarkIdentifierRegexp.MatchString(value) {
-		return StarlarkIdentifier{}, invalidStarlarkIdentifierPattern
+		return StarlarkIdentifier{}, errInvalidStarlarkIdentifier
 	}
 	return StarlarkIdentifier{value: value}, nil
 }
 
+// MustNewStarlarkIdentifier is the same as NewStarlarkIdentifier,
+// except that it panics if the provided value is not a valid Starlark
+// identifier.
 func MustNewStarlarkIdentifier(value string) StarlarkIdentifier {
 	identifier, err := NewStarlarkIdentifier(value)
 	if err != nil {
@@ -36,6 +44,9 @@ func (i StarlarkIdentifier) String() string {
 	return i.value
 }
 
+// IsPublic returns true if the Starlark identifier refers to a
+// function, variable or constant that is public (i.e., not beginning
+// with an underscore).
 func (i StarlarkIdentifier) IsPublic() bool {
 	return i.value[0] != '_'
 }

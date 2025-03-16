@@ -12,11 +12,12 @@ const validApparentTargetPatternPattern = `(` +
 
 var validApparentTargetPatternRegexp = regexp.MustCompile("^" + validApparentTargetPatternPattern + "$")
 
-var invalidApparentTargetPatternPattern = errors.New("apparent target pattern must match " + validApparentTargetPatternPattern)
+var errInvalidApparentTargetPattern = errors.New("apparent target pattern must match " + validApparentTargetPatternPattern)
 
 // ApparentTargetPattern is a target pattern string that is prefixed
-// with either a canonical or apparent repo name. This type can be used
-// to refer to zero or more targets within the context of a given
+// with either a canonical or apparent repo name (e.g.,
+// @@rules_go+//:all or @my_repo//tools/...). This type can be used to
+// refer to zero or more targets within the context of a given
 // repository.
 type ApparentTargetPattern struct {
 	value string
@@ -26,13 +27,19 @@ func newValidApparentTargetPattern(value string) ApparentTargetPattern {
 	return ApparentTargetPattern{value: removeTargetPatternTargetNameIfRedundant(value)}
 }
 
+// NewApparentTargetPattern validates that the provided string value is
+// a valid apparent target pattern. If so, an instance of
+// ApparentTargetPattern is returned that wraps the value.
 func NewApparentTargetPattern(value string) (ApparentTargetPattern, error) {
 	if !validApparentTargetPatternRegexp.MatchString(value) {
-		return ApparentTargetPattern{}, invalidApparentTargetPatternPattern
+		return ApparentTargetPattern{}, errInvalidApparentTargetPattern
 	}
 	return newValidApparentTargetPattern(value), nil
 }
 
+// MustNewApparentTargetPattern is the same as NewApparentTargetPattern,
+// except that it panics if the provided value is not a valid apparent
+// target pattern.
 func MustNewApparentTargetPattern(value string) ApparentTargetPattern {
 	tp, err := NewApparentTargetPattern(value)
 	if err != nil {

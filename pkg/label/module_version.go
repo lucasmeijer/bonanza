@@ -26,17 +26,22 @@ const (
 )
 
 var (
-	validModuleVersionRegexp    = regexp.MustCompile("^" + validModuleVersionPattern + "$")
-	invalidModuleVersionPattern = errors.New("module version must match " + validModuleVersionPattern)
+	validModuleVersionRegexp = regexp.MustCompile("^" + validModuleVersionPattern + "$")
+	errInvalidModuleVersion  = errors.New("module version must match " + validModuleVersionPattern)
 )
 
+// NewModuleVersion validates that a string contains a valid a Bazel
+// module version (e.g., "1.7.1" or "0.0.0-20241220-5e258e33". If so, it
+// wraps the value in a ModuleVersion.
 func NewModuleVersion(value string) (ModuleVersion, error) {
 	if !validModuleVersionRegexp.MatchString(value) {
-		return ModuleVersion{}, invalidModuleVersionPattern
+		return ModuleVersion{}, errInvalidModuleVersion
 	}
 	return ModuleVersion{value: value}, nil
 }
 
+// MustNewModuleVersion is the same as NewModuleVersion, except that it
+// panics if the provided value is not a valid Bazel module version.
 func MustNewModuleVersion(value string) ModuleVersion {
 	m, err := NewModuleVersion(value)
 	if err != nil {
@@ -86,6 +91,7 @@ func stripSeparator(in *string) int {
 	}
 }
 
+// Compare two Bazel module version numbers along a total order.
 func (mv ModuleVersion) Compare(other ModuleVersion) int {
 	separators := "+.-"
 	a, b := mv.value, other.value

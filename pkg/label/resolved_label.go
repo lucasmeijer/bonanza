@@ -11,7 +11,7 @@ const validResolvedLabelPattern = `(` + validCanonicalLabelPattern + `|` +
 
 var validResolvedLabelRegexp = regexp.MustCompile("^" + validResolvedLabelPattern + "$")
 
-var invalidResolvedLabelPattern = errors.New("resolved label must match " + validResolvedLabelPattern)
+var errInvalidResolvedLabel = errors.New("resolved label must match " + validResolvedLabelPattern)
 
 // ResolvedLabel corresponds to a label for which resolution to a
 // canonical label has been attempted. The label is either a canonical
@@ -26,7 +26,7 @@ type ResolvedLabel struct {
 // canonical label has been attempted.
 func NewResolvedLabel(value string) (ResolvedLabel, error) {
 	if !validResolvedLabelRegexp.MatchString(value) {
-		return ResolvedLabel{}, invalidResolvedLabelPattern
+		return ResolvedLabel{}, errInvalidResolvedLabel
 	}
 	return newValidResolvedLabel(value), nil
 }
@@ -35,6 +35,8 @@ func newValidResolvedLabel(value string) ResolvedLabel {
 	return ResolvedLabel{value: removeLabelTargetNameIfRedundant(value)}
 }
 
+// MustNewResolvedLabel is identical to NewResolvedLabel, except that it
+// panics if the provided value is not a valid resolved label.
 func MustNewResolvedLabel(value string) ResolvedLabel {
 	l, err := NewResolvedLabel(value)
 	if err != nil {

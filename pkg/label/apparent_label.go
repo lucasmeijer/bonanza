@@ -16,7 +16,7 @@ const (
 
 var validApparentLabelRegexp = regexp.MustCompile("^" + validApparentLabelPattern + "$")
 
-var invalidApparentLabelPattern = errors.New("apparent label must match " + validApparentLabelPattern)
+var errInvalidApparentLabel = errors.New("apparent label must match " + validApparentLabelPattern)
 
 // ApparentLabel is a label string that is prefixed with either a
 // canonical or apparent repo name. This type can be used to refer to
@@ -29,13 +29,18 @@ func newValidApparentLabel(value string) ApparentLabel {
 	return ApparentLabel{value: removeLabelTargetNameIfRedundant(value)}
 }
 
+// NewApparentLabel validates that the provided string is a valid
+// apparent label. If so, an instance of ApparentLabel is returned that
+// wraps the value.
 func NewApparentLabel(value string) (ApparentLabel, error) {
 	if !validApparentLabelRegexp.MatchString(value) {
-		return ApparentLabel{}, invalidApparentLabelPattern
+		return ApparentLabel{}, errInvalidApparentLabel
 	}
 	return newValidApparentLabel(value), nil
 }
 
+// MustNewApparentLabel is the same as NewApparentLabel, except that it
+// panics if the provided string is not a valid apparent label.
 func MustNewApparentLabel(value string) ApparentLabel {
 	l, err := NewApparentLabel(value)
 	if err != nil {
