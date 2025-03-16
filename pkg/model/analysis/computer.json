@@ -186,7 +186,13 @@
             "type": "*model_filesystem.FileReader[TReference]"
          }
       },
-      "FilesInPackage": { },
+      "FilesInPackage": {
+         "dependsOn": [
+            "DirectoryCreationParametersObject",
+            "DirectoryReaders",
+            "Repo"
+         ]
+      },
       "Glob": {
          "dependsOn": [
             "FilesInPackage"

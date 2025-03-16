@@ -315,10 +315,9 @@ message FilesInPackage {
   }
 
   message Value {
-    // Directory of the package, with the following features removed:
-    //
-    // - Child directories that belong to nested packages.
-    // - File properties, so that only the names of files remain.
+    // Directory of the package, with child directories removed that
+    // belong to nested packages. Furthermore, file contents are
+    // removed, thereby making all files empty.
     bonanza.model.filesystem.Directory directory = 1;
   }
 }

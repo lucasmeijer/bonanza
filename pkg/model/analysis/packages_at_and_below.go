@@ -18,31 +18,37 @@ import (
 	"github.com/buildbarn/bonanza/pkg/storage/dag"
 )
 
-func (c *baseComputer[TReference, TMetadata]) ComputePackagesAtAndBelowValue(ctx context.Context, key *model_analysis_pb.PackagesAtAndBelow_Key, e PackagesAtAndBelowEnvironment[TReference, TMetadata]) (PatchedPackagesAtAndBelowValue, error) {
-	basePackage, err := label.NewCanonicalPackage(key.BasePackage)
+type getPackageDirectoryEnvironment[TReference any] interface {
+	GetRepoValue(*model_analysis_pb.Repo_Key) model_core.Message[*model_analysis_pb.Repo_Value, TReference]
+}
+
+func (c *baseComputer[TReference, TMetadata]) getPackageDirectory(
+	ctx context.Context,
+	e getPackageDirectoryEnvironment[TReference],
+	directoryReader model_parser.ParsedObjectReader[TReference, model_core.Message[*model_filesystem_pb.Directory, TReference]],
+	canonicalPackageStr string,
+) (model_core.Message[*model_filesystem_pb.Directory, TReference], error) {
+	canonicalPackage, err := label.NewCanonicalPackage(canonicalPackageStr)
 	if err != nil {
-		return PatchedPackagesAtAndBelowValue{}, errors.New("invalid base package")
+		return model_core.Message[*model_filesystem_pb.Directory, TReference]{}, errors.New("invalid base package")
 	}
 
-	directoryReaders, gotDirectoryReaders := e.GetDirectoryReadersValue(
-		&model_analysis_pb.DirectoryReaders_Key{},
-	)
 	repoValue := e.GetRepoValue(&model_analysis_pb.Repo_Key{
-		CanonicalRepo: basePackage.GetCanonicalRepo().String(),
+		CanonicalRepo: canonicalPackage.GetCanonicalRepo().String(),
 	})
-	if !gotDirectoryReaders || !repoValue.IsSet() {
-		return PatchedPackagesAtAndBelowValue{}, evaluation.ErrMissingDependency
+	if !repoValue.IsSet() {
+		return model_core.Message[*model_filesystem_pb.Directory, TReference]{}, evaluation.ErrMissingDependency
 	}
 
 	// Obtain the root directory of the repo.
-	baseDirectory, err := model_parser.Dereference(ctx, directoryReaders.Directory, model_core.NewNestedMessage(repoValue, repoValue.Message.RootDirectoryReference.GetReference()))
+	baseDirectory, err := model_parser.Dereference(ctx, directoryReader, model_core.NewNestedMessage(repoValue, repoValue.Message.RootDirectoryReference.GetReference()))
 	if err != nil {
-		return PatchedPackagesAtAndBelowValue{}, err
+		return model_core.Message[*model_filesystem_pb.Directory, TReference]{}, err
 	}
 
 	// Traverse into the directory belonging to the package path.
 	for component := range strings.FieldsFuncSeq(
-		basePackage.GetPackagePath(),
+		canonicalPackage.GetPackagePath(),
 		func(r rune) bool { return r == '/' },
 	) {
 		directories := baseDirectory.Message.Directories
@@ -52,19 +58,35 @@ func (c *baseComputer[TReference, TMetadata]) ComputePackagesAtAndBelowValue(ctx
 		)
 		if !ok {
 			// Base package does not exist.
-			return model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](&model_analysis_pb.PackagesAtAndBelow_Value{}), nil
+			return model_core.Message[*model_filesystem_pb.Directory, TReference]{}, nil
 		}
 		switch contents := directories[directoryIndex].Contents.(type) {
 		case *model_filesystem_pb.DirectoryNode_ContentsExternal:
-			baseDirectory, err = model_parser.Dereference(ctx, directoryReaders.Directory, model_core.NewNestedMessage(baseDirectory, contents.ContentsExternal.Reference))
+			baseDirectory, err = model_parser.Dereference(ctx, directoryReader, model_core.NewNestedMessage(baseDirectory, contents.ContentsExternal.Reference))
 			if err != nil {
-				return PatchedPackagesAtAndBelowValue{}, err
+				return model_core.Message[*model_filesystem_pb.Directory, TReference]{}, err
 			}
 		case *model_filesystem_pb.DirectoryNode_ContentsInline:
 			baseDirectory = model_core.NewNestedMessage(baseDirectory, contents.ContentsInline)
 		default:
-			return PatchedPackagesAtAndBelowValue{}, errors.New("invalid directory contents type")
+			return model_core.Message[*model_filesystem_pb.Directory, TReference]{}, errors.New("invalid directory contents type")
 		}
+	}
+	return baseDirectory, nil
+}
+
+func (c *baseComputer[TReference, TMetadata]) ComputePackagesAtAndBelowValue(ctx context.Context, key *model_analysis_pb.PackagesAtAndBelow_Key, e PackagesAtAndBelowEnvironment[TReference, TMetadata]) (PatchedPackagesAtAndBelowValue, error) {
+	directoryReaders, gotDirectoryReaders := e.GetDirectoryReadersValue(&model_analysis_pb.DirectoryReaders_Key{})
+	if !gotDirectoryReaders {
+		return PatchedPackagesAtAndBelowValue{}, evaluation.ErrMissingDependency
+	}
+
+	packageDirectory, err := c.getPackageDirectory(ctx, e, directoryReaders.Directory, key.BasePackage)
+	if err != nil {
+		return PatchedPackagesAtAndBelowValue{}, err
+	}
+	if !packageDirectory.IsSet() {
+		return model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](&model_analysis_pb.PackagesAtAndBelow_Value{}), nil
 	}
 
 	// Find packages at and below the base package.
@@ -73,11 +95,11 @@ func (c *baseComputer[TReference, TMetadata]) ComputePackagesAtAndBelowValue(ctx
 		directoryReader: directoryReaders.Directory,
 		leavesReader:    directoryReaders.Leaves,
 	}
-	packageAtBasePackage, err := checker.directoryIsPackage(baseDirectory)
+	packageAtBasePackage, err := checker.directoryIsPackage(packageDirectory)
 	if err != nil {
 		return PatchedPackagesAtAndBelowValue{}, err
 	}
-	if err := checker.findPackagesBelow(baseDirectory, nil); err != nil {
+	if err := checker.findPackagesBelow(packageDirectory, nil); err != nil {
 		return PatchedPackagesAtAndBelowValue{}, err
 	}
 
