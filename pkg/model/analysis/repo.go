@@ -248,6 +248,9 @@ type unmodifiedFileContents[TReference object.BasicReference] struct {
 }
 
 func (fc unmodifiedFileContents[TReference]) createFileMerkleTree(ctx context.Context, options *capturableChangeTrackingDirectoryOptions[TReference]) (model_core.PatchedMessage[*model_filesystem_pb.FileContents, model_core.FileBackedObjectLocation], error) {
+	// TODO: Stop using ExistingFileBackedObjectLocation, as it's not
+	// correct in case the file was being written to storage
+	// asynchronously.
 	return model_core.NewPatchedMessageFromExisting(
 		fc.contents,
 		func(index int) model_core.FileBackedObjectLocation {
@@ -342,6 +345,9 @@ func (cd *capturableChangeTrackingDirectory[TReference]) EnterCapturableDirector
 		if err != nil {
 			return nil, nil, err
 		}
+		// TODO: Stop using ExistingFileBackedObjectLocation, as it's
+		// not correct in case the directory was being written to
+		// storage asynchronously.
 		return &model_filesystem.CreatedDirectory[model_core.FileBackedObjectLocation]{
 			Message: model_core.NewPatchedMessageFromExisting(
 				directoryMessage,
