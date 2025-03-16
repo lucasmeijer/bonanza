@@ -15,25 +15,9 @@ import (
 //
 // The methods below return metadata. The metadata for the root object
 // will be returned by CreateFileMerkleTree.
-type FileMerkleTreeCapturer[T any] interface {
-	CaptureChunk(contents *object.Contents) T
-	CaptureFileContentsList(createdObject model_core.CreatedObject[T]) T
-}
-
-type noopFileMerkleTreeCapturer struct{}
-
-// NoopFileMerkleTreeCapturer is a no-op implementation of
-// FileMerkleTreeCapturer. It can be used when only a reference of a
-// file needs to be computed, and there is no need to capture the
-// resulting Merkle tree.
-var NoopFileMerkleTreeCapturer FileMerkleTreeCapturer[model_core.NoopReferenceMetadata] = noopFileMerkleTreeCapturer{}
-
-func (noopFileMerkleTreeCapturer) CaptureChunk(contents *object.Contents) model_core.NoopReferenceMetadata {
-	return model_core.NoopReferenceMetadata{}
-}
-
-func (noopFileMerkleTreeCapturer) CaptureFileContentsList(createdObject model_core.CreatedObject[model_core.NoopReferenceMetadata]) model_core.NoopReferenceMetadata {
-	return model_core.NoopReferenceMetadata{}
+type FileMerkleTreeCapturer[TMetadata any] interface {
+	CaptureChunk(contents *object.Contents) TMetadata
+	CaptureFileContentsList(createdObject model_core.CreatedObject[TMetadata]) TMetadata
 }
 
 type chunkDiscardingFileMerkleTreeCapturer struct{}
@@ -59,22 +43,25 @@ func (chunkDiscardingFileMerkleTreeCapturer) CaptureFileContentsList(createdObje
 	return o
 }
 
-type fileWritingFileMerkleTreeCapturer struct {
-	capturer *model_core.FileWritingMerkleTreeCapturer
+type simpleFileMerkleTreeCapturer[TMetadata any] struct {
+	capturer model_core.CreatedObjectCapturer[TMetadata]
 }
 
-func NewFileWritingFileMerkleTreeCapturer(capturer *model_core.FileWritingMerkleTreeCapturer) FileMerkleTreeCapturer[model_core.FileBackedObjectLocation] {
-	return fileWritingFileMerkleTreeCapturer{
+// NewSimpleFileMerkleTreeCapturer creates a FileMerkleTreeCapturer that
+// assumes that chunks and file contents lists need to be captured the
+// same way.
+func NewSimpleFileMerkleTreeCapturer[TMetadata any](capturer model_core.CreatedObjectCapturer[TMetadata]) FileMerkleTreeCapturer[TMetadata] {
+	return simpleFileMerkleTreeCapturer[TMetadata]{
 		capturer: capturer,
 	}
 }
 
-func (c fileWritingFileMerkleTreeCapturer) CaptureChunk(contents *object.Contents) model_core.FileBackedObjectLocation {
-	return c.capturer.CaptureObject(model_core.CreatedObject[model_core.FileBackedObjectLocation]{Contents: contents})
+func (c simpleFileMerkleTreeCapturer[TMetadata]) CaptureChunk(contents *object.Contents) TMetadata {
+	return c.capturer.CaptureCreatedObject(model_core.CreatedObject[TMetadata]{Contents: contents})
 }
 
-func (c fileWritingFileMerkleTreeCapturer) CaptureFileContentsList(createdObject model_core.CreatedObject[model_core.FileBackedObjectLocation]) model_core.FileBackedObjectLocation {
-	return c.capturer.CaptureObject(createdObject)
+func (c simpleFileMerkleTreeCapturer[TMetadata]) CaptureFileContentsList(createdObject model_core.CreatedObject[TMetadata]) TMetadata {
+	return c.capturer.CaptureCreatedObject(createdObject)
 }
 
 type FileMerkleTreeCapturerForTesting FileMerkleTreeCapturer[model_core.ReferenceMetadata]

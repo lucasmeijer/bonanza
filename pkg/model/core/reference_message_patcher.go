@@ -28,17 +28,6 @@ type ReferenceMetadata interface {
 	Discard()
 }
 
-// NoopReferenceMetadata is a trivial implementation of
-// ReferenceMetadata that does not capture anything. This can be used if
-// the goal is to simply compute the root node of the Merkle tree,
-// discarding any children that were created in the process.
-type NoopReferenceMetadata struct{}
-
-// Discard all resources owned by this instance of
-// NoopReferenceMetadata. This method is merely provided to satisfy the
-// ReferenceMetadata interface.
-func (NoopReferenceMetadata) Discard() {}
-
 // ReferenceMetadataCreator is invoked by NewPatchedMessageFromExisting
 // for every reference that is encountered, allowing metadata for the
 // outgoing reference to be created.

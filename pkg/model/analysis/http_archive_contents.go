@@ -376,7 +376,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeHttpArchiveContentsValue(ct
 
 	group, groupCtx := errgroup.WithContext(ctx)
 	var createdRootDirectory model_filesystem.CreatedDirectory[model_core.FileBackedObjectLocation]
-	fileWritingMerkleTreeCapturer := model_core.NewFileWritingMerkleTreeCapturer(model_filesystem.NewSectionWriter(merkleTreeNodes))
+	fileWritingObjectCapturer := model_core.NewFileWritingObjectCapturer(model_filesystem.NewSectionWriter(merkleTreeNodes))
 	group.Go(func() error {
 		return model_filesystem.CreateDirectoryMerkleTree(
 			groupCtx,
@@ -387,11 +387,11 @@ func (c *baseComputer[TReference, TMetadata]) ComputeHttpArchiveContentsValue(ct
 				options: &capturableArchiveDirectoryOptions[model_core.FileBackedObjectLocation]{
 					contentsFile:           extractedFiles,
 					fileCreationParameters: fileCreationParameters,
-					fileMerkleTreeCapturer: model_filesystem.NewFileWritingFileMerkleTreeCapturer(fileWritingMerkleTreeCapturer),
+					fileMerkleTreeCapturer: model_filesystem.NewSimpleFileMerkleTreeCapturer(fileWritingObjectCapturer),
 				},
 				directory: &rootDirectory,
 			},
-			model_filesystem.NewFileWritingDirectoryMerkleTreeCapturer(fileWritingMerkleTreeCapturer),
+			model_filesystem.NewSimpleDirectoryMerkleTreeCapturer(fileWritingObjectCapturer),
 			&createdRootDirectory,
 		)
 	})
@@ -412,11 +412,11 @@ func (c *baseComputer[TReference, TMetadata]) ComputeHttpArchiveContentsValue(ct
 	if err != nil {
 		return PatchedHttpArchiveContentsValue{}, err
 	}
-	capturedRootDirectory := fileWritingMerkleTreeCapturer.CaptureObject(createdRootDirectoryObject)
+	capturedRootDirectory := fileWritingObjectCapturer.CaptureCreatedObject(createdRootDirectoryObject)
 
 	// Finalize writing of Merkle tree nodes to disk, and provide
 	// read access to the nodes, so that they can be uploaded.
-	if err := fileWritingMerkleTreeCapturer.Flush(); err != nil {
+	if err := fileWritingObjectCapturer.Flush(); err != nil {
 		return PatchedHttpArchiveContentsValue{}, err
 	}
 	objectContentsWalkerFactory := model_core.NewFileReadingObjectContentsWalkerFactory(merkleTreeNodes)

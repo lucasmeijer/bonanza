@@ -6,9 +6,10 @@ go_library(
     srcs = [
         "cloneable_reference_metadata.go",
         "created_object.go",
-        "file_writing_merkle_tree_capturer.go",
+        "file_writing_object_capturer.go",
         "get_index_from_reference_message.go",
         "message.go",
+        "noop_reference_metadata.go",
         "object_capturer.go",
         "patched_message.go",
         "reference_message_patcher.go",

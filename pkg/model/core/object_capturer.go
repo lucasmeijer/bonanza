@@ -1,6 +1,7 @@
 package core
 
 import (
+	"github.com/buildbarn/bonanza/pkg/storage/dag"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 
 	"google.golang.org/protobuf/proto"
@@ -11,6 +12,22 @@ import (
 // its children, it may yield new metadata.
 type CreatedObjectCapturer[TMetadata any] interface {
 	CaptureCreatedObject(CreatedObject[TMetadata]) TMetadata
+}
+
+type walkableCreatedObjectCapturer struct{}
+
+// WalkableCreatedObjectCapturer is an implementation of ObjectCapturer
+// that creates a dag.ObjectContentsWalker for each created object. This
+// ends up keeping objects in memory and only allows them to be
+// traversed as part of the upload process.
+//
+// This implementation is sufficient when given existing Merkle trees in
+// the form of a dag.ObjectContentsWalkers that need to be combined into
+// single Merkle tree.
+var WalkableCreatedObjectCapturer CreatedObjectCapturer[dag.ObjectContentsWalker] = walkableCreatedObjectCapturer{}
+
+func (walkableCreatedObjectCapturer) CaptureCreatedObject(createdObject CreatedObject[dag.ObjectContentsWalker]) dag.ObjectContentsWalker {
+	return dag.NewSimpleObjectContentsWalker(createdObject.Contents, createdObject.Metadata)
 }
 
 // ExistingObjectCapturer can be used as a factory type for reference

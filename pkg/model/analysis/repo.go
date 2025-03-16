@@ -2924,7 +2924,7 @@ func (c *baseComputer[TReference, TMetadata]) createMerkleTreeFromChangeTracking
 
 	group, groupCtx := errgroup.WithContext(ctx)
 	var createdRootDirectory model_filesystem.CreatedDirectory[model_core.FileBackedObjectLocation]
-	fileWritingMerkleTreeCapturer := model_core.NewFileWritingMerkleTreeCapturer(model_filesystem.NewSectionWriter(merkleTreeNodes))
+	fileWritingObjectCapturer := model_core.NewFileWritingObjectCapturer(model_filesystem.NewSectionWriter(merkleTreeNodes))
 	group.Go(func() error {
 		return model_filesystem.CreateDirectoryMerkleTree(
 			groupCtx,
@@ -2936,12 +2936,12 @@ func (c *baseComputer[TReference, TMetadata]) createMerkleTreeFromChangeTracking
 					context:                groupCtx,
 					directoryReader:        directoryReaders.Directory,
 					fileCreationParameters: fileCreationParameters,
-					fileMerkleTreeCapturer: model_filesystem.NewFileWritingFileMerkleTreeCapturer(fileWritingMerkleTreeCapturer),
+					fileMerkleTreeCapturer: model_filesystem.NewSimpleFileMerkleTreeCapturer(fileWritingObjectCapturer),
 					patchedFiles:           patchedFiles,
 				},
 				directory: rootDirectory,
 			},
-			model_filesystem.NewFileWritingDirectoryMerkleTreeCapturer(fileWritingMerkleTreeCapturer),
+			model_filesystem.NewSimpleDirectoryMerkleTreeCapturer(fileWritingObjectCapturer),
 			&createdRootDirectory,
 		)
 	})
@@ -2959,11 +2959,11 @@ func (c *baseComputer[TReference, TMetadata]) createMerkleTreeFromChangeTracking
 	if err != nil {
 		return model_core.PatchedMessage[*model_filesystem_pb.DirectoryReference, dag.ObjectContentsWalker]{}, err
 	}
-	capturedRootDirectory := fileWritingMerkleTreeCapturer.CaptureObject(createdRootDirectoryObject)
+	capturedRootDirectory := fileWritingObjectCapturer.CaptureCreatedObject(createdRootDirectoryObject)
 
 	// Finalize writing of Merkle tree nodes to disk, and provide
 	// read access to the nodes, so that they can be uploaded.
-	if err := fileWritingMerkleTreeCapturer.Flush(); err != nil {
+	if err := fileWritingObjectCapturer.Flush(); err != nil {
 		return model_core.PatchedMessage[*model_filesystem_pb.DirectoryReference, dag.ObjectContentsWalker]{}, err
 	}
 	objectContentsWalkerFactory := model_core.NewFileReadingObjectContentsWalkerFactory(merkleTreeNodes)

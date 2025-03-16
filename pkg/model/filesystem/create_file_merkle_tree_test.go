@@ -94,7 +94,7 @@ func TestCreateFileMerkleTree(t *testing.T) {
 			ctx,
 			fileCreationParameters,
 			io.LimitReader(twister, 1<<30),
-			model_filesystem.NoopFileMerkleTreeCapturer,
+			model_filesystem.NewSimpleFileMerkleTreeCapturer(model_core.DiscardingCreatedObjectCapturer),
 		)
 		require.NoError(t, err)
 

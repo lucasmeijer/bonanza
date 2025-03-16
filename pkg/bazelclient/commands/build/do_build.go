@@ -276,7 +276,7 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 					DirectoryCloser: moduleRootDirectory,
 					options: &localCapturableDirectoryOptions[model_core.NoopReferenceMetadata]{
 						fileParameters: fileParameters,
-						capturer:       model_filesystem.NoopFileMerkleTreeCapturer,
+						capturer:       model_filesystem.NewSimpleFileMerkleTreeCapturer(model_core.DiscardingCreatedObjectCapturer),
 					},
 				},
 				model_filesystem.FileDiscardingDirectoryMerkleTreeCapturer,

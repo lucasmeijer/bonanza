@@ -537,7 +537,7 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 						directory: inputRootDirectory,
 						pattern:   model_core.NewNestedMessage(command, pattern),
 					},
-					model_filesystem.InMemoryDirectoryMerkleTreeCapturer,
+					model_filesystem.NewSimpleDirectoryMerkleTreeCapturer(model_core.WalkableCreatedObjectCapturer),
 					&outputRoot,
 				)
 			})

@@ -14,7 +14,7 @@ import (
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 )
 
-// FileWritingMerkleTreeCapturer is capable of sequentially writing the
+// FileWritingObjectCapturer is capable of sequentially writing the
 // contents of objects to a file on disk. This can be used to
 // temporarily store large Merkle trees on disk prior to being uploaded
 // to a remote storage server. It may not be feasible to store the
@@ -24,24 +24,24 @@ import (
 // object, the contents are stored literally. After every object, the
 // offset of any previously written children is stored. This makes it
 // possible to traverse the full graph of objects afterwards.
-type FileWritingMerkleTreeCapturer struct {
+type FileWritingObjectCapturer struct {
 	lock               sync.Mutex
 	writer             *bufio.Writer
 	currentOffsetBytes uint64
 	savedErr           error
 }
 
-// NewFileWritingMerkleTreeCapturer creates a
-// FileWritingMerkleTreeCapturer that is in the initial state (i.e.,
+// NewFileWritingObjectCapturer creates a
+// FileWritingObjectCapturer that is in the initial state (i.e.,
 // assuming the output file is empty).
-func NewFileWritingMerkleTreeCapturer(w io.Writer) *FileWritingMerkleTreeCapturer {
-	return &FileWritingMerkleTreeCapturer{
+func NewFileWritingObjectCapturer(w io.Writer) *FileWritingObjectCapturer {
+	return &FileWritingObjectCapturer{
 		writer: bufio.NewWriter(w),
 	}
 }
 
 // CaptureObject writes the contents of a single object to disk.
-func (c *FileWritingMerkleTreeCapturer) CaptureObject(createdObject CreatedObject[FileBackedObjectLocation]) FileBackedObjectLocation {
+func (c *FileWritingObjectCapturer) CaptureCreatedObject(createdObject CreatedObject[FileBackedObjectLocation]) FileBackedObjectLocation {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -77,7 +77,7 @@ func (c *FileWritingMerkleTreeCapturer) CaptureObject(createdObject CreatedObjec
 // Flush the contents of any lingering objects to disk. This function
 // needs to be called to ensure that all objects can be retrieved
 // afterwards.
-func (c *FileWritingMerkleTreeCapturer) Flush() error {
+func (c *FileWritingObjectCapturer) Flush() error {
 	if c.savedErr != nil {
 		return c.savedErr
 	}
@@ -114,7 +114,7 @@ type ReaderAtCloser interface {
 // FileReadingObjectContentsWalkerFactory is a factory type for
 // dag.ObjectContentsWalker that is capable of reading the contents of
 // objects from disk, which were previously written by
-// FileWritingMerkleTreeCapturer.
+// FileWritingObjectCapturer.
 type FileReadingObjectContentsWalkerFactory struct {
 	reader         ReaderAtCloser
 	referenceCount atomic.Uint64
