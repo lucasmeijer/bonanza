@@ -60,16 +60,9 @@ func (c *baseComputer[TReference, TMetadata]) getPackageDirectory(
 			// Base package does not exist.
 			return model_core.Message[*model_filesystem_pb.Directory, TReference]{}, nil
 		}
-		switch contents := directories[directoryIndex].Contents.(type) {
-		case *model_filesystem_pb.DirectoryNode_ContentsExternal:
-			baseDirectory, err = model_parser.Dereference(ctx, directoryReader, model_core.NewNestedMessage(baseDirectory, contents.ContentsExternal.Reference))
-			if err != nil {
-				return model_core.Message[*model_filesystem_pb.Directory, TReference]{}, err
-			}
-		case *model_filesystem_pb.DirectoryNode_ContentsInline:
-			baseDirectory = model_core.NewNestedMessage(baseDirectory, contents.ContentsInline)
-		default:
-			return model_core.Message[*model_filesystem_pb.Directory, TReference]{}, errors.New("invalid directory contents type")
+		baseDirectory, err = model_filesystem.DirectoryNodeGetContents(ctx, directoryReader, model_core.NewNestedMessage(baseDirectory, directories[directoryIndex]))
+		if err != nil {
+			return model_core.Message[*model_filesystem_pb.Directory, TReference]{}, err
 		}
 	}
 	return baseDirectory, nil
@@ -145,18 +138,9 @@ func (pec *packageExistenceChecker[TReference]) findPackagesBelow(d model_core.M
 		}
 		childTrace := dTrace.Append(name)
 
-		var childDirectory model_core.Message[*model_filesystem_pb.Directory, TReference]
-		switch contents := entry.Contents.(type) {
-		case *model_filesystem_pb.DirectoryNode_ContentsExternal:
-			var err error
-			childDirectory, err = model_parser.Dereference(pec.context, pec.directoryReader, model_core.NewNestedMessage(d, contents.ContentsExternal.Reference))
-			if err != nil {
-				return err
-			}
-		case *model_filesystem_pb.DirectoryNode_ContentsInline:
-			childDirectory = model_core.NewNestedMessage(d, contents.ContentsInline)
-		default:
-			return fmt.Errorf("invalid contents type for directory %#v", childTrace.GetUNIXString())
+		childDirectory, err := model_filesystem.DirectoryNodeGetContents(pec.context, pec.directoryReader, model_core.NewNestedMessage(d, entry))
+		if err != nil {
+			return fmt.Errorf("failed to get contents of directory %#v: %w", childTrace.GetUNIXString(), err)
 		}
 
 		directoryIsPackage, err := pec.directoryIsPackage(childDirectory)

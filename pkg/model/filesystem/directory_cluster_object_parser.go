@@ -123,3 +123,20 @@ func DirectoryGetLeaves[TReference any](
 		return model_core.Message[*model_filesystem_pb.Leaves, TReference]{}, status.Error(codes.InvalidArgument, "Directory has no leaves")
 	}
 }
+
+// DirectoryNodeGetContents is a helper function for obtaining the
+// contents of a directory node.
+func DirectoryNodeGetContents[TReference any](
+	ctx context.Context,
+	reader model_parser.ParsedObjectReader[TReference, model_core.Message[*model_filesystem_pb.Directory, TReference]],
+	directoryNode model_core.Message[*model_filesystem_pb.DirectoryNode, TReference],
+) (model_core.Message[*model_filesystem_pb.Directory, TReference], error) {
+	switch contents := directoryNode.Message.Contents.(type) {
+	case *model_filesystem_pb.DirectoryNode_ContentsExternal:
+		return model_parser.Dereference(ctx, reader, model_core.NewNestedMessage(directoryNode, contents.ContentsExternal.Reference))
+	case *model_filesystem_pb.DirectoryNode_ContentsInline:
+		return model_core.NewNestedMessage(directoryNode, contents.ContentsInline), nil
+	default:
+		return model_core.Message[*model_filesystem_pb.Directory, TReference]{}, status.Error(codes.InvalidArgument, "Directory node has no contents")
+	}
+}
