@@ -9,6 +9,8 @@ import (
 
 type stringUnpackerInto struct{}
 
+// String is capable of unpacking any Starlark string value into a
+// native string.
 var String UnpackerInto[string] = stringUnpackerInto{}
 
 func (stringUnpackerInto) UnpackInto(thread *starlark.Thread, v starlark.Value, dst *string) error {

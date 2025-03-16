@@ -11,6 +11,9 @@ import (
 
 type starlarkIdentifierUnpackerInto struct{}
 
+// StarlarkIdentifier is capable of unpacking a string containing a
+// Starlark identifier. Any string that is not a valid name for a
+// Starlark identifier is rejected.
 var StarlarkIdentifier UnpackerInto[label.StarlarkIdentifier] = starlarkIdentifierUnpackerInto{}
 
 func (starlarkIdentifierUnpackerInto) UnpackInto(thread *starlark.Thread, v starlark.Value, dst *label.StarlarkIdentifier) error {

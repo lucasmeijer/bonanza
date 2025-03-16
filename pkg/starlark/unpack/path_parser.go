@@ -13,6 +13,8 @@ type pathParserUnpackerInto struct {
 	pathFormat path.Format
 }
 
+// PathParser is capable of parsing pathname strings, wrapping them in a
+// path parser for traversing over its components.
 func PathParser(pathFormat path.Format) UnpackerInto[path.Parser] {
 	return &pathParserUnpackerInto{
 		pathFormat: pathFormat,

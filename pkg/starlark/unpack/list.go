@@ -11,6 +11,8 @@ type listUnpackerInto[T any] struct {
 	base UnpackerInto[T]
 }
 
+// List is capable of unpacking a Starlark list value into a Go native
+// slice.
 func List[T any](base UnpackerInto[T]) UnpackerInto[[]T] {
 	return &listUnpackerInto[T]{
 		base: base,

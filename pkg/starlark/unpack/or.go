@@ -9,6 +9,13 @@ type orUnpackerInto[T any] struct {
 	unpackers []UnpackerInto[T]
 }
 
+// Or performs unpacking of a value by calling into a series of
+// unpackers. This can be useful if an argument of a Starlark function
+// permits values of multiple types (e.g., either a scalar value or a
+// list).
+//
+// This unpacker can be used in combination with the Decay() function to
+// accept multiple types that are incompatible at the Go type level.
 func Or[T any](unpackers []UnpackerInto[T]) UnpackerInto[T] {
 	return &orUnpackerInto[T]{
 		unpackers: unpackers,

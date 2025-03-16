@@ -11,6 +11,8 @@ import (
 
 type moduleVersionUnpackerInto struct{}
 
+// ModuleVersion is capable of unpacking a string containing a Bazel
+// module version (e.g., "1.7.1", "0.0.0-20241220-5e258e33").
 var ModuleVersion UnpackerInto[label.ModuleVersion] = moduleVersionUnpackerInto{}
 
 func (moduleVersionUnpackerInto) UnpackInto(thread *starlark.Thread, v starlark.Value, dst *label.ModuleVersion) error {

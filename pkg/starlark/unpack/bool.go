@@ -9,6 +9,7 @@ import (
 
 type boolUnpackerInto struct{}
 
+// Bool is capable of unpacking boolean arguments.
 var Bool UnpackerInto[bool] = boolUnpackerInto{}
 
 func (boolUnpackerInto) UnpackInto(thread *starlark.Thread, v starlark.Value, dst *bool) error {

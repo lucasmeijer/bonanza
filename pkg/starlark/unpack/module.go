@@ -11,6 +11,8 @@ import (
 
 type moduleUnpackerInto struct{}
 
+// Module is capable of unpacking a string value containing a Bazel
+// module name (e.g., "rules_go").
 var Module UnpackerInto[label.Module] = moduleUnpackerInto{}
 
 func (moduleUnpackerInto) UnpackInto(thread *starlark.Thread, v starlark.Value, dst *label.Module) error {

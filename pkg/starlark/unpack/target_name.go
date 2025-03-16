@@ -11,6 +11,9 @@ import (
 
 type targetNameUnpackerInto struct{}
 
+// TargetName is capable of unpacking Starlark strings containing Bazel
+// target names (e.g. "go_default_library"). Any string value that is
+// not a valid Bazel target name is rejected.
 var TargetName UnpackerInto[label.TargetName] = targetNameUnpackerInto{}
 
 func (targetNameUnpackerInto) UnpackInto(thread *starlark.Thread, v starlark.Value, dst *label.TargetName) error {

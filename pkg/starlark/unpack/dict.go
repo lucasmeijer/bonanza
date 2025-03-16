@@ -13,6 +13,8 @@ type dictUnpackerInto[TKey comparable, TValue any] struct {
 	valueUnpacker UnpackerInto[TValue]
 }
 
+// Dict is capable of unpacking dicts declared in Starlark code to a Go
+// native map.
 func Dict[TKey comparable, TValue any](keyUnpacker UnpackerInto[TKey], valueUnpacker UnpackerInto[TValue]) UnpackerInto[map[TKey]TValue] {
 	return &dictUnpackerInto[TKey, TValue]{
 		keyUnpacker:   keyUnpacker,

@@ -11,6 +11,13 @@ import (
 
 type apparentLabelUnpackerInto struct{}
 
+// ApparentLabel is capable of unpacking string arguments that contain
+// an apparent label (e.g., "@rules_go//go/platform:darwin_arm64").
+//
+// If the label is not prefixed with a repo name (e.g., "//cmd/mytool")
+// or relative (e.g., ":go_default_library"), the label is resolved to
+// be relative to the package to which the current Starlark file
+// belongs.
 var ApparentLabel UnpackerInto[label.ApparentLabel] = apparentLabelUnpackerInto{}
 
 func (apparentLabelUnpackerInto) UnpackInto(thread *starlark.Thread, v starlark.Value, dst *label.ApparentLabel) error {

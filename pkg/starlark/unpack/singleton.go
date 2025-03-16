@@ -8,6 +8,10 @@ type singletonUnpackerInto[T any] struct {
 	UnpackerInto[T]
 }
 
+// Singleton is capable of unpacking a value and placing it in a slice
+// containing a single element. This unpacker is typically used in
+// combination with Or() in functions having arguments that can either
+// be scalar or a list (e.g., for backward compatibility).
 func Singleton[T any](base UnpackerInto[T]) UnpackerInto[[]T] {
 	return &singletonUnpackerInto[T]{
 		UnpackerInto: base,

@@ -9,6 +9,8 @@ import (
 
 type intUnpackerInto[T constraints.Integer] struct{}
 
+// Int is capable of unpacking Starlark integer values to a Go native
+// integer type of choice.
 func Int[T constraints.Integer]() UnpackerInto[T] {
 	return intUnpackerInto[T]{}
 }

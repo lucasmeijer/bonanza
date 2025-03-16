@@ -10,6 +10,8 @@ import (
 
 type urlUnpackerInto struct{}
 
+// URL is capable of unpacking Starlark strings containing URLs to a Go
+// native URL.
 var URL UnpackerInto[*url.URL] = urlUnpackerInto{}
 
 func (urlUnpackerInto) UnpackInto(thread *starlark.Thread, v starlark.Value, dst **url.URL) error {

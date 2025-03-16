@@ -11,6 +11,9 @@ import (
 
 type apparentRepoUnpackerInto struct{}
 
+// ApparentRepo is capable of unpacking string arguments that contain an
+// apparent repo (e.g., "rules_go"). It does not expect the repo name to
+// have any leading "@" characters.
 var ApparentRepo UnpackerInto[label.ApparentRepo] = apparentRepoUnpackerInto{}
 
 func (apparentRepoUnpackerInto) UnpackInto(thread *starlark.Thread, v starlark.Value, dst *label.ApparentRepo) error {

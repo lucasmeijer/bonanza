@@ -11,6 +11,9 @@ type typeUnpackerInto[T starlark.Value] struct {
 	name string
 }
 
+// Type is capable of unpacking values of an exact Go type. This can be
+// used to validate that an argument corresponds to a custom Starlark
+// type written in Go (e.g., a struct).
 func Type[T starlark.Value](name string) UnpackerInto[T] {
 	return &typeUnpackerInto[T]{
 		name: name,

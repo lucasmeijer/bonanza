@@ -4,6 +4,8 @@ import (
 	"go.starlark.net/starlark"
 )
 
+// UnpackerInto implements a strategy for unpacking a function argument
+// of a Starlark function into a Go type.
 type UnpackerInto[T any] interface {
 	Canonicalizer
 	UnpackInto(thread *starlark.Thread, v starlark.Value, dst *T) error
@@ -15,6 +17,8 @@ type boundUnpacker[T any] struct {
 	unpacker UnpackerInto[T]
 }
 
+// Bind an UnpackerInto to a variable, so that it can unpack a function
+// argument and store it at a desired location.
 func Bind[T any](thread *starlark.Thread, dst *T, unpacker UnpackerInto[T]) starlark.Unpacker {
 	return &boundUnpacker[T]{
 		thread:   thread,

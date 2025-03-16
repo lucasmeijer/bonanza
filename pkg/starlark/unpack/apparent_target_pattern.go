@@ -11,6 +11,13 @@ import (
 
 type apparentTargetPatternUnpackerInto struct{}
 
+// ApparentTargetPattern is capable of unpacking string arguments that
+// contain an apparent target pattern (e.g., "@rules_swift//...").
+//
+// If the target pattern is not prefixed with a repo name (e.g.,
+// "//...") or relative (e.g., ":all"), the target pattern is resolved
+// to be relative to the package to which the current Starlark file
+// belongs.
 var ApparentTargetPattern UnpackerInto[label.ApparentTargetPattern] = apparentTargetPatternUnpackerInto{}
 
 func (apparentTargetPatternUnpackerInto) UnpackInto(thread *starlark.Thread, v starlark.Value, dst *label.ApparentTargetPattern) error {

@@ -7,6 +7,11 @@ import (
 
 type anyUnpackerInto struct{}
 
+// Any can unpack any Starlark value argument and store it into the
+// provided value. This can be useful for situations where the actual
+// parsing of an argument needs to be delayed to a later point in time
+// (e.g., after interpreting other arguments that control the type of
+// this argument.
 var Any UnpackerInto[starlark.Value] = anyUnpackerInto{}
 
 func (anyUnpackerInto) UnpackInto(thread *starlark.Thread, v starlark.Value, dst *starlark.Value) error {
