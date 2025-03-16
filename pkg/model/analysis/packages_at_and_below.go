@@ -84,11 +84,10 @@ func (c *baseComputer[TReference, TMetadata]) ComputePackagesAtAndBelowValue(ctx
 
 	// Find packages at and below the base package.
 	checker := packageExistenceChecker[TReference]{
-		context:         ctx,
-		directoryReader: directoryReaders.Directory,
-		leavesReader:    directoryReaders.Leaves,
+		context:          ctx,
+		directoryReaders: directoryReaders,
 	}
-	packageAtBasePackage, err := checker.directoryIsPackage(packageDirectory)
+	packageAtBasePackage, err := directoryIsPackage(ctx, directoryReaders.Leaves, packageDirectory)
 	if err != nil {
 		return PatchedPackagesAtAndBelowValue{}, err
 	}
@@ -104,13 +103,44 @@ func (c *baseComputer[TReference, TMetadata]) ComputePackagesAtAndBelowValue(ctx
 
 type packageExistenceChecker[TReference any] struct {
 	context                  context.Context
-	directoryReader          model_parser.ParsedObjectReader[TReference, model_core.Message[*model_filesystem_pb.Directory, TReference]]
-	leavesReader             model_parser.ParsedObjectReader[TReference, model_core.Message[*model_filesystem_pb.Leaves, TReference]]
+	directoryReaders         *DirectoryReaders[TReference]
 	packagesBelowBasePackage []string
 }
 
-func (pec *packageExistenceChecker[TReference]) directoryIsPackage(d model_core.Message[*model_filesystem_pb.Directory, TReference]) (bool, error) {
-	leaves, err := model_filesystem.DirectoryGetLeaves(pec.context, pec.leavesReader, d)
+func (pec *packageExistenceChecker[TReference]) findPackagesBelow(d model_core.Message[*model_filesystem_pb.Directory, TReference], dTrace *path.Trace) error {
+	for _, entry := range d.Message.Directories {
+		name, ok := path.NewComponent(entry.Name)
+		if !ok {
+			return fmt.Errorf("invalid directory name %#v in directory %#v", entry.Name, dTrace.GetUNIXString())
+		}
+		childTrace := dTrace.Append(name)
+
+		childDirectory, err := model_filesystem.DirectoryNodeGetContents(pec.context, pec.directoryReaders.Directory, model_core.NewNestedMessage(d, entry))
+		if err != nil {
+			return fmt.Errorf("failed to get contents of directory %#v: %w", childTrace.GetUNIXString(), err)
+		}
+
+		directoryIsPackage, err := directoryIsPackage(pec.context, pec.directoryReaders.Leaves, childDirectory)
+		if err != nil {
+			return fmt.Errorf("failed to determine whether directory %#v is a package: %w", dTrace.GetUNIXString(), err)
+		}
+		if directoryIsPackage {
+			pec.packagesBelowBasePackage = append(pec.packagesBelowBasePackage, childTrace.GetUNIXString())
+		} else {
+			// Not a package. Find packages below.
+			if err := pec.findPackagesBelow(childDirectory, childTrace); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// directoryPackage returns true if the provided directory is the root
+// directory of a package. A directory is a root directory of a package
+// if it contains a BUILD.bazel or BUILD file.
+func directoryIsPackage[TReference any](ctx context.Context, leavesReader model_parser.ParsedObjectReader[TReference, model_core.Message[*model_filesystem_pb.Leaves, TReference]], d model_core.Message[*model_filesystem_pb.Directory, TReference]) (bool, error) {
+	leaves, err := model_filesystem.DirectoryGetLeaves(ctx, leavesReader, d)
 	if err != nil {
 		return false, err
 	}
@@ -128,33 +158,4 @@ func (pec *packageExistenceChecker[TReference]) directoryIsPackage(d model_core.
 		}
 	}
 	return false, nil
-}
-
-func (pec *packageExistenceChecker[TReference]) findPackagesBelow(d model_core.Message[*model_filesystem_pb.Directory, TReference], dTrace *path.Trace) error {
-	for _, entry := range d.Message.Directories {
-		name, ok := path.NewComponent(entry.Name)
-		if !ok {
-			return fmt.Errorf("invalid directory name %#v in directory %#v", entry.Name, dTrace.GetUNIXString())
-		}
-		childTrace := dTrace.Append(name)
-
-		childDirectory, err := model_filesystem.DirectoryNodeGetContents(pec.context, pec.directoryReader, model_core.NewNestedMessage(d, entry))
-		if err != nil {
-			return fmt.Errorf("failed to get contents of directory %#v: %w", childTrace.GetUNIXString(), err)
-		}
-
-		directoryIsPackage, err := pec.directoryIsPackage(childDirectory)
-		if err != nil {
-			return fmt.Errorf("failed to determine whether directory %#v is a package: %w", dTrace.GetUNIXString(), err)
-		}
-		if directoryIsPackage {
-			pec.packagesBelowBasePackage = append(pec.packagesBelowBasePackage, childTrace.GetUNIXString())
-		} else {
-			// Not a package. Find packages below.
-			if err := pec.findPackagesBelow(childDirectory, childTrace); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
