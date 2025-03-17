@@ -66,8 +66,8 @@ func (s *state) getEndState() int {
 	return int(s.wildcards >> stateBits2)
 }
 
-func (s *state) setEndState(mode int) {
-	s.wildcards = s.wildcards&stateMask2 | uint64(mode)<<stateBits2
+func (s *state) setEndState(endState int) {
+	s.wildcards = s.wildcards&stateMask2 | uint64(endState)<<stateBits2
 }
 
 func (s *state) getStarIndex() uint32 {
@@ -183,7 +183,7 @@ func getOrAddStarStarSlash(states *[]state, currentState uint32) (uint32, error)
 	return i, nil
 }
 
-func addPattern(states *[]state, pattern string, terminationMode int) error {
+func addPattern(states *[]state, pattern string, endState int) error {
 	// Walk over the pattern and add states to the NFA for each
 	// construct we encounter.
 	gotRunes := false
@@ -278,7 +278,7 @@ func addPattern(states *[]state, pattern string, terminationMode int) error {
 		// with Bazel, a bare "**" does not match the root
 		// directory, while "foo/**" does match "foo".
 		if previousDirectoryEndState > 0 {
-			(*states)[previousDirectoryEndState].setEndState(terminationMode)
+			(*states)[previousDirectoryEndState].setEndState(endState)
 		}
 		currentState, err = getOrAddStarStarSlash(states, currentState)
 		if err != nil {
@@ -291,7 +291,7 @@ func addPattern(states *[]state, pattern string, terminationMode int) error {
 	default:
 		panic("unexpected number of stars")
 	}
-	(*states)[currentState].setEndState(terminationMode)
+	(*states)[currentState].setEndState(endState)
 	return nil
 }
 
@@ -315,6 +315,58 @@ func NewNFAFromPatterns(includes, excludes []string) (*NFA, error) {
 	for _, pattern := range excludes {
 		if err := addPattern(&states, pattern, 2); err != nil {
 			return nil, fmt.Errorf("invalid \"excludes\" pattern %#v: %w", pattern, err)
+		}
+	}
+	return &NFA{states: states}, nil
+}
+
+// NewNFAFromBytes reobtains a nondeterministic finite automaton (NFA)
+// that is capable of matching paths from a previously generated binary
+// representation.
+func NewNFAFromBytes(b []byte) (*NFA, error) {
+	if len(b) > stateMask1 {
+		return nil, fmt.Errorf("NFA may require more than %d states to represent", stateMask1)
+	}
+
+	states := []state{{}}
+	for currentState := 0; currentState < len(states); currentState++ {
+		// Consume the tag of the state.
+		tag, n := varint.ConsumeForward[uint](b)
+		if n < 0 {
+			return nil, fmt.Errorf("got end of file after %d states, while at least %d states were expected", currentState, len(states))
+		}
+		b = b[n:]
+
+		// Create new states for wildcards "*" and "**/".
+		states[currentState].setEndState(int(tag & 0x3))
+		if tag&(1<<2) != 0 {
+			states[currentState].setStarIndex(uint32(len(states)))
+			states = append(states, state{})
+		}
+		if tag&(1<<3) != 0 {
+			states[currentState].setStarStarSlashIndex(uint32(len(states)))
+			states = append(states, state{})
+		}
+
+		// Create new states for regular characters. Join them
+		// together using a linked list.
+		if runesCount := tag >> 4; runesCount > 0 {
+			states[currentState].setFirstRuneIndex(uint32(len(states)))
+			for {
+				r, n := utf8.DecodeRune(b)
+				if r == utf8.RuneError {
+					return nil, fmt.Errorf("invalid rune in state %d", currentState)
+				}
+				b = b[n:]
+
+				states = append(states, state{})
+				runesCount--
+				if runesCount == 0 {
+					states[len(states)-1].initializeRune(r, 0)
+					break
+				}
+				states[len(states)-1].initializeRune(r, uint32(len(states)))
+			}
 		}
 	}
 	return &NFA{states: states}, nil
