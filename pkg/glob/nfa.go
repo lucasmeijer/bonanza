@@ -26,48 +26,23 @@ func init() {
 	}
 }
 
-// basicState keeps track of basic properties of a state of the NFA for
-// parsing glob patterns. The following data is included:
-//
-//   - Bottom bits: If non-zero, the current state has an outgoing edge
-//     for wildcard "*". The index of the target state is provided.
-//
-//   - Middle bits: If non-zero, the current state has an outgoing edge
-//     for wildcard "**/". The index of the target state is provided.
-//
-//   - Top bits: Whether the current state is an end state.
-type basicState uint64
-
-func (s basicState) getEndState() int {
-	return int(s >> stateBits2)
-}
-
-func (s *basicState) setEndState(mode int) {
-	*s = *s&stateMask2 | basicState(mode)<<stateBits2
-}
-
-func (s basicState) getStarIndex() uint32 {
-	return uint32(s & stateMask1)
-}
-
-func (s *basicState) setStarIndex(i uint32) {
-	*s = *s&^stateMask1 | basicState(i)
-}
-
-func (s basicState) getStarStarSlashIndex() uint32 {
-	return uint32(s >> stateBits1 & stateMask1)
-}
-
-func (s *basicState) setStarStarSlashIndex(i uint32) {
-	*s = *s&^(stateMask1<<stateBits1) | (basicState(i) << stateBits1)
-}
-
-// compiledState keeps track of all properties of a state of the NFA for
-// parsing glob patterns that is currently being compiled.
-type compiledState struct {
-	// Outgoing edge transitions for wildcards "*" and "**/", and whether
-	// the current state is an end state.
-	basicState
+// state keeps track of all properties of a state of the NFA for parsing
+// glob patterns.
+type state struct {
+	// Outgoing edge transitions for wildcards "*" and "**/", and
+	// whether the current state is an end state. This field holds
+	// the following data:
+	//
+	//   - Bottom bits: If non-zero, the current state has an
+	//     outgoing edge for wildcard "*". The index of the target
+	//     state is provided.
+	//
+	//   - Middle bits: If non-zero, the current state has an
+	//     outgoing edge for wildcard "**/". The index of the target
+	//     state is provided.
+	//
+	//   - Top bits: Whether the current state is an end state.
+	wildcards uint64
 
 	// Outgoing edge transitions for regular characters. These are
 	// stored in the form of a linked list, where each state
@@ -87,45 +62,69 @@ type compiledState struct {
 	runes uint64
 }
 
-func (s *compiledState) getCurrentRune() rune {
+func (s *state) getEndState() int {
+	return int(s.wildcards >> stateBits2)
+}
+
+func (s *state) setEndState(mode int) {
+	s.wildcards = s.wildcards&stateMask2 | uint64(mode)<<stateBits2
+}
+
+func (s *state) getStarIndex() uint32 {
+	return uint32(s.wildcards & stateMask1)
+}
+
+func (s *state) setStarIndex(i uint32) {
+	s.wildcards = s.wildcards&^stateMask1 | uint64(i)
+}
+
+func (s *state) getStarStarSlashIndex() uint32 {
+	return uint32(s.wildcards >> stateBits1 & stateMask1)
+}
+
+func (s *state) setStarStarSlashIndex(i uint32) {
+	s.wildcards = s.wildcards&^(stateMask1<<stateBits1) | (uint64(i) << stateBits1)
+}
+
+func (s *state) getCurrentRune() rune {
 	return rune(s.runes >> stateBits2)
 }
 
-func (s *compiledState) initializeRune(r rune, nextRuneIndex uint32) {
+func (s *state) initializeRune(r rune, nextRuneIndex uint32) {
 	s.runes = (uint64(r) << stateBits2) | uint64(nextRuneIndex)<<stateBits1
 }
 
-func (s *compiledState) getFirstRuneIndex() uint32 {
+func (s *state) getFirstRuneIndex() uint32 {
 	return uint32(s.runes & stateMask1)
 }
 
-func (s *compiledState) setFirstRuneIndex(i uint32) {
+func (s *state) setFirstRuneIndex(i uint32) {
 	s.runes = s.runes&^stateMask1 | uint64(i)
 }
 
-func (s *compiledState) getNextRuneIndex() uint32 {
+func (s *state) getNextRuneIndex() uint32 {
 	return uint32(s.runes >> stateBits1 & stateMask1)
 }
 
-func (s *compiledState) setNextRuneIndex(i uint32) {
+func (s *state) setNextRuneIndex(i uint32) {
 	s.runes = s.runes&^(stateMask1<<stateBits1) | (uint64(i) << stateBits1)
 }
 
 // addState attaches a new state to the NFA that is being constructed.
 // The newly created state has no outgoing edges.
-func addState(states *[]compiledState) (uint32, error) {
+func addState(states *[]state) (uint32, error) {
 	i := uint32(len(*states))
 	if i > stateMask1 {
 		return 0, fmt.Errorf("patterns require more than %d states to represent", stateMask1)
 	}
-	*states = append(*states, compiledState{})
+	*states = append(*states, state{})
 	return i, nil
 }
 
 // getOrAddRune returns the index of the state associated with the
 // outgoing edge for a non-wildcard character. A new outgoing edge and
 // state are created if none exists yet.
-func getOrAddRune(states *[]compiledState, currentState uint32, r rune) (uint32, error) {
+func getOrAddRune(states *[]state, currentState uint32, r rune) (uint32, error) {
 	// Find the spot at which to insert a new outgoing edge. We want
 	// to keep outgoing edges sorted by rune, so that the output
 	// remains stable even if patterns are reordered.
@@ -157,7 +156,7 @@ func getOrAddRune(states *[]compiledState, currentState uint32, r rune) (uint32,
 // getOrAddRune returns the index of the state associated with the
 // outgoing edge for wildcard "*". A new outgoing edge and state are
 // created if none exists yet.
-func getOrAddStar(states *[]compiledState, currentState uint32) (uint32, error) {
+func getOrAddStar(states *[]state, currentState uint32) (uint32, error) {
 	if i := (*states)[currentState].getStarIndex(); i != 0 {
 		return i, nil
 	}
@@ -172,7 +171,7 @@ func getOrAddStar(states *[]compiledState, currentState uint32) (uint32, error) 
 // getOrAddRune returns the index of the state associated with the
 // outgoing edge for wildcard "**/". A new outgoing edge and state are
 // created if none exists yet.
-func getOrAddStarStarSlash(states *[]compiledState, currentState uint32) (uint32, error) {
+func getOrAddStarStarSlash(states *[]state, currentState uint32) (uint32, error) {
 	if i := (*states)[currentState].getStarStarSlashIndex(); i != 0 {
 		return i, nil
 	}
@@ -184,7 +183,7 @@ func getOrAddStarStarSlash(states *[]compiledState, currentState uint32) (uint32
 	return i, nil
 }
 
-func addPattern(states *[]compiledState, pattern string, terminationMode int) error {
+func addPattern(states *[]state, pattern string, terminationMode int) error {
 	// Walk over the pattern and add states to the NFA for each
 	// construct we encounter.
 	gotRunes := false
@@ -296,10 +295,18 @@ func addPattern(states *[]compiledState, pattern string, terminationMode int) er
 	return nil
 }
 
-// Compile a set of glob patterns into a nondeterministic finite
-// automaton (NFA) that is capable of matching paths.
-func Compile(includes, excludes []string) ([]byte, error) {
-	states := []compiledState{{}}
+// NFA is a nondeterministic finite automaton of a set of glob patterns.
+// This automaton can be used to perform matching of glob patterns
+// against paths.
+type NFA struct {
+	states []state
+}
+
+// NewNFAFromPatterns compiles a set of glob patterns into a
+// nondeterministic finite automaton (NFA) that is capable of matching
+// paths.
+func NewNFAFromPatterns(includes, excludes []string) (*NFA, error) {
+	states := []state{{}}
 	for _, pattern := range includes {
 		if err := addPattern(&states, pattern, 1); err != nil {
 			return nil, fmt.Errorf("invalid \"includes\" pattern %#v: %w", pattern, err)
@@ -310,11 +317,16 @@ func Compile(includes, excludes []string) ([]byte, error) {
 			return nil, fmt.Errorf("invalid \"excludes\" pattern %#v: %w", pattern, err)
 		}
 	}
+	return &NFA{states: states}, nil
+}
 
-	var nfa []byte
+// Bytes returns a copy of the nondeterministic finite automaton in
+// binary form, allowing it to be stored or transmitted.
+func (nfa *NFA) Bytes() []byte {
+	var out []byte
 	statesToEmit := []uint32{0}
 	for len(statesToEmit) > 0 {
-		s := &states[statesToEmit[0]]
+		s := &nfa.states[statesToEmit[0]]
 		statesToEmit = statesToEmit[1:]
 
 		// Emit a tag for the state, indicating whether paths
@@ -330,17 +342,17 @@ func Compile(includes, excludes []string) ([]byte, error) {
 			tag |= 1 << 3
 			statesToEmit = append(statesToEmit, i)
 		}
-		for i := s.getFirstRuneIndex(); i != 0; i = states[i].getNextRuneIndex() {
+		for i := s.getFirstRuneIndex(); i != 0; i = nfa.states[i].getNextRuneIndex() {
 			tag += 1 << 4
 			statesToEmit = append(statesToEmit, i)
 		}
-		nfa = varint.AppendForward(nfa, tag)
+		out = varint.AppendForward(out, tag)
 
 		// Emit the runes of the outgoing edges for this state.
-		for i := s.getFirstRuneIndex(); i != 0; i = states[i].getNextRuneIndex() {
-			nfa = utf8.AppendRune(nfa, states[i].getCurrentRune())
+		for i := s.getFirstRuneIndex(); i != 0; i = nfa.states[i].getNextRuneIndex() {
+			out = utf8.AppendRune(out, nfa.states[i].getCurrentRune())
 		}
 
 	}
-	return nfa, nil
+	return out
 }

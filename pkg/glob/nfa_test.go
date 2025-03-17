@@ -7,48 +7,48 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCompile(t *testing.T) {
+func TestNewNFAFromPatterns(t *testing.T) {
 	t.Run("Failure", func(t *testing.T) {
 		t.Run("Empty", func(t *testing.T) {
-			_, err := glob.Compile([]string{""}, nil)
+			_, err := glob.NewNFAFromPatterns([]string{""}, nil)
 			require.EqualError(t, err, "invalid \"includes\" pattern \"\": pathname components cannot be empty")
 		})
 
 		t.Run("TooManyStars", func(t *testing.T) {
-			_, err := glob.Compile([]string{"***"}, nil)
+			_, err := glob.NewNFAFromPatterns([]string{"***"}, nil)
 			require.EqualError(t, err, "invalid \"includes\" pattern \"***\": \"***\" has no special meaning")
 		})
 
 		t.Run("StarStarWithinFilename1", func(t *testing.T) {
-			_, err := glob.Compile([]string{"a**"}, nil)
+			_, err := glob.NewNFAFromPatterns([]string{"a**"}, nil)
 			require.EqualError(t, err, "invalid \"includes\" pattern \"a**\": \"**\" can not be placed inside a component")
 		})
 
 		t.Run("StarStarWithinFilename2", func(t *testing.T) {
-			_, err := glob.Compile([]string{"**a"}, nil)
+			_, err := glob.NewNFAFromPatterns([]string{"**a"}, nil)
 			require.EqualError(t, err, "invalid \"includes\" pattern \"**a\": \"**\" can not be placed inside a component")
 		})
 
 		t.Run("RedundantStarStarsMiddle", func(t *testing.T) {
-			_, err := glob.Compile([]string{"a/**/**/b"}, nil)
+			_, err := glob.NewNFAFromPatterns([]string{"a/**/**/b"}, nil)
 			require.EqualError(t, err, "invalid \"includes\" pattern \"a/**/**/b\": redundant \"**\"")
 		})
 
 		t.Run("RedundantStarStarsEnd", func(t *testing.T) {
-			_, err := glob.Compile([]string{"a/**/**"}, nil)
+			_, err := glob.NewNFAFromPatterns([]string{"a/**/**"}, nil)
 			require.EqualError(t, err, "invalid \"includes\" pattern \"a/**/**\": redundant \"**\"")
 		})
 	})
 
 	t.Run("Success", func(t *testing.T) {
 		t.Run("Empty", func(t *testing.T) {
-			nfa, err := glob.Compile(nil, nil)
+			nfa, err := glob.NewNFAFromPatterns(nil, nil)
 			require.NoError(t, err)
-			require.Equal(t, []byte{0x80}, nfa)
+			require.Equal(t, []byte{0x80}, nfa.Bytes())
 		})
 
 		t.Run("LiteralFilename", func(t *testing.T) {
-			nfa, err := glob.Compile([]string{"hello"}, nil)
+			nfa, err := glob.NewNFAFromPatterns([]string{"hello"}, nil)
 			require.NoError(t, err)
 			require.Equal(t, []byte{
 				/*       */ 0x90, 'h',
@@ -57,20 +57,20 @@ func TestCompile(t *testing.T) {
 				/* hel   */ 0x90, 'l',
 				/* hell  */ 0x90, 'o',
 				/* hello */ 0x81,
-			}, nfa)
+			}, nfa.Bytes())
 		})
 
 		t.Run("Star", func(t *testing.T) {
-			nfa, err := glob.Compile([]string{"*"}, nil)
+			nfa, err := glob.NewNFAFromPatterns([]string{"*"}, nil)
 			require.NoError(t, err)
 			require.Equal(t, []byte{
 				/*   */ 0x84,
 				/* * */ 0x81,
-			}, nfa)
+			}, nfa.Bytes())
 		})
 
 		t.Run("MultipleStars", func(t *testing.T) {
-			nfa, err := glob.Compile([]string{"*a*b*c*"}, nil)
+			nfa, err := glob.NewNFAFromPatterns([]string{"*a*b*c*"}, nil)
 			require.NoError(t, err)
 			require.Equal(t, []byte{
 				/*         */ 0x84,
@@ -81,11 +81,11 @@ func TestCompile(t *testing.T) {
 				/* ꘎a꘎b꘎   */ 0x90, 'c',
 				/* ꘎a꘎b꘎c  */ 0x84,
 				/* ꘎a꘎b꘎c꘎ */ 0x81,
-			}, nfa)
+			}, nfa.Bytes())
 		})
 
 		t.Run("MultipleStarStars", func(t *testing.T) {
-			nfa, err := glob.Compile([]string{"a/**/b/**/c"}, nil)
+			nfa, err := glob.NewNFAFromPatterns([]string{"a/**/b/**/c"}, nil)
 			require.NoError(t, err)
 			require.Equal(t, []byte{
 				/*             */ 0x90, 'a',
@@ -96,7 +96,7 @@ func TestCompile(t *testing.T) {
 				/* a/꘎꘎/b/     */ 0x88,
 				/* a/꘎꘎/b/꘎꘎/  */ 0x90, 'c',
 				/* a/꘎꘎/b/꘎꘎/c */ 0x81,
-			}, nfa)
+			}, nfa.Bytes())
 		})
 
 		t.Run("StarStar", func(t *testing.T) {
@@ -104,20 +104,20 @@ func TestCompile(t *testing.T) {
 			// not a bare "**". Solve this by converting it
 			// to "**/*. For consistency with Bazel, the
 			// root directory should not be matched.
-			nfa, err := glob.Compile([]string{"**"}, nil)
+			nfa, err := glob.NewNFAFromPatterns([]string{"**"}, nil)
 			require.NoError(t, err)
 			require.Equal(t, []byte{
 				/*      */ 0x88,
 				/* ꘎꘎/  */ 0x84,
 				/* ꘎꘎/꘎ */ 0x81,
-			}, nfa)
+			}, nfa.Bytes())
 		})
 
 		t.Run("StarStarAtEnd", func(t *testing.T) {
 			// If a pattern ends with "/**", we translate it
 			// to "/**/*". For consistency with Bazel, the
 			// final directory should also be matched.
-			nfa, err := glob.Compile([]string{"hello/**"}, nil)
+			nfa, err := glob.NewNFAFromPatterns([]string{"hello/**"}, nil)
 			require.NoError(t, err)
 			require.Equal(t, []byte{
 				/*            */ 0x90, 'h',
@@ -129,11 +129,11 @@ func TestCompile(t *testing.T) {
 				/* hello/     */ 0x88,
 				/* hello/꘎꘎/  */ 0x84,
 				/* hello/꘎꘎/꘎ */ 0x81,
-			}, nfa)
+			}, nfa.Bytes())
 		})
 
 		t.Run("Prefix", func(t *testing.T) {
-			nfa, err := glob.Compile([]string{
+			nfa, err := glob.NewNFAFromPatterns([]string{
 				"good",
 				"goodbye",
 			}, nil)
@@ -147,11 +147,11 @@ func TestCompile(t *testing.T) {
 				/* goodb   */ 0x90, 'y',
 				/* goodby  */ 0x90, 'e',
 				/* goodbye */ 0x81,
-			}, nfa)
+			}, nfa.Bytes())
 		})
 
 		t.Run("Branch1", func(t *testing.T) {
-			nfa, err := glob.Compile(
+			nfa, err := glob.NewNFAFromPatterns(
 				[]string{"goodbye"},
 				[]string{"good work"},
 			)
@@ -170,13 +170,13 @@ func TestCompile(t *testing.T) {
 				/* goodbye   */ 0x81,
 				/* good␣wor  */ 0x90, 'k',
 				/* good␣work */ 0x82,
-			}, nfa)
+			}, nfa.Bytes())
 		})
 
 		t.Run("Branch2", func(t *testing.T) {
 			// Swapping the strings around should not affect
 			// the order in which states are returned.
-			nfa, err := glob.Compile(
+			nfa, err := glob.NewNFAFromPatterns(
 				[]string{"good work"},
 				[]string{"goodbye"},
 			)
@@ -195,11 +195,11 @@ func TestCompile(t *testing.T) {
 				/* goodbye   */ 0x82,
 				/* good␣wor  */ 0x90, 'k',
 				/* good␣work */ 0x81,
-			}, nfa)
+			}, nfa.Bytes())
 		})
 
 		t.Run("FileExtensions", func(t *testing.T) {
-			nfa, err := glob.Compile(
+			nfa, err := glob.NewNFAFromPatterns(
 				[]string{
 					"*.h",
 					"*.H",
@@ -242,7 +242,7 @@ func TestCompile(t *testing.T) {
 				/* ꘎.tcc */ 0x81,
 				/* ꘎.tlh */ 0x81,
 				/* ꘎.tli */ 0x81,
-			}, nfa)
+			}, nfa.Bytes())
 		})
 	})
 }
