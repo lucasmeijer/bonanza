@@ -195,6 +195,7 @@
       },
       "Glob": {
          "dependsOn": [
+            "DirectoryReaders",
             "FilesInPackage"
          ]
       },

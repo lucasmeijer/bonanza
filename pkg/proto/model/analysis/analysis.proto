@@ -372,6 +372,9 @@ message Glob {
     // Set of relative paths below the package's directory that are
     // matched by one or more of the include patterns and none of the
     // exclude patterns.
+    //
+    // Paths are sorted alphabetically, with the '/' character having no
+    // special meaning.
     repeated string matched_paths = 1;
   }
 }

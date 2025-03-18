@@ -13,11 +13,8 @@ import (
 const (
 	maxRuneBits = 21
 
-	stateBits1 = (64 - 21) / 2
-	stateMask1 = 1<<stateBits1 - 1
-
-	stateBits2 = 2 * stateBits1
-	stateMask2 = 1<<stateBits2 - 1
+	stateBits = (64 - 21) / 2
+	stateMask = 1<<stateBits - 1
 )
 
 func init() {
@@ -26,6 +23,17 @@ func init() {
 	}
 }
 
+// endState indicates whether a given state of the nondeterministic
+// finite automaton is an end state (i.e., a state in which parsing
+// terminates).
+type endState int
+
+const (
+	endStateNone     endState = 0
+	endStatePositive endState = 1
+	endStateNegative endState = 2
+)
+
 // state keeps track of all properties of a state of the NFA for parsing
 // glob patterns.
 type state struct {
@@ -33,89 +41,114 @@ type state struct {
 	// whether the current state is an end state. This field holds
 	// the following data:
 	//
-	//   - Bottom bits: If non-zero, the current state has an
-	//     outgoing edge for wildcard "*". The index of the target
-	//     state is provided.
+	// - Bits 0 to 20: If non-zero, the current state has an
+	//   outgoing edge for wildcard "*". The index of the target
+	//   state is provided.
 	//
-	//   - Middle bits: If non-zero, the current state has an
-	//     outgoing edge for wildcard "**/". The index of the target
-	//     state is provided.
+	// - Bits 21 to 41: If non-zero, the current state has an
+	//   outgoing edge for wildcard "**/". The index of the target
+	//   state is provided.
 	//
-	//   - Top bits: Whether the current state is an end state.
+	// - Bit 42: Whether this state or any of its successive
+	//   states are a positive end state. If not set, attempts to
+	//   patch paths may return early.
+	//
+	// - Bits 43 and 44: Whether the current state is an end state.
 	wildcards uint64
 
 	// Outgoing edge transitions for regular characters. These are
 	// stored in the form of a linked list, where each state
 	// references its sibling. This fields holds the following data:
 	//
-	// - Bottom bits: If non-zero, the current state has one or more
+	// - Bits 0 to 20: If non-zero, the current state has one or more
 	//   outgoing references for non-wildcard characters. The index
 	//   of the state associated with the first outgoing edge is
 	//   provided.
 	//
-	// - Middle bits: If non-zero, the parent state has multiple
+	// - Bits 21 to 41: If non-zero, the parent state has multiple
 	//   outgoing references for non-wildcard characters. The index
 	//   of the next sibling of the current state is provided.
 	//
-	// - Top bits: The rune associated with the outgoing edge
+	// - Bits 42 to 62: The rune associated with the outgoing edge
 	//   pointing from the parent state to the current state.
 	runes uint64
 }
 
-func (s *state) getEndState() int {
-	return int(s.wildcards >> stateBits2)
-}
-
-func (s *state) setEndState(endState int) {
-	s.wildcards = s.wildcards&stateMask2 | uint64(endState)<<stateBits2
-}
-
 func (s *state) getStarIndex() uint32 {
-	return uint32(s.wildcards & stateMask1)
+	return uint32(s.wildcards & stateMask)
 }
 
 func (s *state) setStarIndex(i uint32) {
-	s.wildcards = s.wildcards&^stateMask1 | uint64(i)
+	s.wildcards = s.wildcards&^stateMask | uint64(i)
 }
 
 func (s *state) getStarStarSlashIndex() uint32 {
-	return uint32(s.wildcards >> stateBits1 & stateMask1)
+	return uint32(s.wildcards >> stateBits & stateMask)
 }
 
 func (s *state) setStarStarSlashIndex(i uint32) {
-	s.wildcards = s.wildcards&^(stateMask1<<stateBits1) | (uint64(i) << stateBits1)
+	s.wildcards = s.wildcards&^(stateMask<<stateBits) | (uint64(i) << stateBits)
+}
+
+func (s *state) propagateHasPositiveEndState(states []state) {
+	const hasPositiveEndState = 1 << (2 * stateBits)
+	if s.getEndState() == endStatePositive ||
+		states[s.getStarIndex()].getHasPositiveEndState() ||
+		states[s.getStarStarSlashIndex()].getHasPositiveEndState() {
+		s.wildcards |= hasPositiveEndState
+		return
+	}
+	for index := s.getFirstRuneIndex(); index != 0; index = states[index].getNextRuneIndex() {
+		if states[index].getHasPositiveEndState() {
+			s.wildcards |= hasPositiveEndState
+			return
+		}
+	}
+}
+
+func (s *state) getHasPositiveEndState() bool {
+	return s.wildcards&(1<<(2*stateBits)) != 0
+}
+
+func (s *state) getEndState() endState {
+	return endState(s.wildcards >> (2*stateBits + 1))
+}
+
+func (s *state) setEndState(endState endState) {
+	const shift = 2*stateBits + 1
+	s.wildcards = s.wildcards&(1<<shift-1) | uint64(endState)<<shift
 }
 
 func (s *state) getCurrentRune() rune {
-	return rune(s.runes >> stateBits2)
+	return rune(s.runes >> (2 * stateBits))
 }
 
 func (s *state) initializeRune(r rune, nextRuneIndex uint32) {
-	s.runes = (uint64(r) << stateBits2) | uint64(nextRuneIndex)<<stateBits1
+	s.runes = (uint64(r) << (2 * stateBits)) | uint64(nextRuneIndex)<<stateBits
 }
 
 func (s *state) getFirstRuneIndex() uint32 {
-	return uint32(s.runes & stateMask1)
+	return uint32(s.runes & stateMask)
 }
 
 func (s *state) setFirstRuneIndex(i uint32) {
-	s.runes = s.runes&^stateMask1 | uint64(i)
+	s.runes = s.runes&^stateMask | uint64(i)
 }
 
 func (s *state) getNextRuneIndex() uint32 {
-	return uint32(s.runes >> stateBits1 & stateMask1)
+	return uint32(s.runes >> stateBits & stateMask)
 }
 
 func (s *state) setNextRuneIndex(i uint32) {
-	s.runes = s.runes&^(stateMask1<<stateBits1) | (uint64(i) << stateBits1)
+	s.runes = s.runes&^(stateMask<<stateBits) | (uint64(i) << stateBits)
 }
 
 // addState attaches a new state to the NFA that is being constructed.
 // The newly created state has no outgoing edges.
 func addState(states *[]state) (uint32, error) {
 	i := uint32(len(*states))
-	if i > stateMask1 {
-		return 0, fmt.Errorf("patterns require more than %d states to represent", stateMask1)
+	if i > stateMask {
+		return 0, fmt.Errorf("patterns require more than %d states to represent", stateMask)
 	}
 	*states = append(*states, state{})
 	return i, nil
@@ -183,7 +216,7 @@ func getOrAddStarStarSlash(states *[]state, currentState uint32) (uint32, error)
 	return i, nil
 }
 
-func addPattern(states *[]state, pattern string, endState int) error {
+func addPattern(states *[]state, pattern string, endState endState) error {
 	// Walk over the pattern and add states to the NFA for each
 	// construct we encounter.
 	gotRunes := false
@@ -308,14 +341,18 @@ type NFA struct {
 func NewNFAFromPatterns(includes, excludes []string) (*NFA, error) {
 	states := []state{{}}
 	for _, pattern := range includes {
-		if err := addPattern(&states, pattern, 1); err != nil {
+		if err := addPattern(&states, pattern, endStatePositive); err != nil {
 			return nil, fmt.Errorf("invalid \"includes\" pattern %#v: %w", pattern, err)
 		}
 	}
 	for _, pattern := range excludes {
-		if err := addPattern(&states, pattern, 2); err != nil {
+		if err := addPattern(&states, pattern, endStateNegative); err != nil {
 			return nil, fmt.Errorf("invalid \"excludes\" pattern %#v: %w", pattern, err)
 		}
+	}
+
+	for currentState := len(states) - 1; currentState > 0; currentState-- {
+		states[currentState].propagateHasPositiveEndState(states)
 	}
 	return &NFA{states: states}, nil
 }
@@ -324,10 +361,11 @@ func NewNFAFromPatterns(includes, excludes []string) (*NFA, error) {
 // that is capable of matching paths from a previously generated binary
 // representation.
 func NewNFAFromBytes(b []byte) (*NFA, error) {
-	if len(b) > stateMask1 {
-		return nil, fmt.Errorf("NFA may require more than %d states to represent", stateMask1)
+	if len(b) > stateMask {
+		return nil, fmt.Errorf("NFA may require more than %d states to represent", stateMask)
 	}
 
+	// Perform a forward pass to ingest all states.
 	states := []state{{}}
 	for currentState := 0; currentState < len(states); currentState++ {
 		// Consume the tag of the state.
@@ -338,7 +376,7 @@ func NewNFAFromBytes(b []byte) (*NFA, error) {
 		b = b[n:]
 
 		// Create new states for wildcards "*" and "**/".
-		states[currentState].setEndState(int(tag & 0x3))
+		states[currentState].setEndState(endState(tag & 0x3))
 		if tag&(1<<2) != 0 {
 			states[currentState].setStarIndex(uint32(len(states)))
 			states = append(states, state{})
@@ -368,6 +406,11 @@ func NewNFAFromBytes(b []byte) (*NFA, error) {
 				states[len(states)-1].initializeRune(r, uint32(len(states)))
 			}
 		}
+	}
+
+	// Perform a backward pass to propagate state properties.
+	for currentState := len(states) - 1; currentState > 0; currentState-- {
+		states[currentState].propagateHasPositiveEndState(states)
 	}
 	return &NFA{states: states}, nil
 }
@@ -404,7 +447,6 @@ func (nfa *NFA) Bytes() []byte {
 		for i := s.getFirstRuneIndex(); i != 0; i = nfa.states[i].getNextRuneIndex() {
 			out = utf8.AppendRune(out, nfa.states[i].getCurrentRune())
 		}
-
 	}
 	return out
 }
