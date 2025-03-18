@@ -9,6 +9,7 @@ ConstraintValueInfo = provider()
 DebugPackageInfo = provider()
 DeclaredToolchainInfo = provider()
 ExecutionInfo = provider()
+FeatureFlagInfo = provider()
 FilesToRunProvider = provider()
 InstrumentedFilesInfo = provider()
 OutputGroupInfo = provider(dict_like = True)
@@ -69,6 +70,13 @@ def _template_variable_info_init(variables):
     return {"variables": variables}
 
 TemplateVariableInfo, _TemplateVariableInfoRaw = provider(init = _template_variable_info_init)
+
+def _cc_libc_top_alias_impl(ctx):
+    fail("TODO")
+
+cc_libc_top_alias = rule(
+    implementation = _cc_libc_top_alias_impl,
+)
 
 def _cc_proto_library_impl(ctx):
     fail("TODO")
@@ -970,6 +978,7 @@ def builtins_json_encode_indent(x, **kwargs):
 
 exported_rules = {
     "alias": native.alias,
+    "cc_libc_top_alias": cc_libc_top_alias,
     "cc_proto_library": cc_proto_library,
     "cc_toolchain_suite": cc_toolchain_suite,
     "config_setting": config_setting,
@@ -1004,6 +1013,7 @@ exported_toplevels = {
     "ProguardSpecProvider": ProguardSpecProvider,
     "PyInfo": PyInfo,
     "config_common": struct(
+        FeatureFlagInfo = FeatureFlagInfo,
         toolchain_type = config_common.toolchain_type,
     ),
     "coverage_common": struct(
