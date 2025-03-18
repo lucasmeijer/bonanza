@@ -572,7 +572,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 		ruleTarget := targetKind.RuleTarget
 		ruleIdentifier, err := label.NewCanonicalStarlarkIdentifier(ruleTarget.RuleIdentifier)
 		if err != nil {
-			return PatchedConfiguredTargetValue{}, evaluation.ErrMissingDependency
+			return PatchedConfiguredTargetValue{}, err
 		}
 
 		allBuiltinsModulesNames := e.GetBuiltinsModuleNamesValue(&model_analysis_pb.BuiltinsModuleNames_Key{})
@@ -2114,7 +2114,7 @@ func (tc *toolchainContext[TReference, TMetadata]) Get(thread *starlark.Thread, 
 			execGroupDefinition.ExecCompatibleWith,
 		)
 		if err != nil {
-			return nil, true, evaluation.ErrMissingDependency
+			return nil, true, err
 		}
 		configurationReference := model_core.NewPatchedMessageFromExistingCaptured(
 			rc.environment,
