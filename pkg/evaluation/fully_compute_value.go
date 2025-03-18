@@ -306,6 +306,9 @@ func FullyComputeValue[TReference object.BasicReference, TMetadata any](
 		}
 		err = ks.value.compute(ctx, c, &e)
 		if err != nil {
+			if p.err != nil {
+				err = p.err
+			}
 			if !errors.Is(err, ErrMissingDependency) {
 				fmt.Printf("\n")
 
