@@ -887,11 +887,14 @@ func decodeList_Elements[TReference object.BasicReference, TMetadata model_core.
 			options.valueDecodingOptions,
 		)
 		if err != nil {
-			return err
+			return fmt.Errorf("index %d: %w", options.out.Len(), err)
 		}
 		if err := options.out.Append(value); err != nil {
 			return err
 		}
 	}
-	return errIter
+	if errIter != nil {
+		return fmt.Errorf("failed to iterate list: %w", errIter)
+	}
+	return nil
 }

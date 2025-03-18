@@ -1001,17 +1001,17 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 							valueDecodingOptions,
 						)
 						if err != nil {
-							return PatchedConfiguredTargetValue{}, err
+							return PatchedConfiguredTargetValue{}, fmt.Errorf("decode value part: %w", err)
 						}
 						if isScalar && mayHaveMultipleConfigurations {
 							decodedPart = starlark.NewList([]starlark.Value{decodedPart})
 						}
 						if err := concatenateAttrValueParts(thread, &attrValue, decodedPart); err != nil {
-							return PatchedConfiguredTargetValue{}, err
+							return PatchedConfiguredTargetValue{}, fmt.Errorf("concatenate attr value parts: %w", err)
 						}
 						if mayHaveMultipleConfigurations {
 							if err := concatenateAttrValueParts(thread, &splitAttrEntry, decodedPart); err != nil {
-								return PatchedConfiguredTargetValue{}, err
+								return PatchedConfiguredTargetValue{}, fmt.Errorf("concatenate split attr value parts: %w", err)
 							}
 						}
 					}
@@ -1036,7 +1036,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 					filesDepset := model_starlark.NewDepsetFromList[TReference, TMetadata](filesDepsetElements, model_starlark_pb.Depset_DEFAULT)
 					files, err := filesDepset.ToList(thread)
 					if err != nil {
-						return PatchedConfiguredTargetValue{}, err
+						return PatchedConfiguredTargetValue{}, fmt.Errorf("converting files depset to list: %w", err)
 					}
 					files.Freeze()
 					if allowSingleFile {
