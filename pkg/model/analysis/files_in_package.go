@@ -60,8 +60,8 @@ func (d *currentPackageLimitingDirectory[TReference]) ReadDir() ([]filesystem.Fi
 	for len(directories) > 0 || len(files) > 0 || len(symlinks) > 0 {
 		if len(directories) > 0 {
 			entry := directories[0]
-			if (len(files) == 0 || strings.Compare(entry.Name, files[0].Name) < 0) &&
-				(len(symlinks) == 0 || strings.Compare(entry.Name, symlinks[0].Name) < 0) {
+			if (len(files) == 0 || entry.Name < files[0].Name) &&
+				(len(symlinks) == 0 || entry.Name < symlinks[0].Name) {
 				// Report directory if it is not a package.
 				childDirectory, err := model_filesystem.DirectoryNodeGetContents(
 					d.options.context,
@@ -94,7 +94,7 @@ func (d *currentPackageLimitingDirectory[TReference]) ReadDir() ([]filesystem.Fi
 
 		if len(files) > 0 {
 			entry := files[0]
-			if len(symlinks) == 0 || strings.Compare(entry.Name, symlinks[0].Name) < 0 {
+			if len(symlinks) == 0 || entry.Name < symlinks[0].Name {
 				// Report regular file.
 				name, ok := path.NewComponent(entry.Name)
 				if !ok {
