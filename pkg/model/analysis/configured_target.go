@@ -897,7 +897,6 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 				splitAttrValue = starlark.NewDict(len(transition.Message.Entries))
 			}
 
-			allowFiles := labelOptions.AllowFiles
 			var filesDepsetElements []any
 
 			if len(transition.Message.Entries) == 0 {
@@ -969,73 +968,69 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 							}
 							providerInstances := model_core.NewNestedMessage(configuredTarget, configuredTarget.Message.ProviderInstances)
 
-							if len(allowFiles) > 0 || executable {
-								defaultInfoProviderIdentifierStr := defaultInfoProviderIdentifier.String()
-								defaultInfoIndex, ok := sort.Find(
-									len(providerInstances.Message),
-									func(i int) int {
-										return strings.Compare(defaultInfoProviderIdentifierStr, providerInstances.Message[i].ProviderInstanceProperties.GetProviderIdentifier())
-									},
+							defaultInfoProviderIdentifierStr := defaultInfoProviderIdentifier.String()
+							defaultInfoIndex, ok := sort.Find(
+								len(providerInstances.Message),
+								func(i int) int {
+									return strings.Compare(defaultInfoProviderIdentifierStr, providerInstances.Message[i].ProviderInstanceProperties.GetProviderIdentifier())
+								},
+							)
+							if !ok {
+								return nil, fmt.Errorf("target with label %#v did not yield provider %#v", resolvedLabelStr, defaultInfoProviderIdentifierStr)
+							}
+
+							files, err := model_starlark.GetStructFieldValue(
+								ctx,
+								c.valueReaders.List,
+								model_core.NewNestedMessage(providerInstances, providerInstances.Message[defaultInfoIndex].Fields),
+								"files",
+							)
+							if err != nil {
+								return nil, fmt.Errorf("failed to obtain field \"files\" of DefaultInfo provider of target with label %#v: %w", resolvedLabelStr, err)
+							}
+							valueDepset, ok := files.Message.Kind.(*model_starlark_pb.Value_Depset)
+							if !ok {
+								return nil, fmt.Errorf("field \"files\" of DefaultInfo provider of target with label %#v is not a depset", resolvedLabelStr)
+							}
+							for _, element := range valueDepset.Depset.Elements {
+								// TODO: Validate extensions.
+								filesDepsetElements = append(filesDepsetElements, model_core.NewNestedMessage(files, element))
+							}
+
+							if executable {
+								filesToRun, err := model_starlark.GetStructFieldValue(
+									ctx,
+									c.valueReaders.List,
+									model_core.NewNestedMessage(providerInstances, providerInstances.Message[defaultInfoIndex].Fields),
+									"files_to_run",
 								)
+								if err != nil {
+									return nil, fmt.Errorf("failed to obtain field \"files\" of DefaultInfo provider of target with label %#v: %w", resolvedLabelStr, err)
+								}
+								filesToRunStruct, ok := filesToRun.Message.Kind.(*model_starlark_pb.Value_Struct)
 								if !ok {
-									return nil, fmt.Errorf("target with label %#v did not yield provider %#v", resolvedLabelStr, defaultInfoProviderIdentifierStr)
+									return nil, fmt.Errorf("field \"files_to_run\" of DefaultInfo provider of target with label %#v is not a struct", resolvedLabelStr)
 								}
-
-								if len(allowFiles) > 0 {
-									files, err := model_starlark.GetStructFieldValue(
-										ctx,
-										c.valueReaders.List,
-										model_core.NewNestedMessage(providerInstances, providerInstances.Message[defaultInfoIndex].Fields),
-										"files",
-									)
-									if err != nil {
-										return nil, fmt.Errorf("failed to obtain field \"files\" of DefaultInfo provider of target with label %#v: %w", resolvedLabelStr, err)
-									}
-									valueDepset, ok := files.Message.Kind.(*model_starlark_pb.Value_Depset)
-									if !ok {
-										return nil, fmt.Errorf("field \"files\" of DefaultInfo provider of target with label %#v is not a depset", resolvedLabelStr)
-									}
-									for _, element := range valueDepset.Depset.Elements {
-										// TODO: Validate extensions.
-										filesDepsetElements = append(filesDepsetElements, model_core.NewNestedMessage(files, element))
-									}
+								executableField, err := model_starlark.GetStructFieldValue(
+									ctx,
+									c.valueReaders.List,
+									model_core.NewNestedMessage(filesToRun, filesToRunStruct.Struct.Fields),
+									"executable",
+								)
+								if err != nil {
+									return nil, fmt.Errorf("failed to obtain field \"files_to_run.executable\" of DefaultInfo provider of target with label %#v: %w", resolvedLabelStr, err)
 								}
-
-								if executable {
-									filesToRun, err := model_starlark.GetStructFieldValue(
-										ctx,
-										c.valueReaders.List,
-										model_core.NewNestedMessage(providerInstances, providerInstances.Message[defaultInfoIndex].Fields),
-										"files_to_run",
-									)
-									if err != nil {
-										return nil, fmt.Errorf("failed to obtain field \"files\" of DefaultInfo provider of target with label %#v: %w", resolvedLabelStr, err)
-									}
-									filesToRunStruct, ok := filesToRun.Message.Kind.(*model_starlark_pb.Value_Struct)
-									if !ok {
-										return nil, fmt.Errorf("field \"files_to_run\" of DefaultInfo provider of target with label %#v is not a struct", resolvedLabelStr)
-									}
-									executableField, err := model_starlark.GetStructFieldValue(
-										ctx,
-										c.valueReaders.List,
-										model_core.NewNestedMessage(filesToRun, filesToRunStruct.Struct.Fields),
-										"executable",
-									)
-									if err != nil {
-										return nil, fmt.Errorf("failed to obtain field \"files_to_run.executable\" of DefaultInfo provider of target with label %#v: %w", resolvedLabelStr, err)
-									}
-									decodedExecutable, err := model_starlark.DecodeValue[TReference, TMetadata](
-										executableField,
-										/* currentIdentifier = */ nil,
-										c.getValueDecodingOptions(ctx, func(resolvedLabel label.ResolvedLabel) (starlark.Value, error) {
-											return model_starlark.NewLabel[TReference, TMetadata](resolvedLabel), nil
-										}),
-									)
-									if err != nil {
-										return nil, fmt.Errorf("decode field \"files_to_run.executable\" of DefaultInfo provider of target with label %#v: %w", resolvedLabelStr, err)
-									}
-									executableValues[namedAttr.Name] = decodedExecutable
+								decodedExecutable, err := model_starlark.DecodeValue[TReference, TMetadata](
+									executableField,
+									/* currentIdentifier = */ nil,
+									c.getValueDecodingOptions(ctx, func(resolvedLabel label.ResolvedLabel) (starlark.Value, error) {
+										return model_starlark.NewLabel[TReference, TMetadata](resolvedLabel), nil
+									}),
+								)
+								if err != nil {
+									return nil, fmt.Errorf("decode field \"files_to_run.executable\" of DefaultInfo provider of target with label %#v: %w", resolvedLabelStr, err)
 								}
+								executableValues[namedAttr.Name] = decodedExecutable
 							}
 
 							return model_starlark.NewTargetReference[TReference, TMetadata](canonicalLabel.AsResolved(), providerInstances), nil
@@ -1081,25 +1076,23 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 					splitAttrValues[namedAttr.Name] = splitAttrValue
 				}
 
-				if len(allowFiles) > 0 {
-					filesDepset := model_starlark.NewDepsetFromList[TReference, TMetadata](filesDepsetElements, model_starlark_pb.Depset_DEFAULT)
-					files, err := filesDepset.ToList(thread)
-					if err != nil {
-						return PatchedConfiguredTargetValue{}, fmt.Errorf("converting files depset to list: %w", err)
+				filesDepset := model_starlark.NewDepsetFromList[TReference, TMetadata](filesDepsetElements, model_starlark_pb.Depset_DEFAULT)
+				files, err := filesDepset.ToList(thread)
+				if err != nil {
+					return PatchedConfiguredTargetValue{}, fmt.Errorf("converting files depset to list: %w", err)
+				}
+				files.Freeze()
+				if allowSingleFile {
+					switch l := files.Len(); l {
+					case 0:
+						fileValues[namedAttr.Name] = starlark.None
+					case 1:
+						fileValues[namedAttr.Name] = files.Index(0)
+					default:
+						return PatchedConfiguredTargetValue{}, fmt.Errorf("attr %#v has allow_single_file=True, but its value expands to %d targets", namedAttr.Name, l)
 					}
-					files.Freeze()
-					if allowSingleFile {
-						switch l := files.Len(); l {
-						case 0:
-							fileValues[namedAttr.Name] = starlark.None
-						case 1:
-							fileValues[namedAttr.Name] = files.Index(0)
-						default:
-							return PatchedConfiguredTargetValue{}, fmt.Errorf("attr %#v has allow_single_file=True, but its value expands to %d targets", namedAttr.Name, l)
-						}
-					} else {
-						filesValues[namedAttr.Name] = files
-					}
+				} else {
+					filesValues[namedAttr.Name] = files
 				}
 			}
 		}
