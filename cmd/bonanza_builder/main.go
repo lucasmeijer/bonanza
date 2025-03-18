@@ -167,6 +167,25 @@ type referenceWrappingParsedObjectReader struct {
 }
 
 func (r *referenceWrappingParsedObjectReader) ReadParsedObject(ctx context.Context, reference builderReference) (model_core.Message[[]byte, builderReference], error) {
+	if contents := reference.embeddedMetadata.contents; contents != nil {
+		// Object has not been written to storage yet.
+		// Return the copy that lives in memory.
+		//
+		// TODO: We should return some kind of hint to indicate
+		// that the caller is not permitted to cache this!
+		degree := contents.GetDegree()
+		outgoingReferences := make(object.OutgoingReferencesList[builderReference], 0, degree)
+		children := reference.embeddedMetadata.children
+		for i := range degree {
+			outgoingReferences = append(outgoingReferences, builderReference{
+				LocalReference:   contents.GetOutgoingReference(i),
+				embeddedMetadata: children[i],
+			})
+		}
+		return model_core.NewMessage(contents.GetPayload(), outgoingReferences), nil
+	}
+
+	// Read object from storage.
 	m, err := r.base.ReadParsedObject(ctx, reference.GetLocalReference())
 	if err != nil {
 		return model_core.Message[[]byte, builderReference]{}, err
@@ -184,6 +203,7 @@ func (r *referenceWrappingParsedObjectReader) ReadParsedObject(ctx context.Conte
 
 type builderReference struct {
 	object.LocalReference
+	embeddedMetadata builderReferenceMetadata
 }
 
 type builderReferenceMetadata struct {
@@ -219,12 +239,18 @@ func (builderObjectCapturer) CaptureCreatedObject(createdObject model_core.Creat
 	}
 }
 
-func (builderObjectCapturer) CaptureExistingObject(builderReference) builderReferenceMetadata {
+func (builderObjectCapturer) CaptureExistingObject(reference builderReference) builderReferenceMetadata {
+	if reference.embeddedMetadata.contents != nil {
+		return reference.embeddedMetadata
+	}
 	return builderReferenceMetadata{}
 }
 
 func (builderObjectCapturer) PeekCapturedObject(reference object.LocalReference, metadata builderReferenceMetadata) builderReference {
-	panic("TODO")
+	return builderReference{
+		LocalReference:   reference,
+		embeddedMetadata: metadata,
+	}
 }
 
 type builderExecutor struct {
@@ -278,7 +304,9 @@ func (e *builderExecutor) Execute(ctx context.Context, action *model_build_pb.Ac
 					),
 				},
 			),
-			builderReference{buildSpecificationReference},
+			builderReference{
+				LocalReference: buildSpecificationReference,
+			},
 			buildSpecificationEncoder,
 			e.httpClient,
 			e.filePool,
@@ -306,7 +334,7 @@ func (e *builderExecutor) Execute(ctx context.Context, action *model_build_pb.Ac
 					// to upload is memory backed.
 					object.Unlimited,
 				); err != nil {
-					return nil, fmt.Errorf("failed to store DAG with reference %e: %w", localReference.String(), err)
+					return nil, fmt.Errorf("failed to store DAG with reference %s: %w", localReference.String(), err)
 				}
 				storedReferences = append(storedReferences, builderReference{
 					LocalReference: localReference,
