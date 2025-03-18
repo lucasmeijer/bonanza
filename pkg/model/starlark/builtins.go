@@ -1119,8 +1119,6 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 						return nil, err
 					}
 
-					sort.Strings(include)
-					sort.Strings(exclude)
 					targetNames, err := globExpander.(GlobExpander)(include, exclude, excludeDirectories == 0)
 					if err != nil {
 						return nil, err
