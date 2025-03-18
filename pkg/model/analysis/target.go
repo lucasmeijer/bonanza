@@ -47,7 +47,7 @@ func (c *baseComputer[TReference, TMetadata]) lookupTargetDefinitionInTargetList
 	if definition == nil {
 		return model_core.Message[*model_starlark_pb.Target_Definition, TReference]{}, errors.New("target does not have a definition")
 	}
-	return model_core.NewNestedMessage(targetList, definition), nil
+	return model_core.NewNestedMessage(target, definition), nil
 }
 
 func (c *baseComputer[TReference, TMetadata]) ComputeTargetValue(ctx context.Context, key *model_analysis_pb.Target_Key, e TargetEnvironment[TReference, TMetadata]) (PatchedTargetValue, error) {
