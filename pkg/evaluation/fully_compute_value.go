@@ -53,11 +53,19 @@ func appendFormattedKey[TReference object.BasicReference](out []byte, key model_
 }
 
 type keyState[TReference object.BasicReference, TMetadata any] struct {
-	parent              *keyState[TReference, TMetadata]
-	key                 model_core.Message[proto.Message, TReference]
-	next                *keyState[TReference, TMetadata]
-	value               valueState[TReference, TMetadata]
-	missingDependencies []*keyState[TReference, TMetadata]
+	parent       *keyState[TReference, TMetadata]
+	key          model_core.Message[proto.Message, TReference]
+	next         *keyState[TReference, TMetadata]
+	value        valueState[TReference, TMetadata]
+	blockedCount int
+	blocking     map[*keyState[TReference, TMetadata]]struct{}
+}
+
+func (ks *keyState[TReference, TMetadata]) markBlocked(ksBlocker *keyState[TReference, TMetadata]) {
+	if _, ok := ksBlocker.blocking[ks]; !ok {
+		ksBlocker.blocking[ks] = struct{}{}
+		ks.blockedCount++
+	}
 }
 
 func (ks *keyState[TReference, TMetadata]) getKeyType() string {
@@ -65,21 +73,9 @@ func (ks *keyState[TReference, TMetadata]) getKeyType() string {
 }
 
 func (ks *keyState[TReference, TMetadata]) getDependencyCycle(cyclePath *[]*keyState[TReference, TMetadata], seen map[*keyState[TReference, TMetadata]]int) int {
-	pathLength := len(*cyclePath)
-	for _, ksDep := range ks.missingDependencies {
-		*cyclePath = append(*cyclePath, ksDep)
-		if index, ok := seen[ksDep]; ok {
-			return index
-		}
-		seen[ksDep] = pathLength
-
-		if index := ksDep.getDependencyCycle(cyclePath, seen); index >= 0 {
-			return index
-		}
-
-		*cyclePath = (*cyclePath)[:pathLength]
-		delete(seen, ksDep)
-	}
+	// TODO: Reimplement obtaining dependency cycles, now that we've
+	// changed the direction in which key states reference each
+	// other.
 	return -1
 }
 
@@ -133,11 +129,11 @@ type fullyComputingKeyPool[TReference object.BasicReference, TMetadata any] stru
 	storeValueChildren ValueChildrenStorer[TReference]
 
 	// Variable fields.
-	keys                   map[string]*keyState[TReference, TMetadata]
-	firstPendingKey        *keyState[TReference, TMetadata]
-	lastPendingKey         **keyState[TReference, TMetadata]
-	firstMissingDependency *keyState[TReference, TMetadata]
-	err                    error
+	keys                map[string]*keyState[TReference, TMetadata]
+	firstPendingKey     *keyState[TReference, TMetadata]
+	lastPendingKey      **keyState[TReference, TMetadata]
+	lastKeyWithBlockers *keyState[TReference, TMetadata]
+	err                 error
 }
 
 func (p *fullyComputingKeyPool[TReference, TMetadata]) setError(err error) {
@@ -154,9 +150,8 @@ func (p *fullyComputingKeyPool[TReference, TMetadata]) enqueue(ks *keyState[TRef
 type fullyComputingEnvironment[TReference object.BasicReference, TMetadata any] struct {
 	model_core.ObjectManager[TReference, TMetadata]
 
-	pool                *fullyComputingKeyPool[TReference, TMetadata]
-	keyState            *keyState[TReference, TMetadata]
-	missingDependencies []*keyState[TReference, TMetadata]
+	pool     *fullyComputingKeyPool[TReference, TMetadata]
+	keyState *keyState[TReference, TMetadata]
 }
 
 func (e *fullyComputingEnvironment[TReference, TMetadata]) getKeyState(patchedKey model_core.PatchedMessage[proto.Message, dag.ObjectContentsWalker], vs valueState[TReference, TMetadata]) *keyState[TReference, TMetadata] {
@@ -183,13 +178,13 @@ func (e *fullyComputingEnvironment[TReference, TMetadata]) getKeyState(patchedKe
 	ks, ok := p.keys[keyStr]
 	if !ok {
 		ks = &keyState[TReference, TMetadata]{
-			parent: e.keyState,
-			key:    key,
-			value:  vs,
+			parent:   e.keyState,
+			key:      key,
+			value:    vs,
+			blocking: map[*keyState[TReference, TMetadata]]struct{}{},
 		}
 		p.keys[keyStr] = ks
 		p.enqueue(ks)
-		p.firstMissingDependency = nil
 	}
 	return ks
 }
@@ -201,7 +196,7 @@ func (e *fullyComputingEnvironment[TReference, TMetadata]) GetMessageValue(patch
 	}
 	vs := ks.value.(*messageValueState[TReference, TMetadata])
 	if !vs.value.IsSet() {
-		e.missingDependencies = append(e.missingDependencies, ks)
+		e.keyState.markBlocked(ks)
 	}
 	return vs.value
 }
@@ -213,7 +208,7 @@ func (e *fullyComputingEnvironment[TReference, TMetadata]) GetNativeValue(patche
 	}
 	vs := ks.value.(*nativeValueState[TReference, TMetadata])
 	if !vs.isSet {
-		e.missingDependencies = append(e.missingDependencies, ks)
+		e.keyState.markBlocked(ks)
 		return nil, false
 	}
 	return vs.value, true
@@ -253,7 +248,7 @@ func FullyComputeValue[TReference object.BasicReference, TMetadata any](
 	longestKeyType := 0
 	for !requestedValueState.value.IsSet() {
 		ks := p.firstPendingKey
-		if ks == p.firstMissingDependency {
+		if ks == nil {
 			var stack []*keyState[TReference, TMetadata]
 			traceLongestKeyType := 0
 			for ksIter := ks; ksIter != nil; ksIter = ksIter.parent {
@@ -335,19 +330,22 @@ func FullyComputeValue[TReference object.BasicReference, TMetadata any](
 			}
 			// Value could not be computed, because one of
 			// its dependencies hasn't been computed yet.
-			p.enqueue(ks)
-			if len(e.missingDependencies) == 0 {
+			if ks.blockedCount == 0 {
 				panic("function returned ErrMissingDependency, but no missing dependencies were registered")
-			}
-			ks.missingDependencies = e.missingDependencies
-			if p.firstMissingDependency == nil {
-				p.firstMissingDependency = ks
 			}
 			fmt.Printf("\r\x1b[K")
 		} else {
-			// Successfully computed value.
-			ks.missingDependencies = nil
-			p.firstMissingDependency = nil
+			// Successfully computed value. Unblock any keys
+			// that were waiting on us and enqueue them if
+			// they no longer have any blockers.
+			for ksBlocked := range ks.blocking {
+				ksBlocked.blockedCount--
+				if ksBlocked.blockedCount == 0 {
+					p.enqueue(ksBlocked)
+				}
+			}
+			ks.blocking = nil
+
 			fmt.Printf("\n")
 		}
 	}
