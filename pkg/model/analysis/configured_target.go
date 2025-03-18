@@ -594,10 +594,18 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 
 		thread := c.newStarlarkThread(ctx, e, allBuiltinsModulesNames.Message.BuiltinsModuleNames)
 
+		// Set all common attrs.
+		attrValues := make(map[string]any, len(ruleDefinition.Message.Attrs)+2)
+		attrValues["name"] = starlark.String(targetLabel.GetTargetName().String())
+		tags := make([]starlark.Value, 0, len(ruleTarget.Tags))
+		for _, tag := range ruleTarget.Tags {
+			tags = append(tags, starlark.String(tag))
+		}
+		attrValues["tags"] = starlark.NewList(tags)
+
 		// Obtain all attr values that don't depend on any
 		// configuration, as these need to be provided to any
 		// incoming edge transitions.
-		attrValues := make(map[string]any, len(ruleDefinition.Message.Attrs))
 		ruleTargetPublicAttrValues := ruleTarget.PublicAttrValues
 	GetConfigurationFreeAttrValues:
 		for _, namedAttr := range ruleDefinition.Message.Attrs {
