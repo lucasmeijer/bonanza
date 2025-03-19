@@ -185,16 +185,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeModuleRepoMappingValue(ctx 
 		return PatchedModuleRepoMappingValue{}, err
 	}
 
-	// Add "bazel_tools" implicitly.
 	repos := handler.repos
-	bazelTools := label.MustNewApparentRepo("bazel_tools")
-	if _, ok := repos[bazelTools]; !ok {
-		canonicalRepo := label.MustNewCanonicalRepo("bazel_tools+")
-		repos[bazelTools] = canonicalRepoMapping{
-			canonicalRepo: canonicalRepo,
-		}
-	}
-
 	mappings := make([]*model_analysis_pb.ModuleRepoMapping_Value_Mapping, 0, len(repos))
 	for _, apparentRepo := range slices.SortedFunc(
 		maps.Keys(repos),

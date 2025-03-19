@@ -70,6 +70,8 @@ type parseModuleDotBazelFileEnvironment[TReference object.BasicReference] interf
 	GetFileReaderValue(key *model_analysis_pb.FileReader_Key) (*model_filesystem.FileReader[TReference], bool)
 }
 
+var bazelToolsModule = label.MustNewModule("bazel_tools")
+
 func (c *baseComputer[TReference, TMetadata]) parseModuleDotBazel(ctx context.Context, moduleContentsMsg model_core.Message[*model_filesystem_pb.FileContents, TReference], moduleInstance label.ModuleInstance, e parseModuleDotBazelFileEnvironment[TReference], handler pg_starlark.RootModuleDotBazelHandler) error {
 	fileReader, gotFileReader := e.GetFileReaderValue(&model_analysis_pb.FileReader_Key{})
 	if !gotFileReader {
@@ -88,12 +90,31 @@ func (c *baseComputer[TReference, TMetadata]) parseModuleDotBazel(ctx context.Co
 		return err
 	}
 
-	return pg_starlark.ParseModuleDotBazel(
+	if err := pg_starlark.ParseModuleDotBazel(
 		string(moduleFileContents),
 		moduleTarget,
 		nil,
 		handler,
-	)
+	); err != nil {
+		return err
+	}
+
+	if moduleInstance.GetModule() != bazelToolsModule {
+		// Every module implicitly depends on "bazel_tools". Add
+		// it here, so that @bazel_tools//... works and
+		// bazel_tools+/MODULE.bazel also gets processed.
+		if err := handler.BazelDep(
+			bazelToolsModule,
+			/* version = */ nil,
+			/* maxCompatibilityLevel = */ 0,
+			bazelToolsModule.ToApparentRepo(),
+			/* devDependency = */ false,
+		); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 type visitModuleDotBazelFilesBreadthFirstEnvironment[TReference object.BasicReference] interface {
