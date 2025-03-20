@@ -81,7 +81,7 @@ func (LocalPathExtractingModuleDotBazelHandler) UseExtension(extensionBzlFile la
 	return pg_starlark.NullModuleExtensionProxy, nil
 }
 
-func (LocalPathExtractingModuleDotBazelHandler) UseRepoRule(repoRuleBzlFile label.ApparentLabel, repoRuleName string) (pg_starlark.RepoRuleProxy, error) {
+func (LocalPathExtractingModuleDotBazelHandler) UseRepoRule(repoRuleBzlFile label.ApparentLabel, repoRuleName label.StarlarkIdentifier) (pg_starlark.RepoRuleProxy, error) {
 	return func(name label.ApparentRepo, devDependency bool, attrs map[string]starlark.Value) error {
 		return nil
 	}, nil

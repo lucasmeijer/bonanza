@@ -68,7 +68,7 @@ type ChildModuleDotBazelHandler interface {
 	RegisterExecutionPlatforms(platformTargetPatterns []label.ApparentTargetPattern, devDependency bool) error
 	RegisterToolchains(toolchainTargetPatterns []label.ApparentTargetPattern, devDependency bool) error
 	UseExtension(extensionBzlFile label.ApparentLabel, extensionName label.StarlarkIdentifier, devDependency, isolate bool) (ModuleExtensionProxy, error)
-	UseRepoRule(repoRuleBzlFile label.ApparentLabel, repoRuleName string) (RepoRuleProxy, error)
+	UseRepoRule(repoRuleBzlFile label.ApparentLabel, repoRuleName label.StarlarkIdentifier) (RepoRuleProxy, error)
 }
 
 type overrideIgnoringRootModuleDotBazelHandler struct {
@@ -423,11 +423,11 @@ func ParseModuleDotBazel(contents string, filename label.CanonicalLabel, localPa
 			}),
 			"use_repo_rule": starlark.NewBuiltin("use_repo_rule", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 				var repoRuleBzlFile label.ApparentLabel
-				var repoRuleName string
+				var repoRuleName label.StarlarkIdentifier
 				if err := starlark.UnpackArgs(
 					b.Name(), args, kwargs,
 					"repo_rule_bzl_file", unpack.Bind(thread, &repoRuleBzlFile, unpack.ApparentLabel),
-					"repo_rule_name", unpack.Bind(thread, &repoRuleName, unpack.String),
+					"repo_rule_name", unpack.Bind(thread, &repoRuleName, unpack.StarlarkIdentifier),
 				); err != nil {
 					return nil, err
 				}
@@ -435,7 +435,7 @@ func ParseModuleDotBazel(contents string, filename label.CanonicalLabel, localPa
 				if err != nil {
 					return nil, err
 				}
-				return starlark.NewBuiltin(repoRuleName, func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+				return starlark.NewBuiltin(repoRuleName.String(), func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 					if len(args) > 0 {
 						return nil, fmt.Errorf("%s: got %d positional arguments, want 0", b.Name(), len(args))
 					}

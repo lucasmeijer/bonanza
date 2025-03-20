@@ -155,7 +155,7 @@ func (h *usedModuleExtensionExtractingModuleDotBazelHandler[TReference, TMetadat
 	}, nil
 }
 
-func (usedModuleExtensionExtractingModuleDotBazelHandler[TReference, TMetadata]) UseRepoRule(repoRuleBzlFile label.ApparentLabel, repoRuleName string) (pg_starlark.RepoRuleProxy, error) {
+func (usedModuleExtensionExtractingModuleDotBazelHandler[TReference, TMetadata]) UseRepoRule(repoRuleBzlFile label.ApparentLabel, repoRuleName label.StarlarkIdentifier) (pg_starlark.RepoRuleProxy, error) {
 	return func(name label.ApparentRepo, devDependency bool, attrs map[string]starlark.Value) error {
 		return nil
 	}, nil

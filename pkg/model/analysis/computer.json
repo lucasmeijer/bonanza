@@ -247,6 +247,7 @@
             "FileReader",
             "HttpArchiveContents",
             "HttpFileContents",
+            "ModuleDotBazelContents",
             "RegisteredRepoPlatform",
             "Repo",
             "RootModule",

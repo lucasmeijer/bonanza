@@ -125,14 +125,14 @@ func (h *repoMappingCapturingModuleDotBazelHandler) UseExtension(extensionBzlFil
 	return pg_starlark.NullModuleExtensionProxy, nil
 }
 
-func (h *repoMappingCapturingModuleDotBazelHandler) UseRepoRule(repoRuleBzlFile label.ApparentLabel, repoRuleName string) (pg_starlark.RepoRuleProxy, error) {
+func (h *repoMappingCapturingModuleDotBazelHandler) UseRepoRule(repoRuleBzlFile label.ApparentLabel, repoRuleName label.StarlarkIdentifier) (pg_starlark.RepoRuleProxy, error) {
 	return func(name label.ApparentRepo, devDependency bool, attrs map[string]starlark.Value) error {
 		if devDependency && h.ignoreDevDependencies {
 			return nil
 		}
 		return h.setRepo(name, canonicalRepoMapping{
 			canonicalRepo: h.moduleInstance.
-				GetModuleExtension(label.MustNewStarlarkIdentifier("_repo_rules")).
+				GetModuleExtension(repoRulesExtensionName).
 				GetCanonicalRepoWithModuleExtension(name),
 		})
 	}, nil

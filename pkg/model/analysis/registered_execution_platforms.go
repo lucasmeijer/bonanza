@@ -160,7 +160,7 @@ func (registeredExecutionPlatformExtractingModuleDotBazelHandler[TReference, TMe
 	return pg_starlark.NullModuleExtensionProxy, nil
 }
 
-func (registeredExecutionPlatformExtractingModuleDotBazelHandler[TReference, TMetadata]) UseRepoRule(repoRuleBzlFile label.ApparentLabel, repoRuleName string) (pg_starlark.RepoRuleProxy, error) {
+func (registeredExecutionPlatformExtractingModuleDotBazelHandler[TReference, TMetadata]) UseRepoRule(repoRuleBzlFile label.ApparentLabel, repoRuleName label.StarlarkIdentifier) (pg_starlark.RepoRuleProxy, error) {
 	return func(name label.ApparentRepo, devDependency bool, attrs map[string]starlark.Value) error {
 		return nil
 	}, nil
