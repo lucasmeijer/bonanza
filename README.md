@@ -106,3 +106,7 @@ As this project essentially attempts to provide an alternative to Bazel,
 it has a fairly large scope. Contributions are therefore very much
 appreciated. Be sure to [join `#buildbarn` on Slack](https://github.com/buildbarn#join-us-on-slack)
 to get involved.
+
+## Additional resources
+
+- [Presentation](https://docs.google.com/presentation/d/1uh6CxvvziQunw55e_bs1Juz3jfaiE-QJVs2DCfeMeTw/edit?usp=sharing) at the 2025-03-20 Snowflake Buildbarn meetup.
