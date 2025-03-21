@@ -243,7 +243,7 @@ func TestParseModuleDotBazel(t *testing.T) {
 		gomock.InOrder(
 			handler.EXPECT().UseRepoRule(
 				/* repoRuleBzlFile = */ label.MustNewApparentLabel("@bazel_tools//tools/build_defs/repo:http.bzl"),
-				/* repoRuleName = */ "http_archive",
+				/* repoRuleName = */ label.MustNewStarlarkIdentifier("http_archive"),
 			).Return(proxy4.Call, nil),
 			proxy4.EXPECT().Call(
 				/* name = */ label.MustNewApparentRepo("my_repo_name"),
