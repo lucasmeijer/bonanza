@@ -15,6 +15,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/bluekeyes/go-gitdiff/gitdiff"
 	"github.com/buildbarn/bb-storage/pkg/filesystem"
@@ -1388,6 +1389,27 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doDownloadAndExtrac
 	}), nil
 }
 
+// bytesToValidString converts a byte slice containing UTF-8 encoded
+// characters to a string. If invalid UTF-8 sequences are encountered,
+// U+FFFD is emitted.
+func bytesToValidString(p []byte) string {
+	if utf8.Valid(p) {
+		// Fast path: byte slice is already valid UTF-8.
+		return string(p)
+	}
+
+	// Slow path: byte slice contains one or more invalid sequences.
+	var sb strings.Builder
+	for {
+		r, size := utf8.DecodeRune(p)
+		if size == 0 {
+			return sb.String()
+		}
+		sb.WriteRune(r)
+		p = p[size:]
+	}
+}
+
 func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	mrc.maybeGetCommandEncoder()
 	mrc.maybeGetDirectoryCreationParameters()
@@ -1640,8 +1662,8 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 
 	return model_starlark.NewStructFromDict[TReference, TMetadata](nil, map[string]any{
 		"return_code": starlark.MakeInt64(actionResult.Message.ExitCode),
-		"stderr":      starlark.String(stderr),
-		"stdout":      starlark.String(stdout),
+		"stderr":      starlark.String(bytesToValidString(stderr)),
+		"stdout":      starlark.String(bytesToValidString(stdout)),
 	}), nil
 }
 
