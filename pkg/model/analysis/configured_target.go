@@ -606,6 +606,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 		tagsList := starlark.NewList(tags)
 		attrValues["tags"] = tagsList
 
+		attrValues["testonly"] = starlark.Bool(ruleTarget.InheritableAttrs.GetTestonly())
+
 		edgeTransitionAttrValues := make(map[string]any, len(ruleDefinition.Message.Attrs)+2)
 		for k, v := range attrValues {
 			edgeTransitionAttrValues[k] = v
