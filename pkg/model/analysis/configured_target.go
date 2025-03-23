@@ -596,12 +596,20 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 
 		// Set all common attrs.
 		attrValues := make(map[string]any, len(ruleDefinition.Message.Attrs)+2)
-		attrValues["name"] = starlark.String(targetLabel.GetTargetName().String())
+		name := starlark.String(targetLabel.GetTargetName().String())
+		attrValues["name"] = name
+
 		tags := make([]starlark.Value, 0, len(ruleTarget.Tags))
 		for _, tag := range ruleTarget.Tags {
 			tags = append(tags, starlark.String(tag))
 		}
-		attrValues["tags"] = starlark.NewList(tags)
+		tagsList := starlark.NewList(tags)
+		attrValues["tags"] = tagsList
+
+		edgeTransitionAttrValues := make(map[string]any, len(ruleDefinition.Message.Attrs)+2)
+		for k, v := range attrValues {
+			edgeTransitionAttrValues[k] = v
+		}
 
 		// Obtain all attr values that don't depend on any
 		// configuration, as these need to be provided to any
@@ -616,14 +624,6 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 				}
 				publicAttrValue = ruleTargetPublicAttrValues[0]
 				ruleTargetPublicAttrValues = ruleTargetPublicAttrValues[1:]
-			}
-
-			// Skip types that have values that contain
-			// labels, as those depend on a configuration.
-			switch namedAttr.Attr.GetType().(type) {
-			case *model_starlark_pb.Attr_Label, *model_starlark_pb.Attr_LabelList, *model_starlark_pb.Attr_LabelKeyedStringDict,
-				*model_starlark_pb.Attr_Output, *model_starlark_pb.Attr_OutputList:
-				continue GetConfigurationFreeAttrValues
 			}
 
 			var valueParts []model_core.Message[*model_starlark_pb.Value, TReference]
@@ -673,7 +673,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 					valuePart,
 					/* currentIdentifier = */ nil,
 					c.getValueDecodingOptions(ctx, func(resolvedLabel label.ResolvedLabel) (starlark.Value, error) {
-						return nil, fmt.Errorf("value of attr %#v contains labels, which is not expected for this type", namedAttr.Name)
+						return model_starlark.NewLabel[TReference, TMetadata](resolvedLabel), nil
 					}),
 				)
 				if err != nil {
@@ -684,7 +684,17 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 				}
 			}
 			attrValue.Freeze()
-			attrValues[namedAttr.Name] = attrValue
+
+			switch namedAttr.Attr.GetType().(type) {
+			case *model_starlark_pb.Attr_Label, *model_starlark_pb.Attr_LabelList, *model_starlark_pb.Attr_LabelKeyedStringDict,
+				*model_starlark_pb.Attr_Output, *model_starlark_pb.Attr_OutputList:
+				// Don't set these, as they depend on
+				// the configuration.
+			default:
+				attrValues[namedAttr.Name] = attrValue
+			}
+
+			edgeTransitionAttrValues[namedAttr.Name] = attrValue
 		}
 		if l := len(ruleTargetPublicAttrValues); l != 0 {
 			return PatchedConfiguredTargetValue{}, fmt.Errorf("rule target has %d more public attr values than the rule definition has public attrs", l)
@@ -698,7 +708,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 				e,
 				cfgTransitionIdentifier,
 				configurationReference,
-				model_starlark.NewStructFromDict[TReference, TMetadata](nil, attrValues),
+				model_starlark.NewStructFromDict[TReference, TMetadata](nil, edgeTransitionAttrValues),
 			)
 			if err != nil {
 				return PatchedConfiguredTargetValue{}, err
@@ -790,6 +800,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 			}
 			attrValue.Freeze()
 			attrValues[namedAttr.Name] = attrValue
+			edgeTransitionAttrValues[namedAttr.Name] = attrValue
 
 			switch namedAttr.Attr.GetType().(type) {
 			case *model_starlark_pb.Attr_Output:
@@ -818,7 +829,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 		filesValues := map[string]any{}
 		splitAttrValues := map[string]any{}
 		ruleTargetPublicAttrValues = ruleTarget.PublicAttrValues
-		nonLabelAttrValues := model_starlark.NewStructFromDict[TReference, TMetadata](nil, attrValues)
+		edgeTransitionAttrValuesStruct := model_starlark.NewStructFromDict[TReference, TMetadata](nil, edgeTransitionAttrValues)
 	GetLabelAttrValues:
 		for _, namedAttr := range ruleDefinition.Message.Attrs {
 			var publicAttrValue *model_starlark_pb.RuleTarget_PublicAttrValue
@@ -881,7 +892,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 			// Perform outgoing edge transition. User
 			// defined transitions get access to all
 			// non-label attr values.
-			patchedTransition, mayHaveMultipleConfigurations, err := c.performTransition(ctx, e, labelOptions.Cfg, configurationReference, nonLabelAttrValues)
+			patchedTransition, mayHaveMultipleConfigurations, err := c.performTransition(ctx, e, labelOptions.Cfg, configurationReference, edgeTransitionAttrValuesStruct)
 			if err != nil {
 				if errors.Is(err, evaluation.ErrMissingDependency) {
 					missingDependencies = true
