@@ -4,3 +4,8 @@ filegroup(
     name = "collect_cc_coverage",
     srcs = ["collect_cc_coverage.sh"],
 )
+
+alias(
+    name = "lcov_merger",
+    actual = "@remote_coverage_tools//:lcov_merger",
+)

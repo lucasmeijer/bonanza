@@ -8,3 +8,6 @@ bazel_dep(name = "rules_shell")
 
 xcode_configure = use_extension("//tools/osx:xcode_configure.bzl", "xcode_configure_extension")
 use_repo(xcode_configure, "local_config_xcode")
+
+remote_coverage_tools_extension = use_extension("//tools/test:extensions.bzl", "remote_coverage_tools_extension")
+use_repo(remote_coverage_tools_extension, "remote_coverage_tools")
