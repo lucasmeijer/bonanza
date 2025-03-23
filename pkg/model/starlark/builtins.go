@@ -1358,6 +1358,7 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 				var subrules []*Subrule[TReference, TMetadata]
 				test := false
 				var toolchains []*ToolchainType[TReference, TMetadata]
+				skylarkTestable := false
 				if err := starlark.UnpackArgs(
 					b.Name(), args, kwargs,
 					// Positional arguments.
@@ -1378,6 +1379,7 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 					"subrules?", unpack.Bind(thread, &subrules, unpack.List(unpack.Type[*Subrule[TReference, TMetadata]]("subrule"))),
 					"test?", unpack.Bind(thread, &test, unpack.Bool),
 					"toolchains?", unpack.Bind(thread, &toolchains, unpack.List(toolchainTypeUnpackerInto)),
+					"_skylark_testable?", unpack.Bind(thread, &skylarkTestable, unpack.Bool),
 				); err != nil {
 					return nil, err
 				}
