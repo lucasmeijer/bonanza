@@ -53,7 +53,8 @@
          "dependsOn": [
             "ConfiguredTarget",
             "RegisteredToolchainsForType",
-            "Target"
+            "Target",
+            "VisibleTarget"
          ],
          "keyContainsReferences": true
       },
