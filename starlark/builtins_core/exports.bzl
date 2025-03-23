@@ -356,6 +356,9 @@ def _test_suite_impl(ctx):
 
 test_suite = rule(
     _test_suite_impl,
+    attrs = {
+        "tests": attr.string_list(),
+    },
 )
 
 def _toolchain_impl(ctx):
