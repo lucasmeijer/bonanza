@@ -1253,10 +1253,10 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 		// Convert list of providers to a map where the provider
 		// identifier is the key.
 		providerInstancesByIdentifier := make(map[label.CanonicalStarlarkIdentifier]*model_starlark.Struct[TReference, TMetadata], len(providerInstances))
-		for _, providerInstance := range providerInstances {
+		for i, providerInstance := range providerInstances {
 			providerIdentifier, err := providerInstance.GetProviderIdentifier()
 			if err != nil {
-				return PatchedConfiguredTargetValue{}, err
+				return PatchedConfiguredTargetValue{}, fmt.Errorf("struct returned at index %d: %w", i, err)
 			}
 			if _, ok := providerInstancesByIdentifier[providerIdentifier]; ok {
 				return PatchedConfiguredTargetValue{}, fmt.Errorf("implementation function returned multiple structs for provider %#v", providerIdentifier.String())
