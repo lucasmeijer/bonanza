@@ -258,7 +258,19 @@ func (c *baseComputer[TReference, TMetadata]) ComputeVisibleTargetValue(ctx cont
 			if !ok {
 				return PatchedVisibleTargetValue{}, errors.New("build setting override is not a valid leaf")
 			}
-			labelValue, ok := leaf.Leaf.Value.GetKind().(*model_starlark_pb.Value_Label)
+			value := leaf.Leaf.Value
+			if listValue, ok := value.GetKind().(*model_starlark_pb.Value_List); ok {
+				elements := listValue.List.Elements
+				if len(elements) != 1 {
+					return PatchedVisibleTargetValue{}, errors.New("build setting override value is not a single element list")
+				}
+				listLeaf, ok := elements[0].Level.(*model_starlark_pb.List_Element_Leaf)
+				if !ok {
+					return PatchedVisibleTargetValue{}, errors.New("build setting override value is not a list")
+				}
+				value = listLeaf.Leaf
+			}
+			labelValue, ok := value.GetKind().(*model_starlark_pb.Value_Label)
 			if !ok {
 				return PatchedVisibleTargetValue{}, errors.New("build setting override value is not a label")
 			}

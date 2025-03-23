@@ -26,3 +26,11 @@ func (ui *singletonUnpackerInto[T]) UnpackInto(thread *starlark.Thread, v starla
 	*dst = instance[:]
 	return nil
 }
+
+func (ui *singletonUnpackerInto[T]) Canonicalize(thread *starlark.Thread, v starlark.Value) (starlark.Value, error) {
+	element, err := ui.UnpackerInto.Canonicalize(thread, v)
+	if err != nil {
+		return nil, err
+	}
+	return starlark.NewList([]starlark.Value{element}), nil
+}

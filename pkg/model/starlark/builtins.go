@@ -115,6 +115,7 @@ func labelSetting[TReference object.BasicReference, TMetadata model_core.Cloneab
 
 	var name string
 	var buildSettingDefault string
+	singletonList := false
 	var visibility []pg_label.ResolvedLabel
 	labelOrStringUnpackerInto := NewLabelOrStringUnpackerInto[TReference, TMetadata](currentPackage)
 	if err := starlark.UnpackArgs(
@@ -124,6 +125,11 @@ func labelSetting[TReference object.BasicReference, TMetadata model_core.Cloneab
 		// None to implement command line flags that don't point
 		// to anything by default.
 		"build_setting_default", unpack.Bind(thread, &buildSettingDefault, unpack.IfNotNone(unpack.Stringer(labelOrStringUnpackerInto))),
+		// Extension: --platforms is a list at the command line
+		// level, but it can only be set to a single value at a
+		// time during analysis. As part of transitions it still
+		// needs to be set to a singleton list.
+		"singleton_list?", unpack.Bind(thread, &singletonList, unpack.Bool),
 		"visibility?", unpack.Bind(thread, &visibility, unpack.IfNotNone(unpack.List(labelOrStringUnpackerInto))),
 	); err != nil {
 		return nil, err
@@ -142,6 +148,7 @@ func labelSetting[TReference object.BasicReference, TMetadata model_core.Cloneab
 					LabelSetting: &model_starlark_pb.LabelSetting{
 						BuildSettingDefault: buildSettingDefault,
 						Flag:                flag,
+						SingletonList:       singletonList,
 						Visibility:          visibilityPackageGroup.Message,
 					},
 				},
@@ -690,6 +697,24 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 						return nil, err
 					}
 					return NewBuildSetting(IntBuildSettingType, flag), nil
+				},
+			),
+			"label_list": starlark.NewBuiltin(
+				"config.label_list",
+				func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+					if len(args) > 0 {
+						return nil, fmt.Errorf("%s: got %d positional arguments, want 0", b.Name(), len(args))
+					}
+					flag := false
+					repeatable := false
+					if err := starlark.UnpackArgs(
+						b.Name(), args, kwargs,
+						"flag?", unpack.Bind(thread, &flag, unpack.Bool),
+						"repeatable?", unpack.Bind(thread, &repeatable, unpack.Bool),
+					); err != nil {
+						return nil, err
+					}
+					return NewBuildSetting(NewLabelListBuildSettingType[TReference, TMetadata](repeatable), flag), nil
 				},
 			),
 			"none": starlark.NewBuiltin(

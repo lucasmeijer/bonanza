@@ -748,12 +748,14 @@ func DecodeAttrType[TReference any, TMetadata model_core.CloneableReferenceMetad
 	}
 }
 
-func DecodeBuildSettingType(buildSetting *model_starlark_pb.BuildSetting) (BuildSettingType, error) {
+func DecodeBuildSettingType[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](buildSetting *model_starlark_pb.BuildSetting) (BuildSettingType, error) {
 	switch buildSettingTypeInfo := buildSetting.Type.(type) {
 	case *model_starlark_pb.BuildSetting_Bool:
 		return BoolBuildSettingType, nil
 	case *model_starlark_pb.BuildSetting_Int:
 		return IntBuildSettingType, nil
+	case *model_starlark_pb.BuildSetting_LabelList:
+		return NewLabelListBuildSettingType[TReference, TMetadata](buildSettingTypeInfo.LabelList.Repeatable), nil
 	case *model_starlark_pb.BuildSetting_String_:
 		return StringBuildSettingType, nil
 	case *model_starlark_pb.BuildSetting_StringList:
@@ -763,8 +765,8 @@ func DecodeBuildSettingType(buildSetting *model_starlark_pb.BuildSetting) (Build
 	}
 }
 
-func decodeBuildSetting(buildSetting *model_starlark_pb.BuildSetting) (*BuildSetting, error) {
-	buildSettingType, err := DecodeBuildSettingType(buildSetting)
+func decodeBuildSetting[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](buildSetting *model_starlark_pb.BuildSetting) (*BuildSetting, error) {
+	buildSettingType, err := DecodeBuildSettingType[TReference, TMetadata](buildSetting)
 	if err != nil {
 		return nil, err
 	}

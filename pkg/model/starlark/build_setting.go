@@ -3,6 +3,8 @@ package starlark
 import (
 	"fmt"
 
+	pg_label "github.com/buildbarn/bonanza/pkg/label"
+	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
 	"github.com/buildbarn/bonanza/pkg/starlark/unpack"
 
@@ -54,7 +56,7 @@ func (bs *BuildSetting) Encode() *model_starlark_pb.BuildSetting {
 type BuildSettingType interface {
 	Type() string
 	Encode(out *model_starlark_pb.BuildSetting)
-	GetCanonicalizer() unpack.Canonicalizer
+	GetCanonicalizer(currentPackage pg_label.CanonicalPackage) unpack.Canonicalizer
 }
 
 type boolBuildSettingType struct{}
@@ -71,7 +73,7 @@ func (boolBuildSettingType) Encode(out *model_starlark_pb.BuildSetting) {
 	}
 }
 
-func (boolBuildSettingType) GetCanonicalizer() unpack.Canonicalizer {
+func (boolBuildSettingType) GetCanonicalizer(currentPackage pg_label.CanonicalPackage) unpack.Canonicalizer {
 	return unpack.Bool
 }
 
@@ -89,8 +91,34 @@ func (intBuildSettingType) Encode(out *model_starlark_pb.BuildSetting) {
 	}
 }
 
-func (intBuildSettingType) GetCanonicalizer() unpack.Canonicalizer {
+func (intBuildSettingType) GetCanonicalizer(currentPackage pg_label.CanonicalPackage) unpack.Canonicalizer {
 	return unpack.Int[int32]()
+}
+
+type labelListBuildSettingType[TReference any, TMetadata model_core.CloneableReferenceMetadata] struct {
+	repeatable bool
+}
+
+func NewLabelListBuildSettingType[TReference any, TMetadata model_core.CloneableReferenceMetadata](repeatable bool) BuildSettingType {
+	return labelListBuildSettingType[TReference, TMetadata]{
+		repeatable: repeatable,
+	}
+}
+
+func (labelListBuildSettingType[TReference, TMetadata]) Type() string {
+	return "label_list"
+}
+
+func (bst labelListBuildSettingType[TReference, TMetadata]) Encode(out *model_starlark_pb.BuildSetting) {
+	out.Type = &model_starlark_pb.BuildSetting_LabelList{
+		LabelList: &model_starlark_pb.BuildSetting_ListType{
+			Repeatable: bst.repeatable,
+		},
+	}
+}
+
+func (labelListBuildSettingType[TReference, TMetadata]) GetCanonicalizer(currentPackage pg_label.CanonicalPackage) unpack.Canonicalizer {
+	return unpack.List(NewLabelOrStringUnpackerInto[TReference, TMetadata](currentPackage))
 }
 
 type stringBuildSettingType struct{}
@@ -107,7 +135,7 @@ func (stringBuildSettingType) Encode(out *model_starlark_pb.BuildSetting) {
 	}
 }
 
-func (stringBuildSettingType) GetCanonicalizer() unpack.Canonicalizer {
+func (stringBuildSettingType) GetCanonicalizer(currentPackage pg_label.CanonicalPackage) unpack.Canonicalizer {
 	return unpack.String
 }
 
@@ -127,12 +155,12 @@ func (stringListBuildSettingType) Type() string {
 
 func (bst stringListBuildSettingType) Encode(out *model_starlark_pb.BuildSetting) {
 	out.Type = &model_starlark_pb.BuildSetting_StringList{
-		StringList: &model_starlark_pb.BuildSetting_StringListType{
+		StringList: &model_starlark_pb.BuildSetting_ListType{
 			Repeatable: bst.repeatable,
 		},
 	}
 }
 
-func (stringListBuildSettingType) GetCanonicalizer() unpack.Canonicalizer {
+func (stringListBuildSettingType) GetCanonicalizer(currentPackage pg_label.CanonicalPackage) unpack.Canonicalizer {
 	return unpack.List(unpack.String)
 }

@@ -182,7 +182,11 @@ func (r *rule[TReference, TMetadata]) CallInternal(thread *starlark.Thread, args
 		mandatoryUnpackers = append(
 			mandatoryUnpackers,
 			"build_setting_default",
-			unpack.Bind(thread, &buildSettingDefault, unpack.Canonicalize(buildSetting.buildSettingType.GetCanonicalizer())),
+			unpack.Bind(
+				thread,
+				&buildSettingDefault,
+				unpack.Canonicalize(buildSetting.buildSettingType.GetCanonicalizer(currentPackage)),
+			),
 		)
 	}
 
@@ -613,7 +617,7 @@ func (rd *protoRuleDefinition[TReference, TMetadata]) GetBuildSetting(thread *st
 	if buildSettingMessage == nil {
 		return nil, nil
 	}
-	return decodeBuildSetting(buildSettingMessage)
+	return decodeBuildSetting[TReference, TMetadata](buildSettingMessage)
 }
 
 func (rd *protoRuleDefinition[TReference, TMetadata]) GetInitializer(thread *starlark.Thread) (*NamedFunction[TReference, TMetadata], error) {

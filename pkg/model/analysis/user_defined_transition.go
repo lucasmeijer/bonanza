@@ -333,11 +333,15 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx c
 			case *model_starlark_pb.Target_Definition_LabelSetting:
 				// Build setting is a label_setting() or
 				// label_flag().
-				buildSettingDefault, err := label.NewResolvedLabel(targetKind.LabelSetting.BuildSettingDefault)
+				buildSettingDefaultLabel, err := label.NewResolvedLabel(targetKind.LabelSetting.BuildSettingDefault)
 				if err != nil {
 					return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("invalid build setting default for label setting %#v: %w", visibleBuildSettingLabel)
 				}
-				if err := inputs.SetKey(thread, starlark.String(input), model_starlark.NewLabel[TReference, TMetadata](buildSettingDefault)); err != nil {
+				buildSettingDefault := model_starlark.NewLabel[TReference, TMetadata](buildSettingDefaultLabel)
+				if targetKind.LabelSetting.SingletonList {
+					buildSettingDefault = starlark.NewList([]starlark.Value{buildSettingDefault})
+				}
+				if err := inputs.SetKey(thread, starlark.String(input), buildSettingDefault); err != nil {
 					return performUserDefinedTransitionResult[TMetadata]{}, err
 				}
 			case *model_starlark_pb.Target_Definition_RuleTarget:
@@ -417,7 +421,20 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx c
 		switch targetKind := targetValue.Message.Definition.GetKind().(type) {
 		case *model_starlark_pb.Target_Definition_LabelSetting:
 			// Build setting is a label_setting() or label_flag().
-			canonicalizer = model_starlark.NewLabelOrStringUnpackerInto[TReference, TMetadata](transitionPackage)
+			labelSettingUnpackerInto := model_starlark.NewLabelOrStringUnpackerInto[TReference, TMetadata](transitionPackage)
+			if targetKind.LabelSetting.SingletonList {
+				canonicalizer = unpack.Or([]unpack.UnpackerInto[[]label.ResolvedLabel]{
+					unpack.Singleton(labelSettingUnpackerInto),
+					// This allows us to set this
+					// build setting to a list with
+					// multiple values, which is not
+					// what we want. Add a custom
+					// unpacker to forbid this.
+					unpack.List(labelSettingUnpackerInto),
+				})
+			} else {
+				canonicalizer = labelSettingUnpackerInto
+			}
 			defaultValue = model_core.NewSimpleMessage[TReference](
 				&model_starlark_pb.Value{
 					Kind: &model_starlark_pb.Value_Label{
@@ -448,11 +465,11 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx c
 			if ruleDefinition.Definition.BuildSetting == nil {
 				return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("rule %#v used by build setting %#v does not have \"build_setting\" set", targetKind.RuleTarget.RuleIdentifier, visibleBuildSettingLabel)
 			}
-			buildSettingType, err := model_starlark.DecodeBuildSettingType(ruleDefinition.Definition.BuildSetting)
+			buildSettingType, err := model_starlark.DecodeBuildSettingType[TReference, TMetadata](ruleDefinition.Definition.BuildSetting)
 			if err != nil {
 				return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("failed to decode build setting type for rule %#v used by build setting %#v: %w", targetKind.RuleTarget.RuleIdentifier, visibleBuildSettingLabel, err)
 			}
-			canonicalizer = buildSettingType.GetCanonicalizer()
+			canonicalizer = buildSettingType.GetCanonicalizer(transitionPackage)
 			defaultValue = model_core.NewNestedMessage(targetValue, targetKind.RuleTarget.BuildSettingDefault)
 		default:
 			return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("target %#v is not a label setting or rule target", visibleBuildSettingLabel)

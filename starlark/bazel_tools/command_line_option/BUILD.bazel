@@ -1,4 +1,7 @@
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag", "string_list_flag")
+load(":settings.bzl", "label_list_flag")
+
+package(default_visibility = ["//visibility:public"])
 
 bool_flag(
     name = "experimental_prefer_mutual_xcode",
@@ -95,6 +98,11 @@ bool_flag(
     visibility = ["//visibility:public"],
 )
 
+label_list_flag(
+    name = "extra_execution_platforms",
+    build_setting_default = [],
+)
+
 label_flag(
     name = "fdo_optimize",
     build_setting_default = None,
@@ -188,6 +196,7 @@ string_flag(
 label_flag(
     name = "platforms",
     build_setting_default = "@platforms//host",
+    singleton_list = True,
     visibility = ["//visibility:public"],
 )
 

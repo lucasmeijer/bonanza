@@ -209,7 +209,7 @@ message BuildSetting {
   // Whether or not this build setting is callable on the command line.
   bool flag = 1;
 
-  message StringListType {
+  message ListType {
     // If set, instead of expecting a comma-separated value, this flag
     // is allowed to be set multiple times on the command line with each
     // individual value treated as a single string to add to the list
@@ -227,11 +227,14 @@ message BuildSetting {
     // Accept int32 values.
     google.protobuf.Empty int = 3;
 
+    // Accept []Label values.
+    ListType label_list = 4;
+
     // Accept string values.
-    google.protobuf.Empty string = 4;
+    google.protobuf.Empty string = 5;
 
     // Accept []string values.
-    StringListType string_list = 5;
+    ListType string_list = 6;
   }
 }
 
@@ -407,9 +410,13 @@ message LabelSetting {
   // Whether the setting can be controlled via a command line flag.
   bool flag = 2;
 
+  // Even though the build setting can only be set to a single label, as
+  // part of user defined transitions it is expected to be a list.
+  bool singleton_list = 3;
+
   // The visibility of the label setting, which may differ from the
   // visibility of the target to which the label setting.
-  PackageGroup visibility = 3;
+  PackageGroup visibility = 4;
 }
 
 message List {
