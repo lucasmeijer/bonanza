@@ -1031,6 +1031,7 @@ exported_toplevels = {
         indent = json.indent,
     ),
     "platform_common": struct(
+        ConstraintValueInfo = ConstraintValueInfo,
         TemplateVariableInfo = TemplateVariableInfo,
         ToolchainInfo = ToolchainInfo,
     ),
