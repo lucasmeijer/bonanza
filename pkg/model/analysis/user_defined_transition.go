@@ -493,6 +493,12 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx c
 		/* kwargs = */ nil,
 	)
 	if err != nil {
+		if !errors.Is(err, evaluation.ErrMissingDependency) && !errors.Is(err, errTransitionDependsOnAttrs) {
+			var evalErr *starlark.EvalError
+			if errors.As(err, &evalErr) {
+				return performUserDefinedTransitionResult[TMetadata]{}, errors.New(evalErr.Backtrace())
+			}
+		}
 		return performUserDefinedTransitionResult[TMetadata]{}, err
 	}
 
