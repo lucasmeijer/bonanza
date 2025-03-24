@@ -964,7 +964,7 @@ def builtins_internal_java_common_internal_do_not_use_get_runtime_classpath_for_
     return "TODO"
 
 def builtins_internal_java_common_internal_do_not_use_incompatible_disable_non_executable_java_binary():
-    return "TODO"
+    return False
 
 def builtins_internal_java_common_internal_do_not_use_target_kind():
     return "TODO"
