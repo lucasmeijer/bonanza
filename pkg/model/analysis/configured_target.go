@@ -1675,7 +1675,7 @@ func (ruleContext[TReference, TMetadata]) doRunfiles(thread *starlark.Thread, b 
 	), nil
 }
 
-func (ruleContext[TReference, TMetadata]) doTargetPlatformHasConstraint(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+func (rc *ruleContext[TReference, TMetadata]) doTargetPlatformHasConstraint(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("%s: got %d positional arguments, want 1", b.Name(), len(args))
 	}
@@ -1687,7 +1687,78 @@ func (ruleContext[TReference, TMetadata]) doTargetPlatformHasConstraint(thread *
 		return nil, err
 	}
 
-	return nil, errors.New("TODO: Implement target platform has constraint")
+	labelUnpackerInto := model_starlark.NewLabelOrStringUnpackerInto[TReference, TMetadata](model_starlark.CurrentFilePackage(thread, 1))
+
+	// Obtain the label of the provided constraint value.
+	constraintValueLabelValue, err := constraintValue.Attr(thread, "label")
+	if err != nil {
+		return nil, errors.New("\"label\" attribute of constraint value")
+	}
+	var constraintValueLabel label.ResolvedLabel
+	if err := labelUnpackerInto.UnpackInto(thread, constraintValueLabelValue, &constraintValueLabel); err != nil {
+		return nil, errors.New("\"label\" attribute of constraint value")
+	}
+
+	// Obtain the label of the constraint setting.
+	constraintSetting, err := constraintValue.Attr(thread, "constraint")
+	if err != nil {
+		return nil, err
+	}
+	constraintSettingAttrs, ok := constraintSetting.(starlark.HasAttrs)
+	if !ok {
+		return nil, errors.New("\"constraint\" attribute of constraint value is not a struct")
+	}
+	constraintSettingLabelValue, err := constraintSettingAttrs.Attr(thread, "label")
+	if err != nil {
+		return nil, errors.New("\"constraint.label\" attribute of constraint value")
+	}
+	var constraintSettingLabel label.ResolvedLabel
+	if err := labelUnpackerInto.UnpackInto(thread, constraintSettingLabelValue, &constraintSettingLabel); err != nil {
+		return nil, errors.New("\"constraint.label\" attribute of constraint value")
+	}
+
+	// Obtain constraints of the target platform.
+	platformInfoProvider, err := getTargetPlatformInfoProvider(rc.environment, rc.configurationReference)
+	if err != nil {
+		return nil, err
+	}
+	platformConstraints, err := model_starlark.GetStructFieldValue(rc.context, rc.computer.valueReaders.List, platformInfoProvider, "constraints")
+	if err != nil {
+		return nil, err
+	}
+	platformConstraintsDict, ok := platformConstraints.Message.GetKind().(*model_starlark_pb.Value_Dict)
+	if !ok {
+		return nil, errors.New("\"constraints\" attribute of target platform's PlatformInfo is not a dict")
+	}
+
+	// Check whether the provided constraint setting is present on
+	// the target platform. If so, check whether the provided
+	// constraint value matches.
+	constraintSettingLabelStr := constraintSettingLabel.String()
+	var errIter error
+	for platformConstraintSetting, platformConstraintValue := range model_starlark.AllDictLeafEntries(
+		rc.context,
+		rc.computer.valueReaders.Dict,
+		model_core.NewNestedMessage(platformConstraints, platformConstraintsDict.Dict),
+		&errIter,
+	) {
+		platformConstraintSettingLabel, ok := platformConstraintSetting.Message.GetKind().(*model_starlark_pb.Value_Label)
+		if !ok {
+			return nil, errors.New("key in \"constraints\" attribute of target platform's PlatformInfo dict is not a label")
+		}
+		if platformConstraintSettingLabel.Label == constraintSettingLabelStr {
+			platformConstraintValueLabel, ok := platformConstraintValue.Message.GetKind().(*model_starlark_pb.Value_Label)
+			if !ok {
+				return nil, fmt.Errorf("value of \"constraints\" attribute %#v of target platform's PlatformInfo dict is not a label", platformConstraintValueLabel.Label)
+			}
+			return starlark.Bool(platformConstraintValueLabel.Label == constraintValueLabel.String()), nil
+		}
+	}
+	if errIter != nil {
+		return nil, fmt.Errorf("failed to iterate platform constraints: %w", errIter)
+	}
+
+	return nil, errors.New("TODO: Check whether constraint value is equal to its default")
 }
 
 type ruleContextActions[TReference object.BasicReference, TMetadata BaseComputerReferenceMetadata] struct {
