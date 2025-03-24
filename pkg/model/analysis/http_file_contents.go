@@ -46,6 +46,9 @@ ProcessURLs:
 				downloadedFile.Close()
 				return PatchedHttpFileContentsValue{}, err
 			}
+			for _, entry := range key.FetchOptions.GetHeaders() {
+				req.Header.Set(entry.Name, entry.Value)
+			}
 
 			resp, err := c.httpClient.Do(req)
 			if err != nil {

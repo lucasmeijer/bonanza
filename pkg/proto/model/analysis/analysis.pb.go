@@ -1025,10 +1025,11 @@ func (*Glob) Descriptor() ([]byte, []int) {
 }
 
 type HttpFetchOptions struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Urls          []string               `protobuf:"bytes,1,rep,name=urls,proto3" json:"urls,omitempty"`
-	Integrity     string                 `protobuf:"bytes,2,opt,name=integrity,proto3" json:"integrity,omitempty"`
-	AllowFail     bool                   `protobuf:"varint,3,opt,name=allow_fail,json=allowFail,proto3" json:"allow_fail,omitempty"`
+	state         protoimpl.MessageState     `protogen:"open.v1"`
+	Urls          []string                   `protobuf:"bytes,1,rep,name=urls,proto3" json:"urls,omitempty"`
+	Integrity     string                     `protobuf:"bytes,2,opt,name=integrity,proto3" json:"integrity,omitempty"`
+	AllowFail     bool                       `protobuf:"varint,3,opt,name=allow_fail,json=allowFail,proto3" json:"allow_fail,omitempty"`
+	Headers       []*HttpFetchOptions_Header `protobuf:"bytes,4,rep,name=headers,proto3" json:"headers,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1082,6 +1083,13 @@ func (x *HttpFetchOptions) GetAllowFail() bool {
 		return x.AllowFail
 	}
 	return false
+}
+
+func (x *HttpFetchOptions) GetHeaders() []*HttpFetchOptions_Header {
+	if x != nil {
+		return x.Headers
+	}
+	return nil
 }
 
 type HttpArchiveContents struct {
@@ -4916,6 +4924,58 @@ func (x *Glob_Value) GetMatchedPaths() []string {
 	return nil
 }
 
+type HttpFetchOptions_Header struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HttpFetchOptions_Header) Reset() {
+	*x = HttpFetchOptions_Header{}
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[116]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HttpFetchOptions_Header) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HttpFetchOptions_Header) ProtoMessage() {}
+
+func (x *HttpFetchOptions_Header) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[116]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HttpFetchOptions_Header.ProtoReflect.Descriptor instead.
+func (*HttpFetchOptions_Header) Descriptor() ([]byte, []int) {
+	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{26, 0}
+}
+
+func (x *HttpFetchOptions_Header) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *HttpFetchOptions_Header) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
 type HttpArchiveContents_Key struct {
 	state         protoimpl.MessageState         `protogen:"open.v1"`
 	FetchOptions  *HttpFetchOptions              `protobuf:"bytes,1,opt,name=fetch_options,json=fetchOptions,proto3" json:"fetch_options,omitempty"`
@@ -4926,7 +4986,7 @@ type HttpArchiveContents_Key struct {
 
 func (x *HttpArchiveContents_Key) Reset() {
 	*x = HttpArchiveContents_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[116]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[117]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4938,7 +4998,7 @@ func (x *HttpArchiveContents_Key) String() string {
 func (*HttpArchiveContents_Key) ProtoMessage() {}
 
 func (x *HttpArchiveContents_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[116]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[117]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4977,7 +5037,7 @@ type HttpArchiveContents_Value struct {
 
 func (x *HttpArchiveContents_Value) Reset() {
 	*x = HttpArchiveContents_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[117]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[118]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4989,7 +5049,7 @@ func (x *HttpArchiveContents_Value) String() string {
 func (*HttpArchiveContents_Value) ProtoMessage() {}
 
 func (x *HttpArchiveContents_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[117]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[118]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5021,7 +5081,7 @@ type HttpFileContents_Key struct {
 
 func (x *HttpFileContents_Key) Reset() {
 	*x = HttpFileContents_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[118]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[119]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5033,7 +5093,7 @@ func (x *HttpFileContents_Key) String() string {
 func (*HttpFileContents_Key) ProtoMessage() {}
 
 func (x *HttpFileContents_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[118]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[119]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5065,7 +5125,7 @@ type HttpFileContents_Value struct {
 
 func (x *HttpFileContents_Value) Reset() {
 	*x = HttpFileContents_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[119]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[120]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5077,7 +5137,7 @@ func (x *HttpFileContents_Value) String() string {
 func (*HttpFileContents_Value) ProtoMessage() {}
 
 func (x *HttpFileContents_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[119]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[120]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5109,7 +5169,7 @@ type HttpFileContents_Value_Exists struct {
 
 func (x *HttpFileContents_Value_Exists) Reset() {
 	*x = HttpFileContents_Value_Exists{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[120]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[121]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5121,7 +5181,7 @@ func (x *HttpFileContents_Value_Exists) String() string {
 func (*HttpFileContents_Value_Exists) ProtoMessage() {}
 
 func (x *HttpFileContents_Value_Exists) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[120]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[121]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5153,7 +5213,7 @@ type ModuleDotBazelContents_Key struct {
 
 func (x *ModuleDotBazelContents_Key) Reset() {
 	*x = ModuleDotBazelContents_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[121]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[122]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5165,7 +5225,7 @@ func (x *ModuleDotBazelContents_Key) String() string {
 func (*ModuleDotBazelContents_Key) ProtoMessage() {}
 
 func (x *ModuleDotBazelContents_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[121]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[122]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5197,7 +5257,7 @@ type ModuleDotBazelContents_Value struct {
 
 func (x *ModuleDotBazelContents_Value) Reset() {
 	*x = ModuleDotBazelContents_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[122]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[123]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5209,7 +5269,7 @@ func (x *ModuleDotBazelContents_Value) String() string {
 func (*ModuleDotBazelContents_Value) ProtoMessage() {}
 
 func (x *ModuleDotBazelContents_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[122]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[123]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5243,7 +5303,7 @@ type MakeVariables_Key struct {
 
 func (x *MakeVariables_Key) Reset() {
 	*x = MakeVariables_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[123]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[124]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5255,7 +5315,7 @@ func (x *MakeVariables_Key) String() string {
 func (*MakeVariables_Key) ProtoMessage() {}
 
 func (x *MakeVariables_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[123]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[124]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5301,7 +5361,7 @@ type MakeVariables_Value struct {
 
 func (x *MakeVariables_Value) Reset() {
 	*x = MakeVariables_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[124]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[125]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5313,7 +5373,7 @@ func (x *MakeVariables_Value) String() string {
 func (*MakeVariables_Value) ProtoMessage() {}
 
 func (x *MakeVariables_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[124]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[125]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5346,7 +5406,7 @@ type MakeVariables_Value_MakeVariable struct {
 
 func (x *MakeVariables_Value_MakeVariable) Reset() {
 	*x = MakeVariables_Value_MakeVariable{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[125]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[126]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5358,7 +5418,7 @@ func (x *MakeVariables_Value_MakeVariable) String() string {
 func (*MakeVariables_Value_MakeVariable) ProtoMessage() {}
 
 func (x *MakeVariables_Value_MakeVariable) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[125]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[126]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5396,7 +5456,7 @@ type ModuleRegistryUrls_Key struct {
 
 func (x *ModuleRegistryUrls_Key) Reset() {
 	*x = ModuleRegistryUrls_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[126]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[127]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5408,7 +5468,7 @@ func (x *ModuleRegistryUrls_Key) String() string {
 func (*ModuleRegistryUrls_Key) ProtoMessage() {}
 
 func (x *ModuleRegistryUrls_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[126]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[127]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5433,7 +5493,7 @@ type ModuleRegistryUrls_Value struct {
 
 func (x *ModuleRegistryUrls_Value) Reset() {
 	*x = ModuleRegistryUrls_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[127]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[128]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5445,7 +5505,7 @@ func (x *ModuleRegistryUrls_Value) String() string {
 func (*ModuleRegistryUrls_Value) ProtoMessage() {}
 
 func (x *ModuleRegistryUrls_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[127]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[128]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5477,7 +5537,7 @@ type ModuleRepoMapping_Key struct {
 
 func (x *ModuleRepoMapping_Key) Reset() {
 	*x = ModuleRepoMapping_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[128]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[129]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5489,7 +5549,7 @@ func (x *ModuleRepoMapping_Key) String() string {
 func (*ModuleRepoMapping_Key) ProtoMessage() {}
 
 func (x *ModuleRepoMapping_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[128]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[129]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5521,7 +5581,7 @@ type ModuleRepoMapping_Value struct {
 
 func (x *ModuleRepoMapping_Value) Reset() {
 	*x = ModuleRepoMapping_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[129]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[130]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5533,7 +5593,7 @@ func (x *ModuleRepoMapping_Value) String() string {
 func (*ModuleRepoMapping_Value) ProtoMessage() {}
 
 func (x *ModuleRepoMapping_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[129]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[130]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5566,7 +5626,7 @@ type ModuleRepoMapping_Value_Mapping struct {
 
 func (x *ModuleRepoMapping_Value_Mapping) Reset() {
 	*x = ModuleRepoMapping_Value_Mapping{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[130]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[131]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5578,7 +5638,7 @@ func (x *ModuleRepoMapping_Value_Mapping) String() string {
 func (*ModuleRepoMapping_Value_Mapping) ProtoMessage() {}
 
 func (x *ModuleRepoMapping_Value_Mapping) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[130]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[131]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5617,7 +5677,7 @@ type ModuleExtensionRepo_Key struct {
 
 func (x *ModuleExtensionRepo_Key) Reset() {
 	*x = ModuleExtensionRepo_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[131]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[132]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5629,7 +5689,7 @@ func (x *ModuleExtensionRepo_Key) String() string {
 func (*ModuleExtensionRepo_Key) ProtoMessage() {}
 
 func (x *ModuleExtensionRepo_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[131]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[132]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5661,7 +5721,7 @@ type ModuleExtensionRepo_Value struct {
 
 func (x *ModuleExtensionRepo_Value) Reset() {
 	*x = ModuleExtensionRepo_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[132]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[133]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5673,7 +5733,7 @@ func (x *ModuleExtensionRepo_Value) String() string {
 func (*ModuleExtensionRepo_Value) ProtoMessage() {}
 
 func (x *ModuleExtensionRepo_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[132]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[133]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5705,7 +5765,7 @@ type ModuleExtensionRepoNames_Key struct {
 
 func (x *ModuleExtensionRepoNames_Key) Reset() {
 	*x = ModuleExtensionRepoNames_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[133]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[134]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5717,7 +5777,7 @@ func (x *ModuleExtensionRepoNames_Key) String() string {
 func (*ModuleExtensionRepoNames_Key) ProtoMessage() {}
 
 func (x *ModuleExtensionRepoNames_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[133]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[134]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5749,7 +5809,7 @@ type ModuleExtensionRepoNames_Value struct {
 
 func (x *ModuleExtensionRepoNames_Value) Reset() {
 	*x = ModuleExtensionRepoNames_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[134]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[135]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5761,7 +5821,7 @@ func (x *ModuleExtensionRepoNames_Value) String() string {
 func (*ModuleExtensionRepoNames_Value) ProtoMessage() {}
 
 func (x *ModuleExtensionRepoNames_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[134]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[135]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5793,7 +5853,7 @@ type ModuleExtensionRepos_Key struct {
 
 func (x *ModuleExtensionRepos_Key) Reset() {
 	*x = ModuleExtensionRepos_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[135]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[136]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5805,7 +5865,7 @@ func (x *ModuleExtensionRepos_Key) String() string {
 func (*ModuleExtensionRepos_Key) ProtoMessage() {}
 
 func (x *ModuleExtensionRepos_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[135]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[136]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5837,7 +5897,7 @@ type ModuleExtensionRepos_Value struct {
 
 func (x *ModuleExtensionRepos_Value) Reset() {
 	*x = ModuleExtensionRepos_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[136]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[137]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5849,7 +5909,7 @@ func (x *ModuleExtensionRepos_Value) String() string {
 func (*ModuleExtensionRepos_Value) ProtoMessage() {}
 
 func (x *ModuleExtensionRepos_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[136]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[137]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5885,7 +5945,7 @@ type ModuleExtensionRepos_Value_Repo struct {
 
 func (x *ModuleExtensionRepos_Value_Repo) Reset() {
 	*x = ModuleExtensionRepos_Value_Repo{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[137]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[138]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5897,7 +5957,7 @@ func (x *ModuleExtensionRepos_Value_Repo) String() string {
 func (*ModuleExtensionRepos_Value_Repo) ProtoMessage() {}
 
 func (x *ModuleExtensionRepos_Value_Repo) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[137]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[138]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5964,7 +6024,7 @@ type ModuleExtensionRepos_Value_Repo_Parent struct {
 
 func (x *ModuleExtensionRepos_Value_Repo_Parent) Reset() {
 	*x = ModuleExtensionRepos_Value_Repo_Parent{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[138]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[139]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5976,7 +6036,7 @@ func (x *ModuleExtensionRepos_Value_Repo_Parent) String() string {
 func (*ModuleExtensionRepos_Value_Repo_Parent) ProtoMessage() {}
 
 func (x *ModuleExtensionRepos_Value_Repo_Parent) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[138]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[139]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6014,7 +6074,7 @@ type ModuleFinalBuildList_Key struct {
 
 func (x *ModuleFinalBuildList_Key) Reset() {
 	*x = ModuleFinalBuildList_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[139]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[140]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6026,7 +6086,7 @@ func (x *ModuleFinalBuildList_Key) String() string {
 func (*ModuleFinalBuildList_Key) ProtoMessage() {}
 
 func (x *ModuleFinalBuildList_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[139]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[140]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6051,7 +6111,7 @@ type ModuleFinalBuildList_Value struct {
 
 func (x *ModuleFinalBuildList_Value) Reset() {
 	*x = ModuleFinalBuildList_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[140]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[141]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6063,7 +6123,7 @@ func (x *ModuleFinalBuildList_Value) String() string {
 func (*ModuleFinalBuildList_Value) ProtoMessage() {}
 
 func (x *ModuleFinalBuildList_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[140]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[141]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6094,7 +6154,7 @@ type ModuleRoughBuildList_Key struct {
 
 func (x *ModuleRoughBuildList_Key) Reset() {
 	*x = ModuleRoughBuildList_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[141]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[142]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6106,7 +6166,7 @@ func (x *ModuleRoughBuildList_Key) String() string {
 func (*ModuleRoughBuildList_Key) ProtoMessage() {}
 
 func (x *ModuleRoughBuildList_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[141]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[142]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6131,7 +6191,7 @@ type ModuleRoughBuildList_Value struct {
 
 func (x *ModuleRoughBuildList_Value) Reset() {
 	*x = ModuleRoughBuildList_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[142]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[143]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6143,7 +6203,7 @@ func (x *ModuleRoughBuildList_Value) String() string {
 func (*ModuleRoughBuildList_Value) ProtoMessage() {}
 
 func (x *ModuleRoughBuildList_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[142]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[143]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6174,7 +6234,7 @@ type ModulesWithMultipleVersions_Key struct {
 
 func (x *ModulesWithMultipleVersions_Key) Reset() {
 	*x = ModulesWithMultipleVersions_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[143]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[144]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6186,7 +6246,7 @@ func (x *ModulesWithMultipleVersions_Key) String() string {
 func (*ModulesWithMultipleVersions_Key) ProtoMessage() {}
 
 func (x *ModulesWithMultipleVersions_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[143]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[144]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6211,7 +6271,7 @@ type ModulesWithMultipleVersions_Value struct {
 
 func (x *ModulesWithMultipleVersions_Value) Reset() {
 	*x = ModulesWithMultipleVersions_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[144]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[145]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6223,7 +6283,7 @@ func (x *ModulesWithMultipleVersions_Value) String() string {
 func (*ModulesWithMultipleVersions_Value) ProtoMessage() {}
 
 func (x *ModulesWithMultipleVersions_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[144]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[145]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6254,7 +6314,7 @@ type ModulesWithMultipleVersionsObject_Key struct {
 
 func (x *ModulesWithMultipleVersionsObject_Key) Reset() {
 	*x = ModulesWithMultipleVersionsObject_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[145]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[146]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6266,7 +6326,7 @@ func (x *ModulesWithMultipleVersionsObject_Key) String() string {
 func (*ModulesWithMultipleVersionsObject_Key) ProtoMessage() {}
 
 func (x *ModulesWithMultipleVersionsObject_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[145]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[146]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6290,7 +6350,7 @@ type ModulesWithOverrides_Key struct {
 
 func (x *ModulesWithOverrides_Key) Reset() {
 	*x = ModulesWithOverrides_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[146]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[147]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6302,7 +6362,7 @@ func (x *ModulesWithOverrides_Key) String() string {
 func (*ModulesWithOverrides_Key) ProtoMessage() {}
 
 func (x *ModulesWithOverrides_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[146]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[147]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6327,7 +6387,7 @@ type ModulesWithOverrides_Value struct {
 
 func (x *ModulesWithOverrides_Value) Reset() {
 	*x = ModulesWithOverrides_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[147]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[148]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6339,7 +6399,7 @@ func (x *ModulesWithOverrides_Value) String() string {
 func (*ModulesWithOverrides_Value) ProtoMessage() {}
 
 func (x *ModulesWithOverrides_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[147]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[148]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6375,7 +6435,7 @@ type ModuleOverride_SingleVersion struct {
 
 func (x *ModuleOverride_SingleVersion) Reset() {
 	*x = ModuleOverride_SingleVersion{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[148]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[149]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6387,7 +6447,7 @@ func (x *ModuleOverride_SingleVersion) String() string {
 func (*ModuleOverride_SingleVersion) ProtoMessage() {}
 
 func (x *ModuleOverride_SingleVersion) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[148]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[149]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6448,7 +6508,7 @@ type ModuleOverride_MultipleVersions struct {
 
 func (x *ModuleOverride_MultipleVersions) Reset() {
 	*x = ModuleOverride_MultipleVersions{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[149]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[150]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6460,7 +6520,7 @@ func (x *ModuleOverride_MultipleVersions) String() string {
 func (*ModuleOverride_MultipleVersions) ProtoMessage() {}
 
 func (x *ModuleOverride_MultipleVersions) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[149]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[150]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6498,7 +6558,7 @@ type ModulesWithRemoteOverrides_Key struct {
 
 func (x *ModulesWithRemoteOverrides_Key) Reset() {
 	*x = ModulesWithRemoteOverrides_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[150]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[151]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6510,7 +6570,7 @@ func (x *ModulesWithRemoteOverrides_Key) String() string {
 func (*ModulesWithRemoteOverrides_Key) ProtoMessage() {}
 
 func (x *ModulesWithRemoteOverrides_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[150]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[151]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6535,7 +6595,7 @@ type ModulesWithRemoteOverrides_Value struct {
 
 func (x *ModulesWithRemoteOverrides_Value) Reset() {
 	*x = ModulesWithRemoteOverrides_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[151]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[152]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6547,7 +6607,7 @@ func (x *ModulesWithRemoteOverrides_Value) String() string {
 func (*ModulesWithRemoteOverrides_Value) ProtoMessage() {}
 
 func (x *ModulesWithRemoteOverrides_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[151]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[152]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6579,7 +6639,7 @@ type Package_Key struct {
 
 func (x *Package_Key) Reset() {
 	*x = Package_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[152]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[153]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6591,7 +6651,7 @@ func (x *Package_Key) String() string {
 func (*Package_Key) ProtoMessage() {}
 
 func (x *Package_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[152]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[153]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6623,7 +6683,7 @@ type Package_Value struct {
 
 func (x *Package_Value) Reset() {
 	*x = Package_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[153]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[154]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6635,7 +6695,7 @@ func (x *Package_Value) String() string {
 func (*Package_Value) ProtoMessage() {}
 
 func (x *Package_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[153]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[154]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6671,7 +6731,7 @@ type Package_Value_Target struct {
 
 func (x *Package_Value_Target) Reset() {
 	*x = Package_Value_Target{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[154]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[155]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6683,7 +6743,7 @@ func (x *Package_Value_Target) String() string {
 func (*Package_Value_Target) ProtoMessage() {}
 
 func (x *Package_Value_Target) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[154]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[155]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6750,7 +6810,7 @@ type Package_Value_Target_Parent struct {
 
 func (x *Package_Value_Target_Parent) Reset() {
 	*x = Package_Value_Target_Parent{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[155]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[156]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6762,7 +6822,7 @@ func (x *Package_Value_Target_Parent) String() string {
 func (*Package_Value_Target_Parent) ProtoMessage() {}
 
 func (x *Package_Value_Target_Parent) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[155]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[156]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6801,7 +6861,7 @@ type PackagesAtAndBelow_Key struct {
 
 func (x *PackagesAtAndBelow_Key) Reset() {
 	*x = PackagesAtAndBelow_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[156]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[157]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6813,7 +6873,7 @@ func (x *PackagesAtAndBelow_Key) String() string {
 func (*PackagesAtAndBelow_Key) ProtoMessage() {}
 
 func (x *PackagesAtAndBelow_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[156]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[157]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6846,7 +6906,7 @@ type PackagesAtAndBelow_Value struct {
 
 func (x *PackagesAtAndBelow_Value) Reset() {
 	*x = PackagesAtAndBelow_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[157]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[158]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6858,7 +6918,7 @@ func (x *PackagesAtAndBelow_Value) String() string {
 func (*PackagesAtAndBelow_Value) ProtoMessage() {}
 
 func (x *PackagesAtAndBelow_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[157]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[158]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6896,7 +6956,7 @@ type RegisteredExecutionPlatforms_Key struct {
 
 func (x *RegisteredExecutionPlatforms_Key) Reset() {
 	*x = RegisteredExecutionPlatforms_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[158]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[159]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6908,7 +6968,7 @@ func (x *RegisteredExecutionPlatforms_Key) String() string {
 func (*RegisteredExecutionPlatforms_Key) ProtoMessage() {}
 
 func (x *RegisteredExecutionPlatforms_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[158]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[159]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6933,7 +6993,7 @@ type RegisteredExecutionPlatforms_Value struct {
 
 func (x *RegisteredExecutionPlatforms_Value) Reset() {
 	*x = RegisteredExecutionPlatforms_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[159]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[160]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6945,7 +7005,7 @@ func (x *RegisteredExecutionPlatforms_Value) String() string {
 func (*RegisteredExecutionPlatforms_Value) ProtoMessage() {}
 
 func (x *RegisteredExecutionPlatforms_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[159]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[160]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6976,7 +7036,7 @@ type RegisteredRepoPlatform_Key struct {
 
 func (x *RegisteredRepoPlatform_Key) Reset() {
 	*x = RegisteredRepoPlatform_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[160]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[161]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6988,7 +7048,7 @@ func (x *RegisteredRepoPlatform_Key) String() string {
 func (*RegisteredRepoPlatform_Key) ProtoMessage() {}
 
 func (x *RegisteredRepoPlatform_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[160]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[161]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7016,7 +7076,7 @@ type RegisteredRepoPlatform_Value struct {
 
 func (x *RegisteredRepoPlatform_Value) Reset() {
 	*x = RegisteredRepoPlatform_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[161]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[162]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7028,7 +7088,7 @@ func (x *RegisteredRepoPlatform_Value) String() string {
 func (*RegisteredRepoPlatform_Value) ProtoMessage() {}
 
 func (x *RegisteredRepoPlatform_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[161]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[162]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7082,7 +7142,7 @@ type RegisteredRepoPlatform_Value_EnvironmentVariable struct {
 
 func (x *RegisteredRepoPlatform_Value_EnvironmentVariable) Reset() {
 	*x = RegisteredRepoPlatform_Value_EnvironmentVariable{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[162]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[163]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7094,7 +7154,7 @@ func (x *RegisteredRepoPlatform_Value_EnvironmentVariable) String() string {
 func (*RegisteredRepoPlatform_Value_EnvironmentVariable) ProtoMessage() {}
 
 func (x *RegisteredRepoPlatform_Value_EnvironmentVariable) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[162]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[163]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7132,7 +7192,7 @@ type RegisteredToolchains_Key struct {
 
 func (x *RegisteredToolchains_Key) Reset() {
 	*x = RegisteredToolchains_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[163]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[164]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7144,7 +7204,7 @@ func (x *RegisteredToolchains_Key) String() string {
 func (*RegisteredToolchains_Key) ProtoMessage() {}
 
 func (x *RegisteredToolchains_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[163]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[164]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7169,7 +7229,7 @@ type RegisteredToolchains_Value struct {
 
 func (x *RegisteredToolchains_Value) Reset() {
 	*x = RegisteredToolchains_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[164]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[165]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7181,7 +7241,7 @@ func (x *RegisteredToolchains_Value) String() string {
 func (*RegisteredToolchains_Value) ProtoMessage() {}
 
 func (x *RegisteredToolchains_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[164]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[165]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7214,7 +7274,7 @@ type RegisteredToolchains_Value_RegisteredToolchainType struct {
 
 func (x *RegisteredToolchains_Value_RegisteredToolchainType) Reset() {
 	*x = RegisteredToolchains_Value_RegisteredToolchainType{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[165]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[166]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7226,7 +7286,7 @@ func (x *RegisteredToolchains_Value_RegisteredToolchainType) String() string {
 func (*RegisteredToolchains_Value_RegisteredToolchainType) ProtoMessage() {}
 
 func (x *RegisteredToolchains_Value_RegisteredToolchainType) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[165]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[166]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7265,7 +7325,7 @@ type RegisteredToolchainsForType_Key struct {
 
 func (x *RegisteredToolchainsForType_Key) Reset() {
 	*x = RegisteredToolchainsForType_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[166]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[167]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7277,7 +7337,7 @@ func (x *RegisteredToolchainsForType_Key) String() string {
 func (*RegisteredToolchainsForType_Key) ProtoMessage() {}
 
 func (x *RegisteredToolchainsForType_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[166]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[167]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7309,7 +7369,7 @@ type RegisteredToolchainsForType_Value struct {
 
 func (x *RegisteredToolchainsForType_Value) Reset() {
 	*x = RegisteredToolchainsForType_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[167]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[168]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7321,7 +7381,7 @@ func (x *RegisteredToolchainsForType_Value) String() string {
 func (*RegisteredToolchainsForType_Value) ProtoMessage() {}
 
 func (x *RegisteredToolchainsForType_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[167]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[168]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7353,7 +7413,7 @@ type Repo_Key struct {
 
 func (x *Repo_Key) Reset() {
 	*x = Repo_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[168]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[169]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7365,7 +7425,7 @@ func (x *Repo_Key) String() string {
 func (*Repo_Key) ProtoMessage() {}
 
 func (x *Repo_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[168]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[169]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7397,7 +7457,7 @@ type Repo_Value struct {
 
 func (x *Repo_Value) Reset() {
 	*x = Repo_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[169]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[170]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7409,7 +7469,7 @@ func (x *Repo_Value) String() string {
 func (*Repo_Value) ProtoMessage() {}
 
 func (x *Repo_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[169]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[170]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7441,7 +7501,7 @@ type RepoDefaultAttrs_Key struct {
 
 func (x *RepoDefaultAttrs_Key) Reset() {
 	*x = RepoDefaultAttrs_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[170]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[171]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7453,7 +7513,7 @@ func (x *RepoDefaultAttrs_Key) String() string {
 func (*RepoDefaultAttrs_Key) ProtoMessage() {}
 
 func (x *RepoDefaultAttrs_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[170]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[171]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7485,7 +7545,7 @@ type RepoDefaultAttrs_Value struct {
 
 func (x *RepoDefaultAttrs_Value) Reset() {
 	*x = RepoDefaultAttrs_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[171]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[172]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7497,7 +7557,7 @@ func (x *RepoDefaultAttrs_Value) String() string {
 func (*RepoDefaultAttrs_Value) ProtoMessage() {}
 
 func (x *RepoDefaultAttrs_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[171]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[172]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7531,7 +7591,7 @@ type ResolvedToolchains_Key struct {
 
 func (x *ResolvedToolchains_Key) Reset() {
 	*x = ResolvedToolchains_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[172]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[173]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7543,7 +7603,7 @@ func (x *ResolvedToolchains_Key) String() string {
 func (*ResolvedToolchains_Key) ProtoMessage() {}
 
 func (x *ResolvedToolchains_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[172]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[173]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7589,7 +7649,7 @@ type ResolvedToolchains_Value struct {
 
 func (x *ResolvedToolchains_Value) Reset() {
 	*x = ResolvedToolchains_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[173]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[174]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7601,7 +7661,7 @@ func (x *ResolvedToolchains_Value) String() string {
 func (*ResolvedToolchains_Value) ProtoMessage() {}
 
 func (x *ResolvedToolchains_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[173]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[174]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7632,7 +7692,7 @@ type RootModule_Key struct {
 
 func (x *RootModule_Key) Reset() {
 	*x = RootModule_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[174]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[175]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7644,7 +7704,7 @@ func (x *RootModule_Key) String() string {
 func (*RootModule_Key) ProtoMessage() {}
 
 func (x *RootModule_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[174]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[175]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7670,7 +7730,7 @@ type RootModule_Value struct {
 
 func (x *RootModule_Value) Reset() {
 	*x = RootModule_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[175]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[176]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7682,7 +7742,7 @@ func (x *RootModule_Value) String() string {
 func (*RootModule_Value) ProtoMessage() {}
 
 func (x *RootModule_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[175]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[176]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7721,7 +7781,7 @@ type Select_Key struct {
 
 func (x *Select_Key) Reset() {
 	*x = Select_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[176]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[177]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7733,7 +7793,7 @@ func (x *Select_Key) String() string {
 func (*Select_Key) ProtoMessage() {}
 
 func (x *Select_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[176]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[177]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7765,7 +7825,7 @@ type Select_Value struct {
 
 func (x *Select_Value) Reset() {
 	*x = Select_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[177]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[178]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7777,7 +7837,7 @@ func (x *Select_Value) String() string {
 func (*Select_Value) ProtoMessage() {}
 
 func (x *Select_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[177]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[178]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7808,7 +7868,7 @@ type StableInputRootPath_Key struct {
 
 func (x *StableInputRootPath_Key) Reset() {
 	*x = StableInputRootPath_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[178]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[179]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7820,7 +7880,7 @@ func (x *StableInputRootPath_Key) String() string {
 func (*StableInputRootPath_Key) ProtoMessage() {}
 
 func (x *StableInputRootPath_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[178]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[179]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7845,7 +7905,7 @@ type StableInputRootPath_Value struct {
 
 func (x *StableInputRootPath_Value) Reset() {
 	*x = StableInputRootPath_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[179]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[180]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7857,7 +7917,7 @@ func (x *StableInputRootPath_Value) String() string {
 func (*StableInputRootPath_Value) ProtoMessage() {}
 
 func (x *StableInputRootPath_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[179]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[180]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7888,7 +7948,7 @@ type StableInputRootPathObject_Key struct {
 
 func (x *StableInputRootPathObject_Key) Reset() {
 	*x = StableInputRootPathObject_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[180]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[181]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7900,7 +7960,7 @@ func (x *StableInputRootPathObject_Key) String() string {
 func (*StableInputRootPathObject_Key) ProtoMessage() {}
 
 func (x *StableInputRootPathObject_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[180]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[181]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7925,7 +7985,7 @@ type Target_Key struct {
 
 func (x *Target_Key) Reset() {
 	*x = Target_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[181]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[182]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7937,7 +7997,7 @@ func (x *Target_Key) String() string {
 func (*Target_Key) ProtoMessage() {}
 
 func (x *Target_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[181]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[182]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7969,7 +8029,7 @@ type Target_Value struct {
 
 func (x *Target_Value) Reset() {
 	*x = Target_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[182]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[183]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7981,7 +8041,7 @@ func (x *Target_Value) String() string {
 func (*Target_Value) ProtoMessage() {}
 
 func (x *Target_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[182]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[183]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8014,7 +8074,7 @@ type TargetCompletion_Key struct {
 
 func (x *TargetCompletion_Key) Reset() {
 	*x = TargetCompletion_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[183]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[184]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8026,7 +8086,7 @@ func (x *TargetCompletion_Key) String() string {
 func (*TargetCompletion_Key) ProtoMessage() {}
 
 func (x *TargetCompletion_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[183]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[184]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8064,7 +8124,7 @@ type TargetCompletion_Value struct {
 
 func (x *TargetCompletion_Value) Reset() {
 	*x = TargetCompletion_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[184]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[185]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8076,7 +8136,7 @@ func (x *TargetCompletion_Value) String() string {
 func (*TargetCompletion_Value) ProtoMessage() {}
 
 func (x *TargetCompletion_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[184]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[185]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8101,7 +8161,7 @@ type TargetPatternExpansion_Key struct {
 
 func (x *TargetPatternExpansion_Key) Reset() {
 	*x = TargetPatternExpansion_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[185]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[186]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8113,7 +8173,7 @@ func (x *TargetPatternExpansion_Key) String() string {
 func (*TargetPatternExpansion_Key) ProtoMessage() {}
 
 func (x *TargetPatternExpansion_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[185]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[186]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8145,7 +8205,7 @@ type TargetPatternExpansion_Value struct {
 
 func (x *TargetPatternExpansion_Value) Reset() {
 	*x = TargetPatternExpansion_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[186]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[187]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8157,7 +8217,7 @@ func (x *TargetPatternExpansion_Value) String() string {
 func (*TargetPatternExpansion_Value) ProtoMessage() {}
 
 func (x *TargetPatternExpansion_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[186]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[187]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8193,7 +8253,7 @@ type TargetPatternExpansion_Value_TargetLabel struct {
 
 func (x *TargetPatternExpansion_Value_TargetLabel) Reset() {
 	*x = TargetPatternExpansion_Value_TargetLabel{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[187]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[188]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8205,7 +8265,7 @@ func (x *TargetPatternExpansion_Value_TargetLabel) String() string {
 func (*TargetPatternExpansion_Value_TargetLabel) ProtoMessage() {}
 
 func (x *TargetPatternExpansion_Value_TargetLabel) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[187]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[188]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8273,7 +8333,7 @@ type TargetPatternExpansion_Value_TargetLabel_Parent struct {
 
 func (x *TargetPatternExpansion_Value_TargetLabel_Parent) Reset() {
 	*x = TargetPatternExpansion_Value_TargetLabel_Parent{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[188]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[189]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8285,7 +8345,7 @@ func (x *TargetPatternExpansion_Value_TargetLabel_Parent) String() string {
 func (*TargetPatternExpansion_Value_TargetLabel_Parent) ProtoMessage() {}
 
 func (x *TargetPatternExpansion_Value_TargetLabel_Parent) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[188]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[189]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8319,7 +8379,7 @@ type ModuleExtension_User struct {
 
 func (x *ModuleExtension_User) Reset() {
 	*x = ModuleExtension_User{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[189]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[190]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8331,7 +8391,7 @@ func (x *ModuleExtension_User) String() string {
 func (*ModuleExtension_User) ProtoMessage() {}
 
 func (x *ModuleExtension_User) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[189]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[190]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8378,7 +8438,7 @@ type ModuleExtension_TagClass struct {
 
 func (x *ModuleExtension_TagClass) Reset() {
 	*x = ModuleExtension_TagClass{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[190]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[191]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8390,7 +8450,7 @@ func (x *ModuleExtension_TagClass) String() string {
 func (*ModuleExtension_TagClass) ProtoMessage() {}
 
 func (x *ModuleExtension_TagClass) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[190]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[191]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8430,7 +8490,7 @@ type ModuleExtension_Tag struct {
 
 func (x *ModuleExtension_Tag) Reset() {
 	*x = ModuleExtension_Tag{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[191]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[192]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8442,7 +8502,7 @@ func (x *ModuleExtension_Tag) String() string {
 func (*ModuleExtension_Tag) ProtoMessage() {}
 
 func (x *ModuleExtension_Tag) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[191]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[192]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8481,7 +8541,7 @@ type RepositoryRuleObject_Key struct {
 
 func (x *RepositoryRuleObject_Key) Reset() {
 	*x = RepositoryRuleObject_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[192]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[193]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8493,7 +8553,7 @@ func (x *RepositoryRuleObject_Key) String() string {
 func (*RepositoryRuleObject_Key) ProtoMessage() {}
 
 func (x *RepositoryRuleObject_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[192]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[193]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8525,7 +8585,7 @@ type UsedModuleExtension_Key struct {
 
 func (x *UsedModuleExtension_Key) Reset() {
 	*x = UsedModuleExtension_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[193]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[194]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8537,7 +8597,7 @@ func (x *UsedModuleExtension_Key) String() string {
 func (*UsedModuleExtension_Key) ProtoMessage() {}
 
 func (x *UsedModuleExtension_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[193]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[194]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8569,7 +8629,7 @@ type UsedModuleExtension_Value struct {
 
 func (x *UsedModuleExtension_Value) Reset() {
 	*x = UsedModuleExtension_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[194]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[195]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8581,7 +8641,7 @@ func (x *UsedModuleExtension_Value) String() string {
 func (*UsedModuleExtension_Value) ProtoMessage() {}
 
 func (x *UsedModuleExtension_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[194]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[195]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8612,7 +8672,7 @@ type UsedModuleExtensions_Key struct {
 
 func (x *UsedModuleExtensions_Key) Reset() {
 	*x = UsedModuleExtensions_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[195]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[196]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8624,7 +8684,7 @@ func (x *UsedModuleExtensions_Key) String() string {
 func (*UsedModuleExtensions_Key) ProtoMessage() {}
 
 func (x *UsedModuleExtensions_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[195]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[196]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8649,7 +8709,7 @@ type UsedModuleExtensions_Value struct {
 
 func (x *UsedModuleExtensions_Value) Reset() {
 	*x = UsedModuleExtensions_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[196]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[197]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8661,7 +8721,7 @@ func (x *UsedModuleExtensions_Value) String() string {
 func (*UsedModuleExtensions_Value) ProtoMessage() {}
 
 func (x *UsedModuleExtensions_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[196]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[197]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8694,7 +8754,7 @@ type UserDefinedTransition_Key struct {
 
 func (x *UserDefinedTransition_Key) Reset() {
 	*x = UserDefinedTransition_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[197]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[198]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8706,7 +8766,7 @@ func (x *UserDefinedTransition_Key) String() string {
 func (*UserDefinedTransition_Key) ProtoMessage() {}
 
 func (x *UserDefinedTransition_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[197]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[198]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8749,7 +8809,7 @@ type UserDefinedTransition_Value struct {
 
 func (x *UserDefinedTransition_Value) Reset() {
 	*x = UserDefinedTransition_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[198]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[199]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8761,7 +8821,7 @@ func (x *UserDefinedTransition_Value) String() string {
 func (*UserDefinedTransition_Value) ProtoMessage() {}
 
 func (x *UserDefinedTransition_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[198]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[199]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8827,7 +8887,7 @@ type UserDefinedTransition_Value_Success struct {
 
 func (x *UserDefinedTransition_Value_Success) Reset() {
 	*x = UserDefinedTransition_Value_Success{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[199]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[200]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8839,7 +8899,7 @@ func (x *UserDefinedTransition_Value_Success) String() string {
 func (*UserDefinedTransition_Value_Success) ProtoMessage() {}
 
 func (x *UserDefinedTransition_Value_Success) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[199]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[200]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8872,7 +8932,7 @@ type UserDefinedTransition_Value_Success_Entry struct {
 
 func (x *UserDefinedTransition_Value_Success_Entry) Reset() {
 	*x = UserDefinedTransition_Value_Success_Entry{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[200]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[201]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8884,7 +8944,7 @@ func (x *UserDefinedTransition_Value_Success_Entry) String() string {
 func (*UserDefinedTransition_Value_Success_Entry) ProtoMessage() {}
 
 func (x *UserDefinedTransition_Value_Success_Entry) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[200]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[201]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8927,7 +8987,7 @@ type VisibleTarget_Key struct {
 
 func (x *VisibleTarget_Key) Reset() {
 	*x = VisibleTarget_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[201]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[202]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8939,7 +8999,7 @@ func (x *VisibleTarget_Key) String() string {
 func (*VisibleTarget_Key) ProtoMessage() {}
 
 func (x *VisibleTarget_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[201]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[202]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8999,7 +9059,7 @@ type VisibleTarget_Value struct {
 
 func (x *VisibleTarget_Value) Reset() {
 	*x = VisibleTarget_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[202]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[203]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9011,7 +9071,7 @@ func (x *VisibleTarget_Value) String() string {
 func (*VisibleTarget_Value) ProtoMessage() {}
 
 func (x *VisibleTarget_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[202]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[203]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9309,13 +9369,21 @@ var file_pkg_proto_model_analysis_analysis_proto_rawDesc = string([]byte{
 	0x72, 0x69, 0x65, 0x73, 0x1a, 0x2c, 0x0a, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x12, 0x23, 0x0a,
 	0x0d, 0x6d, 0x61, 0x74, 0x63, 0x68, 0x65, 0x64, 0x5f, 0x70, 0x61, 0x74, 0x68, 0x73, 0x18, 0x01,
 	0x20, 0x03, 0x28, 0x09, 0x52, 0x0c, 0x6d, 0x61, 0x74, 0x63, 0x68, 0x65, 0x64, 0x50, 0x61, 0x74,
-	0x68, 0x73, 0x22, 0x63, 0x0a, 0x10, 0x48, 0x74, 0x74, 0x70, 0x46, 0x65, 0x74, 0x63, 0x68, 0x4f,
-	0x70, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x12, 0x12, 0x0a, 0x04, 0x75, 0x72, 0x6c, 0x73, 0x18, 0x01,
-	0x20, 0x03, 0x28, 0x09, 0x52, 0x04, 0x75, 0x72, 0x6c, 0x73, 0x12, 0x1c, 0x0a, 0x09, 0x69, 0x6e,
-	0x74, 0x65, 0x67, 0x72, 0x69, 0x74, 0x79, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x69,
-	0x6e, 0x74, 0x65, 0x67, 0x72, 0x69, 0x74, 0x79, 0x12, 0x1d, 0x0a, 0x0a, 0x61, 0x6c, 0x6c, 0x6f,
-	0x77, 0x5f, 0x66, 0x61, 0x69, 0x6c, 0x18, 0x03, 0x20, 0x01, 0x28, 0x08, 0x52, 0x09, 0x61, 0x6c,
-	0x6c, 0x6f, 0x77, 0x46, 0x61, 0x69, 0x6c, 0x22, 0xc3, 0x02, 0x0a, 0x13, 0x48, 0x74, 0x74, 0x70,
+	0x68, 0x73, 0x22, 0xe2, 0x01, 0x0a, 0x10, 0x48, 0x74, 0x74, 0x70, 0x46, 0x65, 0x74, 0x63, 0x68,
+	0x4f, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x12, 0x12, 0x0a, 0x04, 0x75, 0x72, 0x6c, 0x73, 0x18,
+	0x01, 0x20, 0x03, 0x28, 0x09, 0x52, 0x04, 0x75, 0x72, 0x6c, 0x73, 0x12, 0x1c, 0x0a, 0x09, 0x69,
+	0x6e, 0x74, 0x65, 0x67, 0x72, 0x69, 0x74, 0x79, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09,
+	0x69, 0x6e, 0x74, 0x65, 0x67, 0x72, 0x69, 0x74, 0x79, 0x12, 0x1d, 0x0a, 0x0a, 0x61, 0x6c, 0x6c,
+	0x6f, 0x77, 0x5f, 0x66, 0x61, 0x69, 0x6c, 0x18, 0x03, 0x20, 0x01, 0x28, 0x08, 0x52, 0x09, 0x61,
+	0x6c, 0x6c, 0x6f, 0x77, 0x46, 0x61, 0x69, 0x6c, 0x12, 0x49, 0x0a, 0x07, 0x68, 0x65, 0x61, 0x64,
+	0x65, 0x72, 0x73, 0x18, 0x04, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x2f, 0x2e, 0x62, 0x6f, 0x6e, 0x61,
+	0x6e, 0x7a, 0x61, 0x2e, 0x6d, 0x6f, 0x64, 0x65, 0x6c, 0x2e, 0x61, 0x6e, 0x61, 0x6c, 0x79, 0x73,
+	0x69, 0x73, 0x2e, 0x48, 0x74, 0x74, 0x70, 0x46, 0x65, 0x74, 0x63, 0x68, 0x4f, 0x70, 0x74, 0x69,
+	0x6f, 0x6e, 0x73, 0x2e, 0x48, 0x65, 0x61, 0x64, 0x65, 0x72, 0x52, 0x07, 0x68, 0x65, 0x61, 0x64,
+	0x65, 0x72, 0x73, 0x1a, 0x32, 0x0a, 0x06, 0x48, 0x65, 0x61, 0x64, 0x65, 0x72, 0x12, 0x12, 0x0a,
+	0x04, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x6e, 0x61, 0x6d,
+	0x65, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09,
+	0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x22, 0xc3, 0x02, 0x0a, 0x13, 0x48, 0x74, 0x74, 0x70,
 	0x41, 0x72, 0x63, 0x68, 0x69, 0x76, 0x65, 0x43, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x73, 0x1a,
 	0xdc, 0x01, 0x0a, 0x03, 0x4b, 0x65, 0x79, 0x12, 0x4d, 0x0a, 0x0d, 0x66, 0x65, 0x74, 0x63, 0x68,
 	0x5f, 0x6f, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x28,
@@ -9906,7 +9974,7 @@ func file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP() []byte {
 }
 
 var file_pkg_proto_model_analysis_analysis_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_pkg_proto_model_analysis_analysis_proto_msgTypes = make([]protoimpl.MessageInfo, 203)
+var file_pkg_proto_model_analysis_analysis_proto_msgTypes = make([]protoimpl.MessageInfo, 204)
 var file_pkg_proto_model_analysis_analysis_proto_goTypes = []any{
 	(HttpArchiveContents_Key_Format)(0),                        // 0: bonanza.model.analysis.HttpArchiveContents.Key.Format
 	(*ActionResult)(nil),                                       // 1: bonanza.model.analysis.ActionResult
@@ -10025,205 +10093,207 @@ var file_pkg_proto_model_analysis_analysis_proto_goTypes = []any{
 	(*FilesInPackage_Value)(nil),                               // 114: bonanza.model.analysis.FilesInPackage.Value
 	(*Glob_Key)(nil),                                           // 115: bonanza.model.analysis.Glob.Key
 	(*Glob_Value)(nil),                                         // 116: bonanza.model.analysis.Glob.Value
-	(*HttpArchiveContents_Key)(nil),                            // 117: bonanza.model.analysis.HttpArchiveContents.Key
-	(*HttpArchiveContents_Value)(nil),                          // 118: bonanza.model.analysis.HttpArchiveContents.Value
-	(*HttpFileContents_Key)(nil),                               // 119: bonanza.model.analysis.HttpFileContents.Key
-	(*HttpFileContents_Value)(nil),                             // 120: bonanza.model.analysis.HttpFileContents.Value
-	(*HttpFileContents_Value_Exists)(nil),                      // 121: bonanza.model.analysis.HttpFileContents.Value.Exists
-	(*ModuleDotBazelContents_Key)(nil),                         // 122: bonanza.model.analysis.ModuleDotBazelContents.Key
-	(*ModuleDotBazelContents_Value)(nil),                       // 123: bonanza.model.analysis.ModuleDotBazelContents.Value
-	(*MakeVariables_Key)(nil),                                  // 124: bonanza.model.analysis.MakeVariables.Key
-	(*MakeVariables_Value)(nil),                                // 125: bonanza.model.analysis.MakeVariables.Value
-	(*MakeVariables_Value_MakeVariable)(nil),                   // 126: bonanza.model.analysis.MakeVariables.Value.MakeVariable
-	(*ModuleRegistryUrls_Key)(nil),                             // 127: bonanza.model.analysis.ModuleRegistryUrls.Key
-	(*ModuleRegistryUrls_Value)(nil),                           // 128: bonanza.model.analysis.ModuleRegistryUrls.Value
-	(*ModuleRepoMapping_Key)(nil),                              // 129: bonanza.model.analysis.ModuleRepoMapping.Key
-	(*ModuleRepoMapping_Value)(nil),                            // 130: bonanza.model.analysis.ModuleRepoMapping.Value
-	(*ModuleRepoMapping_Value_Mapping)(nil),                    // 131: bonanza.model.analysis.ModuleRepoMapping.Value.Mapping
-	(*ModuleExtensionRepo_Key)(nil),                            // 132: bonanza.model.analysis.ModuleExtensionRepo.Key
-	(*ModuleExtensionRepo_Value)(nil),                          // 133: bonanza.model.analysis.ModuleExtensionRepo.Value
-	(*ModuleExtensionRepoNames_Key)(nil),                       // 134: bonanza.model.analysis.ModuleExtensionRepoNames.Key
-	(*ModuleExtensionRepoNames_Value)(nil),                     // 135: bonanza.model.analysis.ModuleExtensionRepoNames.Value
-	(*ModuleExtensionRepos_Key)(nil),                           // 136: bonanza.model.analysis.ModuleExtensionRepos.Key
-	(*ModuleExtensionRepos_Value)(nil),                         // 137: bonanza.model.analysis.ModuleExtensionRepos.Value
-	(*ModuleExtensionRepos_Value_Repo)(nil),                    // 138: bonanza.model.analysis.ModuleExtensionRepos.Value.Repo
-	(*ModuleExtensionRepos_Value_Repo_Parent)(nil),             // 139: bonanza.model.analysis.ModuleExtensionRepos.Value.Repo.Parent
-	(*ModuleFinalBuildList_Key)(nil),                           // 140: bonanza.model.analysis.ModuleFinalBuildList.Key
-	(*ModuleFinalBuildList_Value)(nil),                         // 141: bonanza.model.analysis.ModuleFinalBuildList.Value
-	(*ModuleRoughBuildList_Key)(nil),                           // 142: bonanza.model.analysis.ModuleRoughBuildList.Key
-	(*ModuleRoughBuildList_Value)(nil),                         // 143: bonanza.model.analysis.ModuleRoughBuildList.Value
-	(*ModulesWithMultipleVersions_Key)(nil),                    // 144: bonanza.model.analysis.ModulesWithMultipleVersions.Key
-	(*ModulesWithMultipleVersions_Value)(nil),                  // 145: bonanza.model.analysis.ModulesWithMultipleVersions.Value
-	(*ModulesWithMultipleVersionsObject_Key)(nil),              // 146: bonanza.model.analysis.ModulesWithMultipleVersionsObject.Key
-	(*ModulesWithOverrides_Key)(nil),                           // 147: bonanza.model.analysis.ModulesWithOverrides.Key
-	(*ModulesWithOverrides_Value)(nil),                         // 148: bonanza.model.analysis.ModulesWithOverrides.Value
-	(*ModuleOverride_SingleVersion)(nil),                       // 149: bonanza.model.analysis.ModuleOverride.SingleVersion
-	(*ModuleOverride_MultipleVersions)(nil),                    // 150: bonanza.model.analysis.ModuleOverride.MultipleVersions
-	(*ModulesWithRemoteOverrides_Key)(nil),                     // 151: bonanza.model.analysis.ModulesWithRemoteOverrides.Key
-	(*ModulesWithRemoteOverrides_Value)(nil),                   // 152: bonanza.model.analysis.ModulesWithRemoteOverrides.Value
-	(*Package_Key)(nil),                                        // 153: bonanza.model.analysis.Package.Key
-	(*Package_Value)(nil),                                      // 154: bonanza.model.analysis.Package.Value
-	(*Package_Value_Target)(nil),                               // 155: bonanza.model.analysis.Package.Value.Target
-	(*Package_Value_Target_Parent)(nil),                        // 156: bonanza.model.analysis.Package.Value.Target.Parent
-	(*PackagesAtAndBelow_Key)(nil),                             // 157: bonanza.model.analysis.PackagesAtAndBelow.Key
-	(*PackagesAtAndBelow_Value)(nil),                           // 158: bonanza.model.analysis.PackagesAtAndBelow.Value
-	(*RegisteredExecutionPlatforms_Key)(nil),                   // 159: bonanza.model.analysis.RegisteredExecutionPlatforms.Key
-	(*RegisteredExecutionPlatforms_Value)(nil),                 // 160: bonanza.model.analysis.RegisteredExecutionPlatforms.Value
-	(*RegisteredRepoPlatform_Key)(nil),                         // 161: bonanza.model.analysis.RegisteredRepoPlatform.Key
-	(*RegisteredRepoPlatform_Value)(nil),                       // 162: bonanza.model.analysis.RegisteredRepoPlatform.Value
-	(*RegisteredRepoPlatform_Value_EnvironmentVariable)(nil),   // 163: bonanza.model.analysis.RegisteredRepoPlatform.Value.EnvironmentVariable
-	(*RegisteredToolchains_Key)(nil),                           // 164: bonanza.model.analysis.RegisteredToolchains.Key
-	(*RegisteredToolchains_Value)(nil),                         // 165: bonanza.model.analysis.RegisteredToolchains.Value
-	(*RegisteredToolchains_Value_RegisteredToolchainType)(nil), // 166: bonanza.model.analysis.RegisteredToolchains.Value.RegisteredToolchainType
-	(*RegisteredToolchainsForType_Key)(nil),                    // 167: bonanza.model.analysis.RegisteredToolchainsForType.Key
-	(*RegisteredToolchainsForType_Value)(nil),                  // 168: bonanza.model.analysis.RegisteredToolchainsForType.Value
-	(*Repo_Key)(nil),                                           // 169: bonanza.model.analysis.Repo.Key
-	(*Repo_Value)(nil),                                         // 170: bonanza.model.analysis.Repo.Value
-	(*RepoDefaultAttrs_Key)(nil),                               // 171: bonanza.model.analysis.RepoDefaultAttrs.Key
-	(*RepoDefaultAttrs_Value)(nil),                             // 172: bonanza.model.analysis.RepoDefaultAttrs.Value
-	(*ResolvedToolchains_Key)(nil),                             // 173: bonanza.model.analysis.ResolvedToolchains.Key
-	(*ResolvedToolchains_Value)(nil),                           // 174: bonanza.model.analysis.ResolvedToolchains.Value
-	(*RootModule_Key)(nil),                                     // 175: bonanza.model.analysis.RootModule.Key
-	(*RootModule_Value)(nil),                                   // 176: bonanza.model.analysis.RootModule.Value
-	(*Select_Key)(nil),                                         // 177: bonanza.model.analysis.Select.Key
-	(*Select_Value)(nil),                                       // 178: bonanza.model.analysis.Select.Value
-	(*StableInputRootPath_Key)(nil),                            // 179: bonanza.model.analysis.StableInputRootPath.Key
-	(*StableInputRootPath_Value)(nil),                          // 180: bonanza.model.analysis.StableInputRootPath.Value
-	(*StableInputRootPathObject_Key)(nil),                      // 181: bonanza.model.analysis.StableInputRootPathObject.Key
-	(*Target_Key)(nil),                                         // 182: bonanza.model.analysis.Target.Key
-	(*Target_Value)(nil),                                       // 183: bonanza.model.analysis.Target.Value
-	(*TargetCompletion_Key)(nil),                               // 184: bonanza.model.analysis.TargetCompletion.Key
-	(*TargetCompletion_Value)(nil),                             // 185: bonanza.model.analysis.TargetCompletion.Value
-	(*TargetPatternExpansion_Key)(nil),                         // 186: bonanza.model.analysis.TargetPatternExpansion.Key
-	(*TargetPatternExpansion_Value)(nil),                       // 187: bonanza.model.analysis.TargetPatternExpansion.Value
-	(*TargetPatternExpansion_Value_TargetLabel)(nil),           // 188: bonanza.model.analysis.TargetPatternExpansion.Value.TargetLabel
-	(*TargetPatternExpansion_Value_TargetLabel_Parent)(nil),    // 189: bonanza.model.analysis.TargetPatternExpansion.Value.TargetLabel.Parent
-	(*ModuleExtension_User)(nil),                               // 190: bonanza.model.analysis.ModuleExtension.User
-	(*ModuleExtension_TagClass)(nil),                           // 191: bonanza.model.analysis.ModuleExtension.TagClass
-	(*ModuleExtension_Tag)(nil),                                // 192: bonanza.model.analysis.ModuleExtension.Tag
-	(*RepositoryRuleObject_Key)(nil),                           // 193: bonanza.model.analysis.RepositoryRuleObject.Key
-	(*UsedModuleExtension_Key)(nil),                            // 194: bonanza.model.analysis.UsedModuleExtension.Key
-	(*UsedModuleExtension_Value)(nil),                          // 195: bonanza.model.analysis.UsedModuleExtension.Value
-	(*UsedModuleExtensions_Key)(nil),                           // 196: bonanza.model.analysis.UsedModuleExtensions.Key
-	(*UsedModuleExtensions_Value)(nil),                         // 197: bonanza.model.analysis.UsedModuleExtensions.Value
-	(*UserDefinedTransition_Key)(nil),                          // 198: bonanza.model.analysis.UserDefinedTransition.Key
-	(*UserDefinedTransition_Value)(nil),                        // 199: bonanza.model.analysis.UserDefinedTransition.Value
-	(*UserDefinedTransition_Value_Success)(nil),                // 200: bonanza.model.analysis.UserDefinedTransition.Value.Success
-	(*UserDefinedTransition_Value_Success_Entry)(nil),          // 201: bonanza.model.analysis.UserDefinedTransition.Value.Success.Entry
-	(*VisibleTarget_Key)(nil),                                  // 202: bonanza.model.analysis.VisibleTarget.Key
-	(*VisibleTarget_Value)(nil),                                // 203: bonanza.model.analysis.VisibleTarget.Value
-	(*starlark.Repo_Definition)(nil),                           // 204: bonanza.model.starlark.Repo.Definition
-	(*core.Reference)(nil),                                     // 205: bonanza.model.core.Reference
-	(*durationpb.Duration)(nil),                                // 206: google.protobuf.Duration
-	(*build.BuildSpecification)(nil),                           // 207: bonanza.model.build.BuildSpecification
-	(*encoding.BinaryEncoder)(nil),                             // 208: bonanza.model.encoding.BinaryEncoder
-	(*starlark.CompiledProgram)(nil),                           // 209: bonanza.model.starlark.CompiledProgram
-	(*starlark.Value)(nil),                                     // 210: bonanza.model.starlark.Value
-	(*starlark.Struct)(nil),                                    // 211: bonanza.model.starlark.Struct
-	(*filesystem.DirectoryAccessParameters)(nil),               // 212: bonanza.model.filesystem.DirectoryAccessParameters
-	(*filesystem.DirectoryCreationParameters)(nil),             // 213: bonanza.model.filesystem.DirectoryCreationParameters
-	(*filesystem.FileAccessParameters)(nil),                    // 214: bonanza.model.filesystem.FileAccessParameters
-	(*filesystem.FileCreationParameters)(nil),                  // 215: bonanza.model.filesystem.FileCreationParameters
-	(*filesystem.FileProperties)(nil),                          // 216: bonanza.model.filesystem.FileProperties
-	(*filesystem.Directory)(nil),                               // 217: bonanza.model.filesystem.Directory
-	(*filesystem.DirectoryReference)(nil),                      // 218: bonanza.model.filesystem.DirectoryReference
-	(*filesystem.FileContents)(nil),                            // 219: bonanza.model.filesystem.FileContents
-	(*starlark.Repo)(nil),                                      // 220: bonanza.model.starlark.Repo
-	(*starlark.Target)(nil),                                    // 221: bonanza.model.starlark.Target
-	(*starlark.InheritableAttrs)(nil),                          // 222: bonanza.model.starlark.InheritableAttrs
-	(*starlark.ToolchainType)(nil),                             // 223: bonanza.model.starlark.ToolchainType
-	(*starlark.Target_Definition)(nil),                         // 224: bonanza.model.starlark.Target.Definition
-	(*starlark.Struct_Fields)(nil),                             // 225: bonanza.model.starlark.Struct.Fields
-	(*emptypb.Empty)(nil),                                      // 226: google.protobuf.Empty
+	(*HttpFetchOptions_Header)(nil),                            // 117: bonanza.model.analysis.HttpFetchOptions.Header
+	(*HttpArchiveContents_Key)(nil),                            // 118: bonanza.model.analysis.HttpArchiveContents.Key
+	(*HttpArchiveContents_Value)(nil),                          // 119: bonanza.model.analysis.HttpArchiveContents.Value
+	(*HttpFileContents_Key)(nil),                               // 120: bonanza.model.analysis.HttpFileContents.Key
+	(*HttpFileContents_Value)(nil),                             // 121: bonanza.model.analysis.HttpFileContents.Value
+	(*HttpFileContents_Value_Exists)(nil),                      // 122: bonanza.model.analysis.HttpFileContents.Value.Exists
+	(*ModuleDotBazelContents_Key)(nil),                         // 123: bonanza.model.analysis.ModuleDotBazelContents.Key
+	(*ModuleDotBazelContents_Value)(nil),                       // 124: bonanza.model.analysis.ModuleDotBazelContents.Value
+	(*MakeVariables_Key)(nil),                                  // 125: bonanza.model.analysis.MakeVariables.Key
+	(*MakeVariables_Value)(nil),                                // 126: bonanza.model.analysis.MakeVariables.Value
+	(*MakeVariables_Value_MakeVariable)(nil),                   // 127: bonanza.model.analysis.MakeVariables.Value.MakeVariable
+	(*ModuleRegistryUrls_Key)(nil),                             // 128: bonanza.model.analysis.ModuleRegistryUrls.Key
+	(*ModuleRegistryUrls_Value)(nil),                           // 129: bonanza.model.analysis.ModuleRegistryUrls.Value
+	(*ModuleRepoMapping_Key)(nil),                              // 130: bonanza.model.analysis.ModuleRepoMapping.Key
+	(*ModuleRepoMapping_Value)(nil),                            // 131: bonanza.model.analysis.ModuleRepoMapping.Value
+	(*ModuleRepoMapping_Value_Mapping)(nil),                    // 132: bonanza.model.analysis.ModuleRepoMapping.Value.Mapping
+	(*ModuleExtensionRepo_Key)(nil),                            // 133: bonanza.model.analysis.ModuleExtensionRepo.Key
+	(*ModuleExtensionRepo_Value)(nil),                          // 134: bonanza.model.analysis.ModuleExtensionRepo.Value
+	(*ModuleExtensionRepoNames_Key)(nil),                       // 135: bonanza.model.analysis.ModuleExtensionRepoNames.Key
+	(*ModuleExtensionRepoNames_Value)(nil),                     // 136: bonanza.model.analysis.ModuleExtensionRepoNames.Value
+	(*ModuleExtensionRepos_Key)(nil),                           // 137: bonanza.model.analysis.ModuleExtensionRepos.Key
+	(*ModuleExtensionRepos_Value)(nil),                         // 138: bonanza.model.analysis.ModuleExtensionRepos.Value
+	(*ModuleExtensionRepos_Value_Repo)(nil),                    // 139: bonanza.model.analysis.ModuleExtensionRepos.Value.Repo
+	(*ModuleExtensionRepos_Value_Repo_Parent)(nil),             // 140: bonanza.model.analysis.ModuleExtensionRepos.Value.Repo.Parent
+	(*ModuleFinalBuildList_Key)(nil),                           // 141: bonanza.model.analysis.ModuleFinalBuildList.Key
+	(*ModuleFinalBuildList_Value)(nil),                         // 142: bonanza.model.analysis.ModuleFinalBuildList.Value
+	(*ModuleRoughBuildList_Key)(nil),                           // 143: bonanza.model.analysis.ModuleRoughBuildList.Key
+	(*ModuleRoughBuildList_Value)(nil),                         // 144: bonanza.model.analysis.ModuleRoughBuildList.Value
+	(*ModulesWithMultipleVersions_Key)(nil),                    // 145: bonanza.model.analysis.ModulesWithMultipleVersions.Key
+	(*ModulesWithMultipleVersions_Value)(nil),                  // 146: bonanza.model.analysis.ModulesWithMultipleVersions.Value
+	(*ModulesWithMultipleVersionsObject_Key)(nil),              // 147: bonanza.model.analysis.ModulesWithMultipleVersionsObject.Key
+	(*ModulesWithOverrides_Key)(nil),                           // 148: bonanza.model.analysis.ModulesWithOverrides.Key
+	(*ModulesWithOverrides_Value)(nil),                         // 149: bonanza.model.analysis.ModulesWithOverrides.Value
+	(*ModuleOverride_SingleVersion)(nil),                       // 150: bonanza.model.analysis.ModuleOverride.SingleVersion
+	(*ModuleOverride_MultipleVersions)(nil),                    // 151: bonanza.model.analysis.ModuleOverride.MultipleVersions
+	(*ModulesWithRemoteOverrides_Key)(nil),                     // 152: bonanza.model.analysis.ModulesWithRemoteOverrides.Key
+	(*ModulesWithRemoteOverrides_Value)(nil),                   // 153: bonanza.model.analysis.ModulesWithRemoteOverrides.Value
+	(*Package_Key)(nil),                                        // 154: bonanza.model.analysis.Package.Key
+	(*Package_Value)(nil),                                      // 155: bonanza.model.analysis.Package.Value
+	(*Package_Value_Target)(nil),                               // 156: bonanza.model.analysis.Package.Value.Target
+	(*Package_Value_Target_Parent)(nil),                        // 157: bonanza.model.analysis.Package.Value.Target.Parent
+	(*PackagesAtAndBelow_Key)(nil),                             // 158: bonanza.model.analysis.PackagesAtAndBelow.Key
+	(*PackagesAtAndBelow_Value)(nil),                           // 159: bonanza.model.analysis.PackagesAtAndBelow.Value
+	(*RegisteredExecutionPlatforms_Key)(nil),                   // 160: bonanza.model.analysis.RegisteredExecutionPlatforms.Key
+	(*RegisteredExecutionPlatforms_Value)(nil),                 // 161: bonanza.model.analysis.RegisteredExecutionPlatforms.Value
+	(*RegisteredRepoPlatform_Key)(nil),                         // 162: bonanza.model.analysis.RegisteredRepoPlatform.Key
+	(*RegisteredRepoPlatform_Value)(nil),                       // 163: bonanza.model.analysis.RegisteredRepoPlatform.Value
+	(*RegisteredRepoPlatform_Value_EnvironmentVariable)(nil),   // 164: bonanza.model.analysis.RegisteredRepoPlatform.Value.EnvironmentVariable
+	(*RegisteredToolchains_Key)(nil),                           // 165: bonanza.model.analysis.RegisteredToolchains.Key
+	(*RegisteredToolchains_Value)(nil),                         // 166: bonanza.model.analysis.RegisteredToolchains.Value
+	(*RegisteredToolchains_Value_RegisteredToolchainType)(nil), // 167: bonanza.model.analysis.RegisteredToolchains.Value.RegisteredToolchainType
+	(*RegisteredToolchainsForType_Key)(nil),                    // 168: bonanza.model.analysis.RegisteredToolchainsForType.Key
+	(*RegisteredToolchainsForType_Value)(nil),                  // 169: bonanza.model.analysis.RegisteredToolchainsForType.Value
+	(*Repo_Key)(nil),                                           // 170: bonanza.model.analysis.Repo.Key
+	(*Repo_Value)(nil),                                         // 171: bonanza.model.analysis.Repo.Value
+	(*RepoDefaultAttrs_Key)(nil),                               // 172: bonanza.model.analysis.RepoDefaultAttrs.Key
+	(*RepoDefaultAttrs_Value)(nil),                             // 173: bonanza.model.analysis.RepoDefaultAttrs.Value
+	(*ResolvedToolchains_Key)(nil),                             // 174: bonanza.model.analysis.ResolvedToolchains.Key
+	(*ResolvedToolchains_Value)(nil),                           // 175: bonanza.model.analysis.ResolvedToolchains.Value
+	(*RootModule_Key)(nil),                                     // 176: bonanza.model.analysis.RootModule.Key
+	(*RootModule_Value)(nil),                                   // 177: bonanza.model.analysis.RootModule.Value
+	(*Select_Key)(nil),                                         // 178: bonanza.model.analysis.Select.Key
+	(*Select_Value)(nil),                                       // 179: bonanza.model.analysis.Select.Value
+	(*StableInputRootPath_Key)(nil),                            // 180: bonanza.model.analysis.StableInputRootPath.Key
+	(*StableInputRootPath_Value)(nil),                          // 181: bonanza.model.analysis.StableInputRootPath.Value
+	(*StableInputRootPathObject_Key)(nil),                      // 182: bonanza.model.analysis.StableInputRootPathObject.Key
+	(*Target_Key)(nil),                                         // 183: bonanza.model.analysis.Target.Key
+	(*Target_Value)(nil),                                       // 184: bonanza.model.analysis.Target.Value
+	(*TargetCompletion_Key)(nil),                               // 185: bonanza.model.analysis.TargetCompletion.Key
+	(*TargetCompletion_Value)(nil),                             // 186: bonanza.model.analysis.TargetCompletion.Value
+	(*TargetPatternExpansion_Key)(nil),                         // 187: bonanza.model.analysis.TargetPatternExpansion.Key
+	(*TargetPatternExpansion_Value)(nil),                       // 188: bonanza.model.analysis.TargetPatternExpansion.Value
+	(*TargetPatternExpansion_Value_TargetLabel)(nil),           // 189: bonanza.model.analysis.TargetPatternExpansion.Value.TargetLabel
+	(*TargetPatternExpansion_Value_TargetLabel_Parent)(nil),    // 190: bonanza.model.analysis.TargetPatternExpansion.Value.TargetLabel.Parent
+	(*ModuleExtension_User)(nil),                               // 191: bonanza.model.analysis.ModuleExtension.User
+	(*ModuleExtension_TagClass)(nil),                           // 192: bonanza.model.analysis.ModuleExtension.TagClass
+	(*ModuleExtension_Tag)(nil),                                // 193: bonanza.model.analysis.ModuleExtension.Tag
+	(*RepositoryRuleObject_Key)(nil),                           // 194: bonanza.model.analysis.RepositoryRuleObject.Key
+	(*UsedModuleExtension_Key)(nil),                            // 195: bonanza.model.analysis.UsedModuleExtension.Key
+	(*UsedModuleExtension_Value)(nil),                          // 196: bonanza.model.analysis.UsedModuleExtension.Value
+	(*UsedModuleExtensions_Key)(nil),                           // 197: bonanza.model.analysis.UsedModuleExtensions.Key
+	(*UsedModuleExtensions_Value)(nil),                         // 198: bonanza.model.analysis.UsedModuleExtensions.Value
+	(*UserDefinedTransition_Key)(nil),                          // 199: bonanza.model.analysis.UserDefinedTransition.Key
+	(*UserDefinedTransition_Value)(nil),                        // 200: bonanza.model.analysis.UserDefinedTransition.Value
+	(*UserDefinedTransition_Value_Success)(nil),                // 201: bonanza.model.analysis.UserDefinedTransition.Value.Success
+	(*UserDefinedTransition_Value_Success_Entry)(nil),          // 202: bonanza.model.analysis.UserDefinedTransition.Value.Success.Entry
+	(*VisibleTarget_Key)(nil),                                  // 203: bonanza.model.analysis.VisibleTarget.Key
+	(*VisibleTarget_Value)(nil),                                // 204: bonanza.model.analysis.VisibleTarget.Value
+	(*starlark.Repo_Definition)(nil),                           // 205: bonanza.model.starlark.Repo.Definition
+	(*core.Reference)(nil),                                     // 206: bonanza.model.core.Reference
+	(*durationpb.Duration)(nil),                                // 207: google.protobuf.Duration
+	(*build.BuildSpecification)(nil),                           // 208: bonanza.model.build.BuildSpecification
+	(*encoding.BinaryEncoder)(nil),                             // 209: bonanza.model.encoding.BinaryEncoder
+	(*starlark.CompiledProgram)(nil),                           // 210: bonanza.model.starlark.CompiledProgram
+	(*starlark.Value)(nil),                                     // 211: bonanza.model.starlark.Value
+	(*starlark.Struct)(nil),                                    // 212: bonanza.model.starlark.Struct
+	(*filesystem.DirectoryAccessParameters)(nil),               // 213: bonanza.model.filesystem.DirectoryAccessParameters
+	(*filesystem.DirectoryCreationParameters)(nil),             // 214: bonanza.model.filesystem.DirectoryCreationParameters
+	(*filesystem.FileAccessParameters)(nil),                    // 215: bonanza.model.filesystem.FileAccessParameters
+	(*filesystem.FileCreationParameters)(nil),                  // 216: bonanza.model.filesystem.FileCreationParameters
+	(*filesystem.FileProperties)(nil),                          // 217: bonanza.model.filesystem.FileProperties
+	(*filesystem.Directory)(nil),                               // 218: bonanza.model.filesystem.Directory
+	(*filesystem.DirectoryReference)(nil),                      // 219: bonanza.model.filesystem.DirectoryReference
+	(*filesystem.FileContents)(nil),                            // 220: bonanza.model.filesystem.FileContents
+	(*starlark.Repo)(nil),                                      // 221: bonanza.model.starlark.Repo
+	(*starlark.Target)(nil),                                    // 222: bonanza.model.starlark.Target
+	(*starlark.InheritableAttrs)(nil),                          // 223: bonanza.model.starlark.InheritableAttrs
+	(*starlark.ToolchainType)(nil),                             // 224: bonanza.model.starlark.ToolchainType
+	(*starlark.Target_Definition)(nil),                         // 225: bonanza.model.starlark.Target.Definition
+	(*starlark.Struct_Fields)(nil),                             // 226: bonanza.model.starlark.Struct.Fields
+	(*emptypb.Empty)(nil),                                      // 227: google.protobuf.Empty
 }
 var file_pkg_proto_model_analysis_analysis_proto_depIdxs = []int32{
 	94,  // 0: bonanza.model.analysis.Configuration.build_setting_overrides:type_name -> bonanza.model.analysis.Configuration.BuildSettingOverride
-	149, // 1: bonanza.model.analysis.ModuleOverride.single_version:type_name -> bonanza.model.analysis.ModuleOverride.SingleVersion
-	150, // 2: bonanza.model.analysis.ModuleOverride.multiple_versions:type_name -> bonanza.model.analysis.ModuleOverride.MultipleVersions
-	204, // 3: bonanza.model.analysis.ModuleOverride.repository_rule:type_name -> bonanza.model.starlark.Repo.Definition
-	48,  // 4: bonanza.model.analysis.ExecutionPlatform.constraints:type_name -> bonanza.model.analysis.Constraint
-	48,  // 5: bonanza.model.analysis.RegisteredToolchain.exec_compatible_with:type_name -> bonanza.model.analysis.Constraint
-	48,  // 6: bonanza.model.analysis.RegisteredToolchain.target_compatible_with:type_name -> bonanza.model.analysis.Constraint
-	190, // 7: bonanza.model.analysis.ModuleExtension.users:type_name -> bonanza.model.analysis.ModuleExtension.User
-	205, // 8: bonanza.model.analysis.ActionResult.Key.command_reference:type_name -> bonanza.model.core.Reference
-	205, // 9: bonanza.model.analysis.ActionResult.Key.input_root_reference:type_name -> bonanza.model.core.Reference
-	206, // 10: bonanza.model.analysis.ActionResult.Key.execution_timeout:type_name -> google.protobuf.Duration
-	205, // 11: bonanza.model.analysis.ActionResult.Value.outputs_reference:type_name -> bonanza.model.core.Reference
-	207, // 12: bonanza.model.analysis.BuildSpecification.Value.build_specification:type_name -> bonanza.model.build.BuildSpecification
-	208, // 13: bonanza.model.analysis.CommandEncoders.Value.command_encoders:type_name -> bonanza.model.encoding.BinaryEncoder
-	48,  // 14: bonanza.model.analysis.CompatibleExecutionPlatforms.Key.constraints:type_name -> bonanza.model.analysis.Constraint
-	49,  // 15: bonanza.model.analysis.CompatibleExecutionPlatforms.Value.execution_platforms:type_name -> bonanza.model.analysis.ExecutionPlatform
-	205, // 16: bonanza.model.analysis.CompatibleToolchainsForType.Key.configuration_reference:type_name -> bonanza.model.core.Reference
-	52,  // 17: bonanza.model.analysis.CompatibleToolchainsForType.Value.toolchains:type_name -> bonanza.model.analysis.RegisteredToolchain
-	209, // 18: bonanza.model.analysis.CompiledBzlFile.Value.compiled_program:type_name -> bonanza.model.starlark.CompiledProgram
-	210, // 19: bonanza.model.analysis.CompiledBzlFileGlobal.Value.global:type_name -> bonanza.model.starlark.Value
-	95,  // 20: bonanza.model.analysis.Configuration.BuildSettingOverride.leaf:type_name -> bonanza.model.analysis.Configuration.BuildSettingOverride.Leaf
-	96,  // 21: bonanza.model.analysis.Configuration.BuildSettingOverride.parent:type_name -> bonanza.model.analysis.Configuration.BuildSettingOverride.Parent
-	210, // 22: bonanza.model.analysis.Configuration.BuildSettingOverride.Leaf.value:type_name -> bonanza.model.starlark.Value
-	205, // 23: bonanza.model.analysis.Configuration.BuildSettingOverride.Parent.reference:type_name -> bonanza.model.core.Reference
-	205, // 24: bonanza.model.analysis.ConfiguredTarget.Key.configuration_reference:type_name -> bonanza.model.core.Reference
-	211, // 25: bonanza.model.analysis.ConfiguredTarget.Value.provider_instances:type_name -> bonanza.model.starlark.Struct
-	212, // 26: bonanza.model.analysis.DirectoryAccessParameters.Value.directory_access_parameters:type_name -> bonanza.model.filesystem.DirectoryAccessParameters
-	213, // 27: bonanza.model.analysis.DirectoryCreationParameters.Value.directory_creation_parameters:type_name -> bonanza.model.filesystem.DirectoryCreationParameters
-	214, // 28: bonanza.model.analysis.FileAccessParameters.Value.file_access_parameters:type_name -> bonanza.model.filesystem.FileAccessParameters
-	215, // 29: bonanza.model.analysis.FileCreationParameters.Value.file_creation_parameters:type_name -> bonanza.model.filesystem.FileCreationParameters
-	216, // 30: bonanza.model.analysis.FileProperties.Value.exists:type_name -> bonanza.model.filesystem.FileProperties
-	217, // 31: bonanza.model.analysis.FilesInPackage.Value.directory:type_name -> bonanza.model.filesystem.Directory
-	27,  // 32: bonanza.model.analysis.HttpArchiveContents.Key.fetch_options:type_name -> bonanza.model.analysis.HttpFetchOptions
-	0,   // 33: bonanza.model.analysis.HttpArchiveContents.Key.format:type_name -> bonanza.model.analysis.HttpArchiveContents.Key.Format
-	218, // 34: bonanza.model.analysis.HttpArchiveContents.Value.exists:type_name -> bonanza.model.filesystem.DirectoryReference
-	27,  // 35: bonanza.model.analysis.HttpFileContents.Key.fetch_options:type_name -> bonanza.model.analysis.HttpFetchOptions
-	121, // 36: bonanza.model.analysis.HttpFileContents.Value.exists:type_name -> bonanza.model.analysis.HttpFileContents.Value.Exists
-	219, // 37: bonanza.model.analysis.HttpFileContents.Value.Exists.contents:type_name -> bonanza.model.filesystem.FileContents
-	219, // 38: bonanza.model.analysis.ModuleDotBazelContents.Value.contents:type_name -> bonanza.model.filesystem.FileContents
-	205, // 39: bonanza.model.analysis.MakeVariables.Key.configuration_reference:type_name -> bonanza.model.core.Reference
-	126, // 40: bonanza.model.analysis.MakeVariables.Value.variables:type_name -> bonanza.model.analysis.MakeVariables.Value.MakeVariable
-	131, // 41: bonanza.model.analysis.ModuleRepoMapping.Value.mappings:type_name -> bonanza.model.analysis.ModuleRepoMapping.Value.Mapping
-	204, // 42: bonanza.model.analysis.ModuleExtensionRepo.Value.definition:type_name -> bonanza.model.starlark.Repo.Definition
-	138, // 43: bonanza.model.analysis.ModuleExtensionRepos.Value.repos:type_name -> bonanza.model.analysis.ModuleExtensionRepos.Value.Repo
-	220, // 44: bonanza.model.analysis.ModuleExtensionRepos.Value.Repo.leaf:type_name -> bonanza.model.starlark.Repo
-	139, // 45: bonanza.model.analysis.ModuleExtensionRepos.Value.Repo.parent:type_name -> bonanza.model.analysis.ModuleExtensionRepos.Value.Repo.Parent
-	205, // 46: bonanza.model.analysis.ModuleExtensionRepos.Value.Repo.Parent.reference:type_name -> bonanza.model.core.Reference
-	37,  // 47: bonanza.model.analysis.ModuleFinalBuildList.Value.build_list:type_name -> bonanza.model.analysis.BuildListModule
-	37,  // 48: bonanza.model.analysis.ModuleRoughBuildList.Value.build_list:type_name -> bonanza.model.analysis.BuildListModule
-	40,  // 49: bonanza.model.analysis.ModulesWithMultipleVersions.Value.overrides_list:type_name -> bonanza.model.analysis.OverridesListModule
-	40,  // 50: bonanza.model.analysis.ModulesWithOverrides.Value.overrides_list:type_name -> bonanza.model.analysis.OverridesListModule
-	44,  // 51: bonanza.model.analysis.ModulesWithRemoteOverrides.Value.module_overrides:type_name -> bonanza.model.analysis.ModuleOverride
-	155, // 52: bonanza.model.analysis.Package.Value.targets:type_name -> bonanza.model.analysis.Package.Value.Target
-	221, // 53: bonanza.model.analysis.Package.Value.Target.leaf:type_name -> bonanza.model.starlark.Target
-	156, // 54: bonanza.model.analysis.Package.Value.Target.parent:type_name -> bonanza.model.analysis.Package.Value.Target.Parent
-	205, // 55: bonanza.model.analysis.Package.Value.Target.Parent.reference:type_name -> bonanza.model.core.Reference
-	49,  // 56: bonanza.model.analysis.RegisteredExecutionPlatforms.Value.execution_platforms:type_name -> bonanza.model.analysis.ExecutionPlatform
-	163, // 57: bonanza.model.analysis.RegisteredRepoPlatform.Value.repository_os_environ:type_name -> bonanza.model.analysis.RegisteredRepoPlatform.Value.EnvironmentVariable
-	166, // 58: bonanza.model.analysis.RegisteredToolchains.Value.toolchain_types:type_name -> bonanza.model.analysis.RegisteredToolchains.Value.RegisteredToolchainType
-	52,  // 59: bonanza.model.analysis.RegisteredToolchains.Value.RegisteredToolchainType.toolchains:type_name -> bonanza.model.analysis.RegisteredToolchain
-	52,  // 60: bonanza.model.analysis.RegisteredToolchainsForType.Value.toolchains:type_name -> bonanza.model.analysis.RegisteredToolchain
-	218, // 61: bonanza.model.analysis.Repo.Value.root_directory_reference:type_name -> bonanza.model.filesystem.DirectoryReference
-	222, // 62: bonanza.model.analysis.RepoDefaultAttrs.Value.inheritable_attrs:type_name -> bonanza.model.starlark.InheritableAttrs
-	48,  // 63: bonanza.model.analysis.ResolvedToolchains.Key.exec_compatible_with:type_name -> bonanza.model.analysis.Constraint
-	205, // 64: bonanza.model.analysis.ResolvedToolchains.Key.configuration_reference:type_name -> bonanza.model.core.Reference
-	223, // 65: bonanza.model.analysis.ResolvedToolchains.Key.toolchains:type_name -> bonanza.model.starlark.ToolchainType
-	224, // 66: bonanza.model.analysis.Target.Value.definition:type_name -> bonanza.model.starlark.Target.Definition
-	205, // 67: bonanza.model.analysis.TargetCompletion.Key.configuration_reference:type_name -> bonanza.model.core.Reference
-	188, // 68: bonanza.model.analysis.TargetPatternExpansion.Value.target_labels:type_name -> bonanza.model.analysis.TargetPatternExpansion.Value.TargetLabel
-	189, // 69: bonanza.model.analysis.TargetPatternExpansion.Value.TargetLabel.parent:type_name -> bonanza.model.analysis.TargetPatternExpansion.Value.TargetLabel.Parent
-	205, // 70: bonanza.model.analysis.TargetPatternExpansion.Value.TargetLabel.Parent.reference:type_name -> bonanza.model.core.Reference
-	191, // 71: bonanza.model.analysis.ModuleExtension.User.tag_classes:type_name -> bonanza.model.analysis.ModuleExtension.TagClass
-	192, // 72: bonanza.model.analysis.ModuleExtension.TagClass.tags:type_name -> bonanza.model.analysis.ModuleExtension.Tag
-	225, // 73: bonanza.model.analysis.ModuleExtension.Tag.attrs:type_name -> bonanza.model.starlark.Struct.Fields
-	65,  // 74: bonanza.model.analysis.UsedModuleExtension.Value.module_extension:type_name -> bonanza.model.analysis.ModuleExtension
-	65,  // 75: bonanza.model.analysis.UsedModuleExtensions.Value.module_extensions:type_name -> bonanza.model.analysis.ModuleExtension
-	205, // 76: bonanza.model.analysis.UserDefinedTransition.Key.input_configuration_reference:type_name -> bonanza.model.core.Reference
-	226, // 77: bonanza.model.analysis.UserDefinedTransition.Value.transition_depends_on_attrs:type_name -> google.protobuf.Empty
-	200, // 78: bonanza.model.analysis.UserDefinedTransition.Value.success:type_name -> bonanza.model.analysis.UserDefinedTransition.Value.Success
-	201, // 79: bonanza.model.analysis.UserDefinedTransition.Value.Success.entries:type_name -> bonanza.model.analysis.UserDefinedTransition.Value.Success.Entry
-	205, // 80: bonanza.model.analysis.UserDefinedTransition.Value.Success.Entry.output_configuration_reference:type_name -> bonanza.model.core.Reference
-	205, // 81: bonanza.model.analysis.VisibleTarget.Key.configuration_reference:type_name -> bonanza.model.core.Reference
-	82,  // [82:82] is the sub-list for method output_type
-	82,  // [82:82] is the sub-list for method input_type
-	82,  // [82:82] is the sub-list for extension type_name
-	82,  // [82:82] is the sub-list for extension extendee
-	0,   // [0:82] is the sub-list for field type_name
+	117, // 1: bonanza.model.analysis.HttpFetchOptions.headers:type_name -> bonanza.model.analysis.HttpFetchOptions.Header
+	150, // 2: bonanza.model.analysis.ModuleOverride.single_version:type_name -> bonanza.model.analysis.ModuleOverride.SingleVersion
+	151, // 3: bonanza.model.analysis.ModuleOverride.multiple_versions:type_name -> bonanza.model.analysis.ModuleOverride.MultipleVersions
+	205, // 4: bonanza.model.analysis.ModuleOverride.repository_rule:type_name -> bonanza.model.starlark.Repo.Definition
+	48,  // 5: bonanza.model.analysis.ExecutionPlatform.constraints:type_name -> bonanza.model.analysis.Constraint
+	48,  // 6: bonanza.model.analysis.RegisteredToolchain.exec_compatible_with:type_name -> bonanza.model.analysis.Constraint
+	48,  // 7: bonanza.model.analysis.RegisteredToolchain.target_compatible_with:type_name -> bonanza.model.analysis.Constraint
+	191, // 8: bonanza.model.analysis.ModuleExtension.users:type_name -> bonanza.model.analysis.ModuleExtension.User
+	206, // 9: bonanza.model.analysis.ActionResult.Key.command_reference:type_name -> bonanza.model.core.Reference
+	206, // 10: bonanza.model.analysis.ActionResult.Key.input_root_reference:type_name -> bonanza.model.core.Reference
+	207, // 11: bonanza.model.analysis.ActionResult.Key.execution_timeout:type_name -> google.protobuf.Duration
+	206, // 12: bonanza.model.analysis.ActionResult.Value.outputs_reference:type_name -> bonanza.model.core.Reference
+	208, // 13: bonanza.model.analysis.BuildSpecification.Value.build_specification:type_name -> bonanza.model.build.BuildSpecification
+	209, // 14: bonanza.model.analysis.CommandEncoders.Value.command_encoders:type_name -> bonanza.model.encoding.BinaryEncoder
+	48,  // 15: bonanza.model.analysis.CompatibleExecutionPlatforms.Key.constraints:type_name -> bonanza.model.analysis.Constraint
+	49,  // 16: bonanza.model.analysis.CompatibleExecutionPlatforms.Value.execution_platforms:type_name -> bonanza.model.analysis.ExecutionPlatform
+	206, // 17: bonanza.model.analysis.CompatibleToolchainsForType.Key.configuration_reference:type_name -> bonanza.model.core.Reference
+	52,  // 18: bonanza.model.analysis.CompatibleToolchainsForType.Value.toolchains:type_name -> bonanza.model.analysis.RegisteredToolchain
+	210, // 19: bonanza.model.analysis.CompiledBzlFile.Value.compiled_program:type_name -> bonanza.model.starlark.CompiledProgram
+	211, // 20: bonanza.model.analysis.CompiledBzlFileGlobal.Value.global:type_name -> bonanza.model.starlark.Value
+	95,  // 21: bonanza.model.analysis.Configuration.BuildSettingOverride.leaf:type_name -> bonanza.model.analysis.Configuration.BuildSettingOverride.Leaf
+	96,  // 22: bonanza.model.analysis.Configuration.BuildSettingOverride.parent:type_name -> bonanza.model.analysis.Configuration.BuildSettingOverride.Parent
+	211, // 23: bonanza.model.analysis.Configuration.BuildSettingOverride.Leaf.value:type_name -> bonanza.model.starlark.Value
+	206, // 24: bonanza.model.analysis.Configuration.BuildSettingOverride.Parent.reference:type_name -> bonanza.model.core.Reference
+	206, // 25: bonanza.model.analysis.ConfiguredTarget.Key.configuration_reference:type_name -> bonanza.model.core.Reference
+	212, // 26: bonanza.model.analysis.ConfiguredTarget.Value.provider_instances:type_name -> bonanza.model.starlark.Struct
+	213, // 27: bonanza.model.analysis.DirectoryAccessParameters.Value.directory_access_parameters:type_name -> bonanza.model.filesystem.DirectoryAccessParameters
+	214, // 28: bonanza.model.analysis.DirectoryCreationParameters.Value.directory_creation_parameters:type_name -> bonanza.model.filesystem.DirectoryCreationParameters
+	215, // 29: bonanza.model.analysis.FileAccessParameters.Value.file_access_parameters:type_name -> bonanza.model.filesystem.FileAccessParameters
+	216, // 30: bonanza.model.analysis.FileCreationParameters.Value.file_creation_parameters:type_name -> bonanza.model.filesystem.FileCreationParameters
+	217, // 31: bonanza.model.analysis.FileProperties.Value.exists:type_name -> bonanza.model.filesystem.FileProperties
+	218, // 32: bonanza.model.analysis.FilesInPackage.Value.directory:type_name -> bonanza.model.filesystem.Directory
+	27,  // 33: bonanza.model.analysis.HttpArchiveContents.Key.fetch_options:type_name -> bonanza.model.analysis.HttpFetchOptions
+	0,   // 34: bonanza.model.analysis.HttpArchiveContents.Key.format:type_name -> bonanza.model.analysis.HttpArchiveContents.Key.Format
+	219, // 35: bonanza.model.analysis.HttpArchiveContents.Value.exists:type_name -> bonanza.model.filesystem.DirectoryReference
+	27,  // 36: bonanza.model.analysis.HttpFileContents.Key.fetch_options:type_name -> bonanza.model.analysis.HttpFetchOptions
+	122, // 37: bonanza.model.analysis.HttpFileContents.Value.exists:type_name -> bonanza.model.analysis.HttpFileContents.Value.Exists
+	220, // 38: bonanza.model.analysis.HttpFileContents.Value.Exists.contents:type_name -> bonanza.model.filesystem.FileContents
+	220, // 39: bonanza.model.analysis.ModuleDotBazelContents.Value.contents:type_name -> bonanza.model.filesystem.FileContents
+	206, // 40: bonanza.model.analysis.MakeVariables.Key.configuration_reference:type_name -> bonanza.model.core.Reference
+	127, // 41: bonanza.model.analysis.MakeVariables.Value.variables:type_name -> bonanza.model.analysis.MakeVariables.Value.MakeVariable
+	132, // 42: bonanza.model.analysis.ModuleRepoMapping.Value.mappings:type_name -> bonanza.model.analysis.ModuleRepoMapping.Value.Mapping
+	205, // 43: bonanza.model.analysis.ModuleExtensionRepo.Value.definition:type_name -> bonanza.model.starlark.Repo.Definition
+	139, // 44: bonanza.model.analysis.ModuleExtensionRepos.Value.repos:type_name -> bonanza.model.analysis.ModuleExtensionRepos.Value.Repo
+	221, // 45: bonanza.model.analysis.ModuleExtensionRepos.Value.Repo.leaf:type_name -> bonanza.model.starlark.Repo
+	140, // 46: bonanza.model.analysis.ModuleExtensionRepos.Value.Repo.parent:type_name -> bonanza.model.analysis.ModuleExtensionRepos.Value.Repo.Parent
+	206, // 47: bonanza.model.analysis.ModuleExtensionRepos.Value.Repo.Parent.reference:type_name -> bonanza.model.core.Reference
+	37,  // 48: bonanza.model.analysis.ModuleFinalBuildList.Value.build_list:type_name -> bonanza.model.analysis.BuildListModule
+	37,  // 49: bonanza.model.analysis.ModuleRoughBuildList.Value.build_list:type_name -> bonanza.model.analysis.BuildListModule
+	40,  // 50: bonanza.model.analysis.ModulesWithMultipleVersions.Value.overrides_list:type_name -> bonanza.model.analysis.OverridesListModule
+	40,  // 51: bonanza.model.analysis.ModulesWithOverrides.Value.overrides_list:type_name -> bonanza.model.analysis.OverridesListModule
+	44,  // 52: bonanza.model.analysis.ModulesWithRemoteOverrides.Value.module_overrides:type_name -> bonanza.model.analysis.ModuleOverride
+	156, // 53: bonanza.model.analysis.Package.Value.targets:type_name -> bonanza.model.analysis.Package.Value.Target
+	222, // 54: bonanza.model.analysis.Package.Value.Target.leaf:type_name -> bonanza.model.starlark.Target
+	157, // 55: bonanza.model.analysis.Package.Value.Target.parent:type_name -> bonanza.model.analysis.Package.Value.Target.Parent
+	206, // 56: bonanza.model.analysis.Package.Value.Target.Parent.reference:type_name -> bonanza.model.core.Reference
+	49,  // 57: bonanza.model.analysis.RegisteredExecutionPlatforms.Value.execution_platforms:type_name -> bonanza.model.analysis.ExecutionPlatform
+	164, // 58: bonanza.model.analysis.RegisteredRepoPlatform.Value.repository_os_environ:type_name -> bonanza.model.analysis.RegisteredRepoPlatform.Value.EnvironmentVariable
+	167, // 59: bonanza.model.analysis.RegisteredToolchains.Value.toolchain_types:type_name -> bonanza.model.analysis.RegisteredToolchains.Value.RegisteredToolchainType
+	52,  // 60: bonanza.model.analysis.RegisteredToolchains.Value.RegisteredToolchainType.toolchains:type_name -> bonanza.model.analysis.RegisteredToolchain
+	52,  // 61: bonanza.model.analysis.RegisteredToolchainsForType.Value.toolchains:type_name -> bonanza.model.analysis.RegisteredToolchain
+	219, // 62: bonanza.model.analysis.Repo.Value.root_directory_reference:type_name -> bonanza.model.filesystem.DirectoryReference
+	223, // 63: bonanza.model.analysis.RepoDefaultAttrs.Value.inheritable_attrs:type_name -> bonanza.model.starlark.InheritableAttrs
+	48,  // 64: bonanza.model.analysis.ResolvedToolchains.Key.exec_compatible_with:type_name -> bonanza.model.analysis.Constraint
+	206, // 65: bonanza.model.analysis.ResolvedToolchains.Key.configuration_reference:type_name -> bonanza.model.core.Reference
+	224, // 66: bonanza.model.analysis.ResolvedToolchains.Key.toolchains:type_name -> bonanza.model.starlark.ToolchainType
+	225, // 67: bonanza.model.analysis.Target.Value.definition:type_name -> bonanza.model.starlark.Target.Definition
+	206, // 68: bonanza.model.analysis.TargetCompletion.Key.configuration_reference:type_name -> bonanza.model.core.Reference
+	189, // 69: bonanza.model.analysis.TargetPatternExpansion.Value.target_labels:type_name -> bonanza.model.analysis.TargetPatternExpansion.Value.TargetLabel
+	190, // 70: bonanza.model.analysis.TargetPatternExpansion.Value.TargetLabel.parent:type_name -> bonanza.model.analysis.TargetPatternExpansion.Value.TargetLabel.Parent
+	206, // 71: bonanza.model.analysis.TargetPatternExpansion.Value.TargetLabel.Parent.reference:type_name -> bonanza.model.core.Reference
+	192, // 72: bonanza.model.analysis.ModuleExtension.User.tag_classes:type_name -> bonanza.model.analysis.ModuleExtension.TagClass
+	193, // 73: bonanza.model.analysis.ModuleExtension.TagClass.tags:type_name -> bonanza.model.analysis.ModuleExtension.Tag
+	226, // 74: bonanza.model.analysis.ModuleExtension.Tag.attrs:type_name -> bonanza.model.starlark.Struct.Fields
+	65,  // 75: bonanza.model.analysis.UsedModuleExtension.Value.module_extension:type_name -> bonanza.model.analysis.ModuleExtension
+	65,  // 76: bonanza.model.analysis.UsedModuleExtensions.Value.module_extensions:type_name -> bonanza.model.analysis.ModuleExtension
+	206, // 77: bonanza.model.analysis.UserDefinedTransition.Key.input_configuration_reference:type_name -> bonanza.model.core.Reference
+	227, // 78: bonanza.model.analysis.UserDefinedTransition.Value.transition_depends_on_attrs:type_name -> google.protobuf.Empty
+	201, // 79: bonanza.model.analysis.UserDefinedTransition.Value.success:type_name -> bonanza.model.analysis.UserDefinedTransition.Value.Success
+	202, // 80: bonanza.model.analysis.UserDefinedTransition.Value.Success.entries:type_name -> bonanza.model.analysis.UserDefinedTransition.Value.Success.Entry
+	206, // 81: bonanza.model.analysis.UserDefinedTransition.Value.Success.Entry.output_configuration_reference:type_name -> bonanza.model.core.Reference
+	206, // 82: bonanza.model.analysis.VisibleTarget.Key.configuration_reference:type_name -> bonanza.model.core.Reference
+	83,  // [83:83] is the sub-list for method output_type
+	83,  // [83:83] is the sub-list for method input_type
+	83,  // [83:83] is the sub-list for extension type_name
+	83,  // [83:83] is the sub-list for extension extendee
+	0,   // [0:83] is the sub-list for field type_name
 }
 
 func init() { file_pkg_proto_model_analysis_analysis_proto_init() }
@@ -10240,19 +10310,19 @@ func file_pkg_proto_model_analysis_analysis_proto_init() {
 		(*Configuration_BuildSettingOverride_Leaf_)(nil),
 		(*Configuration_BuildSettingOverride_Parent_)(nil),
 	}
-	file_pkg_proto_model_analysis_analysis_proto_msgTypes[137].OneofWrappers = []any{
+	file_pkg_proto_model_analysis_analysis_proto_msgTypes[138].OneofWrappers = []any{
 		(*ModuleExtensionRepos_Value_Repo_Leaf)(nil),
 		(*ModuleExtensionRepos_Value_Repo_Parent_)(nil),
 	}
-	file_pkg_proto_model_analysis_analysis_proto_msgTypes[154].OneofWrappers = []any{
+	file_pkg_proto_model_analysis_analysis_proto_msgTypes[155].OneofWrappers = []any{
 		(*Package_Value_Target_Leaf)(nil),
 		(*Package_Value_Target_Parent_)(nil),
 	}
-	file_pkg_proto_model_analysis_analysis_proto_msgTypes[187].OneofWrappers = []any{
+	file_pkg_proto_model_analysis_analysis_proto_msgTypes[188].OneofWrappers = []any{
 		(*TargetPatternExpansion_Value_TargetLabel_Leaf)(nil),
 		(*TargetPatternExpansion_Value_TargetLabel_Parent_)(nil),
 	}
-	file_pkg_proto_model_analysis_analysis_proto_msgTypes[198].OneofWrappers = []any{
+	file_pkg_proto_model_analysis_analysis_proto_msgTypes[199].OneofWrappers = []any{
 		(*UserDefinedTransition_Value_TransitionDependsOnAttrs)(nil),
 		(*UserDefinedTransition_Value_Success_)(nil),
 	}
@@ -10262,7 +10332,7 @@ func file_pkg_proto_model_analysis_analysis_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pkg_proto_model_analysis_analysis_proto_rawDesc), len(file_pkg_proto_model_analysis_analysis_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   203,
+			NumMessages:   204,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -390,6 +390,17 @@ message HttpFetchOptions {
   // If not set, let the function fail if the server returns a HTTP
   // status code other than 200 and 404.
   bool allow_fail = 3;
+
+  message Header {
+    // Name of the HTTP header to set.
+    string name = 1;
+
+    // Value to assign to the HTTP header.
+    string value = 2;
+  }
+
+  // HTTP headers to send to servers as part of outgoing requests.
+  repeated Header headers = 4;
 }
 
 message HttpArchiveContents {

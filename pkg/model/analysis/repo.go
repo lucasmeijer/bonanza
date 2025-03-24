@@ -1235,13 +1235,22 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doDownload(thread *
 		integrity = "sha256-" + base64.StdEncoding.EncodeToString(sha256Bytes)
 	}
 
+	headersEntries := make([]*model_analysis_pb.HttpFetchOptions_Header, 0, len(headers))
+	for _, name := range slices.Sorted(maps.Keys(headers)) {
+		headersEntries = append(headersEntries, &model_analysis_pb.HttpFetchOptions_Header{
+			Name:  name,
+			Value: headers[name],
+		})
+	}
+
 	fileContentsValue := mrc.environment.GetHttpFileContentsValue(&model_analysis_pb.HttpFileContents_Key{
 		FetchOptions: &model_analysis_pb.HttpFetchOptions{
 			Urls:      urls,
 			Integrity: integrity,
 			AllowFail: allowFail,
+			Headers:   headersEntries,
+			// TODO: Set auth!
 		},
-		// TODO: Set auth and headers!
 	})
 	if !block {
 		return nil, errors.New("non-blocking downloads are not implemented yet")
