@@ -831,29 +831,29 @@ func decodeDictEntries[TReference object.BasicReference, TMetadata model_core.Cl
 	thread.SetLocal(ValueDecodingOptionsKey, options.valueDecodingOptions)
 
 	var errIter error
-	for entry := range AllDictLeafEntries(
+	for key, value := range AllDictLeafEntries(
 		options.valueDecodingOptions.Context,
 		options.valueDecodingOptions.Readers.Dict,
 		in,
 		&errIter,
 	) {
-		key, err := DecodeValue[TReference, TMetadata](
-			model_core.NewNestedMessage(entry, entry.Message.Key),
+		decodedKey, err := DecodeValue[TReference, TMetadata](
+			key,
 			nil,
 			options.valueDecodingOptions,
 		)
 		if err != nil {
 			return err
 		}
-		value, err := DecodeValue[TReference, TMetadata](
-			model_core.NewNestedMessage(entry, entry.Message.Value),
+		decodedValue, err := DecodeValue[TReference, TMetadata](
+			value,
 			nil,
 			options.valueDecodingOptions,
 		)
 		if err != nil {
 			return err
 		}
-		if err := options.out.SetKey(thread, key, value); err != nil {
+		if err := options.out.SetKey(thread, decodedKey, decodedValue); err != nil {
 			return err
 		}
 	}

@@ -17,7 +17,7 @@ func AllDictLeafEntries[TReference any](
 	reader model_parser.ParsedObjectReader[TReference, model_core.Message[[]*model_starlark_pb.Dict_Entry, TReference]],
 	rootDict model_core.Message[*model_starlark_pb.Dict, TReference],
 	errOut *error,
-) iter.Seq[model_core.Message[*model_starlark_pb.Dict_Entry_Leaf, TReference]] {
+) iter.Seq2[model_core.Message[*model_starlark_pb.Value, TReference], model_core.Message[*model_starlark_pb.Value, TReference]] {
 	allLeaves := btree.AllLeaves(
 		ctx,
 		reader,
@@ -30,14 +30,17 @@ func AllDictLeafEntries[TReference any](
 		},
 		errOut,
 	)
-	return func(yield func(model_core.Message[*model_starlark_pb.Dict_Entry_Leaf, TReference]) bool) {
+	return func(yield func(model_core.Message[*model_starlark_pb.Value, TReference], model_core.Message[*model_starlark_pb.Value, TReference]) bool) {
 		allLeaves(func(entry model_core.Message[*model_starlark_pb.Dict_Entry, TReference]) bool {
 			leafEntry, ok := entry.Message.Level.(*model_starlark_pb.Dict_Entry_Leaf_)
 			if !ok {
 				*errOut = errors.New("not a valid leaf entry")
 				return false
 			}
-			return yield(model_core.NewNestedMessage(entry, leafEntry.Leaf))
+			return yield(
+				model_core.NewNestedMessage(entry, leafEntry.Leaf.Key),
+				model_core.NewNestedMessage(entry, leafEntry.Leaf.Value),
+			)
 		})
 	}
 }

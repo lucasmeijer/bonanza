@@ -47,21 +47,21 @@ func (c *baseComputer[TReference, TMetadata]) extractFromPlatformInfoConstraints
 	}
 	var iterErr error
 	constraints := map[string]string{}
-	for entry := range model_starlark.AllDictLeafEntries(
+	for key, value := range model_starlark.AllDictLeafEntries(
 		ctx,
 		c.valueReaders.Dict,
 		model_core.NewNestedMessage(value, dict.Dict),
 		&iterErr,
 	) {
-		key, ok := entry.Message.Key.GetKind().(*model_starlark_pb.Value_Label)
+		keyLabel, ok := key.Message.GetKind().(*model_starlark_pb.Value_Label)
 		if !ok {
 			return nil, errors.New("key of constraints field of PlatformInfo is not a label")
 		}
-		value, ok := entry.Message.Value.GetKind().(*model_starlark_pb.Value_Label)
+		valueLabel, ok := value.Message.GetKind().(*model_starlark_pb.Value_Label)
 		if !ok {
 			return nil, errors.New("value of constraints field of PlatformInfo is not a label")
 		}
-		constraints[key.Label] = value.Label
+		constraints[keyLabel.Label] = valueLabel.Label
 	}
 	if iterErr != nil {
 		return nil, fmt.Errorf("failed to iterate dict of constraints field of PlatformInfo: %w", iterErr)

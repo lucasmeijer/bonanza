@@ -25,21 +25,21 @@ func (c *baseComputer[TReference, TMetadata]) decodeStringDict(ctx context.Conte
 	}
 	var iterErr error
 	o := map[string]string{}
-	for entry := range model_starlark.AllDictLeafEntries(
+	for key, value := range model_starlark.AllDictLeafEntries(
 		ctx,
 		c.valueReaders.Dict,
 		model_core.NewNestedMessage(d, dict.Dict),
 		&iterErr,
 	) {
-		key, ok := entry.Message.Key.GetKind().(*model_starlark_pb.Value_Str)
+		keyStr, ok := key.Message.GetKind().(*model_starlark_pb.Value_Str)
 		if !ok {
 			return nil, errors.New("key is not a string")
 		}
-		value, ok := entry.Message.Value.GetKind().(*model_starlark_pb.Value_Str)
+		valueStr, ok := value.Message.GetKind().(*model_starlark_pb.Value_Str)
 		if !ok {
 			return nil, errors.New("value is not a string")
 		}
-		o[key.Str] = value.Str
+		o[keyStr.Str] = valueStr.Str
 	}
 	if iterErr != nil {
 		return nil, fmt.Errorf("failed to iterate dict: %w", iterErr)
