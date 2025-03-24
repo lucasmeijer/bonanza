@@ -294,7 +294,12 @@ func (c *baseComputer[TReference, TMetadata]) ComputeModuleDotBazelContentsValue
 				return PatchedModuleDotBazelContentsValue{}, fmt.Errorf("failed to construct URL for module %s with version %s in registry %#v: %s", foundModule.Name, foundModule.Version, foundModule.RegistryUrl)
 			}
 
-			fileContentsValue := e.GetHttpFileContentsValue(&model_analysis_pb.HttpFileContents_Key{Urls: []string{moduleFileURL}})
+			fileContentsValue := e.GetHttpFileContentsValue(
+				&model_analysis_pb.HttpFileContents_Key{
+					FetchOptions: &model_analysis_pb.HttpFetchOptions{
+						Urls: []string{moduleFileURL},
+					},
+				})
 			if !fileContentsValue.IsSet() {
 				return PatchedModuleDotBazelContentsValue{}, evaluation.ErrMissingDependency
 			}

@@ -246,15 +246,13 @@ func (c *baseComputer[TReference, TMetadata]) ComputeHttpArchiveContentsValue(ct
 	directoryCreationParameters, gotDirectoryCreationParameters := e.GetDirectoryCreationParametersObjectValue(&model_analysis_pb.DirectoryCreationParametersObject_Key{})
 	fileCreationParameters, gotFileCreationParameters := e.GetFileCreationParametersObjectValue(&model_analysis_pb.FileCreationParametersObject_Key{})
 	httpFileContentsValue := e.GetHttpFileContentsValue(&model_analysis_pb.HttpFileContents_Key{
-		AllowFail: key.AllowFail,
-		Integrity: key.Integrity,
-		Urls:      key.Urls,
+		FetchOptions: key.FetchOptions,
 	})
 	if !gotFileReader || !gotDirectoryCreationParameters || !gotFileCreationParameters || !httpFileContentsValue.IsSet() {
 		return PatchedHttpArchiveContentsValue{}, evaluation.ErrMissingDependency
 	}
 	if httpFileContentsValue.Message.Exists == nil {
-		return PatchedHttpArchiveContentsValue{}, fmt.Errorf("file at URLs %#v does not exist", key.Urls)
+		return PatchedHttpArchiveContentsValue{}, errors.New("file does not exist")
 	}
 
 	httpFileContentsEntry, err := model_filesystem.NewFileContentsEntryFromProto(

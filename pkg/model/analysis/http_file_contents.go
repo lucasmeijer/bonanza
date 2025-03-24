@@ -26,7 +26,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeHttpFileContentsValue(ctx c
 	}
 
 ProcessURLs:
-	for _, url := range key.Urls {
+	for _, url := range key.FetchOptions.GetUrls() {
 		// Store copies of the file in a local cache directory.
 		// TODO: Remove this feature once our storage is robust enough.
 		urlHash := sha256.Sum256([]byte(url))
@@ -69,14 +69,14 @@ ProcessURLs:
 			default:
 				downloadedFile.Close()
 				c.cacheDirectory.Remove(filename)
-				if key.AllowFail {
+				if key.FetchOptions.GetAllowFail() {
 					continue ProcessURLs
 				}
 				return PatchedHttpFileContentsValue{}, fmt.Errorf("received unexpected HTTP response %#v", resp.Status)
 			}
 		}
 
-		if key.Integrity != "" {
+		if key.FetchOptions.GetIntegrity() != "" {
 			// TODO: Validate integrity of the downloaded file!
 		}
 

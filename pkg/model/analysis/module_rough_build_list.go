@@ -202,7 +202,13 @@ ProcessModule:
 				if err != nil {
 					return PatchedModuleRoughBuildListValue{}, fmt.Errorf("failed to construct URL for module %s with version %s in registry %#v: %w", module.name, module.version, registryURL, err)
 				}
-				httpFileContents := e.GetHttpFileContentsValue(&model_analysis_pb.HttpFileContents_Key{Urls: []string{moduleFileURL}})
+				httpFileContents := e.GetHttpFileContentsValue(
+					&model_analysis_pb.HttpFileContents_Key{
+						FetchOptions: &model_analysis_pb.HttpFetchOptions{
+							Urls: []string{moduleFileURL},
+						},
+					},
+				)
 				if !httpFileContents.IsSet() {
 					missingDependencies = true
 					continue ProcessModule

@@ -379,8 +379,23 @@ message Glob {
   }
 }
 
+message HttpFetchOptions {
+  // The URLs to fetch.
+  repeated string urls = 1;
+
+  // Optional checksum of the file to download, provided in the
+  // Subresource Integrity (SRI) format.
+  string integrity = 2;
+
+  // If not set, let the function fail if the server returns a HTTP
+  // status code other than 200 and 404.
+  bool allow_fail = 3;
+}
+
 message HttpArchiveContents {
   message Key {
+    HttpFetchOptions fetch_options = 1;
+
     enum Format {
       // The format of the archive is not specified.
       UNKNOWN = 0;
@@ -396,19 +411,8 @@ message HttpArchiveContents {
       ZIP = 3;
     }
 
-    // The URLs to fetch.
-    repeated string urls = 1;
-
     // The format of the archive.
     Format format = 2;
-
-    // Optional checksum of the archive to download, provided in the
-    // Subresource Integrity (SRI) format.
-    string integrity = 3;
-
-    // If not set, let the function fail if the server returns a HTTP
-    // status code other than 200 and 404.
-    bool allow_fail = 4;
   }
 
   message Value {
@@ -424,16 +428,7 @@ message HttpArchiveContents {
 
 message HttpFileContents {
   message Key {
-    // The URLs to fetch.
-    repeated string urls = 1;
-
-    // Optional checksum of the file to download, provided in the
-    // Subresource Integrity (SRI) format.
-    string integrity = 2;
-
-    // If not set, let the function fail if the server returns a HTTP
-    // status code other than 200 and 404.
-    bool allow_fail = 3;
+    HttpFetchOptions fetch_options = 1;
   }
 
   message Value {

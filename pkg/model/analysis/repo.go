@@ -642,7 +642,13 @@ func (c *baseComputer[TReference, TMetadata]) fetchModuleFromRegistry(
 		return PatchedRepoValue{}, fmt.Errorf("failed to construct URL for module %s with version %s in registry %#v: %w", module.Name, module.Version, module.RegistryUrl, err)
 	}
 
-	sourceJSONContentsValue := e.GetHttpFileContentsValue(&model_analysis_pb.HttpFileContents_Key{Urls: []string{sourceJSONURL}})
+	sourceJSONContentsValue := e.GetHttpFileContentsValue(
+		&model_analysis_pb.HttpFileContents_Key{
+			FetchOptions: &model_analysis_pb.HttpFetchOptions{
+				Urls: []string{sourceJSONURL},
+			},
+		},
+	)
 	if !sourceJSONContentsValue.IsSet() {
 		return PatchedRepoValue{}, evaluation.ErrMissingDependency
 	}
@@ -675,9 +681,11 @@ func (c *baseComputer[TReference, TMetadata]) fetchModuleFromRegistry(
 	// that needs downloading is done.
 	missingDependencies := false
 	archiveContentsValue := e.GetHttpArchiveContentsValue(&model_analysis_pb.HttpArchiveContents_Key{
-		Urls:      []string{sourceJSON.URL},
-		Integrity: sourceJSON.Integrity,
-		Format:    archiveFormat,
+		FetchOptions: &model_analysis_pb.HttpFetchOptions{
+			Urls:      []string{sourceJSON.URL},
+			Integrity: sourceJSON.Integrity,
+		},
+		Format: archiveFormat,
 	})
 	if !archiveContentsValue.IsSet() {
 		missingDependencies = true
@@ -698,8 +706,10 @@ func (c *baseComputer[TReference, TMetadata]) fetchModuleFromRegistry(
 			return PatchedRepoValue{}, fmt.Errorf("failed to construct URL for patch %s of module %s with version %s in registry %#v: %s", patchEntry.key, module.Name, module.Version, module.RegistryUrl, err)
 		}
 		patchContentsValue := e.GetHttpFileContentsValue(&model_analysis_pb.HttpFileContents_Key{
-			Urls:      []string{patchURL},
-			Integrity: patchEntry.value,
+			FetchOptions: &model_analysis_pb.HttpFetchOptions{
+				Urls:      []string{patchURL},
+				Integrity: patchEntry.value,
+			},
 		})
 		if !patchContentsValue.IsSet() {
 			missingDependencies = true
@@ -1226,9 +1236,11 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doDownload(thread *
 	}
 
 	fileContentsValue := mrc.environment.GetHttpFileContentsValue(&model_analysis_pb.HttpFileContents_Key{
-		Urls:      urls,
-		Integrity: integrity,
-		AllowFail: allowFail,
+		FetchOptions: &model_analysis_pb.HttpFetchOptions{
+			Urls:      urls,
+			Integrity: integrity,
+			AllowFail: allowFail,
+		},
 		// TODO: Set auth and headers!
 	})
 	if !block {
@@ -1344,10 +1356,12 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doDownloadAndExtrac
 	}
 
 	archiveContentsValue := mrc.environment.GetHttpArchiveContentsValue(&model_analysis_pb.HttpArchiveContents_Key{
-		AllowFail: allowFail,
-		Format:    archiveFormat,
-		Integrity: integrity,
-		Urls:      urls,
+		FetchOptions: &model_analysis_pb.HttpFetchOptions{
+			AllowFail: allowFail,
+			Integrity: integrity,
+			Urls:      urls,
+		},
+		Format: archiveFormat,
 	})
 	if !archiveContentsValue.IsSet() {
 		return nil, evaluation.ErrMissingDependency
