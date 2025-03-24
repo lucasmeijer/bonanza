@@ -1380,6 +1380,7 @@ type ruleContext[TReference object.BasicReference, TMetadata BaseComputerReferen
 	outputs                starlark.Value
 	execGroups             []*ruleContextExecGroupState
 	tags                   *starlark.List
+	varDict                *starlark.Dict
 	fragments              map[string]*model_starlark.Struct[TReference, TMetadata]
 }
 
@@ -1553,15 +1554,35 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 			execGroupIndex: execGroupIndex,
 		}, nil
 	case "var":
-		// We shouldn't attempt to support --define, as Bazel
-		// only provides it for backward compatibility. Provide
-		// an empty dictionary to keep existing users happy.
-		//
-		// TODO: Should we at least provide support for
-		// platform_common.TemplateVariableInfo?
-		d := starlark.NewDict(0)
-		d.Freeze()
-		return d, nil
+		if rc.varDict == nil {
+			configurationReference := model_core.NewPatchedMessageFromExistingCaptured(
+				rc.environment,
+				rc.configurationReference,
+			)
+			makeVariables := rc.environment.GetMakeVariablesValue(
+				model_core.NewPatchedMessage(
+					&model_analysis_pb.MakeVariables_Key{
+						FromPackage:            rc.targetLabel.GetCanonicalPackage().String(),
+						ConfigurationReference: configurationReference.Message,
+						Toolchains:             rc.ruleTarget.Message.Toolchains,
+					},
+					model_core.MapReferenceMetadataToWalkers(configurationReference.Patcher),
+				),
+			)
+			if !makeVariables.IsSet() {
+				return nil, evaluation.ErrMissingDependency
+			}
+
+			d := starlark.NewDict(len(makeVariables.Message.Variables))
+			for _, variable := range makeVariables.Message.Variables {
+				if err := d.SetKey(thread, starlark.String(variable.Key), starlark.String(variable.Value)); err != nil {
+					return nil, err
+				}
+			}
+			d.Freeze()
+			rc.varDict = d
+		}
+		return rc.varDict, nil
 	case "version_file":
 		// Fill all of this in properly.
 		return model_starlark.NewFile[TReference, TMetadata](&model_starlark_pb.File{

@@ -110,6 +110,7 @@
             "CompiledBzlFileFunctionFactory",
             "CompiledBzlFileGlobal",
             "ConfiguredTarget",
+            "MakeVariables",
             "ResolvedToolchains",
             "RootModule",
             "Select",
@@ -212,6 +213,13 @@
          "dependsOn": [
             "FileCreationParametersObject"
          ]
+      },
+      "MakeVariables": {
+         "dependsOn": [
+            "ConfiguredTarget",
+            "VisibleTarget"
+         ],
+         "keyContainsReferences": true
       },
       "ModuleDotBazelContents": {
          "dependsOn": [

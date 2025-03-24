@@ -1,0 +1,7 @@
+load(":default_make_variables.bzl", "default_make_variables")
+
+# Provider of Make variables that are available by default.
+default_make_variables(
+    name = "default_make_variables",
+    visibility = ["//visibility:public"],
+)
