@@ -197,7 +197,6 @@ genrule = rule(
         "output_to_bindir": attr.bool(),
         "outs": attr.output_list(mandatory = True),
         "srcs": attr.label_list(allow_files = True),
-        "toolchains": attr.label_list(),
         "tools": attr.label_list(allow_files = True),
     },
 )

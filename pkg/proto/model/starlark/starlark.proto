@@ -703,6 +703,15 @@ message RuleTarget {
   // default value if the build setting is not set explicitly is
   // provided.
   Value build_setting_default = 7;
+
+  // The set of targets whose Make variables this target is allowed to
+  // access. These targets are instances of rules that provide
+  // TemplateVariableInfo.
+  //
+  // Note that this is distinct from the concept of toolchain resolution
+  // that is used by rule implementations for platform-dependent
+  // configuration.
+  repeated string toolchains = 8;
 }
 
 message Runfiles {
