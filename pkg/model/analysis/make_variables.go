@@ -2,6 +2,7 @@ package analysis
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -19,6 +20,7 @@ var templateVariableInfoProviderIdentifier = label.MustNewCanonicalStarlarkIdent
 
 func (c *baseComputer[TReference, TMetadata]) ComputeMakeVariablesValue(ctx context.Context, key model_core.Message[*model_analysis_pb.MakeVariables_Key, TReference], e MakeVariablesEnvironment[TReference, TMetadata]) (PatchedMakeVariablesValue, error) {
 	allVariables := map[string]string{}
+	missingDependencies := false
 	for _, toolchainLabel := range append([]string{"@@bazel_tools+//tools/make:default_make_variables"}, key.Message.Toolchains...) {
 		// Obtain TemplateVariableInfo of the provided toolchain.
 		configurationReference := model_core.NewNestedMessage(key, key.Message.ConfigurationReference)
@@ -34,7 +36,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeMakeVariablesValue(ctx cont
 			),
 		)
 		if !visibleTargetValue.IsSet() {
-			return PatchedMakeVariablesValue{}, evaluation.ErrMissingDependency
+			missingDependencies = true
+			continue
 		}
 		templateVariableInfoProvider, err := getProviderFromConfiguredTarget(
 			e,
@@ -43,6 +46,10 @@ func (c *baseComputer[TReference, TMetadata]) ComputeMakeVariablesValue(ctx cont
 			templateVariableInfoProviderIdentifier,
 		)
 		if err != nil {
+			if errors.Is(err, evaluation.ErrMissingDependency) {
+				missingDependencies = true
+				continue
+			}
 			return PatchedMakeVariablesValue{}, fmt.Errorf("failed to obtain TemplateVariableInfo provider of toolchain %#v: %w", toolchainLabel, err)
 		}
 
@@ -80,6 +87,9 @@ func (c *baseComputer[TReference, TMetadata]) ComputeMakeVariablesValue(ctx cont
 		if errIter != nil {
 			return PatchedMakeVariablesValue{}, fmt.Errorf("failed to iterate \"variables\" field of TemplateVariableInfo provide of toolchain %#v: %w", toolchainLabel, errIter)
 		}
+	}
+	if missingDependencies {
+		return PatchedMakeVariablesValue{}, evaluation.ErrMissingDependency
 	}
 
 	// Return all variables in sorted order.
