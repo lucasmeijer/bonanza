@@ -193,9 +193,11 @@ string_flag(
     visibility = ["//visibility:public"],
 )
 
+platform(name = "empty_platform")
+
 label_flag(
     name = "platforms",
-    build_setting_default = "@platforms//host",
+    build_setting_default = ":empty_platform",
     singleton_list = True,
     visibility = ["//visibility:public"],
 )
