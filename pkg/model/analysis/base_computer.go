@@ -341,11 +341,13 @@ func (c *baseComputer[TReference, TMetadata]) newStarlarkThread(ctx context.Cont
 }
 
 func (c *baseComputer[TReference, TMetadata]) ComputeBuildResultValue(ctx context.Context, key *model_analysis_pb.BuildResult_Key, e BuildResultEnvironment[TReference, TMetadata]) (PatchedBuildResultValue, error) {
-	buildSpecification := e.GetBuildSpecificationValue(&model_analysis_pb.BuildSpecification_Key{})
-	if !buildSpecification.IsSet() {
+	buildSpecificationMessage := e.GetBuildSpecificationValue(&model_analysis_pb.BuildSpecification_Key{})
+	if !buildSpecificationMessage.IsSet() {
 		return PatchedBuildResultValue{}, evaluation.ErrMissingDependency
 	}
-	rootModuleName := buildSpecification.Message.BuildSpecification.RootModuleName
+	buildSpecification := buildSpecificationMessage.Message.BuildSpecification
+
+	rootModuleName := buildSpecification.RootModuleName
 	rootModule, err := label.NewModule(rootModuleName)
 	if err != nil {
 		return PatchedBuildResultValue{}, fmt.Errorf("invalid root module name %#v: %w", rootModuleName, err)
@@ -353,49 +355,82 @@ func (c *baseComputer[TReference, TMetadata]) ComputeBuildResultValue(ctx contex
 	rootRepo := rootModule.ToModuleInstance(nil).GetBareCanonicalRepo()
 	rootPackage := rootRepo.GetRootPackage()
 
-	// TODO: Obtain platform constraints from --platforms.
+	const platformsCommandLineOptionLabel = "@@bazel_tools+//command_line_option:platforms"
+	platformExpectedTransitionOutput, err := getExpectedTransitionOutput[TReference, TMetadata](e, rootPackage, platformsCommandLineOptionLabel)
+	if err != nil {
+		return PatchedBuildResultValue{}, err
+	}
+
+	thread := c.newStarlarkThread(ctx, e, buildSpecification.BuiltinsModuleNames)
+	valueEncodingOptions := c.getValueEncodingOptions(e, nil)
 	missingDependencies := false
-	for _, targetPattern := range buildSpecification.Message.BuildSpecification.TargetPatterns {
-		apparentTargetPattern, err := rootPackage.AppendTargetPattern(targetPattern)
+	for _, targetPlatform := range buildSpecification.TargetPlatforms {
+		targetPlatformConfigurationReference, err := c.applyTransition(
+			ctx,
+			e,
+			model_core.NewSimpleMessage[TReference](&model_analysis_pb.Configuration{}),
+			[]expectedTransitionOutput[TReference]{platformExpectedTransitionOutput},
+			thread,
+			starlark.StringDict{platformsCommandLineOptionLabel: starlark.String(targetPlatform)},
+			valueEncodingOptions,
+		)
 		if err != nil {
-			return PatchedBuildResultValue{}, fmt.Errorf("invalid target pattern %#v: %w", targetPattern, err)
-		}
-		canonicalTargetPattern, err := resolveApparent(e, rootRepo, apparentTargetPattern)
-		if err != nil {
-			return PatchedBuildResultValue{}, err
-		}
-
-		var iterErr error
-		for canonicalTargetLabel := range c.expandCanonicalTargetPattern(ctx, e, canonicalTargetPattern, &iterErr) {
-			visibleTargetValue := e.GetVisibleTargetValue(
-				model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](
-					&model_analysis_pb.VisibleTarget_Key{
-						FromPackage: canonicalTargetLabel.GetCanonicalPackage().String(),
-						ToLabel:     canonicalTargetLabel.String(),
-					},
-				),
-			)
-			if !visibleTargetValue.IsSet() {
-				missingDependencies = true
-				continue
-			}
-
-			targetCompletionValue := e.GetTargetCompletionValue(
-				model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](
-					&model_analysis_pb.TargetCompletion_Key{
-						Label: visibleTargetValue.Message.Label,
-					},
-				),
-			)
-			if !targetCompletionValue.IsSet() {
-				missingDependencies = true
-			}
-		}
-		if iterErr != nil {
-			if !errors.Is(iterErr, evaluation.ErrMissingDependency) {
-				return PatchedBuildResultValue{}, fmt.Errorf("failed to iterate target pattern %#v: %w", targetPattern, iterErr)
+			if !errors.Is(err, evaluation.ErrMissingDependency) {
+				return PatchedBuildResultValue{}, fmt.Errorf("failed to transition to target platform %#v: %w", targetPlatform, err)
 			}
 			missingDependencies = true
+			continue
+		}
+		clonedConfigurationReference := model_core.PatchedMessageToCloneable(targetPlatformConfigurationReference)
+
+		for _, targetPattern := range buildSpecification.TargetPatterns {
+			apparentTargetPattern, err := rootPackage.AppendTargetPattern(targetPattern)
+			if err != nil {
+				return PatchedBuildResultValue{}, fmt.Errorf("invalid target pattern %#v: %w", targetPattern, err)
+			}
+			canonicalTargetPattern, err := resolveApparent(e, rootRepo, apparentTargetPattern)
+			if err != nil {
+				return PatchedBuildResultValue{}, err
+			}
+
+			var iterErr error
+			for canonicalTargetLabel := range c.expandCanonicalTargetPattern(ctx, e, canonicalTargetPattern, &iterErr) {
+				patchedConfigurationReference1 := model_core.NewPatchedMessageFromCloneable(clonedConfigurationReference)
+				visibleTargetValue := e.GetVisibleTargetValue(
+					model_core.NewPatchedMessage(
+						&model_analysis_pb.VisibleTarget_Key{
+							FromPackage:            canonicalTargetLabel.GetCanonicalPackage().String(),
+							ToLabel:                canonicalTargetLabel.String(),
+							ConfigurationReference: patchedConfigurationReference1.Message,
+						},
+						model_core.MapReferenceMetadataToWalkers(patchedConfigurationReference1.Patcher),
+					),
+				)
+				if !visibleTargetValue.IsSet() {
+					missingDependencies = true
+					continue
+				}
+
+				patchedConfigurationReference2 := model_core.NewPatchedMessageFromCloneable(clonedConfigurationReference)
+				targetCompletionValue := e.GetTargetCompletionValue(
+					model_core.NewPatchedMessage(
+						&model_analysis_pb.TargetCompletion_Key{
+							Label:                  visibleTargetValue.Message.Label,
+							ConfigurationReference: patchedConfigurationReference2.Message,
+						},
+						model_core.MapReferenceMetadataToWalkers(patchedConfigurationReference2.Patcher),
+					),
+				)
+				if !targetCompletionValue.IsSet() {
+					missingDependencies = true
+				}
+			}
+			if iterErr != nil {
+				if !errors.Is(iterErr, evaluation.ErrMissingDependency) {
+					return PatchedBuildResultValue{}, fmt.Errorf("failed to iterate target pattern %#v: %w", targetPattern, iterErr)
+				}
+				missingDependencies = true
+			}
 		}
 	}
 	if missingDependencies {

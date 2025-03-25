@@ -9,8 +9,13 @@
       "BuildResult": {
          "dependsOn": [
             "BuildSpecification",
+            "BuiltinsModuleNames",
             "CanonicalRepoName",
+            "CompiledBzlFileDecodedGlobals",
+            "CompiledBzlFileFunctionFactory",
+            "CompiledBzlFileGlobal",
             "RootModule",
+            "Target",
             "TargetCompletion",
             "TargetPatternExpansion",
             "VisibleTarget"
