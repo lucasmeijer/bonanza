@@ -425,12 +425,15 @@ func (c *baseComputer[TReference, TMetadata]) ComputeHttpArchiveContentsValue(ct
 	rootReference := createdRootDirectoryObject.Contents.GetReference()
 	return model_core.NewPatchedMessage(
 		&model_analysis_pb.HttpArchiveContents_Value{
-			Exists: createdRootDirectory.ToDirectoryReference(
-				patcher.AddReference(
-					rootReference,
-					objectContentsWalkerFactory.CreateObjectContentsWalker(rootReference, capturedRootDirectory),
+			Exists: &model_analysis_pb.HttpArchiveContents_Value_Exists{
+				Contents: createdRootDirectory.ToDirectoryReference(
+					patcher.AddReference(
+						rootReference,
+						objectContentsWalkerFactory.CreateObjectContentsWalker(rootReference, capturedRootDirectory),
+					),
 				),
-			),
+				Sha256: httpFileContentsValue.Message.Exists.Sha256,
+			},
 		},
 		patcher,
 	), nil

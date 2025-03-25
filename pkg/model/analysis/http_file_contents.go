@@ -1,13 +1,17 @@
 package analysis
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"hash"
 	"io"
 	"io/fs"
+	"math"
 	"net/http"
 
 	"github.com/buildbarn/bb-storage/pkg/filesystem"
@@ -79,8 +83,37 @@ ProcessURLs:
 			}
 		}
 
-		if key.FetchOptions.GetIntegrity() != "" {
-			// TODO: Validate integrity of the downloaded file!
+		var hasher hash.Hash
+		if integrity := key.FetchOptions.GetIntegrity(); integrity == nil {
+			hasher = sha256.New()
+		} else {
+			switch integrity.HashAlgorithm {
+			case model_analysis_pb.SubresourceIntegrity_SHA256:
+				hasher = sha256.New()
+			case model_analysis_pb.SubresourceIntegrity_SHA384:
+				hasher = sha512.New384()
+			case model_analysis_pb.SubresourceIntegrity_SHA512:
+				hasher = sha512.New()
+			default:
+				downloadedFile.Close()
+				c.cacheDirectory.Remove(filename)
+				return PatchedHttpFileContentsValue{}, errors.New("unknown subresource integrity hash algorithm")
+			}
+		}
+		if _, err := io.Copy(hasher, io.NewSectionReader(downloadedFile, 0, math.MaxInt64)); err != nil {
+			downloadedFile.Close()
+			c.cacheDirectory.Remove(filename)
+			return PatchedHttpFileContentsValue{}, fmt.Errorf("failed to hash file: %w", err)
+		}
+		hash := hasher.Sum(nil)
+
+		var sha256 []byte
+		if integrity := key.FetchOptions.GetIntegrity(); integrity == nil {
+			sha256 = hash
+		} else if !bytes.Equal(hash, integrity.Hash) {
+			downloadedFile.Close()
+			c.cacheDirectory.Remove(filename)
+			return PatchedHttpFileContentsValue{}, fmt.Errorf("file has hash %s, while %s was expected", hex.EncodeToString(hash), hex.EncodeToString(integrity.Hash))
 		}
 
 		// Compute a Merkle tree of the file and return it. The
@@ -100,6 +133,7 @@ ProcessURLs:
 			&model_analysis_pb.HttpFileContents_Value{
 				Exists: &model_analysis_pb.HttpFileContents_Value_Exists{
 					Contents: fileMerkleTree.Message,
+					Sha256:   sha256,
 				},
 			},
 			fileMerkleTree.Patcher,

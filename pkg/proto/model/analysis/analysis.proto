@@ -379,13 +379,27 @@ message Glob {
   }
 }
 
+message SubresourceIntegrity {
+  enum HashAlgorithm {
+    SHA256 = 0;
+    SHA384 = 1;
+    SHA512 = 2;
+  }
+
+  // Hash algorithm that was used to compute the Subresource Integrity.
+  HashAlgorithm hash_algorithm = 1;
+
+  // Hash value associated with the Subresource Integrity.
+  bytes hash = 2;
+}
+
 message HttpFetchOptions {
   // The URLs to fetch.
   repeated string urls = 1;
 
   // Optional checksum of the file to download, provided in the
   // Subresource Integrity (SRI) format.
-  string integrity = 2;
+  SubresourceIntegrity integrity = 2;
 
   // If not set, let the function fail if the server returns a HTTP
   // status code other than 200 and 404.
@@ -405,6 +419,7 @@ message HttpFetchOptions {
 
 message HttpArchiveContents {
   message Key {
+    // URLs and options for determining how to fetch the file.
     HttpFetchOptions fetch_options = 1;
 
     enum Format {
@@ -427,18 +442,30 @@ message HttpArchiveContents {
   }
 
   message Value {
+    message Exists {
+      // The contents of the archive.
+      //
+      // The directory hierarchy MUST NOT contain any symbolic links
+      // whose targets escape the root directory (i.e.,
+      // maximum_symlink_escapement_levels MUST be zero).
+      bonanza.model.filesystem.DirectoryReference contents = 1;
+
+      // A SHA-256 hash of the archive that was downloaded. This field
+      // is only set if no integrity was provided as part of
+      // fetch_options.
+      bytes sha256 = 2;
+    }
+
     // If set, the archive was fetched and extracted successfully. If
-    // not set, fetching the file failed with a HTTP 404 status code.
-    //
-    // The directory hierarchy MUST NOT contain any symbolic links whose
-    // targets escape the root directory (i.e.,
-    // maximum_symlink_escapement_levels MUST be zero).
-    bonanza.model.filesystem.DirectoryReference exists = 1;
+    // not set, fetching the file failed with a non-200 HTTP status
+    // code.
+    Exists exists = 1;
   }
 }
 
 message HttpFileContents {
   message Key {
+    // URLs and options for determining how to fetch the file.
     HttpFetchOptions fetch_options = 1;
   }
 
@@ -446,6 +473,10 @@ message HttpFileContents {
     message Exists {
       // The contents of the file, if the file was non-empty.
       bonanza.model.filesystem.FileContents contents = 1;
+
+      // A SHA-256 hash of the file that was downloaded. This field is
+      // only set if no integrity was provided as part of fetch_options.
+      bytes sha256 = 2;
     }
 
     // If set, the file was fetched successfully. If not set, fetching

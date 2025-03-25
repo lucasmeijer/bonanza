@@ -618,6 +618,47 @@ func inferArchiveFormatFromURL(url string) (model_analysis_pb.HttpArchiveContent
 	return 0, false
 }
 
+func parseSubresourceIntegrity(integrity string) (*model_analysis_pb.SubresourceIntegrity, error) {
+	dash := strings.IndexByte(integrity, '-')
+	if dash < 0 {
+		return nil, errors.New("subresource integrity does not contain a dash")
+	}
+
+	hashAlgorithmStr := integrity[:dash]
+	hashAlgorithm, ok := model_analysis_pb.SubresourceIntegrity_HashAlgorithm_value[strings.ToUpper(hashAlgorithmStr)]
+	if !ok {
+		return nil, fmt.Errorf("unknown hash algorithm %#v", hashAlgorithmStr)
+	}
+
+	hashStr := integrity[dash+1:]
+	hash, err := base64.StdEncoding.DecodeString(hashStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid hash %#v: %w", hashStr, err)
+	}
+
+	return &model_analysis_pb.SubresourceIntegrity{
+		HashAlgorithm: model_analysis_pb.SubresourceIntegrity_HashAlgorithm(hashAlgorithm),
+		Hash:          hash,
+	}, nil
+}
+
+func parseSubresourceIntegrityOrSHA256(integrity, sha256 string) (*model_analysis_pb.SubresourceIntegrity, error) {
+	if integrity != "" {
+		return parseSubresourceIntegrity(integrity)
+	}
+	if sha256 != "" {
+		sha256Bytes, err := hex.DecodeString(sha256)
+		if err != nil {
+			return nil, fmt.Errorf("invalid sha256: %w", err)
+		}
+		return &model_analysis_pb.SubresourceIntegrity{
+			HashAlgorithm: model_analysis_pb.SubresourceIntegrity_SHA256,
+			Hash:          sha256Bytes,
+		}, nil
+	}
+	return nil, nil
+}
+
 func (c *baseComputer[TReference, TMetadata]) fetchModuleFromRegistry(
 	ctx context.Context,
 	module *model_analysis_pb.BuildListModule,
@@ -676,6 +717,11 @@ func (c *baseComputer[TReference, TMetadata]) fetchModuleFromRegistry(
 		return PatchedRepoValue{}, fmt.Errorf("cannot derive archive format from file extension of URL %#v", sourceJSONURL)
 	}
 
+	integrity, err := parseSubresourceIntegrity(sourceJSON.Integrity)
+	if err != nil {
+		return PatchedRepoValue{}, fmt.Errorf("invalid subresource integrity %#v in %#v: %w", sourceJSON.Integrity, sourceJSONURL, err)
+	}
+
 	// Download source archive and all patches that need to be
 	// applied. Return all the errors at once - this way, anything
 	// that needs downloading is done.
@@ -683,7 +729,7 @@ func (c *baseComputer[TReference, TMetadata]) fetchModuleFromRegistry(
 	archiveContentsValue := e.GetHttpArchiveContentsValue(&model_analysis_pb.HttpArchiveContents_Key{
 		FetchOptions: &model_analysis_pb.HttpFetchOptions{
 			Urls:      []string{sourceJSON.URL},
-			Integrity: sourceJSON.Integrity,
+			Integrity: integrity,
 		},
 		Format: archiveFormat,
 	})
@@ -703,12 +749,18 @@ func (c *baseComputer[TReference, TMetadata]) fetchModuleFromRegistry(
 			patchEntry.key,
 		)
 		if err != nil {
-			return PatchedRepoValue{}, fmt.Errorf("failed to construct URL for patch %s of module %s with version %s in registry %#v: %s", patchEntry.key, module.Name, module.Version, module.RegistryUrl, err)
+			return PatchedRepoValue{}, fmt.Errorf("failed to construct URL for patch %s of module %s with version %s in registry %#v: %w", patchEntry.key, module.Name, module.Version, module.RegistryUrl, err)
 		}
+
+		integrity, err := parseSubresourceIntegrity(patchEntry.value)
+		if err != nil {
+			return PatchedRepoValue{}, fmt.Errorf("invalid subresource integrity %#v for patch %#v: %w", patchEntry.value, patchURL, err)
+		}
+
 		patchContentsValue := e.GetHttpFileContentsValue(&model_analysis_pb.HttpFileContents_Key{
 			FetchOptions: &model_analysis_pb.HttpFetchOptions{
 				Urls:      []string{patchURL},
-				Integrity: patchEntry.value,
+				Integrity: integrity,
 			},
 		})
 		if !patchContentsValue.IsSet() {
@@ -723,7 +775,7 @@ func (c *baseComputer[TReference, TMetadata]) fetchModuleFromRegistry(
 			model_core.NewNestedMessage(patchContentsValue, patchContentsValue.Message.Exists.Contents),
 		)
 		if err != nil {
-			return PatchedRepoValue{}, fmt.Errorf("invalid file contents for patch %#v: %s", patchEntry.key, err)
+			return PatchedRepoValue{}, fmt.Errorf("invalid file contents for patch %#v: %w", patchEntry.key, err)
 		}
 
 		patchesToApply = append(patchesToApply, patchToApply[TReference]{
@@ -778,7 +830,7 @@ func (c *baseComputer[TReference, TMetadata]) fetchModuleFromRegistry(
 	return c.applyPatches(
 		ctx,
 		e,
-		model_core.NewNestedMessage(archiveContentsValue, archiveContentsValue.Message.Exists),
+		model_core.NewNestedMessage(archiveContentsValue, archiveContentsValue.Message.Exists.Contents),
 		sourceJSON.StripPrefix,
 		patchesToApply,
 	)
@@ -1186,6 +1238,25 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) maybeGetStableInput
 	return nil
 }
 
+func createDownloadSuccessResult[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](integrity *model_analysis_pb.SubresourceIntegrity, sha256 []byte) starlark.Value {
+	fields := map[string]any{
+		"success": starlark.Bool(true),
+	}
+
+	if integrity == nil {
+		integrity = &model_analysis_pb.SubresourceIntegrity{
+			HashAlgorithm: model_analysis_pb.SubresourceIntegrity_SHA256,
+			Hash:          sha256,
+		}
+	}
+	fields["integrity"] = starlark.String(strings.ToLower(model_analysis_pb.SubresourceIntegrity_HashAlgorithm_name[int32(integrity.HashAlgorithm)]) + "-" + base64.StdEncoding.EncodeToString(integrity.Hash))
+	if integrity.HashAlgorithm == model_analysis_pb.SubresourceIntegrity_SHA256 {
+		fields["sha256"] = starlark.String(hex.EncodeToString(integrity.Hash))
+	}
+
+	return model_starlark.NewStructFromDict[TReference, TMetadata](nil, fields)
+}
+
 func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doDownload(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	mrc.maybeGetDirectoryReaders()
 	if err := mrc.maybeGetStableInputRootPath(); err != nil {
@@ -1227,12 +1298,9 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doDownload(thread *
 		return nil, err
 	}
 
-	if integrity == "" && sha256 != "" {
-		sha256Bytes, err := hex.DecodeString(sha256)
-		if err != nil {
-			return nil, fmt.Errorf("invalid sha256: %w", err)
-		}
-		integrity = "sha256-" + base64.StdEncoding.EncodeToString(sha256Bytes)
+	integrityMessage, err := parseSubresourceIntegrityOrSHA256(integrity, sha256)
+	if err != nil {
+		return nil, err
 	}
 
 	headersEntries := make([]*model_analysis_pb.HttpFetchOptions_Header, 0, len(headers))
@@ -1246,7 +1314,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doDownload(thread *
 	fileContentsValue := mrc.environment.GetHttpFileContentsValue(&model_analysis_pb.HttpFileContents_Key{
 		FetchOptions: &model_analysis_pb.HttpFetchOptions{
 			Urls:      urls,
-			Integrity: integrity,
+			Integrity: integrityMessage,
 			AllowFail: allowFail,
 			Headers:   headersEntries,
 			// TODO: Set auth!
@@ -1259,7 +1327,8 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doDownload(thread *
 	if !fileContentsValue.IsSet() {
 		return nil, evaluation.ErrMissingDependency
 	}
-	if fileContentsValue.Message.Exists == nil {
+	exists := fileContentsValue.Message.Exists
+	if exists == nil {
 		// File does not exist, or allow_fail was set and an
 		// error occurred.
 		return model_starlark.NewStructFromDict[TReference, TMetadata](nil, map[string]any{
@@ -1285,17 +1354,14 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doDownload(thread *
 		&changeTrackingFile[TReference]{
 			isExecutable: executable,
 			contents: unmodifiedFileContents[TReference]{
-				contents: model_core.NewNestedMessage(fileContentsValue, fileContentsValue.Message.Exists.Contents),
+				contents: model_core.NewNestedMessage(fileContentsValue, exists.Contents),
 			},
 		},
 	); err != nil {
 		return nil, err
 	}
 
-	return model_starlark.NewStructFromDict[TReference, TMetadata](nil, map[string]any{
-		"success": starlark.Bool(true),
-		// TODO: Add "sha256" and "integrity" fields.
-	}), nil
+	return createDownloadSuccessResult[TReference, TMetadata](integrityMessage, exists.Sha256), nil
 }
 
 func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doDownloadAndExtract(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -1343,12 +1409,9 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doDownloadAndExtrac
 		return nil, err
 	}
 
-	if integrity == "" && sha256 != "" {
-		sha256Bytes, err := hex.DecodeString(sha256)
-		if err != nil {
-			return nil, fmt.Errorf("invalid sha256: %w", err)
-		}
-		integrity = "sha256-" + base64.StdEncoding.EncodeToString(sha256Bytes)
+	integrityMessage, err := parseSubresourceIntegrityOrSHA256(integrity, sha256)
+	if err != nil {
+		return nil, err
 	}
 
 	var typeToMatch string
@@ -1367,7 +1430,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doDownloadAndExtrac
 	archiveContentsValue := mrc.environment.GetHttpArchiveContentsValue(&model_analysis_pb.HttpArchiveContents_Key{
 		FetchOptions: &model_analysis_pb.HttpFetchOptions{
 			AllowFail: allowFail,
-			Integrity: integrity,
+			Integrity: integrityMessage,
 			Urls:      urls,
 		},
 		Format: archiveFormat,
@@ -1385,7 +1448,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doDownloadAndExtrac
 
 	// Determine which directory to place inside the file system.
 	archiveRootDirectory := changeTrackingDirectory[TReference]{
-		currentReference: model_core.NewNestedMessage(archiveContentsValue, archiveContentsValue.Message.Exists),
+		currentReference: model_core.NewNestedMessage(archiveContentsValue, archiveContentsValue.Message.Exists.Contents),
 	}
 	rootDirectoryResolver := changeTrackingDirectoryResolver[TReference]{
 		loadOptions:      mrc.directoryLoadOptions,
@@ -1406,10 +1469,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doDownloadAndExtrac
 
 	*r.stack.Peek() = *rootDirectoryResolver.currentDirectory
 
-	return model_starlark.NewStructFromDict[TReference, TMetadata](nil, map[string]any{
-		"success": starlark.Bool(true),
-		// TODO: Add "sha256" and "integrity" fields.
-	}), nil
+	return createDownloadSuccessResult[TReference, TMetadata](integrityMessage, archiveContentsValue.Message.Exists.Sha256), nil
 }
 
 // bytesToValidString converts a byte slice containing UTF-8 encoded
