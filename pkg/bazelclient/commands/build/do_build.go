@@ -291,6 +291,11 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 		logger.Fatal(err)
 	}
 
+	targetPlatforms := strings.FieldsFunc(args.BuildFlags.Platforms, func(r rune) bool { return r == ',' })
+	if len(targetPlatforms) == 0 {
+		targetPlatforms = []string{"@platforms//host"}
+	}
+
 	// Construct a BuildSpecification message that lists all the
 	// modules and contains all of the flags to instruct what needs
 	// to be built.
@@ -303,6 +308,7 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 		BuiltinsModuleNames:             args.CommonFlags.BuiltinsModule,
 		RepoPlatform:                    args.CommonFlags.RepoPlatform,
 		CommandEncoders:                 defaultEncoders,
+		TargetPlatforms:                 targetPlatforms,
 	}
 	switch args.CommonFlags.LockfileMode {
 	case arguments.LockfileMode_Off:
