@@ -20,7 +20,7 @@ func Dereference[
 	reference, err := model_core.FlattenReference(m)
 	if err != nil {
 		var bad TValue
-		return bad, nil
+		return bad, err
 	}
 	value, err := reader.ReadParsedObject(ctx, reference)
 	return value, err
