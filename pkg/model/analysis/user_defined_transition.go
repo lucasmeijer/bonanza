@@ -20,6 +20,7 @@ import (
 	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
 	"github.com/buildbarn/bonanza/pkg/starlark/unpack"
 	"github.com/buildbarn/bonanza/pkg/storage/dag"
+	"github.com/buildbarn/bonanza/pkg/storage/object"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -34,6 +35,118 @@ type expectedTransitionOutput[TReference any] struct {
 	key           string
 	canonicalizer unpack.Canonicalizer
 	defaultValue  model_core.Message[*model_starlark_pb.Value, TReference]
+}
+
+type getExpectedTransitionOutputEnvironment[TReference any] interface {
+	resolveApparentEnvironment[TReference]
+
+	GetCompiledBzlFileGlobalValue(*model_analysis_pb.CompiledBzlFileGlobal_Key) model_core.Message[*model_analysis_pb.CompiledBzlFileGlobal_Value, TReference]
+	GetTargetValue(*model_analysis_pb.Target_Key) model_core.Message[*model_analysis_pb.Target_Value, TReference]
+	GetVisibleTargetValue(model_core.PatchedMessage[*model_analysis_pb.VisibleTarget_Key, dag.ObjectContentsWalker]) model_core.Message[*model_analysis_pb.VisibleTarget_Value, TReference]
+}
+
+func getExpectedTransitionOutput[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](e getExpectedTransitionOutputEnvironment[TReference], transitionPackage label.CanonicalPackage, output string) (expectedTransitionOutput[TReference], error) {
+	// Resolve the actual build setting target corresponding
+	// to the string value provided as part of the
+	// transition definition.
+	pkg := transitionPackage
+	if strings.HasPrefix(output, "//command_line_option:") {
+		pkg = commandLineOptionRepoRootPackage
+	}
+	apparentBuildSettingLabel, err := pkg.AppendLabel(output)
+	if err != nil {
+		return expectedTransitionOutput[TReference]{}, fmt.Errorf("invalid build setting label %#v: %w", output, err)
+	}
+	canonicalBuildSettingLabel, err := resolveApparent(e, transitionPackage.GetCanonicalRepo(), apparentBuildSettingLabel)
+	if err != nil {
+		return expectedTransitionOutput[TReference]{}, err
+	}
+	visibleTargetValue := e.GetVisibleTargetValue(
+		model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](
+			&model_analysis_pb.VisibleTarget_Key{
+				FromPackage:        canonicalBuildSettingLabel.GetCanonicalPackage().String(),
+				ToLabel:            canonicalBuildSettingLabel.String(),
+				StopAtLabelSetting: true,
+			},
+		),
+	)
+	if !visibleTargetValue.IsSet() {
+		return expectedTransitionOutput[TReference]{}, evaluation.ErrMissingDependency
+	}
+	visibleBuildSettingLabel := visibleTargetValue.Message.Label
+
+	// Determine how values associated with this build
+	// setting need to be canonicalized.
+	targetValue := e.GetTargetValue(&model_analysis_pb.Target_Key{
+		Label: visibleBuildSettingLabel,
+	})
+	if !targetValue.IsSet() {
+		return expectedTransitionOutput[TReference]{}, evaluation.ErrMissingDependency
+	}
+	var canonicalizer unpack.Canonicalizer
+	var defaultValue model_core.Message[*model_starlark_pb.Value, TReference]
+	switch targetKind := targetValue.Message.Definition.GetKind().(type) {
+	case *model_starlark_pb.Target_Definition_LabelSetting:
+		// Build setting is a label_setting() or label_flag().
+		labelSettingUnpackerInto := model_starlark.NewLabelOrStringUnpackerInto[TReference, TMetadata](transitionPackage)
+		if targetKind.LabelSetting.SingletonList {
+			canonicalizer = unpack.Or([]unpack.UnpackerInto[[]label.ResolvedLabel]{
+				unpack.Singleton(labelSettingUnpackerInto),
+				// This allows us to set this
+				// build setting to a list with
+				// multiple values, which is not
+				// what we want. Add a custom
+				// unpacker to forbid this.
+				unpack.List(labelSettingUnpackerInto),
+			})
+		} else {
+			canonicalizer = labelSettingUnpackerInto
+		}
+		defaultValue = model_core.NewSimpleMessage[TReference](
+			&model_starlark_pb.Value{
+				Kind: &model_starlark_pb.Value_Label{
+					Label: targetKind.LabelSetting.BuildSettingDefault,
+				},
+			},
+		)
+	case *model_starlark_pb.Target_Definition_RuleTarget:
+		// Build setting is written in Starlark.
+		if targetKind.RuleTarget.BuildSettingDefault == nil {
+			return expectedTransitionOutput[TReference]{}, fmt.Errorf("rule %#v used by label setting %#v does not have \"build_setting\" set", targetKind.RuleTarget.RuleIdentifier, visibleBuildSettingLabel)
+		}
+		ruleValue := e.GetCompiledBzlFileGlobalValue(&model_analysis_pb.CompiledBzlFileGlobal_Key{
+			Identifier: targetKind.RuleTarget.RuleIdentifier,
+		})
+		if !ruleValue.IsSet() {
+			return expectedTransitionOutput[TReference]{}, evaluation.ErrMissingDependency
+		}
+		rule, ok := ruleValue.Message.Global.Kind.(*model_starlark_pb.Value_Rule)
+		if !ok {
+			return expectedTransitionOutput[TReference]{}, fmt.Errorf("identifier %#v used by build setting %#v is not a rule", targetKind.RuleTarget.RuleIdentifier, visibleBuildSettingLabel)
+		}
+		ruleDefinition, ok := rule.Rule.Kind.(*model_starlark_pb.Rule_Definition_)
+		if !ok {
+			return expectedTransitionOutput[TReference]{}, fmt.Errorf("rule %#v used by build setting %#v does not have a definition", targetKind.RuleTarget.RuleIdentifier, visibleBuildSettingLabel)
+		}
+		if ruleDefinition.Definition.BuildSetting == nil {
+			return expectedTransitionOutput[TReference]{}, fmt.Errorf("rule %#v used by build setting %#v does not have \"build_setting\" set", targetKind.RuleTarget.RuleIdentifier, visibleBuildSettingLabel)
+		}
+		buildSettingType, err := model_starlark.DecodeBuildSettingType[TReference, TMetadata](ruleDefinition.Definition.BuildSetting)
+		if err != nil {
+			return expectedTransitionOutput[TReference]{}, fmt.Errorf("failed to decode build setting type for rule %#v used by build setting %#v: %w", targetKind.RuleTarget.RuleIdentifier, visibleBuildSettingLabel, err)
+		}
+		canonicalizer = buildSettingType.GetCanonicalizer(transitionPackage)
+		defaultValue = model_core.NewNestedMessage(targetValue, targetKind.RuleTarget.BuildSettingDefault)
+	default:
+		return expectedTransitionOutput[TReference]{}, fmt.Errorf("target %#v is not a label setting or rule target", visibleBuildSettingLabel)
+	}
+
+	return expectedTransitionOutput[TReference]{
+		label:         visibleBuildSettingLabel,
+		key:           output,
+		canonicalizer: canonicalizer,
+		defaultValue:  defaultValue,
+	}, nil
 }
 
 func (c *baseComputer[TReference, TMetadata]) applyTransition(
@@ -197,11 +310,10 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 
 type performUserDefinedTransitionEnvironment[TReference, TMetadata any] interface {
 	model_core.ObjectManager[TReference, TMetadata]
+	getExpectedTransitionOutputEnvironment[TReference]
 	starlarkThreadEnvironment[TReference]
 
 	GetCompiledBzlFileGlobalValue(*model_analysis_pb.CompiledBzlFileGlobal_Key) model_core.Message[*model_analysis_pb.CompiledBzlFileGlobal_Value, TReference]
-	GetVisibleTargetValue(model_core.PatchedMessage[*model_analysis_pb.VisibleTarget_Key, dag.ObjectContentsWalker]) model_core.Message[*model_analysis_pb.VisibleTarget_Value, TReference]
-	GetTargetValue(*model_analysis_pb.Target_Key) model_core.Message[*model_analysis_pb.Target_Value, TReference]
 }
 
 type performUserDefinedTransitionResult[TMetadata model_core.ReferenceMetadata] = model_core.PatchedMessage[*model_analysis_pb.UserDefinedTransition_Value_Success, TMetadata]
@@ -373,118 +485,18 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx c
 	expectedOutputs := make([]expectedTransitionOutput[TReference], 0, len(transitionDefinition.Message.Outputs))
 	expectedOutputLabels := make(map[string]string, len(transitionDefinition.Message.Outputs))
 	for _, output := range transitionDefinition.Message.Outputs {
-		// Resolve the actual build setting target corresponding
-		// to the string value provided as part of the
-		// transition definition.
-		pkg := transitionPackage
-		if strings.HasPrefix(output, "//command_line_option:") {
-			pkg = commandLineOptionRepoRootPackage
-		}
-		apparentBuildSettingLabel, err := pkg.AppendLabel(output)
-		if err != nil {
-			return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("invalid build setting label %#v: %w", output, err)
-		}
-		canonicalBuildSettingLabel, err := resolveApparent(e, transitionRepo, apparentBuildSettingLabel)
+		expectedOutput, err := getExpectedTransitionOutput[TReference, TMetadata](e, transitionPackage, output)
 		if err != nil {
 			if errors.Is(err, evaluation.ErrMissingDependency) {
 				missingDependencies = true
 				continue
 			}
-			return performUserDefinedTransitionResult[TMetadata]{}, err
 		}
-		visibleTargetValue := e.GetVisibleTargetValue(
-			model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](
-				&model_analysis_pb.VisibleTarget_Key{
-					FromPackage:        canonicalBuildSettingLabel.GetCanonicalPackage().String(),
-					ToLabel:            canonicalBuildSettingLabel.String(),
-					StopAtLabelSetting: true,
-				},
-			),
-		)
-		if !visibleTargetValue.IsSet() {
-			missingDependencies = true
-			continue
+		if existing, ok := expectedOutputLabels[expectedOutput.label]; ok {
+			return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("outputs %#v and %#v both refer to build setting %#v", existing, output, expectedOutput.label)
 		}
-		visibleBuildSettingLabel := visibleTargetValue.Message.Label
-
-		// Determine how values associated with this build
-		// setting need to be canonicalized.
-		targetValue := e.GetTargetValue(&model_analysis_pb.Target_Key{
-			Label: visibleBuildSettingLabel,
-		})
-		if !targetValue.IsSet() {
-			missingDependencies = true
-			continue
-		}
-		var canonicalizer unpack.Canonicalizer
-		var defaultValue model_core.Message[*model_starlark_pb.Value, TReference]
-		switch targetKind := targetValue.Message.Definition.GetKind().(type) {
-		case *model_starlark_pb.Target_Definition_LabelSetting:
-			// Build setting is a label_setting() or label_flag().
-			labelSettingUnpackerInto := model_starlark.NewLabelOrStringUnpackerInto[TReference, TMetadata](transitionPackage)
-			if targetKind.LabelSetting.SingletonList {
-				canonicalizer = unpack.Or([]unpack.UnpackerInto[[]label.ResolvedLabel]{
-					unpack.Singleton(labelSettingUnpackerInto),
-					// This allows us to set this
-					// build setting to a list with
-					// multiple values, which is not
-					// what we want. Add a custom
-					// unpacker to forbid this.
-					unpack.List(labelSettingUnpackerInto),
-				})
-			} else {
-				canonicalizer = labelSettingUnpackerInto
-			}
-			defaultValue = model_core.NewSimpleMessage[TReference](
-				&model_starlark_pb.Value{
-					Kind: &model_starlark_pb.Value_Label{
-						Label: targetKind.LabelSetting.BuildSettingDefault,
-					},
-				},
-			)
-		case *model_starlark_pb.Target_Definition_RuleTarget:
-			// Build setting is written in Starlark.
-			if targetKind.RuleTarget.BuildSettingDefault == nil {
-				return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("rule %#v used by label setting %#v does not have \"build_setting\" set", targetKind.RuleTarget.RuleIdentifier, visibleBuildSettingLabel)
-			}
-			ruleValue := e.GetCompiledBzlFileGlobalValue(&model_analysis_pb.CompiledBzlFileGlobal_Key{
-				Identifier: targetKind.RuleTarget.RuleIdentifier,
-			})
-			if !ruleValue.IsSet() {
-				missingDependencies = true
-				continue
-			}
-			rule, ok := ruleValue.Message.Global.Kind.(*model_starlark_pb.Value_Rule)
-			if !ok {
-				return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("identifier %#v used by build setting %#v is not a rule", targetKind.RuleTarget.RuleIdentifier, visibleBuildSettingLabel)
-			}
-			ruleDefinition, ok := rule.Rule.Kind.(*model_starlark_pb.Rule_Definition_)
-			if !ok {
-				return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("rule %#v used by build setting %#v does not have a definition", targetKind.RuleTarget.RuleIdentifier, visibleBuildSettingLabel)
-			}
-			if ruleDefinition.Definition.BuildSetting == nil {
-				return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("rule %#v used by build setting %#v does not have \"build_setting\" set", targetKind.RuleTarget.RuleIdentifier, visibleBuildSettingLabel)
-			}
-			buildSettingType, err := model_starlark.DecodeBuildSettingType[TReference, TMetadata](ruleDefinition.Definition.BuildSetting)
-			if err != nil {
-				return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("failed to decode build setting type for rule %#v used by build setting %#v: %w", targetKind.RuleTarget.RuleIdentifier, visibleBuildSettingLabel, err)
-			}
-			canonicalizer = buildSettingType.GetCanonicalizer(transitionPackage)
-			defaultValue = model_core.NewNestedMessage(targetValue, targetKind.RuleTarget.BuildSettingDefault)
-		default:
-			return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("target %#v is not a label setting or rule target", visibleBuildSettingLabel)
-		}
-
-		if existing, ok := expectedOutputLabels[visibleBuildSettingLabel]; ok {
-			return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("outputs %#v and %#v both refer to build setting %#v", existing, output, visibleBuildSettingLabel)
-		}
-		expectedOutputLabels[visibleBuildSettingLabel] = output
-		expectedOutputs = append(expectedOutputs, expectedTransitionOutput[TReference]{
-			label:         visibleBuildSettingLabel,
-			key:           output,
-			canonicalizer: canonicalizer,
-			defaultValue:  defaultValue,
-		})
+		expectedOutputLabels[expectedOutput.label] = output
+		expectedOutputs = append(expectedOutputs, expectedOutput)
 	}
 	slices.SortFunc(expectedOutputs, func(a, b expectedTransitionOutput[TReference]) int {
 		return strings.Compare(a.label, b.label)
