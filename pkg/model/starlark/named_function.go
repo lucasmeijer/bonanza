@@ -81,7 +81,7 @@ func (d starlarkNamedFunctionDefinition[TReference, TMetadata]) Encode(path map[
 	patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
 	position := d.Function.Position()
 	filename := position.Filename()
-	needsCode := filename == options.CurrentFilename.String()
+	needsCode := options.CurrentFilename != nil && filename == options.CurrentFilename.String()
 	name := d.Function.Name()
 
 	var closure *model_starlark_pb.Function_Closure

@@ -175,12 +175,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeUsedModuleExtensionsValue(c
 			isRoot:                isRoot,
 			ignoreDevDependencies: ignoreDevDependencies,
 			usedModuleExtensions:  usedModuleExtensions,
-			valueEncodingOptions: c.getValueEncodingOptions(
-				e,
-				moduleInstance.GetBareCanonicalRepo().
-					GetRootPackage().
-					AppendTargetName(moduleDotBazelTargetName),
-			),
+			valueEncodingOptions:  c.getValueEncodingOptions(e, nil),
 		}
 		isRoot = false
 		return h

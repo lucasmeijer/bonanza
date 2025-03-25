@@ -29,7 +29,7 @@ import (
 const ValueEncodingOptionsKey = "value_encoding_options"
 
 type ValueEncodingOptions[TReference any, TMetadata model_core.CloneableReferenceMetadata] struct {
-	CurrentFilename pg_label.CanonicalLabel
+	CurrentFilename *pg_label.CanonicalLabel
 
 	// Options to use when storing Starlark values in separate objects.
 	ObjectEncoder          model_encoding.BinaryEncoder
@@ -90,10 +90,14 @@ func EncodeCompiledProgram[TReference any, TMetadata model_core.CloneableReferen
 		if err != nil {
 			return model_core.PatchedMessage[*model_starlark_pb.CompiledProgram, TMetadata]{}, err
 		}
-		currentIdentifier := options.CurrentFilename.AppendStarlarkIdentifier(identifier)
+		var currentIdentifier *pg_label.CanonicalStarlarkIdentifier
+		if options.CurrentFilename != nil {
+			i := options.CurrentFilename.AppendStarlarkIdentifier(identifier)
+			currentIdentifier = &i
+		}
 		value := globals[name]
 		if _, ok := value.(NamedGlobal); ok || identifier.IsPublic() {
-			encodedValue, valueNeedsCode, err := EncodeValue[TReference, TMetadata](value, map[starlark.Value]struct{}{}, &currentIdentifier, options)
+			encodedValue, valueNeedsCode, err := EncodeValue[TReference, TMetadata](value, map[starlark.Value]struct{}{}, currentIdentifier, options)
 			if err != nil {
 				return model_core.PatchedMessage[*model_starlark_pb.CompiledProgram, TMetadata]{}, fmt.Errorf("global %#v: %w", name, err)
 			}

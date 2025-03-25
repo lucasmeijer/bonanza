@@ -91,7 +91,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputePackageValue(ctx context.Co
 		}
 
 		thread.SetLocal(model_starlark.CanonicalPackageKey, canonicalPackage)
-		thread.SetLocal(model_starlark.ValueEncodingOptionsKey, c.getValueEncodingOptions(e, buildFileLabel))
+		thread.SetLocal(model_starlark.ValueEncodingOptionsKey, c.getValueEncodingOptions(e, nil))
 		thread.SetLocal(model_starlark.GlobExpanderKey, func(includePatterns, excludePatterns []string, includeDirectories bool) ([]string, error) {
 			nfa, err := glob.NewNFAFromPatterns(includePatterns, excludePatterns)
 			if err != nil {

@@ -202,13 +202,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeModuleExtensionReposValue(c
 			moduleRepo:  moduleRepo,
 			ignoreDevDependencies: rootModuleValue.Message.IgnoreRootModuleDevDependencies ||
 				moduleInstance.GetModule().String() != rootModuleValue.Message.RootModuleName,
-			valueEncodingOptions: c.getValueEncodingOptions(
-				e,
-				moduleRepo.
-					GetRootPackage().
-					AppendTargetName(moduleDotBazelTargetName),
-			),
-			repos: map[string]model_core.PatchedMessage[*model_starlark_pb.Repo, TMetadata]{},
+			valueEncodingOptions: c.getValueEncodingOptions(e, nil),
+			repos:                map[string]model_core.PatchedMessage[*model_starlark_pb.Repo, TMetadata]{},
 		}
 
 		if err := c.parseActiveModuleInstanceModuleDotBazel(
@@ -397,7 +392,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeModuleExtensionReposValue(c
 		// Call into the implementation function to obtain a set of
 		// repos declared by this module extension.
 		thread.SetLocal(model_starlark.CanonicalPackageKey, moduleExtension.GetModuleInstance().GetBareCanonicalRepo().GetRootPackage())
-		thread.SetLocal(model_starlark.ValueEncodingOptionsKey, c.getValueEncodingOptions(e, moduleExtensionIdentifier.GetCanonicalLabel()))
+		thread.SetLocal(model_starlark.ValueEncodingOptionsKey, c.getValueEncodingOptions(e, nil))
 
 		repoRegistrar := model_starlark.NewRepoRegistrar[TMetadata]()
 		thread.SetLocal(model_starlark.RepoRegistrarKey, repoRegistrar)

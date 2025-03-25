@@ -1336,7 +1336,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 			},
 		) {
 			v, _, err := providerInstancesByIdentifier[providerIdentifier].
-				Encode(map[starlark.Value]struct{}{}, c.getValueEncodingOptions(e, targetLabel))
+				Encode(map[starlark.Value]struct{}{}, c.getValueEncodingOptions(e, nil))
 			if err != nil {
 				return PatchedConfiguredTargetValue{}, err
 			}

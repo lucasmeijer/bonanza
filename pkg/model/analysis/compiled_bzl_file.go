@@ -84,7 +84,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeCompiledBzlFileValue(ctx co
 	model_starlark.NameAndExtractGlobals(globals, canonicalLabel)
 
 	// TODO! Use proper encoding options!
-	compiledProgram, err := model_starlark.EncodeCompiledProgram(program, globals, c.getValueEncodingOptions(e, canonicalLabel))
+	compiledProgram, err := model_starlark.EncodeCompiledProgram(program, globals, c.getValueEncodingOptions(e, &canonicalLabel))
 	if err != nil {
 		return PatchedCompiledBzlFileValue{}, err
 	}

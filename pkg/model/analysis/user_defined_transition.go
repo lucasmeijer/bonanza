@@ -495,7 +495,7 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx c
 	}
 
 	// Invoke transition implementation function.
-	valueEncodingOptions := c.getValueEncodingOptions(e, transitionFilename)
+	valueEncodingOptions := c.getValueEncodingOptions(e, nil)
 	outputs, err := starlark.Call(
 		thread,
 		model_starlark.NewNamedFunction(

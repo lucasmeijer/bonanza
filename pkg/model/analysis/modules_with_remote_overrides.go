@@ -37,15 +37,9 @@ func (c *baseComputer[TReference, TMetadata]) ComputeModulesWithRemoteOverridesV
 	// Parse out the root module to find the overrides.
 	overrideModules := []*model_analysis_pb.ModuleOverride{}
 	handler := &overrideExtractingModuleDotBazelHandler[TReference, TMetadata]{
-		overrideModules: &overrideModules,
-		valueEncodingOptions: c.getValueEncodingOptions(
-			e,
-			rootModuleName.ToModuleInstance(nil).
-				GetBareCanonicalRepo().
-				GetRootPackage().
-				AppendTargetName(moduleDotBazelTargetName),
-		),
-		patcher: model_core.NewReferenceMessagePatcher[TMetadata](),
+		overrideModules:      &overrideModules,
+		valueEncodingOptions: c.getValueEncodingOptions(e, nil),
+		patcher:              model_core.NewReferenceMessagePatcher[TMetadata](),
 	}
 	err = c.parseLocalModuleInstanceModuleDotBazel(ctx, rootModuleName.ToModuleInstance(nil), e, handler)
 	if err != nil {
