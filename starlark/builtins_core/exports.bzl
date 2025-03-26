@@ -91,9 +91,32 @@ cc_proto_library = rule(
 def cc_toolchain_suite(**kwargs):
     pass
 
+def _get_effective_constraint_value(constraint_setting, value_label):
+    if value_label == constraint_setting.default_constraint_value:
+        # Constraint value is equal to its default value, meaning it
+        # should not be encoded explicitly as part of the configuration.
+        # Require that the constraint setting is absent.
+        return None
+    return value_label
+
 def _config_setting_impl(ctx):
-    # TODO: Fill ConfigSettingInfo for select() to use.
-    return [ConfigSettingInfo()]
+    return [ConfigSettingInfo(
+        # Convert constraint values to a dictionary of constraint
+        # settings to values. If the provided constraint value is the
+        # default we set it to None, because it effectively means the
+        # constraint setting should not be part of the configuration.
+        constraints = {
+            constraint_value[ConstraintValueInfo].constraint.label: _get_effective_constraint_value(
+                constraint_value[ConstraintValueInfo].constraint,
+                constraint_value[ConstraintValueInfo].label,
+            )
+            for constraint_value in ctx.attr.constraint_values
+        },
+        flag_values = {
+            key.label: value
+            for key, value in ctx.attr.flag_values.items()
+        },
+    )]
 
 def _config_setting_init(**kwargs):
     # The "values" attr can be used to refer to command line options
@@ -113,6 +136,7 @@ config_setting = rule(
             cfg = config.none(),
             providers = [ConstraintValueInfo],
         ),
+        # TODO: Do we even want to support define_values?
         "define_values": attr.string_dict(),
         "flag_values": attr.label_keyed_string_dict(
             # We are only interested in obtaining the build setting
@@ -129,8 +153,8 @@ config_setting = rule(
 def _constraint_setting_impl(ctx):
     default_constraint_value = ctx.attr.default_constraint_value
     return [ConstraintSettingInfo(
-        default_constraint_value = ctx.attr.default_constraint_value.label if ctx.attr.default_constraint_value else None,
-        has_default_constraint_value = bool(ctx.attr.default_constraint_value),
+        default_constraint_value = default_constraint_value.label if default_constraint_value else None,
+        has_default_constraint_value = bool(default_constraint_value),
         label = ctx.label,
     )]
 
@@ -148,10 +172,21 @@ constraint_setting = rule(
 )
 
 def _constraint_value_impl(ctx):
-    return [ConstraintValueInfo(
-        constraint = ctx.attr.constraint_setting[ConstraintSettingInfo],
-        label = ctx.label,
-    )]
+    constraint_setting = ctx.attr.constraint_setting[ConstraintSettingInfo]
+    return [
+        # Also provide a ConfigSettingInfo containing just this
+        # constraint. This allows constraint values to be passed to
+        # select() directly.
+        ConfigSettingInfo(
+            constraints = {
+                constraint_setting.label: _get_effective_constraint_value(constraint_setting, ctx.label),
+            },
+        ),
+        ConstraintValueInfo(
+            constraint = constraint_setting,
+            label = ctx.label,
+        ),
+    ]
 
 constraint_value = rule(
     implementation = _constraint_value_impl,
@@ -161,7 +196,7 @@ constraint_value = rule(
             providers = [ConstraintSettingInfo],
         ),
     },
-    provides = [ConstraintValueInfo],
+    provides = [ConfigSettingInfo, ConstraintValueInfo],
 )
 
 def _filegroup_impl(ctx):
@@ -250,13 +285,7 @@ def _platform_impl(ctx):
                 constraints[setting_label],
                 value_label,
             ))
-
-        # If the value is equal to the setting's default value, we store
-        # None. This allows us to filter them out later, as there is no
-        # point in tracking these.
-        if value_label == value_info.constraint.default_constraint_value:
-            value_label = None
-        constraints[setting_label] = value_label
+        constraints[setting_label] = _get_effective_constraint_value(value_info.constraint, value_label)
 
     exec_pkix_public_key = ctx.attr.exec_pkix_public_key
     repository_os_arch = ctx.attr.repository_os_arch

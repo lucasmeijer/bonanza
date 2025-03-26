@@ -2,14 +2,14 @@ package analysis
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"sort"
-	"strings"
 
 	"github.com/buildbarn/bonanza/pkg/evaluation"
 	"github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
+	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
 	"github.com/buildbarn/bonanza/pkg/storage/dag"
 )
 
@@ -32,39 +32,19 @@ func (c *baseComputer[TReference, TMetadata]) ComputeSelectValue(ctx context.Con
 		}
 		targetLabel := visibleTargetValue.Message.Label
 
-		configuredTarget := e.GetConfiguredTargetValue(
-			model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](
-				&model_analysis_pb.ConfiguredTarget_Key{
-					Label: targetLabel,
-				},
-			),
+		_, err := getProviderFromConfiguredTarget(
+			e,
+			targetLabel,
+			model_core.NewSimplePatchedMessage[model_core.WalkableReferenceMetadata, *model_core_pb.Reference](nil),
+			configSettingInfoProviderIdentifier,
 		)
-		if !configuredTarget.IsSet() {
-			missingDependencies = true
-			continue
+		if err != nil {
+			if errors.Is(err, evaluation.ErrMissingDependency) {
+				missingDependencies = true
+				continue
+			}
+			return PatchedSelectValue{}, fmt.Errorf("failed to obtain ConfigSettingInfo provider for target %#v: %w", targetLabel, err)
 		}
-
-		configSettingInfoProviderIdentifierStr := configSettingInfoProviderIdentifier.String()
-		constraintValueInfoProviderIdentifierStr := constraintValueInfoProviderIdentifier.String()
-		providerInstances := configuredTarget.Message.ProviderInstances
-		if _, ok := sort.Find(
-			len(providerInstances),
-			func(i int) int {
-				return strings.Compare(configSettingInfoProviderIdentifierStr, providerInstances[i].ProviderInstanceProperties.GetProviderIdentifier())
-			},
-		); ok {
-			// TODO!
-		} else if _, ok := sort.Find(
-			len(providerInstances),
-			func(i int) int {
-				return strings.Compare(constraintValueInfoProviderIdentifierStr, providerInstances[i].ProviderInstanceProperties.GetProviderIdentifier())
-			},
-		); ok {
-			// TODO!
-		} else {
-			return PatchedSelectValue{}, fmt.Errorf("target %#v does not provide ConfigSettingInfo or ConstraintValueInfo", targetLabel)
-		}
-
 	}
 	if missingDependencies {
 		return PatchedSelectValue{}, evaluation.ErrMissingDependency

@@ -1574,11 +1574,16 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 					return nil, fmt.Errorf("%s: got %d positional arguments, want 1", b.Name(), len(args))
 				}
 
+				currentPackage := thread.Local(CanonicalPackageKey)
+				if currentPackage == nil {
+					currentPackage = CurrentFilePackage(thread, 1)
+				}
+
 				var conditions map[pg_label.ResolvedLabel]starlark.Value
 				noMatchError := ""
 				if err := starlark.UnpackArgs(
 					b.Name(), args, kwargs,
-					"conditions", unpack.Bind(thread, &conditions, unpack.Dict(NewLabelOrStringUnpackerInto[TReference, TMetadata](CurrentFilePackage(thread, 1)), unpack.Any)),
+					"conditions", unpack.Bind(thread, &conditions, unpack.Dict(NewLabelOrStringUnpackerInto[TReference, TMetadata](currentPackage.(pg_label.CanonicalPackage)), unpack.Any)),
 					"no_match_error?", unpack.Bind(thread, &noMatchError, unpack.String),
 				); err != nil {
 					return nil, err
