@@ -1027,6 +1027,9 @@ message Select {
     // If this reference is not set, conditions are selected without any
     // platform constraints and build settings in place.
     bonanza.model.core.Reference configuration_reference = 2;
+
+    // The package that invokes select().
+    string from_package = 3;
   }
 
   message Value {

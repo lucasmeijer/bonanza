@@ -24,7 +24,13 @@ type getValueFromSelectGroupEnvironment[TReference, TMetadata any] interface {
 	GetSelectValue(model_core.PatchedMessage[*model_analysis_pb.Select_Key, dag.ObjectContentsWalker]) model_core.Message[*model_analysis_pb.Select_Value, TReference]
 }
 
-func getValueFromSelectGroup[TReference object.BasicReference, TMetadata model_core.WalkableReferenceMetadata](e getValueFromSelectGroupEnvironment[TReference, TMetadata], configurationReference model_core.Message[*model_core_pb.Reference, TReference], selectGroup *model_starlark_pb.Select_Group, permitNoMatch bool) (*model_starlark_pb.Value, error) {
+func getValueFromSelectGroup[TReference object.BasicReference, TMetadata model_core.WalkableReferenceMetadata](
+	e getValueFromSelectGroupEnvironment[TReference, TMetadata],
+	configurationReference model_core.Message[*model_core_pb.Reference, TReference],
+	fromPackage label.CanonicalPackage,
+	selectGroup *model_starlark_pb.Select_Group,
+	permitNoMatch bool,
+) (*model_starlark_pb.Value, error) {
 	if len(selectGroup.Conditions) > 0 {
 		conditionIdentifiers := make([]string, 0, len(selectGroup.Conditions))
 		for _, condition := range selectGroup.Conditions {
@@ -36,6 +42,7 @@ func getValueFromSelectGroup[TReference object.BasicReference, TMetadata model_c
 				&model_analysis_pb.Select_Key{
 					ConditionIdentifiers:   conditionIdentifiers,
 					ConfigurationReference: patchedConfigurationReference.Message,
+					FromPackage:            fromPackage.String(),
 				},
 				model_core.MapReferenceMetadataToWalkers(patchedConfigurationReference.Patcher),
 			),
@@ -179,7 +186,13 @@ func (c *baseComputer[TReference, TMetadata]) ComputeVisibleTargetValue(ctx cont
 		if actualSelectGroup == nil {
 			return PatchedVisibleTargetValue{}, errors.New("alias has no actual target")
 		}
-		actualValue, err := getValueFromSelectGroup(e, configurationReference, actualSelectGroup, key.Message.PermitAliasNoMatch)
+		actualValue, err := getValueFromSelectGroup(
+			e,
+			configurationReference,
+			toLabel.GetCanonicalPackage(),
+			actualSelectGroup,
+			key.Message.PermitAliasNoMatch,
+		)
 		if err != nil {
 			return PatchedVisibleTargetValue{}, err
 		}

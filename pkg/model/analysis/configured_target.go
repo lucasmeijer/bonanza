@@ -279,6 +279,7 @@ func getSingleFileConfiguredTargetValue(file *model_starlark_pb.File) PatchedCon
 func getAttrValueParts[TReference object.BasicReference, TMetadata model_core.WalkableReferenceMetadata](
 	e getValueFromSelectGroupEnvironment[TReference, TMetadata],
 	configurationReference model_core.Message[*model_core_pb.Reference, TReference],
+	ruleTargetPackage label.CanonicalPackage,
 	namedAttr model_core.Message[*model_starlark_pb.NamedAttr, TReference],
 	publicAttrValue model_core.Message[*model_starlark_pb.RuleTarget_PublicAttrValue, TReference],
 ) (valueParts model_core.Message[[]*model_starlark_pb.Value, TReference], usedDefaultValue bool, err error) {
@@ -292,7 +293,13 @@ func getAttrValueParts[TReference object.BasicReference, TMetadata model_core.Wa
 		valueParts := make([]*model_starlark_pb.Value, 0, len(selectGroups))
 		missingDependencies := false
 		for _, selectGroup := range selectGroups {
-			valuePart, err := getValueFromSelectGroup(e, configurationReference, selectGroup, false)
+			valuePart, err := getValueFromSelectGroup(
+				e,
+				configurationReference,
+				ruleTargetPackage,
+				selectGroup,
+				false,
+			)
 			if err == nil {
 				valueParts = append(valueParts, valuePart)
 			} else if errors.Is(err, evaluation.ErrMissingDependency) {
@@ -731,6 +738,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 		missingDependencies := false
 		outputsValues := map[string]any{}
 		ruleTargetPublicAttrValues = ruleTarget.PublicAttrValues
+		targetPackage := targetLabel.GetCanonicalPackage()
 	GetNonLabelAttrValues:
 		for _, namedAttr := range ruleDefinition.Message.Attrs {
 			var publicAttrValue *model_starlark_pb.RuleTarget_PublicAttrValue
@@ -751,6 +759,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 			valueParts, _, err := getAttrValueParts(
 				e,
 				configurationReference,
+				targetPackage,
 				model_core.NewNestedMessage(ruleDefinition, namedAttr),
 				model_core.NewNestedMessage(targetValue, publicAttrValue),
 			)
@@ -776,7 +785,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 								return nil, err
 							}
 							canonicalPackage := canonicalLabel.GetCanonicalPackage()
-							if canonicalPackage != targetLabel.GetCanonicalPackage() {
+							if canonicalPackage != targetPackage {
 								return nil, fmt.Errorf("output attr %#v contains to label %#v, which refers to a different package", namedAttr.Name, canonicalLabel.String())
 							}
 							attrOutputs = append(attrOutputs, model_starlark.NewFile[TReference, TMetadata](&model_starlark_pb.File{
@@ -894,6 +903,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 				valueParts, _, err := getAttrValueParts(
 					e,
 					model_core.NewSimpleMessage[TReference]((*model_core_pb.Reference)(nil)),
+					targetPackage,
 					model_core.NewNestedMessage(ruleDefinition, namedAttr),
 					model_core.NewNestedMessage(targetValue, publicAttrValue),
 				)
@@ -931,6 +941,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 					valueParts, usedDefaultValue, err := getAttrValueParts(
 						e,
 						outputConfigurationReference,
+						targetPackage,
 						model_core.NewNestedMessage(ruleDefinition, namedAttr),
 						model_core.NewNestedMessage(targetValue, publicAttrValue),
 					)
@@ -952,7 +963,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 					if usedDefaultValue {
 						visibilityFromPackage = ruleIdentifier.GetCanonicalLabel().GetCanonicalPackage()
 					} else {
-						visibilityFromPackage = targetLabel.GetCanonicalPackage()
+						visibilityFromPackage = targetPackage
 					}
 
 					var splitAttrEntry starlark.Value

@@ -177,6 +177,7 @@ func (h *registeredToolchainExtractingModuleDotBazelHandler[TReference, TMetadat
 					targetCompatibleWithValue, err := getValueFromSelectGroup(
 						h.environment,
 						model_core.NewSimpleMessage[TReference]((*model_core_pb.Reference)(nil)),
+						toolchainLabel.GetCanonicalPackage(),
 						selectGroup,
 						/* permitNoMatch = */ false,
 					)
