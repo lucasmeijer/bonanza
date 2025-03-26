@@ -171,9 +171,15 @@ func (h *registeredToolchainExtractingModuleDotBazelHandler[TReference, TMetadat
 
 				// Annoyingly enough, target_compatible_with is
 				// configurable. Expand select() expressions.
+				// TODO: Is this using the right configuration?
 				var targetCompatibleWithLabels []string
 				for _, selectGroup := range ruleTarget.RuleTarget.TargetCompatibleWith {
-					targetCompatibleWithValue, err := getValueFromSelectGroup(h.environment, selectGroup, false)
+					targetCompatibleWithValue, err := getValueFromSelectGroup(
+						h.environment,
+						model_core.NewSimpleMessage[TReference]((*model_core_pb.Reference)(nil)),
+						selectGroup,
+						/* permitNoMatch = */ false,
+					)
 					if err != nil {
 						return err
 					}

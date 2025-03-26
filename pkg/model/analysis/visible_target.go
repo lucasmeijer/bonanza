@@ -15,21 +15,31 @@ import (
 	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
 	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
 	"github.com/buildbarn/bonanza/pkg/storage/dag"
+	"github.com/buildbarn/bonanza/pkg/storage/object"
 )
 
-type getValueFromSelectGroupEnvironment[TReference any] interface {
-	GetSelectValue(*model_analysis_pb.Select_Key) model_core.Message[*model_analysis_pb.Select_Value, TReference]
+type getValueFromSelectGroupEnvironment[TReference, TMetadata any] interface {
+	model_core.ExistingObjectCapturer[TReference, TMetadata]
+
+	GetSelectValue(model_core.PatchedMessage[*model_analysis_pb.Select_Key, dag.ObjectContentsWalker]) model_core.Message[*model_analysis_pb.Select_Value, TReference]
 }
 
-func getValueFromSelectGroup[TReference any](e getValueFromSelectGroupEnvironment[TReference], selectGroup *model_starlark_pb.Select_Group, permitNoMatch bool) (*model_starlark_pb.Value, error) {
+func getValueFromSelectGroup[TReference object.BasicReference, TMetadata model_core.WalkableReferenceMetadata](e getValueFromSelectGroupEnvironment[TReference, TMetadata], configurationReference model_core.Message[*model_core_pb.Reference, TReference], selectGroup *model_starlark_pb.Select_Group, permitNoMatch bool) (*model_starlark_pb.Value, error) {
 	if len(selectGroup.Conditions) > 0 {
 		conditionIdentifiers := make([]string, 0, len(selectGroup.Conditions))
 		for _, condition := range selectGroup.Conditions {
 			conditionIdentifiers = append(conditionIdentifiers, condition.ConditionIdentifier)
 		}
-		selectValue := e.GetSelectValue(&model_analysis_pb.Select_Key{
-			ConditionIdentifiers: conditionIdentifiers,
-		})
+		patchedConfigurationReference := model_core.NewPatchedMessageFromExistingCaptured(e, configurationReference)
+		selectValue := e.GetSelectValue(
+			model_core.NewPatchedMessage(
+				&model_analysis_pb.Select_Key{
+					ConditionIdentifiers:   conditionIdentifiers,
+					ConfigurationReference: patchedConfigurationReference.Message,
+				},
+				model_core.MapReferenceMetadataToWalkers(patchedConfigurationReference.Patcher),
+			),
+		)
 		if !selectValue.IsSet() {
 			return nil, evaluation.ErrMissingDependency
 		}
@@ -169,7 +179,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeVisibleTargetValue(ctx cont
 		if actualSelectGroup == nil {
 			return PatchedVisibleTargetValue{}, errors.New("alias has no actual target")
 		}
-		actualValue, err := getValueFromSelectGroup(e, actualSelectGroup, key.Message.PermitAliasNoMatch)
+		actualValue, err := getValueFromSelectGroup(e, configurationReference, actualSelectGroup, key.Message.PermitAliasNoMatch)
 		if err != nil {
 			return PatchedVisibleTargetValue{}, err
 		}

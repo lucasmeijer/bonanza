@@ -1021,6 +1021,12 @@ message Select {
   message Key {
     // Condition identifiers from which a selection needs to be made.
     repeated string condition_identifiers = 1;
+
+    // Platform constraints and build settings that are currently active.
+    //
+    // If this reference is not set, conditions are selected without any
+    // platform constraints and build settings in place.
+    bonanza.model.core.Reference configuration_reference = 2;
   }
 
   message Value {

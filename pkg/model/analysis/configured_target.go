@@ -276,8 +276,9 @@ func getSingleFileConfiguredTargetValue(file *model_starlark_pb.File) PatchedCon
 	)
 }
 
-func getAttrValueParts[TReference object.BasicReference](
-	e getValueFromSelectGroupEnvironment[TReference],
+func getAttrValueParts[TReference object.BasicReference, TMetadata model_core.WalkableReferenceMetadata](
+	e getValueFromSelectGroupEnvironment[TReference, TMetadata],
+	configurationReference model_core.Message[*model_core_pb.Reference, TReference],
 	namedAttr model_core.Message[*model_starlark_pb.NamedAttr, TReference],
 	publicAttrValue model_core.Message[*model_starlark_pb.RuleTarget_PublicAttrValue, TReference],
 ) (valueParts model_core.Message[[]*model_starlark_pb.Value, TReference], usedDefaultValue bool, err error) {
@@ -291,7 +292,7 @@ func getAttrValueParts[TReference object.BasicReference](
 		valueParts := make([]*model_starlark_pb.Value, 0, len(selectGroups))
 		missingDependencies := false
 		for _, selectGroup := range selectGroups {
-			valuePart, err := getValueFromSelectGroup(e, selectGroup, false)
+			valuePart, err := getValueFromSelectGroup(e, configurationReference, selectGroup, false)
 			if err == nil {
 				valueParts = append(valueParts, valuePart)
 			} else if errors.Is(err, evaluation.ErrMissingDependency) {
@@ -749,6 +750,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 
 			valueParts, _, err := getAttrValueParts(
 				e,
+				configurationReference,
 				model_core.NewNestedMessage(ruleDefinition, namedAttr),
 				model_core.NewNestedMessage(targetValue, publicAttrValue),
 			)
@@ -844,32 +846,6 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 				continue
 			}
 
-			valueParts, usedDefaultValue, err := getAttrValueParts(
-				e,
-				model_core.NewNestedMessage(ruleDefinition, namedAttr),
-				model_core.NewNestedMessage(targetValue, publicAttrValue),
-			)
-			if err != nil {
-				if errors.Is(err, evaluation.ErrMissingDependency) {
-					missingDependencies = true
-					continue GetLabelAttrValues
-				}
-				return PatchedConfiguredTargetValue{}, err
-			}
-
-			// Whether an explicit value or a default attr
-			// value is used determines how visibility is
-			// computed. For explicit values, visibility is
-			// computed relative to the package declaring
-			// the target. For default values, the package
-			// declaring the rule is used.
-			var visibilityFromPackage label.CanonicalPackage
-			if usedDefaultValue {
-				visibilityFromPackage = ruleIdentifier.GetCanonicalLabel().GetCanonicalPackage()
-			} else {
-				visibilityFromPackage = targetLabel.GetCanonicalPackage()
-			}
-
 			isScalar := false
 			var labelOptions *model_starlark_pb.Attr_LabelOptions
 			allowSingleFile := false
@@ -914,6 +890,21 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 
 			if len(transition.Message.Entries) == 0 {
 				// We should leave targets unconfigured.
+				// Perform select() without a configuration.
+				valueParts, _, err := getAttrValueParts(
+					e,
+					model_core.NewSimpleMessage[TReference]((*model_core_pb.Reference)(nil)),
+					model_core.NewNestedMessage(ruleDefinition, namedAttr),
+					model_core.NewNestedMessage(targetValue, publicAttrValue),
+				)
+				if err != nil {
+					if errors.Is(err, evaluation.ErrMissingDependency) {
+						missingDependencies = true
+						continue GetLabelAttrValues
+					}
+					return PatchedConfiguredTargetValue{}, err
+				}
+
 				// Provide a target reference that does
 				// not contain any providers.
 				for _, valuePart := range valueParts.Message {
@@ -936,6 +927,34 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 				}
 			} else {
 				for _, transitionEntry := range transition.Message.Entries {
+					outputConfigurationReference := model_core.NewNestedMessage(transition, transitionEntry.OutputConfigurationReference)
+					valueParts, usedDefaultValue, err := getAttrValueParts(
+						e,
+						outputConfigurationReference,
+						model_core.NewNestedMessage(ruleDefinition, namedAttr),
+						model_core.NewNestedMessage(targetValue, publicAttrValue),
+					)
+					if err != nil {
+						if errors.Is(err, evaluation.ErrMissingDependency) {
+							missingDependencies = true
+							continue GetLabelAttrValues
+						}
+						return PatchedConfiguredTargetValue{}, err
+					}
+
+					// Whether an explicit value or a default attr
+					// value is used determines how visibility is
+					// computed. For explicit values, visibility is
+					// computed relative to the package declaring
+					// the target. For default values, the package
+					// declaring the rule is used.
+					var visibilityFromPackage label.CanonicalPackage
+					if usedDefaultValue {
+						visibilityFromPackage = ruleIdentifier.GetCanonicalLabel().GetCanonicalPackage()
+					} else {
+						visibilityFromPackage = targetLabel.GetCanonicalPackage()
+					}
+
 					var splitAttrEntry starlark.Value
 					valueDecodingOptions := c.getValueDecodingOptions(ctx, func(resolvedLabel label.ResolvedLabel) (starlark.Value, error) {
 						// Resolve the label.
@@ -943,7 +962,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 						if err != nil {
 							return nil, err
 						}
-						patchedConfigurationReference1 := model_core.NewPatchedMessageFromExistingCaptured(e, model_core.NewNestedMessage(transition, transitionEntry.OutputConfigurationReference))
+						patchedConfigurationReference1 := model_core.NewPatchedMessageFromExistingCaptured(e, outputConfigurationReference)
 						resolvedLabelValue := e.GetVisibleTargetValue(
 							model_core.NewPatchedMessage(
 								&model_analysis_pb.VisibleTarget_Key{
@@ -965,7 +984,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 							}
 
 							// Obtain the providers of the target.
-							patchedConfigurationReference2 := model_core.NewPatchedMessageFromExistingCaptured(e, model_core.NewNestedMessage(transition, transitionEntry.OutputConfigurationReference))
+							patchedConfigurationReference2 := model_core.NewPatchedMessageFromExistingCaptured(e, outputConfigurationReference)
 							configuredTarget := e.GetConfiguredTargetValue(
 								model_core.NewPatchedMessage(
 									&model_analysis_pb.ConfiguredTarget_Key{
