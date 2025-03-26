@@ -109,9 +109,17 @@ def _config_setting_init(**kwargs):
 config_setting = rule(
     implementation = _config_setting_impl,
     attrs = {
-        "constraint_values": attr.label_list(providers = [ConstraintValueInfo]),
+        "constraint_values": attr.label_list(
+            cfg = config.none(),
+            providers = [ConstraintValueInfo],
+        ),
         "define_values": attr.string_dict(),
-        "flag_values": attr.label_keyed_string_dict(),
+        "flag_values": attr.label_keyed_string_dict(
+            # We are only interested in obtaining the build setting
+            # values, which doesn't require these targets to be
+            # configured.
+            cfg = config.unconfigured(),
+        ),
         "values": attr.string_dict(),
     },
     initializer = _config_setting_init,
