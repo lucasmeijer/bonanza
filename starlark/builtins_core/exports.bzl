@@ -95,6 +95,17 @@ def _config_setting_impl(ctx):
     # TODO: Fill ConfigSettingInfo for select() to use.
     return [ConfigSettingInfo()]
 
+def _config_setting_init(**kwargs):
+    # The "values" attr can be used to refer to command line options
+    # that are integrated into Bazel. In our case we declare all of them
+    # as build settings under @bazel_tools//command_line_option. This
+    # allows us to simply remap "values" to "flag_values".
+    kwargs["flag_values"] = kwargs.get("flag_values", {}) | {
+        "@bazel_tools//command_line_option:" + option: value
+        for option, value in kwargs.get("values", {}).items()
+    }
+    return kwargs
+
 config_setting = rule(
     implementation = _config_setting_impl,
     attrs = {
@@ -103,6 +114,7 @@ config_setting = rule(
         "flag_values": attr.label_keyed_string_dict(),
         "values": attr.string_dict(),
     },
+    initializer = _config_setting_init,
     provides = [ConfigSettingInfo],
 )
 
