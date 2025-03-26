@@ -104,6 +104,26 @@ cpp_fragment = rule(
     },
 )
 
+def _platform_fragment_impl(ctx):
+    return [FragmentInfo(
+        host_platform = ctx.attr._host_platform.label,
+        platform = ctx.attr._platform.label,
+    )]
+
+platform_fragment = rule(
+    _platform_fragment_impl,
+    attrs = {
+        "_host_platform": attr.label(
+            cfg = "exec",
+            default = "//command_line_option:platforms",
+        ),
+        "_platform": attr.label(
+            cfg = "target",
+            default = "//command_line_option:platforms",
+        ),
+    },
+)
+
 def _proto_fragment_impl(ctx):
     return [FragmentInfo(
         experimental_protoc_opts = ctx.attr._protocopt[BuildSettingInfo].value,
