@@ -365,13 +365,23 @@ func (c *baseComputer[TReference, TMetadata]) ComputeBuildResultValue(ctx contex
 	valueEncodingOptions := c.getValueEncodingOptions(e, nil)
 	missingDependencies := false
 	for _, targetPlatform := range buildSpecification.TargetPlatforms {
+		apparentTargetPlatform, err := label.NewApparentLabel(targetPlatform)
+		if err != nil {
+			return PatchedBuildResultValue{}, fmt.Errorf("invalid target platform %#v: %w", targetPlatform, err)
+		}
+		canonicalTargetPlatform, err := resolveApparent(e, rootRepo, apparentTargetPlatform)
+		if err != nil {
+			return PatchedBuildResultValue{}, fmt.Errorf("failed to resolve target platform %#v: %w", targetPlatform, err)
+		}
 		targetPlatformConfigurationReference, err := c.applyTransition(
 			ctx,
 			e,
 			model_core.NewSimpleMessage[TReference](&model_analysis_pb.Configuration{}),
 			[]expectedTransitionOutput[TReference]{platformExpectedTransitionOutput},
 			thread,
-			starlark.StringDict{platformsCommandLineOptionLabel: starlark.String(targetPlatform)},
+			starlark.StringDict{
+				platformsCommandLineOptionLabel: model_starlark.NewLabel[TReference, TMetadata](canonicalTargetPlatform.AsResolved()),
+			},
 			valueEncodingOptions,
 		)
 		if err != nil {
