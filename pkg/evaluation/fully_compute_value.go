@@ -2,7 +2,7 @@ package evaluation
 
 import (
 	"context"
-	"encoding/hex"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"slices"
@@ -45,7 +45,7 @@ func appendFormattedKey[TReference object.BasicReference](out []byte, key model_
 			if i > 0 {
 				out = append(out, ", "...)
 			}
-			out = hex.AppendEncode(out, key.OutgoingReferences.GetOutgoingReference(i).GetRawReference())
+			out = base64.RawURLEncoding.AppendEncode(out, key.OutgoingReferences.GetOutgoingReference(i).GetRawReference())
 		}
 		out = append(out, ']')
 	}
