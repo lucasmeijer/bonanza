@@ -441,6 +441,10 @@
          ]
       },
       "Select": {
+         "dependsOn": [
+            "ConfiguredTarget",
+            "VisibleTarget"
+         ],
          "keyContainsReferences": true
       },
       "StableInputRootPath": {
