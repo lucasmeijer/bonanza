@@ -92,8 +92,8 @@ def cc_toolchain_suite(**kwargs):
     pass
 
 def _config_setting_impl(ctx):
-    # TODO: Implement.
-    return []
+    # TODO: Fill ConfigSettingInfo for select() to use.
+    return [ConfigSettingInfo()]
 
 config_setting = rule(
     implementation = _config_setting_impl,
