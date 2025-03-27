@@ -7,7 +7,6 @@ import (
 	"github.com/buildbarn/bonanza/pkg/evaluation"
 	"github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
 	model_starlark "github.com/buildbarn/bonanza/pkg/model/starlark"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
 	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
@@ -15,14 +14,6 @@ import (
 	"github.com/buildbarn/bonanza/pkg/storage/dag"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 )
-
-func (c *baseComputer[TReference, TMetadata]) getConfigurationByReference(ctx context.Context, configurationReference model_core.Message[*model_core_pb.Reference, TReference]) (model_core.Message[*model_analysis_pb.Configuration, TReference], error) {
-	if configurationReference.Message == nil {
-		// Empty configuration.
-		return model_core.NewSimpleMessage[TReference](&model_analysis_pb.Configuration{}), nil
-	}
-	return model_parser.Dereference(ctx, c.configurationReader, configurationReference)
-}
 
 var commandLineOptionPlatformsLabel = label.MustNewCanonicalLabel("@@bazel_tools+//command_line_option:platforms")
 
@@ -36,7 +27,7 @@ func getTargetPlatformInfoProvider[TReference object.BasicReference, TMetadata B
 	configurationReference model_core.Message[*model_core_pb.Reference, TReference],
 ) (model_core.Message[*model_starlark_pb.Struct_Fields, TReference], error) {
 	platformsLabelStr := commandLineOptionPlatformsLabel.String()
-	platformInfoProvider, err := getProviderFromVisibleConfiguredTarget(
+	platformInfoProvider, _, err := getProviderFromVisibleConfiguredTarget(
 		e,
 		commandLineOptionPlatformsLabel.GetCanonicalPackage().String(),
 		platformsLabelStr,

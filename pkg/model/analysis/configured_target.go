@@ -13,6 +13,7 @@ import (
 	"github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/model/core/btree"
+	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
 	model_starlark "github.com/buildbarn/bonanza/pkg/model/starlark"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
 	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
@@ -45,7 +46,7 @@ func (c *baseComputer[TReference, TMetadata]) constraintValuesToConstraints(ctx 
 	constraints := make(map[string]string, len(constraintValues))
 	missingDependencies := false
 	for _, constraintValue := range constraintValues {
-		constrainValueInfoProvider, err := getProviderFromVisibleConfiguredTarget(
+		constrainValueInfoProvider, _, err := getProviderFromVisibleConfiguredTarget(
 			e,
 			fromPackage.String(),
 			constraintValue,
@@ -1430,7 +1431,7 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 				return nil, errors.New("rule is not a build setting")
 			}
 
-			configuration, err := rc.computer.getConfigurationByReference(rc.context, rc.configurationReference)
+			configuration, err := model_parser.MaybeDereference(rc.context, rc.computer.configurationReader, rc.configurationReference)
 			if err != nil {
 				return nil, err
 			}
@@ -1439,7 +1440,7 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 			override, err := btree.Find(
 				rc.context,
 				rc.computer.configurationBuildSettingOverrideReader,
-				model_core.Nested(configuration, configuration.Message.BuildSettingOverrides),
+				model_core.Nested(configuration, configuration.Message.GetBuildSettingOverrides()),
 				func(entry *model_analysis_pb.Configuration_BuildSettingOverride) (int, *model_core_pb.Reference) {
 					switch level := entry.Level.(type) {
 					case *model_analysis_pb.Configuration_BuildSettingOverride_Leaf_:
@@ -2404,7 +2405,7 @@ func getProviderFromVisibleConfiguredTarget[TReference any, TConfigurationRefere
 	configurationReference model_core.Message[*model_core_pb.Reference, TConfigurationReference],
 	configurationObjectCapturer model_core.ExistingObjectCapturer[TConfigurationReference, TMetadata],
 	providerIdentifier label.CanonicalStarlarkIdentifier,
-) (model_core.Message[*model_starlark_pb.Struct_Fields, TReference], error) {
+) (model_core.Message[*model_starlark_pb.Struct_Fields, TReference], string, error) {
 	patchedConfigurationReference := model_core.Patch(
 		configurationObjectCapturer,
 		configurationReference,
@@ -2420,9 +2421,9 @@ func getProviderFromVisibleConfiguredTarget[TReference any, TConfigurationRefere
 		),
 	)
 	if !visibleTarget.IsSet() {
-		return model_core.Message[*model_starlark_pb.Struct_Fields, TReference]{}, evaluation.ErrMissingDependency
+		return model_core.Message[*model_starlark_pb.Struct_Fields, TReference]{}, "", evaluation.ErrMissingDependency
 	}
-	return getProviderFromConfiguredTarget(
+	p, err := getProviderFromConfiguredTarget(
 		e,
 		visibleTarget.Message.Label,
 		model_core.Patch(
@@ -2431,6 +2432,7 @@ func getProviderFromVisibleConfiguredTarget[TReference any, TConfigurationRefere
 		),
 		providerIdentifier,
 	)
+	return p, visibleTarget.Message.Label, err
 }
 
 type args struct{}

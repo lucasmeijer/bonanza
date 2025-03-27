@@ -24,7 +24,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeMakeVariablesValue(ctx cont
 	configurationReference := model_core.Nested(key, key.Message.ConfigurationReference)
 	for _, toolchainLabel := range append([]string{"@@bazel_tools+//tools/make:default_make_variables"}, key.Message.Toolchains...) {
 		// Obtain TemplateVariableInfo of the provided toolchain.
-		templateVariableInfoProvider, err := getProviderFromVisibleConfiguredTarget(
+		templateVariableInfoProvider, _, err := getProviderFromVisibleConfiguredTarget(
 			e,
 			key.Message.FromPackage,
 			toolchainLabel,

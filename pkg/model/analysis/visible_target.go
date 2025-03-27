@@ -11,6 +11,7 @@ import (
 	"github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/model/core/btree"
+	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
 	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
 	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
@@ -245,8 +246,9 @@ func (c *baseComputer[TReference, TMetadata]) ComputeVisibleTargetValue(ctx cont
 
 		// Determine if there is an override in place for this
 		// label setting.
-		configuration, err := c.getConfigurationByReference(
+		configuration, err := model_parser.MaybeDereference(
 			ctx,
+			c.configurationReader,
 			model_core.Nested(key, key.Message.ConfigurationReference),
 		)
 		if err != nil {
@@ -256,7 +258,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeVisibleTargetValue(ctx cont
 		override, err := btree.Find(
 			ctx,
 			c.configurationBuildSettingOverrideReader,
-			model_core.Nested(configuration, configuration.Message.BuildSettingOverrides),
+			model_core.Nested(configuration, configuration.Message.GetBuildSettingOverrides()),
 			func(entry *model_analysis_pb.Configuration_BuildSettingOverride) (int, *model_core_pb.Reference) {
 				switch level := entry.Level.(type) {
 				case *model_analysis_pb.Configuration_BuildSettingOverride_Leaf_:

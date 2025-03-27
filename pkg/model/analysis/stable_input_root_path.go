@@ -9,6 +9,7 @@ import (
 	"github.com/buildbarn/bonanza/pkg/evaluation"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
+	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
 	model_starlark "github.com/buildbarn/bonanza/pkg/model/starlark"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
 	model_command_pb "github.com/buildbarn/bonanza/pkg/proto/model/command"
@@ -112,13 +113,13 @@ func (c *baseComputer[TReference, TMetadata]) ComputeStableInputRootPathValue(ct
 
 	// Capture the standard output of "pwd" and trim the trailing
 	// newline character that it adds.
-	outputs, err := c.getOutputsFromActionResult(ctx, actionResult, directoryReaders)
+	outputs, err := model_parser.MaybeDereference(ctx, directoryReaders.CommandOutputs, model_core.Nested(actionResult, actionResult.Message.OutputsReference))
 	if err != nil {
 		return PatchedStableInputRootPathValue{}, fmt.Errorf("failed to obtain outputs from action result: %w", err)
 	}
 
 	stdoutEntry, err := model_filesystem.NewFileContentsEntryFromProto(
-		model_core.Nested(outputs, outputs.Message.Stdout),
+		model_core.Nested(outputs, outputs.Message.GetStdout()),
 	)
 	if err != nil {
 		return PatchedStableInputRootPathValue{}, fmt.Errorf("invalid standard output entry: %w", err)

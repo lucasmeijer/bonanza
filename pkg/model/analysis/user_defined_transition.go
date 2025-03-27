@@ -14,6 +14,7 @@ import (
 	"github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/model/core/btree"
+	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
 	model_starlark "github.com/buildbarn/bonanza/pkg/model/starlark"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
 	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
@@ -166,7 +167,7 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 	existingIter, existingIterStop := iter.Pull(btree.AllLeaves(
 		ctx,
 		c.configurationBuildSettingOverrideReader,
-		model_core.Nested(configuration, configuration.Message.BuildSettingOverrides),
+		model_core.Nested(configuration, configuration.Message.GetBuildSettingOverrides()),
 		func(override model_core.Message[*model_analysis_pb.Configuration_BuildSettingOverride, TReference]) (*model_core_pb.Reference, error) {
 			if level, ok := override.Message.Level.(*model_analysis_pb.Configuration_BuildSettingOverride_Parent_); ok {
 				return level.Parent.Reference, nil
@@ -308,6 +309,96 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 	), nil
 }
 
+type getBuildSettingValueEnvironment[TReference any] interface {
+	GetTargetValue(*model_analysis_pb.Target_Key) model_core.Message[*model_analysis_pb.Target_Value, TReference]
+	GetVisibleTargetValue(model_core.PatchedMessage[*model_analysis_pb.VisibleTarget_Key, dag.ObjectContentsWalker]) model_core.Message[*model_analysis_pb.VisibleTarget_Value, TReference]
+}
+
+func (c *baseComputer[TReference, TMetadata]) getBuildSettingValue(ctx context.Context, e getBuildSettingValueEnvironment[TReference], fromPackage label.CanonicalPackage, buildSettingLabel string, configuration model_core.Message[*model_analysis_pb.Configuration, TReference]) (model_core.Message[*model_starlark_pb.Value, TReference], error) {
+	visibleTargetValue := e.GetVisibleTargetValue(
+		model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](
+			&model_analysis_pb.VisibleTarget_Key{
+				FromPackage:        fromPackage.String(),
+				ToLabel:            buildSettingLabel,
+				StopAtLabelSetting: true,
+			},
+		),
+	)
+	if !visibleTargetValue.IsSet() {
+		return model_core.Message[*model_starlark_pb.Value, TReference]{}, evaluation.ErrMissingDependency
+	}
+	visibleBuildSettingLabel := visibleTargetValue.Message.Label
+
+	// Determine the current value of the build setting.
+	if buildSettingOverride, err := btree.Find(
+		ctx,
+		c.configurationBuildSettingOverrideReader,
+		model_core.Nested(configuration, configuration.Message.GetBuildSettingOverrides()),
+		func(entry *model_analysis_pb.Configuration_BuildSettingOverride) (int, *model_core_pb.Reference) {
+			switch level := entry.Level.(type) {
+			case *model_analysis_pb.Configuration_BuildSettingOverride_Leaf_:
+				return strings.Compare(visibleBuildSettingLabel, level.Leaf.Label), nil
+			case *model_analysis_pb.Configuration_BuildSettingOverride_Parent_:
+				return strings.Compare(visibleBuildSettingLabel, level.Parent.FirstLabel), level.Parent.Reference
+			default:
+				return 0, nil
+			}
+		},
+	); err != nil {
+		return model_core.Message[*model_starlark_pb.Value, TReference]{}, err
+	} else if buildSettingOverride.IsSet() {
+		// Configuration contains an override for the
+		// build setting. Use the value contained in the
+		// configuration.
+		level, ok := buildSettingOverride.Message.Level.(*model_analysis_pb.Configuration_BuildSettingOverride_Leaf_)
+		if !ok {
+			return model_core.Message[*model_starlark_pb.Value, TReference]{}, fmt.Errorf("build setting override for label setting %#v is not a valid leaf", visibleBuildSettingLabel)
+		}
+		return model_core.Nested(buildSettingOverride, level.Leaf.Value), nil
+	}
+
+	// No override present. Obtain the default value
+	// of the build setting.
+	targetValue := e.GetTargetValue(&model_analysis_pb.Target_Key{
+		Label: visibleBuildSettingLabel,
+	})
+	if !targetValue.IsSet() {
+		return model_core.Message[*model_starlark_pb.Value, TReference]{}, evaluation.ErrMissingDependency
+	}
+	switch targetKind := targetValue.Message.Definition.GetKind().(type) {
+	case *model_starlark_pb.Target_Definition_LabelSetting:
+		// Build setting is a label_setting() or
+		// label_flag().
+		buildSettingDefault := &model_starlark_pb.Value{
+			Kind: &model_starlark_pb.Value_Label{
+				Label: targetKind.LabelSetting.BuildSettingDefault,
+			},
+		}
+		if targetKind.LabelSetting.SingletonList {
+			buildSettingDefault = &model_starlark_pb.Value{
+				Kind: &model_starlark_pb.Value_List{
+					List: &model_starlark_pb.List{
+						Elements: []*model_starlark_pb.List_Element{{
+							Level: &model_starlark_pb.List_Element_Leaf{
+								Leaf: buildSettingDefault,
+							},
+						}},
+					},
+				},
+			}
+		}
+		return model_core.NewSimpleMessage[TReference](buildSettingDefault), nil
+	case *model_starlark_pb.Target_Definition_RuleTarget:
+		// Build setting is written in Starlark.
+		if targetKind.RuleTarget.BuildSettingDefault == nil {
+			return model_core.Message[*model_starlark_pb.Value, TReference]{}, fmt.Errorf("rule %#v used by build setting %#v does not have \"build_setting\" set", targetKind.RuleTarget.RuleIdentifier, visibleBuildSettingLabel)
+		}
+		return model_core.Nested(targetValue, targetKind.RuleTarget.BuildSettingDefault), nil
+	default:
+		return model_core.Message[*model_starlark_pb.Value, TReference]{}, fmt.Errorf("target %#v is not a build setting or rule target", visibleBuildSettingLabel)
+	}
+}
+
 type performUserDefinedTransitionEnvironment[TReference, TMetadata any] interface {
 	model_core.ObjectManager[TReference, TMetadata]
 	getExpectedTransitionOutputEnvironment[TReference]
@@ -345,7 +436,7 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx c
 	transitionPackage := transitionFilename.GetCanonicalPackage()
 	transitionRepo := transitionPackage.GetCanonicalRepo()
 
-	configuration, err := c.getConfigurationByReference(ctx, configurationReference)
+	configuration, err := model_parser.MaybeDereference(ctx, c.configurationReader, configurationReference)
 	if err != nil {
 		return performUserDefinedTransitionResult[TMetadata]{}, err
 	}
@@ -375,108 +466,34 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx c
 			}
 			return performUserDefinedTransitionResult[TMetadata]{}, err
 		}
-		visibleTargetValue := e.GetVisibleTargetValue(
-			model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](
-				&model_analysis_pb.VisibleTarget_Key{
-					FromPackage:        canonicalBuildSettingLabel.GetCanonicalPackage().String(),
-					ToLabel:            canonicalBuildSettingLabel.String(),
-					StopAtLabelSetting: true,
-				},
-			),
-		)
-		if !visibleTargetValue.IsSet() {
-			missingDependencies = true
-			continue
-		}
-		visibleBuildSettingLabel := visibleTargetValue.Message.Label
 
-		// Determine the current value of the build setting.
-		buildSettingOverride, err := btree.Find(
+		encodedValue, err := c.getBuildSettingValue(
 			ctx,
-			c.configurationBuildSettingOverrideReader,
-			model_core.Nested(configuration, configuration.Message.BuildSettingOverrides),
-			func(entry *model_analysis_pb.Configuration_BuildSettingOverride) (int, *model_core_pb.Reference) {
-				switch level := entry.Level.(type) {
-				case *model_analysis_pb.Configuration_BuildSettingOverride_Leaf_:
-					return strings.Compare(visibleBuildSettingLabel, level.Leaf.Label), nil
-				case *model_analysis_pb.Configuration_BuildSettingOverride_Parent_:
-					return strings.Compare(visibleBuildSettingLabel, level.Parent.FirstLabel), level.Parent.Reference
-				default:
-					return 0, nil
-				}
-			},
+			e,
+			// TODO: Is this the right package? Shouldn't we
+			// use the package in which the transition is
+			// declared?
+			canonicalBuildSettingLabel.GetCanonicalPackage(),
+			canonicalBuildSettingLabel.String(),
+			configuration,
 		)
 		if err != nil {
-			return performUserDefinedTransitionResult[TMetadata]{}, err
-		}
-
-		if buildSettingOverride.IsSet() {
-			// Configuration contains an override for the
-			// build setting. Use the value contained in the
-			// configuratoin.
-			level, ok := buildSettingOverride.Message.Level.(*model_analysis_pb.Configuration_BuildSettingOverride_Leaf_)
-			if !ok {
-				return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("build setting override for label setting %#v is not a valid leaf", visibleBuildSettingLabel)
-			}
-			v, err := model_starlark.DecodeValue[TReference, TMetadata](
-				model_core.Nested(buildSettingOverride, level.Leaf.Value),
-				/* currentIdentifier = */ nil,
-				c.getValueDecodingOptions(ctx, func(resolvedLabel label.ResolvedLabel) (starlark.Value, error) {
-					return model_starlark.NewLabel[TReference, TMetadata](resolvedLabel), nil
-				}),
-			)
-			if err := inputs.SetKey(thread, starlark.String(input), v); err != nil {
-				return performUserDefinedTransitionResult[TMetadata]{}, err
-			}
-			if err != nil {
-				return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("failed to decode build setting override for label setting %#v: %w", visibleBuildSettingLabel, err)
-			}
-		} else {
-			// No override present. Obtain the default value
-			// of the build setting.
-			targetValue := e.GetTargetValue(&model_analysis_pb.Target_Key{
-				Label: visibleBuildSettingLabel,
-			})
-			if !targetValue.IsSet() {
+			if errors.Is(err, evaluation.ErrMissingDependency) {
 				missingDependencies = true
 				continue
 			}
-			switch targetKind := targetValue.Message.Definition.GetKind().(type) {
-			case *model_starlark_pb.Target_Definition_LabelSetting:
-				// Build setting is a label_setting() or
-				// label_flag().
-				buildSettingDefaultLabel, err := label.NewResolvedLabel(targetKind.LabelSetting.BuildSettingDefault)
-				if err != nil {
-					return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("invalid build setting default for label setting %#v: %w", visibleBuildSettingLabel)
-				}
-				buildSettingDefault := model_starlark.NewLabel[TReference, TMetadata](buildSettingDefaultLabel)
-				if targetKind.LabelSetting.SingletonList {
-					buildSettingDefault = starlark.NewList([]starlark.Value{buildSettingDefault})
-				}
-				if err := inputs.SetKey(thread, starlark.String(input), buildSettingDefault); err != nil {
-					return performUserDefinedTransitionResult[TMetadata]{}, err
-				}
-			case *model_starlark_pb.Target_Definition_RuleTarget:
-				// Build setting is written in Starlark.
-				if targetKind.RuleTarget.BuildSettingDefault == nil {
-					return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("rule %#v used by build setting %#v does not have \"build_setting\" set", targetKind.RuleTarget.RuleIdentifier, visibleBuildSettingLabel)
-				}
-				v, err := model_starlark.DecodeValue[TReference, TMetadata](
-					model_core.Nested(targetValue, targetKind.RuleTarget.BuildSettingDefault),
-					/* currentIdentifier = */ nil,
-					c.getValueDecodingOptions(ctx, func(resolvedLabel label.ResolvedLabel) (starlark.Value, error) {
-						return nil, errors.New("build settings implemented in Starlark cannot be of type Label")
-					}),
-				)
-				if err := inputs.SetKey(thread, starlark.String(input), v); err != nil {
-					return performUserDefinedTransitionResult[TMetadata]{}, err
-				}
-				if err != nil {
-					return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("failed to decode build setting default for build setting %#v: %w", visibleBuildSettingLabel, err)
-				}
-			default:
-				return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("target %#v is not a build setting or rule target", visibleBuildSettingLabel)
-			}
+			return performUserDefinedTransitionResult[TMetadata]{}, err
+		}
+
+		v, err := model_starlark.DecodeValue[TReference, TMetadata](
+			encodedValue,
+			/* currentIdentifier = */ nil,
+			c.getValueDecodingOptions(ctx, func(resolvedLabel label.ResolvedLabel) (starlark.Value, error) {
+				return model_starlark.NewLabel[TReference, TMetadata](resolvedLabel), nil
+			}),
+		)
+		if err := inputs.SetKey(thread, starlark.String(input), v); err != nil {
+			return performUserDefinedTransitionResult[TMetadata]{}, err
 		}
 	}
 	inputs.Freeze()

@@ -443,6 +443,7 @@
       "Select": {
          "dependsOn": [
             "ConfiguredTarget",
+            "Target",
             "VisibleTarget"
          ],
          "keyContainsReferences": true

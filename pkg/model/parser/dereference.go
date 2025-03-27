@@ -25,3 +25,20 @@ func Dereference[
 	value, err := reader.ReadParsedObject(ctx, reference)
 	return value, err
 }
+
+// MaybeDereference is identical to Dereference, except that it returns
+// a default instance in case the reference message is not set.
+func MaybeDereference[
+	TValue any,
+	TReference any,
+](
+	ctx context.Context,
+	reader ParsedObjectReader[TReference, TValue],
+	m model_core.Message[*model_core_pb.Reference, TReference],
+) (TValue, error) {
+	if m.Message == nil {
+		var zero TValue
+		return zero, nil
+	}
+	return Dereference(ctx, reader, m)
+}

@@ -1685,13 +1685,13 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 	}
 
 	// Extract standard output and standard error from the results.
-	outputs, err := mrc.computer.getOutputsFromActionResult(mrc.context, actionResult, mrc.directoryReaders)
+	outputs, err := model_parser.MaybeDereference(mrc.context, mrc.directoryReaders.CommandOutputs, model_core.Nested(actionResult, actionResult.Message.OutputsReference))
 	if err != nil {
 		return nil, fmt.Errorf("failed to obtain outputs from action result: %w", err)
 	}
 
 	stdoutEntry, err := model_filesystem.NewFileContentsEntryFromProto(
-		model_core.Nested(outputs, outputs.Message.Stdout),
+		model_core.Nested(outputs, outputs.Message.GetStdout()),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("invalid standard output entry: %w", err)
@@ -1702,7 +1702,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 	}
 
 	stderrEntry, err := model_filesystem.NewFileContentsEntryFromProto(
-		model_core.Nested(outputs, outputs.Message.Stderr),
+		model_core.Nested(outputs, outputs.Message.GetStderr()),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("invalid standard error entry: %w", err)
@@ -1717,7 +1717,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 	// input root.
 	var outputRootDirectory changeTrackingDirectory[TReference]
 	if err := outputRootDirectory.setContents(
-		model_core.Nested(outputs, outputs.Message.OutputRoot),
+		model_core.Nested(outputs, outputs.Message.GetOutputRoot()),
 		mrc.directoryLoadOptions,
 	); err != nil {
 		return nil, fmt.Errorf("failed load output root: %w", err)
@@ -1993,13 +1993,13 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doRead(thread *star
 	}
 
 	// Extract standard output.
-	outputs, err := mrc.computer.getOutputsFromActionResult(mrc.context, actionResult, mrc.directoryReaders)
+	outputs, err := model_parser.MaybeDereference(mrc.context, mrc.directoryReaders.CommandOutputs, model_core.Nested(actionResult, actionResult.Message.OutputsReference))
 	if err != nil {
 		return nil, fmt.Errorf("failed to obtain outputs from action result: %w", err)
 	}
 
 	stdoutEntry, err := model_filesystem.NewFileContentsEntryFromProto(
-		model_core.Nested(outputs, outputs.Message.Stdout),
+		model_core.Nested(outputs, outputs.Message.GetStdout()),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("invalid standard output entry: %w", err)
@@ -2148,13 +2148,13 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doWhich(thread *sta
 	if actionResult.Message.ExitCode == 0 {
 		// Capture the standard output of "command -v" and trim the
 		// trailing newline character that it adds.
-		outputs, err := mrc.computer.getOutputsFromActionResult(mrc.context, actionResult, mrc.directoryReaders)
+		outputs, err := model_parser.MaybeDereference(mrc.context, mrc.directoryReaders.CommandOutputs, model_core.Nested(actionResult, actionResult.Message.OutputsReference))
 		if err != nil {
 			return nil, fmt.Errorf("failed to obtain outputs from action result: %w", err)
 		}
 
 		stdoutEntry, err := model_filesystem.NewFileContentsEntryFromProto(
-			model_core.Nested(outputs, outputs.Message.Stdout),
+			model_core.Nested(outputs, outputs.Message.GetStdout()),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("invalid standard output entry: %w", err)
