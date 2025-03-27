@@ -40,7 +40,7 @@ func getTargetPlatformInfoProvider[TReference object.BasicReference, TMetadata B
 		e,
 		commandLineOptionPlatformsLabel.GetCanonicalPackage().String(),
 		platformsLabelStr,
-		model_core.NewSimpleMessage[TReference]((*model_core_pb.Reference)(nil)),
+		configurationReference,
 		e,
 		platformInfoProviderIdentifier,
 	)
