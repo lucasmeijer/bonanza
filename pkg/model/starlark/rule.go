@@ -630,7 +630,7 @@ func (rd *protoRuleDefinition[TReference, TMetadata]) GetInitializer(thread *sta
 	}
 	f := NewNamedFunction(
 		NewProtoNamedFunctionDefinition[TReference, TMetadata](
-			model_core.NewNestedMessage(rd.message, rd.message.Message.Initializer),
+			model_core.Nested(rd.message, rd.message.Message.Initializer),
 		),
 	)
 	return &f, nil
@@ -677,7 +677,7 @@ func (rd *reloadingRuleDefinition[TReference, TMetadata]) getBase(thread *starla
 		return nil, fmt.Errorf("rule %#v does not have a definition", rd.identifier.String())
 	}
 
-	base := NewProtoRuleDefinition[TReference, TMetadata](model_core.NewNestedMessage(value, ruleKind.Definition))
+	base := NewProtoRuleDefinition[TReference, TMetadata](model_core.Nested(value, ruleKind.Definition))
 	rd.base.Store(&base)
 	return base, nil
 }

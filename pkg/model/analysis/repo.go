@@ -139,7 +139,7 @@ func (d *changeTrackingDirectory[TReference]) setContents(contents model_core.Me
 		d.files[name] = &changeTrackingFile[TReference]{
 			isExecutable: properties.IsExecutable,
 			contents: unmodifiedFileContents[TReference]{
-				contents: model_core.NewNestedMessage(leaves, properties.Contents),
+				contents: model_core.Nested(leaves, properties.Contents),
 			},
 		}
 	}
@@ -161,12 +161,12 @@ func (d *changeTrackingDirectory[TReference]) setContents(contents model_core.Me
 		switch childContents := directory.Contents.(type) {
 		case *model_filesystem_pb.DirectoryNode_ContentsExternal:
 			d.directories[name] = &changeTrackingDirectory[TReference]{
-				currentReference: model_core.NewNestedMessage(contents, childContents.ContentsExternal),
+				currentReference: model_core.Nested(contents, childContents.ContentsExternal),
 			}
 		case *model_filesystem_pb.DirectoryNode_ContentsInline:
 			dChild := &changeTrackingDirectory[TReference]{}
 			if err := dChild.setContents(
-				model_core.NewNestedMessage(contents, childContents.ContentsInline),
+				model_core.Nested(contents, childContents.ContentsInline),
 				options,
 			); err != nil {
 				return err
@@ -222,7 +222,7 @@ func (d *changeTrackingDirectory[TReference]) maybeLoadContents(options *changeT
 	if reference := d.currentReference; reference.IsSet() {
 		// Directory has not been accessed before. Load it from
 		// storage and ingest its contents.
-		directoryMessage, err := model_parser.Dereference(options.context, options.directoryReader, model_core.NewNestedMessage(reference, reference.Message.GetReference()))
+		directoryMessage, err := model_parser.Dereference(options.context, options.directoryReader, model_core.Nested(reference, reference.Message.GetReference()))
 		if err != nil {
 			return err
 		}
@@ -342,7 +342,7 @@ func (cd *capturableChangeTrackingDirectory[TReference]) EnterCapturableDirector
 		// Directory has not been modified. Load the copy from
 		// storage, so that it may potentially be inlined into
 		// the parent directory.
-		directoryMessage, err := model_parser.Dereference(cd.options.context, cd.options.directoryReader, model_core.NewNestedMessage(reference, reference.Message.GetReference()))
+		directoryMessage, err := model_parser.Dereference(cd.options.context, cd.options.directoryReader, model_core.Nested(reference, reference.Message.GetReference()))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -697,7 +697,7 @@ func (c *baseComputer[TReference, TMetadata]) fetchModuleFromRegistry(
 		return PatchedRepoValue{}, fmt.Errorf("file at URL %#v does not exist", sourceJSONURL)
 	}
 	sourceJSONContentsEntry, err := model_filesystem.NewFileContentsEntryFromProto(
-		model_core.NewNestedMessage(sourceJSONContentsValue, sourceJSONContentsValue.Message.Exists.Contents),
+		model_core.Nested(sourceJSONContentsValue, sourceJSONContentsValue.Message.Exists.Contents),
 	)
 	if err != nil {
 		return PatchedRepoValue{}, fmt.Errorf("invalid file contents: %w", err)
@@ -772,7 +772,7 @@ func (c *baseComputer[TReference, TMetadata]) fetchModuleFromRegistry(
 		}
 
 		patchContentsEntry, err := model_filesystem.NewFileContentsEntryFromProto(
-			model_core.NewNestedMessage(patchContentsValue, patchContentsValue.Message.Exists.Contents),
+			model_core.Nested(patchContentsValue, patchContentsValue.Message.Exists.Contents),
 		)
 		if err != nil {
 			return PatchedRepoValue{}, fmt.Errorf("invalid file contents for patch %#v: %w", patchEntry.key, err)
@@ -805,7 +805,7 @@ func (c *baseComputer[TReference, TMetadata]) fetchModuleFromRegistry(
 		}
 
 		patchContentsEntry, err := model_filesystem.NewFileContentsEntryFromProto(
-			model_core.NewNestedMessage(patchPropertiesValue, patchPropertiesValue.Message.Exists.Contents),
+			model_core.Nested(patchPropertiesValue, patchPropertiesValue.Message.Exists.Contents),
 		)
 		if err != nil {
 			return PatchedRepoValue{}, fmt.Errorf("invalid file contents for patch %#v: %s", patchLabelStr, err)
@@ -830,7 +830,7 @@ func (c *baseComputer[TReference, TMetadata]) fetchModuleFromRegistry(
 	return c.applyPatches(
 		ctx,
 		e,
-		model_core.NewNestedMessage(archiveContentsValue, archiveContentsValue.Message.Exists.Contents),
+		model_core.Nested(archiveContentsValue, archiveContentsValue.Message.Exists.Contents),
 		sourceJSON.StripPrefix,
 		patchesToApply,
 	)
@@ -1354,7 +1354,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doDownload(thread *
 		&changeTrackingFile[TReference]{
 			isExecutable: executable,
 			contents: unmodifiedFileContents[TReference]{
-				contents: model_core.NewNestedMessage(fileContentsValue, exists.Contents),
+				contents: model_core.Nested(fileContentsValue, exists.Contents),
 			},
 		},
 	); err != nil {
@@ -1448,7 +1448,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doDownloadAndExtrac
 
 	// Determine which directory to place inside the file system.
 	archiveRootDirectory := changeTrackingDirectory[TReference]{
-		currentReference: model_core.NewNestedMessage(archiveContentsValue, archiveContentsValue.Message.Exists.Contents),
+		currentReference: model_core.Nested(archiveContentsValue, archiveContentsValue.Message.Exists.Contents),
 	}
 	rootDirectoryResolver := changeTrackingDirectoryResolver[TReference]{
 		loadOptions:      mrc.directoryLoadOptions,
@@ -1691,7 +1691,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 	}
 
 	stdoutEntry, err := model_filesystem.NewFileContentsEntryFromProto(
-		model_core.NewNestedMessage(outputs, outputs.Message.Stdout),
+		model_core.Nested(outputs, outputs.Message.Stdout),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("invalid standard output entry: %w", err)
@@ -1702,7 +1702,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 	}
 
 	stderrEntry, err := model_filesystem.NewFileContentsEntryFromProto(
-		model_core.NewNestedMessage(outputs, outputs.Message.Stderr),
+		model_core.Nested(outputs, outputs.Message.Stderr),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("invalid standard error entry: %w", err)
@@ -1717,7 +1717,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 	// input root.
 	var outputRootDirectory changeTrackingDirectory[TReference]
 	if err := outputRootDirectory.setContents(
-		model_core.NewNestedMessage(outputs, outputs.Message.OutputRoot),
+		model_core.Nested(outputs, outputs.Message.OutputRoot),
 		mrc.directoryLoadOptions,
 	); err != nil {
 		return nil, fmt.Errorf("failed load output root: %w", err)
@@ -1999,7 +1999,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doRead(thread *star
 	}
 
 	stdoutEntry, err := model_filesystem.NewFileContentsEntryFromProto(
-		model_core.NewNestedMessage(outputs, outputs.Message.Stdout),
+		model_core.Nested(outputs, outputs.Message.Stdout),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("invalid standard output entry: %w", err)
@@ -2154,7 +2154,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doWhich(thread *sta
 		}
 
 		stdoutEntry, err := model_filesystem.NewFileContentsEntryFromProto(
-			model_core.NewNestedMessage(outputs, outputs.Message.Stdout),
+			model_core.Nested(outputs, outputs.Message.Stdout),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("invalid standard output entry: %w", err)
@@ -2367,7 +2367,7 @@ func (ui *externalRepoAddingPathUnpackerInto[TReference, TMetadata]) maybeAddExt
 				if rootDirectoryReference == nil {
 					return errors.New("root directory reference is not set")
 				}
-				repoDirectory.currentReference = model_core.NewNestedMessage(repo, rootDirectoryReference)
+				repoDirectory.currentReference = model_core.Nested(repo, rootDirectoryReference)
 			}
 		}
 	}
@@ -2581,7 +2581,7 @@ func (c *baseComputer[TReference, TMetadata]) fetchModuleExtensionRepo(ctx conte
 		ctx,
 		canonicalRepo,
 		apparentRepo,
-		model_core.NewNestedMessage(repoValue, repo),
+		model_core.Nested(repoValue, repo),
 		e,
 	)
 }
@@ -2614,7 +2614,7 @@ func (c *baseComputer[TReference, TMetadata]) fetchRepo(ctx context.Context, can
 		model_starlark.AllStructFields(
 			ctx,
 			c.valueReaders.List,
-			model_core.NewNestedMessage(repo, repo.Message.AttrValues),
+			model_core.Nested(repo, repo.Message.AttrValues),
 			&errIter,
 		),
 	)
@@ -3130,7 +3130,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRepoValue(ctx context.Conte
 				func(i int) int { return strings.Compare(moduleName, modules[i].Name) },
 			); ok {
 				// Found matching module.
-				rootDirectoryReference := model_core.NewPatchedMessageFromExistingCaptured(e, model_core.NewNestedMessage(buildSpecification, modules[i].RootDirectoryReference))
+				rootDirectoryReference := model_core.NewPatchedMessageFromExistingCaptured(e, model_core.Nested(buildSpecification, modules[i].RootDirectoryReference))
 				return model_core.NewPatchedMessage(
 					&model_analysis_pb.Repo_Value{
 						RootDirectoryReference: rootDirectoryReference.Message,
@@ -3159,7 +3159,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRepoValue(ctx context.Conte
 						ctx,
 						canonicalRepo,
 						canonicalRepo.GetModuleInstance().GetModule().ToApparentRepo(),
-						model_core.NewNestedMessage(remoteOverridesValue, override.RepositoryRule),
+						model_core.Nested(remoteOverridesValue, override.RepositoryRule),
 						e,
 					)
 				case *model_analysis_pb.ModuleOverride_SingleVersion_:

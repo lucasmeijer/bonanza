@@ -56,7 +56,7 @@ func (icf *objectBackedInitialContentsFetcher) getDirectory() (model_core.Messag
 	if err != nil {
 		return model_core.Message[*model_filesystem.Directory, object.LocalReference]{}, util.StatusWrapf(err, "Failed to fetch directory cluster with reference %s", icf.clusterReference)
 	}
-	return model_core.NewNestedMessage(cluster, &cluster.Message[icf.directoryIndex]), nil
+	return model_core.Nested(cluster, &cluster.Message[icf.directoryIndex]), nil
 }
 
 func (icf *objectBackedInitialContentsFetcher) FetchContents(fileReadMonitorFactory virtual.FileReadMonitorFactory) (map[path.Component]virtual.InitialChild, error) {
@@ -69,7 +69,7 @@ func (icf *objectBackedInitialContentsFetcher) FetchContents(fileReadMonitorFact
 	leaves, err := model_filesystem.DirectoryGetLeaves(
 		options.context,
 		options.leavesReader,
-		model_core.NewNestedMessage(directory, directory.Message.Directory),
+		model_core.Nested(directory, directory.Message.Directory),
 	)
 	if err != nil {
 		return nil, err
@@ -94,7 +94,7 @@ func (icf *objectBackedInitialContentsFetcher) FetchContents(fileReadMonitorFact
 		var child virtual.InitialContentsFetcher
 		switch contents := entry.Contents.(type) {
 		case *model_filesystem_pb.DirectoryNode_ContentsExternal:
-			childReference, err := model_core.FlattenReference(model_core.NewNestedMessage(directory, contents.ContentsExternal.Reference))
+			childReference, err := model_core.FlattenReference(model_core.Nested(directory, contents.ContentsExternal.Reference))
 			if err != nil {
 				return nil, util.StatusWrapf(err, "Invalid reference for directory with name %#v", entry.Name)
 			}
@@ -139,7 +139,7 @@ func (icf *objectBackedInitialContentsFetcher) FetchContents(fileReadMonitorFact
 			return nil, status.Errorf(codes.InvalidArgument, "File %#v does not have any properties", entry.Name)
 		}
 		fileContents, err := model_filesystem.NewFileContentsEntryFromProto(
-			model_core.NewNestedMessage(leaves, properties.Contents),
+			model_core.Nested(leaves, properties.Contents),
 		)
 		if err != nil {
 			return nil, util.StatusWrapf(err, "Invalid contents for file %#v", entry.Name)
@@ -188,7 +188,7 @@ func (icf *objectBackedInitialContentsFetcher) VirtualApply(data any) bool {
 	switch typedData := data.(type) {
 	case *ApplyGetRawDirectory:
 		if directory, err := icf.getDirectory(); err == nil {
-			typedData.RawDirectory = model_core.NewNestedMessage(directory, directory.Message.Directory)
+			typedData.RawDirectory = model_core.Nested(directory, directory.Message.Directory)
 		} else {
 			typedData.Err = err
 		}

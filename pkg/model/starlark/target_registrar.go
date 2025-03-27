@@ -43,7 +43,7 @@ func (tr *TargetRegistrar[TMetadata]) getVisibilityPackageGroup(visibility []pg_
 	// or package() in the BUILD.bazel file.
 	return model_core.NewPatchedMessageFromExistingCaptured(
 		model_core.CloningObjectManager[TMetadata]{},
-		model_core.NewNestedMessage(tr.defaultInheritableAttrs, tr.defaultInheritableAttrs.Message.Visibility),
+		model_core.Nested(tr.defaultInheritableAttrs, tr.defaultInheritableAttrs.Message.Visibility),
 	), nil
 }
 

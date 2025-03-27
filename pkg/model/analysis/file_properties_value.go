@@ -66,7 +66,7 @@ func (r *reposFilePropertiesResolver[TReference, TMetadata]) OnDirectory(name pa
 			return nil, evaluation.ErrMissingDependency
 		}
 
-		r.currentDirectoryReference = model_core.NewNestedMessage(repoValue, repoValue.Message.RootDirectoryReference.GetReference())
+		r.currentDirectoryReference = model_core.Nested(repoValue, repoValue.Message.RootDirectoryReference.GetReference())
 		return path.GotDirectory{
 			Child:        r,
 			IsReversible: true,
@@ -82,9 +82,9 @@ func (r *reposFilePropertiesResolver[TReference, TMetadata]) OnDirectory(name pa
 	); ok {
 		switch contents := directories[i].Contents.(type) {
 		case *model_filesystem_pb.DirectoryNode_ContentsExternal:
-			r.currentDirectoryReference = model_core.NewNestedMessage(d, contents.ContentsExternal.Reference)
+			r.currentDirectoryReference = model_core.Nested(d, contents.ContentsExternal.Reference)
 		case *model_filesystem_pb.DirectoryNode_ContentsInline:
-			r.stack = append(r.stack, model_core.NewNestedMessage(d, contents.ContentsInline))
+			r.stack = append(r.stack, model_core.Nested(d, contents.ContentsInline))
 		default:
 			return nil, errors.New("unknown directory contents type")
 		}
@@ -153,7 +153,7 @@ func (r *reposFilePropertiesResolver[TReference, TMetadata]) OnTerminal(name pat
 		if properties == nil {
 			return nil, errors.New("path resolves to file that does not have any properties")
 		}
-		r.fileProperties = model_core.NewNestedMessage(leaves, properties)
+		r.fileProperties = model_core.Nested(leaves, properties)
 		r.gotTerminal = true
 		return nil, nil
 	}

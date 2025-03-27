@@ -118,7 +118,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeStableInputRootPathValue(ct
 	}
 
 	stdoutEntry, err := model_filesystem.NewFileContentsEntryFromProto(
-		model_core.NewNestedMessage(outputs, outputs.Message.Stdout),
+		model_core.Nested(outputs, outputs.Message.Stdout),
 	)
 	if err != nil {
 		return PatchedStableInputRootPathValue{}, fmt.Errorf("invalid standard output entry: %w", err)

@@ -35,12 +35,12 @@ func AllLeaves[
 			} else {
 				entry := lastList.Message[0]
 				lastList.Message = lastList.Message[1:]
-				if childReference, err := traverser(model_core.NewNestedMessage(*lastList, entry)); err != nil {
+				if childReference, err := traverser(model_core.Nested(*lastList, entry)); err != nil {
 					*errOut = err
 					return
 				} else if childReference == nil {
 					// Traverser wants us to yield a leaf.
-					if !yield(model_core.NewNestedMessage(*lastList, entry)) {
+					if !yield(model_core.Nested(*lastList, entry)) {
 						*errOut = nil
 						return
 					}
@@ -49,7 +49,7 @@ func AllLeaves[
 					child, err := model_parser.Dereference[model_core.Message[[]TMessagePtr, TReference]](
 						ctx,
 						reader,
-						model_core.NewNestedMessage(*lastList, childReference),
+						model_core.Nested(*lastList, childReference),
 					)
 					if err != nil {
 						*errOut = err

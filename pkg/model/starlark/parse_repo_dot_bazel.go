@@ -121,7 +121,7 @@ func getDefaultInheritableAttrs[TReference any, TMetadata model_core.CloneableRe
 		// Clone the existing visibility.
 		visibilityPackageGroup = model_core.NewPatchedMessageFromExistingCaptured(
 			model_core.CloningObjectManager[TMetadata]{},
-			model_core.NewNestedMessage(previousInheritableAttrs, previousInheritableAttrs.Message.Visibility),
+			model_core.Nested(previousInheritableAttrs, previousInheritableAttrs.Message.Visibility),
 		)
 	}
 

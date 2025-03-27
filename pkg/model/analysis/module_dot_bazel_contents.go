@@ -37,7 +37,7 @@ func (c *baseComputer[TReference, TMetadata]) parseLocalModuleInstanceModuleDotB
 
 	return c.parseModuleDotBazel(
 		ctx,
-		model_core.NewNestedMessage(moduleFileProperties, moduleFileProperties.Message.Exists.Contents),
+		model_core.Nested(moduleFileProperties, moduleFileProperties.Message.Exists.Contents),
 		moduleInstance,
 		e,
 		handler,
@@ -59,7 +59,7 @@ func (c *baseComputer[TReference, TMetadata]) parseActiveModuleInstanceModuleDot
 	}
 	return c.parseModuleDotBazel(
 		ctx,
-		model_core.NewNestedMessage(moduleFileContentsValue, moduleFileContentsValue.Message.Contents),
+		model_core.Nested(moduleFileContentsValue, moduleFileContentsValue.Message.Contents),
 		moduleInstance,
 		e,
 		handler,
@@ -245,7 +245,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeModuleDotBazelContentsValue
 		if !filePropertiesValue.IsSet() {
 			return PatchedModuleDotBazelContentsValue{}, evaluation.ErrMissingDependency
 		}
-		fileContents := model_core.NewPatchedMessageFromExistingCaptured(e, model_core.NewNestedMessage(filePropertiesValue, filePropertiesValue.Message.Exists.Contents))
+		fileContents := model_core.NewPatchedMessageFromExistingCaptured(e, model_core.Nested(filePropertiesValue, filePropertiesValue.Message.Exists.Contents))
 		return model_core.NewPatchedMessage(
 			&model_analysis_pb.ModuleDotBazelContents_Value{
 				Contents: fileContents.Message,
@@ -306,7 +306,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeModuleDotBazelContentsValue
 			if fileContentsValue.Message.Exists == nil {
 				return PatchedModuleDotBazelContentsValue{}, fmt.Errorf("file at URL %#v does not exist", moduleFileURL)
 			}
-			fileContents := model_core.NewPatchedMessageFromExistingCaptured(e, model_core.NewNestedMessage(fileContentsValue, fileContentsValue.Message.Exists.Contents))
+			fileContents := model_core.NewPatchedMessageFromExistingCaptured(e, model_core.Nested(fileContentsValue, fileContentsValue.Message.Exists.Contents))
 			return model_core.NewPatchedMessage(
 				&model_analysis_pb.ModuleDotBazelContents_Value{
 					Contents: fileContents.Message,

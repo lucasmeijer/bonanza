@@ -34,9 +34,9 @@ func NewSimpleMessage[TReference, TMessage any](m TMessage) Message[TMessage, TR
 	}
 }
 
-// NewNestedMessage is a helper function for creating instances of
-// Message that refer to a message that was mebedded into another one.
-func NewNestedMessage[TMessage1, TMessage2, TReference any](parent Message[TMessage1, TReference], child TMessage2) Message[TMessage2, TReference] {
+// Nested is a helper function for creating instances of Message that
+// refer to a message that was mebedded into another one.
+func Nested[TMessage1, TMessage2, TReference any](parent Message[TMessage1, TReference], child TMessage2) Message[TMessage2, TReference] {
 	return Message[TMessage2, TReference]{
 		Message:            child,
 		OutgoingReferences: parent.OutgoingReferences,

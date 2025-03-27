@@ -41,7 +41,7 @@ func (c *baseComputer[TReference, TMetadata]) getPackageDirectory(
 	}
 
 	// Obtain the root directory of the repo.
-	baseDirectory, err := model_parser.Dereference(ctx, directoryReader, model_core.NewNestedMessage(repoValue, repoValue.Message.RootDirectoryReference.GetReference()))
+	baseDirectory, err := model_parser.Dereference(ctx, directoryReader, model_core.Nested(repoValue, repoValue.Message.RootDirectoryReference.GetReference()))
 	if err != nil {
 		return model_core.Message[*model_filesystem_pb.Directory, TReference]{}, err
 	}
@@ -60,7 +60,7 @@ func (c *baseComputer[TReference, TMetadata]) getPackageDirectory(
 			// Base package does not exist.
 			return model_core.Message[*model_filesystem_pb.Directory, TReference]{}, nil
 		}
-		baseDirectory, err = model_filesystem.DirectoryNodeGetContents(ctx, directoryReader, model_core.NewNestedMessage(baseDirectory, directories[directoryIndex]))
+		baseDirectory, err = model_filesystem.DirectoryNodeGetContents(ctx, directoryReader, model_core.Nested(baseDirectory, directories[directoryIndex]))
 		if err != nil {
 			return model_core.Message[*model_filesystem_pb.Directory, TReference]{}, err
 		}
@@ -115,7 +115,7 @@ func (pec *packageExistenceChecker[TReference]) findPackagesBelow(d model_core.M
 		}
 		childTrace := dTrace.Append(name)
 
-		childDirectory, err := model_filesystem.DirectoryNodeGetContents(pec.context, pec.directoryReaders.Directory, model_core.NewNestedMessage(d, entry))
+		childDirectory, err := model_filesystem.DirectoryNodeGetContents(pec.context, pec.directoryReaders.Directory, model_core.Nested(d, entry))
 		if err != nil {
 			return fmt.Errorf("failed to get contents of directory %#v: %w", childTrace.GetUNIXString(), err)
 		}

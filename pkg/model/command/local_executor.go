@@ -249,7 +249,7 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 				model_parser.NewMessageListObjectParser[object.LocalReference, model_command_pb.ArgumentList_Element](),
 			),
 		),
-		model_core.NewNestedMessage(command, command.Message.Arguments),
+		model_core.Nested(command, command.Message.Arguments),
 		func(element model_core.Message[*model_command_pb.ArgumentList_Element, object.LocalReference]) (*model_core_pb.Reference, error) {
 			if level, ok := element.Message.Level.(*model_command_pb.ArgumentList_Element_Parent); ok {
 				return level.Parent, nil
@@ -282,7 +282,7 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 				model_parser.NewMessageListObjectParser[object.LocalReference, model_command_pb.EnvironmentVariableList_Element](),
 			),
 		),
-		model_core.NewNestedMessage(command, command.Message.EnvironmentVariables),
+		model_core.Nested(command, command.Message.EnvironmentVariables),
 		func(entry model_core.Message[*model_command_pb.EnvironmentVariableList_Element, object.LocalReference]) (*model_core_pb.Reference, error) {
 			if level, ok := entry.Message.Level.(*model_command_pb.EnvironmentVariableList_Element_Parent); ok {
 				return level.Parent, nil
@@ -535,7 +535,7 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 							fileCreationParameters:  fileCreationParameters,
 						},
 						directory: inputRootDirectory,
-						pattern:   model_core.NewNestedMessage(command, pattern),
+						pattern:   model_core.Nested(command, pattern),
 					},
 					model_filesystem.NewSimpleDirectoryMerkleTreeCapturer(model_core.WalkableCreatedObjectCapturer),
 					&outputRoot,
@@ -604,7 +604,7 @@ func (d *prepopulatedCapturableDirectory) getPatternChildren() (model_core.Messa
 	case *model_command_pb.PathPattern_ChildrenExternal:
 		return model_core.Message[*model_command_pb.PathPattern_Children, object.LocalReference]{}, status.Error(codes.Unimplemented, "TODO: Fetch path pattern from storage")
 	case *model_command_pb.PathPattern_ChildrenInline:
-		patternChildren = model_core.NewNestedMessage(d.pattern, childrenType.ChildrenInline)
+		patternChildren = model_core.Nested(d.pattern, childrenType.ChildrenInline)
 	case nil:
 		// Capture all children.
 	default:
@@ -692,7 +692,7 @@ func (d *prepopulatedCapturableDirectory) EnterCapturableDirectory(name path.Com
 		if childPatternMessage == nil {
 			return nil, nil, status.Error(codes.InvalidArgument, "Missing path pattern")
 		}
-		childPattern = model_core.NewNestedMessage(patternChildren, childPatternMessage)
+		childPattern = model_core.Nested(patternChildren, childPatternMessage)
 	} else {
 		// The current directory should be captured without any
 		// filtering. Also don't apply any filtering in the

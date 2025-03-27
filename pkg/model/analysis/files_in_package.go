@@ -66,7 +66,7 @@ func (d *currentPackageLimitingDirectory[TReference]) ReadDir() ([]filesystem.Fi
 				childDirectory, err := model_filesystem.DirectoryNodeGetContents(
 					d.options.context,
 					d.options.directoryReaders.Directory,
-					model_core.NewNestedMessage(d.directory, entry),
+					model_core.Nested(d.directory, entry),
 				)
 				if err != nil {
 					return nil, fmt.Errorf("failed to get contents for directory %#v: %w", entry.Name, err)
@@ -153,7 +153,7 @@ func (d *currentPackageLimitingDirectory[TReference]) EnterCapturableDirectory(n
 	childDirectory, err := model_filesystem.DirectoryNodeGetContents(
 		d.options.context,
 		d.options.directoryReaders.Directory,
-		model_core.NewNestedMessage(d.directory, directories[index]),
+		model_core.Nested(d.directory, directories[index]),
 	)
 	if err != nil {
 		return nil, nil, err

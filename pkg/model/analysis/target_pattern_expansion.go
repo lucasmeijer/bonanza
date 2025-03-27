@@ -47,7 +47,7 @@ func (c *baseComputer[TReference, TMetadata]) expandCanonicalTargetPattern(
 		for entry := range btree.AllLeaves(
 			ctx,
 			c.targetPatternExpansionValueTargetLabelReader,
-			model_core.NewNestedMessage(targetPatternExpansion, targetPatternExpansion.Message.TargetLabels),
+			model_core.Nested(targetPatternExpansion, targetPatternExpansion.Message.TargetLabels),
 			func(entry model_core.Message[*model_analysis_pb.TargetPatternExpansion_Value_TargetLabel, TReference]) (*model_core_pb.Reference, error) {
 				if level, ok := entry.Message.Level.(*model_analysis_pb.TargetPatternExpansion_Value_TargetLabel_Parent_); ok {
 					return level.Parent.Reference, nil
@@ -117,7 +117,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetPatternExpansionValue
 
 		definition, err := c.lookupTargetDefinitionInTargetList(
 			ctx,
-			model_core.NewNestedMessage(packageValue, packageValue.Message.Targets),
+			model_core.Nested(packageValue, packageValue.Message.Targets),
 			initialTarget.GetTargetName(),
 		)
 		if err != nil {
@@ -182,7 +182,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetPatternExpansionValue
 
 			for _, targetLabel := range childTargetPatternExpansion.Message.TargetLabels {
 				if err := treeBuilder.PushChild(
-					model_core.NewPatchedMessageFromExistingCaptured(e, model_core.NewNestedMessage(childTargetPatternExpansion, targetLabel)),
+					model_core.NewPatchedMessageFromExistingCaptured(e, model_core.Nested(childTargetPatternExpansion, targetLabel)),
 				); err != nil {
 					return PatchedTargetPatternExpansionValue{}, err
 				}
@@ -220,7 +220,7 @@ func (c *baseComputer[TReference, TMetadata]) addPackageToTargetPatternExpansion
 	for entry := range btree.AllLeaves(
 		ctx,
 		c.packageValueTargetReader,
-		model_core.NewNestedMessage(packageValue, packageValue.Message.Targets),
+		model_core.Nested(packageValue, packageValue.Message.Targets),
 		func(entry model_core.Message[*model_analysis_pb.Package_Value_Target, TReference]) (*model_core_pb.Reference, error) {
 			if level, ok := entry.Message.Level.(*model_analysis_pb.Package_Value_Target_Parent_); ok {
 				return level.Parent.Reference, nil

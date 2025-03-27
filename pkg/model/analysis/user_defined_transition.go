@@ -136,7 +136,7 @@ func getExpectedTransitionOutput[TReference object.BasicReference, TMetadata mod
 			return expectedTransitionOutput[TReference]{}, fmt.Errorf("failed to decode build setting type for rule %#v used by build setting %#v: %w", targetKind.RuleTarget.RuleIdentifier, visibleBuildSettingLabel, err)
 		}
 		canonicalizer = buildSettingType.GetCanonicalizer(transitionPackage)
-		defaultValue = model_core.NewNestedMessage(targetValue, targetKind.RuleTarget.BuildSettingDefault)
+		defaultValue = model_core.Nested(targetValue, targetKind.RuleTarget.BuildSettingDefault)
 	default:
 		return expectedTransitionOutput[TReference]{}, fmt.Errorf("target %#v is not a label setting or rule target", visibleBuildSettingLabel)
 	}
@@ -166,7 +166,7 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 	existingIter, existingIterStop := iter.Pull(btree.AllLeaves(
 		ctx,
 		c.configurationBuildSettingOverrideReader,
-		model_core.NewNestedMessage(configuration, configuration.Message.BuildSettingOverrides),
+		model_core.Nested(configuration, configuration.Message.BuildSettingOverrides),
 		func(override model_core.Message[*model_analysis_pb.Configuration_BuildSettingOverride, TReference]) (*model_core_pb.Reference, error) {
 			if level, ok := override.Message.Level.(*model_analysis_pb.Configuration_BuildSettingOverride_Parent_); ok {
 				return level.Parent.Reference, nil
@@ -339,7 +339,7 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx c
 	if !ok {
 		return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("%#v is not a rule definition", transitionIdentifier.String())
 	}
-	transitionDefinition := model_core.NewNestedMessage(transitionValue, d.Definition)
+	transitionDefinition := model_core.Nested(transitionValue, d.Definition)
 
 	transitionFilename := transitionIdentifier.GetCanonicalLabel()
 	transitionPackage := transitionFilename.GetCanonicalPackage()
@@ -394,7 +394,7 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx c
 		buildSettingOverride, err := btree.Find(
 			ctx,
 			c.configurationBuildSettingOverrideReader,
-			model_core.NewNestedMessage(configuration, configuration.Message.BuildSettingOverrides),
+			model_core.Nested(configuration, configuration.Message.BuildSettingOverrides),
 			func(entry *model_analysis_pb.Configuration_BuildSettingOverride) (int, *model_core_pb.Reference) {
 				switch level := entry.Level.(type) {
 				case *model_analysis_pb.Configuration_BuildSettingOverride_Leaf_:
@@ -419,7 +419,7 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx c
 				return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("build setting override for label setting %#v is not a valid leaf", visibleBuildSettingLabel)
 			}
 			v, err := model_starlark.DecodeValue[TReference, TMetadata](
-				model_core.NewNestedMessage(buildSettingOverride, level.Leaf.Value),
+				model_core.Nested(buildSettingOverride, level.Leaf.Value),
 				/* currentIdentifier = */ nil,
 				c.getValueDecodingOptions(ctx, func(resolvedLabel label.ResolvedLabel) (starlark.Value, error) {
 					return model_starlark.NewLabel[TReference, TMetadata](resolvedLabel), nil
@@ -462,7 +462,7 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx c
 					return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("rule %#v used by build setting %#v does not have \"build_setting\" set", targetKind.RuleTarget.RuleIdentifier, visibleBuildSettingLabel)
 				}
 				v, err := model_starlark.DecodeValue[TReference, TMetadata](
-					model_core.NewNestedMessage(targetValue, targetKind.RuleTarget.BuildSettingDefault),
+					model_core.Nested(targetValue, targetKind.RuleTarget.BuildSettingDefault),
 					/* currentIdentifier = */ nil,
 					c.getValueDecodingOptions(ctx, func(resolvedLabel label.ResolvedLabel) (starlark.Value, error) {
 						return nil, errors.New("build settings implemented in Starlark cannot be of type Label")
@@ -512,7 +512,7 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx c
 		thread,
 		model_starlark.NewNamedFunction(
 			model_starlark.NewProtoNamedFunctionDefinition[TReference, TMetadata](
-				model_core.NewNestedMessage(transitionDefinition, transitionDefinition.Message.Implementation),
+				model_core.Nested(transitionDefinition, transitionDefinition.Message.Implementation),
 			),
 		),
 		/* args = */ starlark.Tuple{
@@ -641,7 +641,7 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransitionCached
 			attrParameter,
 		)
 	case *model_analysis_pb.UserDefinedTransition_Value_Success_:
-		return model_core.NewPatchedMessageFromExistingCaptured(e, model_core.NewNestedMessage(transitionValue, result.Success)), nil
+		return model_core.NewPatchedMessageFromExistingCaptured(e, model_core.Nested(transitionValue, result.Success)), nil
 	default:
 		return performUserDefinedTransitionResult[TMetadata]{}, errors.New("unexpected user defined transition result type")
 	}
@@ -709,7 +709,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeUserDefinedTransitionValue(
 		ctx,
 		e,
 		key.Message.TransitionIdentifier,
-		model_core.NewNestedMessage(key, key.Message.InputConfigurationReference),
+		model_core.Nested(key, key.Message.InputConfigurationReference),
 		stubbedTransitionAttr{},
 	)
 	if err != nil {

@@ -193,7 +193,7 @@ func (h *registeredToolchainExtractingModuleDotBazelHandler[TReference, TMetadat
 					for element := range btree.AllLeaves(
 						h.context,
 						listReader,
-						model_core.NewNestedMessage(targetValue, targetCompatibleWithList.List.Elements),
+						model_core.Nested(targetValue, targetCompatibleWithList.List.Elements),
 						func(element model_core.Message[*model_starlark_pb.List_Element, TReference]) (*model_core_pb.Reference, error) {
 							if level, ok := element.Message.Level.(*model_starlark_pb.List_Element_Parent_); ok {
 								return level.Parent.Reference, nil

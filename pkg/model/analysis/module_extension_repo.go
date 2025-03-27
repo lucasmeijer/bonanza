@@ -34,7 +34,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeModuleExtensionRepoValue(ct
 	repo, err := btree.Find(
 		ctx,
 		c.moduleExtensionReposValueRepoReader,
-		model_core.NewNestedMessage(moduleExtensionReposValue, moduleExtensionReposValue.Message.Repos),
+		model_core.Nested(moduleExtensionReposValue, moduleExtensionReposValue.Message.Repos),
 		func(entry *model_analysis_pb.ModuleExtensionRepos_Value_Repo) (int, *model_core_pb.Reference) {
 			switch level := entry.Level.(type) {
 			case *model_analysis_pb.ModuleExtensionRepos_Value_Repo_Leaf:
@@ -61,7 +61,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeModuleExtensionRepoValue(ct
 	if definition == nil {
 		return PatchedModuleExtensionRepoValue{}, errors.New("repo does not have a definition")
 	}
-	patchedDefinition := model_core.NewPatchedMessageFromExistingCaptured(e, model_core.NewNestedMessage(repo, definition))
+	patchedDefinition := model_core.NewPatchedMessageFromExistingCaptured(e, model_core.Nested(repo, definition))
 	return model_core.NewPatchedMessage(
 		&model_analysis_pb.ModuleExtensionRepo_Value{
 			Definition: patchedDefinition.Message,

@@ -51,7 +51,7 @@ MatchDirectories:
 			childDirectory, err := model_filesystem.DirectoryNodeGetContents(
 				w.context,
 				w.directoryReaders.Directory,
-				model_core.NewNestedMessage(d, entry),
+				model_core.Nested(d, entry),
 			)
 			if err != nil {
 				return fmt.Errorf("failed to get directory %#v", childPath.GetUNIXString())
@@ -115,7 +115,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeGlobValue(ctx context.Conte
 		includeDirectories: key.IncludeDirectories,
 	}
 	if err := w.walkDirectory(
-		model_core.NewNestedMessage(filesInPackageValue, filesInPackageValue.Message.Directory),
+		model_core.Nested(filesInPackageValue, filesInPackageValue.Message.Directory),
 		nil,
 		&matcher,
 	); err != nil {

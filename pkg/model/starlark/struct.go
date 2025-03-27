@@ -353,7 +353,7 @@ func AllStructFields[TReference any](
 	allLeaves := btree.AllLeaves(
 		ctx,
 		reader,
-		model_core.NewNestedMessage(structFields, structFields.Message.Values),
+		model_core.Nested(structFields, structFields.Message.Values),
 		func(element model_core.Message[*model_starlark_pb.List_Element, TReference]) (*model_core_pb.Reference, error) {
 			if level, ok := element.Message.Level.(*model_starlark_pb.List_Element_Parent_); ok {
 				return level.Parent.Reference, nil
@@ -379,7 +379,7 @@ func AllStructFields[TReference any](
 			key := keys[0]
 			keys = keys[1:]
 
-			return yield(key, model_core.NewNestedMessage(entry, leaf.Leaf))
+			return yield(key, model_core.Nested(entry, leaf.Leaf))
 		})
 	}
 }
@@ -404,7 +404,7 @@ func GetStructFieldValue[TReference any](
 	}
 
 	contiguousLength := len(keys)
-	list := model_core.NewNestedMessage(structFields, structFields.Message.Values)
+	list := model_core.Nested(structFields, structFields.Message.Values)
 	for {
 		// List elements may never refer to empty nested lists,
 		// meaning that if the length of a list is equal to the
@@ -422,7 +422,7 @@ func GetStructFieldValue[TReference any](
 				panic("TODO")
 			case *model_starlark_pb.List_Element_Leaf:
 				if index == 0 {
-					return model_core.NewNestedMessage(list, level.Leaf), nil
+					return model_core.Nested(list, level.Leaf), nil
 				}
 				index--
 			}

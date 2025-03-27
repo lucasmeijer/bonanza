@@ -64,7 +64,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputePackageValue(ctx context.Co
 
 		buildFileLabel := canonicalPackage.AppendTargetName(buildFileName)
 		buildFileContentsEntry, err := model_filesystem.NewFileContentsEntryFromProto(
-			model_core.NewNestedMessage(buildFileProperties, buildFileProperties.Message.Exists.Contents),
+			model_core.Nested(buildFileProperties, buildFileProperties.Message.Exists.Contents),
 		)
 		if err != nil {
 			return PatchedPackageValue{}, fmt.Errorf("invalid contents for file %#v: %w", buildFileLabel.String(), err)
@@ -112,7 +112,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputePackageValue(ctx context.Co
 			model_core.CloningObjectManager[TMetadata]{},
 			model_core.NewPatchedMessageFromExistingCaptured(
 				e,
-				model_core.NewNestedMessage(repoDefaultAttrsValue, repoDefaultAttrsValue.Message.InheritableAttrs),
+				model_core.Nested(repoDefaultAttrsValue, repoDefaultAttrsValue.Message.InheritableAttrs),
 			),
 		)
 
@@ -131,7 +131,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputePackageValue(ctx context.Co
 			return model_starlark.GetStructFieldValue(
 				ctx,
 				listReader,
-				model_core.NewNestedMessage(compiledBzlFile, compiledBzlFile.Message.CompiledProgram.GetGlobals()),
+				model_core.Nested(compiledBzlFile, compiledBzlFile.Message.CompiledProgram.GetGlobals()),
 				identifier.GetStarlarkIdentifier().String(),
 			)
 		})

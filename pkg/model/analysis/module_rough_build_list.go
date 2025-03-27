@@ -190,7 +190,7 @@ ProcessModule:
 				missingDependencies = true
 				continue ProcessModule
 			}
-			moduleFileContents = model_core.NewNestedMessage(moduleFileContentsValue, moduleFileContentsValue.Message.Contents)
+			moduleFileContents = model_core.Nested(moduleFileContentsValue, moduleFileContentsValue.Message.Contents)
 		} else {
 			// No override exists. Download the MODULE.bazel
 			// file from Bazel Central Registry (BCR). We
@@ -214,7 +214,7 @@ ProcessModule:
 					continue ProcessModule
 				}
 				if httpFileContents.Message.Exists != nil {
-					moduleFileContents = model_core.NewNestedMessage(httpFileContents, httpFileContents.Message.Exists.Contents)
+					moduleFileContents = model_core.Nested(httpFileContents, httpFileContents.Message.Exists.Contents)
 					buildListEntry = &model_analysis_pb.BuildListModule{
 						Name:        module.name.String(),
 						Version:     module.version.String(),

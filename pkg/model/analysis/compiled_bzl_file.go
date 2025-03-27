@@ -45,7 +45,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeCompiledBzlFileValue(ctx co
 		return PatchedCompiledBzlFileValue{}, fmt.Errorf("file %#v does not exist", canonicalLabel.String())
 	}
 	buildFileContentsEntry, err := model_filesystem.NewFileContentsEntryFromProto(
-		model_core.NewNestedMessage(bzlFileProperties, bzlFileProperties.Message.Exists.GetContents()),
+		model_core.Nested(bzlFileProperties, bzlFileProperties.Message.Exists.GetContents()),
 	)
 	if err != nil {
 		return PatchedCompiledBzlFileValue{}, fmt.Errorf("invalid file contents: %w", err)
@@ -109,7 +109,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeCompiledBzlFileDecodedGloba
 		return nil, evaluation.ErrMissingDependency
 	}
 	return model_starlark.DecodeGlobals[TReference, TMetadata](
-		model_core.NewNestedMessage(compiledBzlFile, compiledBzlFile.Message.CompiledProgram.GetGlobals()),
+		model_core.Nested(compiledBzlFile, compiledBzlFile.Message.CompiledProgram.GetGlobals()),
 		currentFilename,
 		c.getValueDecodingOptions(ctx, func(resolvedLabel label.ResolvedLabel) (starlark.Value, error) {
 			return model_starlark.NewLabel[TReference, TMetadata](resolvedLabel), nil
@@ -175,7 +175,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeCompiledBzlFileGlobalValue(
 	global, err := model_starlark.GetStructFieldValue(
 		ctx,
 		c.valueReaders.List,
-		model_core.NewNestedMessage(compiledBzlFile, compiledBzlFile.Message.CompiledProgram.GetGlobals()),
+		model_core.Nested(compiledBzlFile, compiledBzlFile.Message.CompiledProgram.GetGlobals()),
 		identifier.GetStarlarkIdentifier().String(),
 	)
 	if err != nil {

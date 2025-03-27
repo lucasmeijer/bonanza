@@ -40,7 +40,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRepositoryRuleObjectValue(c
 
 	attrs, err := c.decodeAttrsDict(
 		ctx,
-		model_core.NewNestedMessage(repositoryRuleValue, d.Definition.Attrs),
+		model_core.Nested(repositoryRuleValue, d.Definition.Attrs),
 		func(resolvedLabel label.ResolvedLabel) (starlark.Value, error) {
 			return model_starlark.NewLabel[TReference, TMetadata](resolvedLabel), nil
 		},
@@ -51,7 +51,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRepositoryRuleObjectValue(c
 
 	return &RepositoryRule{
 		Implementation: model_starlark.NewNamedFunction(model_starlark.NewProtoNamedFunctionDefinition[TReference, TMetadata](
-			model_core.NewNestedMessage(repositoryRuleValue, d.Definition.Implementation),
+			model_core.Nested(repositoryRuleValue, d.Definition.Implementation),
 		)),
 		Attrs: attrs,
 	}, nil
@@ -80,7 +80,7 @@ func (c *baseComputer[TReference, TMetadata]) decodeAttrsDict(ctx context.Contex
 
 		if strings.HasPrefix(namedAttr.Name, "_") {
 			value, err := model_starlark.DecodeValue[TReference, TMetadata](
-				model_core.NewNestedMessage(encodedAttrs, namedAttr.Attr.GetDefault()),
+				model_core.Nested(encodedAttrs, namedAttr.Attr.GetDefault()),
 				/* currentIdentifier = */ nil,
 				c.getValueDecodingOptions(ctx, labelCreator),
 			)
@@ -95,7 +95,7 @@ func (c *baseComputer[TReference, TMetadata]) decodeAttrsDict(ctx context.Contex
 				// TODO: Call into attr type to validate
 				// the value!
 				defaultAttr, err = model_starlark.DecodeValue[TReference, TMetadata](
-					model_core.NewNestedMessage(encodedAttrs, d),
+					model_core.Nested(encodedAttrs, d),
 					/* currentIdentifier = */ nil,
 					c.getValueDecodingOptions(ctx, labelCreator),
 				)

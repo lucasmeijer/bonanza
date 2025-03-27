@@ -58,7 +58,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeCompatibleToolchainsForType
 		return PatchedCompatibleToolchainsForTypeValue{}, evaluation.ErrMissingDependency
 	}
 
-	platformInfoProvider, err := getTargetPlatformInfoProvider(e, model_core.NewNestedMessage(key, key.Message.ConfigurationReference))
+	platformInfoProvider, err := getTargetPlatformInfoProvider(e, model_core.Nested(key, key.Message.ConfigurationReference))
 	if err != nil {
 		return PatchedCompatibleToolchainsForTypeValue{}, err
 	}

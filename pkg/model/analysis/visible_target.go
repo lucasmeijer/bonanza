@@ -79,7 +79,7 @@ func checkVisibility[TReference any](fromPackage label.CanonicalPackage, toLabel
 		return nil
 	}
 
-	subpackages := model_core.NewNestedMessage(toLabelVisibility, toLabelVisibility.Message.Tree)
+	subpackages := model_core.Nested(toLabelVisibility, toLabelVisibility.Message.Tree)
 	component := fromPackage.GetCanonicalRepo().String()
 	fromPackagePath := fromPackage.GetPackagePath()
 	for {
@@ -88,7 +88,7 @@ func checkVisibility[TReference any](fromPackage label.CanonicalPackage, toLabel
 		var overrides model_core.Message[*model_starlark_pb.PackageGroup_Subpackages_Overrides, TReference]
 		switch o := subpackages.Message.GetOverrides().(type) {
 		case *model_starlark_pb.PackageGroup_Subpackages_OverridesInline:
-			overrides = model_core.NewNestedMessage(subpackages, o.OverridesInline)
+			overrides = model_core.Nested(subpackages, o.OverridesInline)
 		case *model_starlark_pb.PackageGroup_Subpackages_OverridesExternal:
 			return errors.New("TODO: Download external overrides!")
 		case nil:
@@ -116,7 +116,7 @@ func checkVisibility[TReference any](fromPackage label.CanonicalPackage, toLabel
 		// An override is in place for this specific component.
 		// Continue traversal.
 		p := packages[packageIndex]
-		subpackages = model_core.NewNestedMessage(overrides, p.Subpackages)
+		subpackages = model_core.Nested(overrides, p.Subpackages)
 
 		if fromPackagePath == "" {
 			// Fully resolved the package name. Consider
@@ -148,7 +148,7 @@ func checkRuleTargetVisibility[TReference any](fromPackage label.CanonicalPackag
 	return checkVisibility(
 		fromPackage,
 		ruleTargetLabel,
-		model_core.NewNestedMessage(ruleTarget, inheritableAttrs.Visibility),
+		model_core.Nested(ruleTarget, inheritableAttrs.Visibility),
 	)
 }
 
@@ -169,14 +169,14 @@ func (c *baseComputer[TReference, TMetadata]) ComputeVisibleTargetValue(ctx cont
 		return PatchedVisibleTargetValue{}, evaluation.ErrMissingDependency
 	}
 
-	configurationReference := model_core.NewNestedMessage(key, key.Message.ConfigurationReference)
+	configurationReference := model_core.Nested(key, key.Message.ConfigurationReference)
 
 	switch definition := targetValue.Message.Definition.GetKind().(type) {
 	case *model_starlark_pb.Target_Definition_Alias:
 		if err := checkVisibility(
 			fromPackage,
 			toLabel,
-			model_core.NewNestedMessage(targetValue, definition.Alias.Visibility),
+			model_core.Nested(targetValue, definition.Alias.Visibility),
 		); err != nil {
 			return PatchedVisibleTargetValue{}, err
 		}
@@ -247,7 +247,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeVisibleTargetValue(ctx cont
 		// label setting.
 		configuration, err := c.getConfigurationByReference(
 			ctx,
-			model_core.NewNestedMessage(key, key.Message.ConfigurationReference),
+			model_core.Nested(key, key.Message.ConfigurationReference),
 		)
 		if err != nil {
 			return PatchedVisibleTargetValue{}, err
@@ -256,7 +256,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeVisibleTargetValue(ctx cont
 		override, err := btree.Find(
 			ctx,
 			c.configurationBuildSettingOverrideReader,
-			model_core.NewNestedMessage(configuration, configuration.Message.BuildSettingOverrides),
+			model_core.Nested(configuration, configuration.Message.BuildSettingOverrides),
 			func(entry *model_analysis_pb.Configuration_BuildSettingOverride) (int, *model_core_pb.Reference) {
 				switch level := entry.Level.(type) {
 				case *model_analysis_pb.Configuration_BuildSettingOverride_Leaf_:
@@ -367,7 +367,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeVisibleTargetValue(ctx cont
 		if err := checkRuleTargetVisibility(
 			fromPackage,
 			ownerLabel,
-			model_core.NewNestedMessage(ownerTargetValue, ruleDefinition.RuleTarget),
+			model_core.Nested(ownerTargetValue, ruleDefinition.RuleTarget),
 		); err != nil {
 			return PatchedVisibleTargetValue{}, err
 		}
@@ -382,7 +382,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeVisibleTargetValue(ctx cont
 		if err := checkRuleTargetVisibility(
 			fromPackage,
 			toLabel,
-			model_core.NewNestedMessage(targetValue, definition.RuleTarget),
+			model_core.Nested(targetValue, definition.RuleTarget),
 		); err != nil {
 			return PatchedVisibleTargetValue{}, err
 		}
@@ -397,7 +397,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeVisibleTargetValue(ctx cont
 		if err := checkVisibility(
 			fromPackage,
 			toLabel,
-			model_core.NewNestedMessage(targetValue, definition.SourceFileTarget.Visibility),
+			model_core.Nested(targetValue, definition.SourceFileTarget.Visibility),
 		); err != nil {
 			return PatchedVisibleTargetValue{}, err
 		}

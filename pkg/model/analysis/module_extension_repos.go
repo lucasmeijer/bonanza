@@ -287,7 +287,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeModuleExtensionReposValue(c
 							model_starlark.AllStructFields(
 								ctx,
 								listReader,
-								model_core.NewNestedMessage(usedModuleExtensionValue, declaredTag.Attrs),
+								model_core.Nested(usedModuleExtensionValue, declaredTag.Attrs),
 								&errIter,
 							),
 						)
@@ -344,7 +344,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeModuleExtensionReposValue(c
 									// invoked without a value for this
 									// attribute. Decode the default value.
 									*defaultValue, err = model_starlark.DecodeValue[TReference, TMetadata](
-										model_core.NewNestedMessage(moduleExtensionDefinitionValue, encodedDefaultValue),
+										model_core.Nested(moduleExtensionDefinitionValue, encodedDefaultValue),
 										/* currentIdentifier = */ nil,
 										valueDecodingOptions,
 									)
@@ -450,7 +450,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeModuleExtensionReposValue(c
 		_, err = starlark.Call(
 			thread,
 			model_starlark.NewNamedFunction(model_starlark.NewProtoNamedFunctionDefinition[TReference, TMetadata](
-				model_core.NewNestedMessage(moduleExtensionDefinitionValue, moduleExtensionDefinition.Implementation),
+				model_core.Nested(moduleExtensionDefinitionValue, moduleExtensionDefinition.Implementation),
 			)),
 			/* args = */ starlark.Tuple{moduleCtx},
 			/* kwargs = */ nil,

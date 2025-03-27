@@ -62,7 +62,7 @@ func deduplicateAndAddTransitive[TReference object.BasicReference, TMetadata mod
 			case *model_starlark_pb.List_Element_Parent_:
 				// Multiple encoded children. Deduplicate
 				// them by list object reference.
-				listReference, err := model_core.FlattenReference(model_core.NewNestedMessage(v, level.Parent.Reference))
+				listReference, err := model_core.FlattenReference(model_core.Nested(v, level.Parent.Reference))
 				if err != nil {
 					return err
 				}
@@ -337,7 +337,7 @@ func (dlc *depsetToListConverter[TReference, TMetadata]) appendChildren(children
 		for encodedElement := range AllListLeafElementsSkippingDuplicateParents(
 			dlc.valueDecodingOptions.Context,
 			dlc.valueDecodingOptions.Readers.List,
-			model_core.NewNestedMessage(v, []*model_starlark_pb.List_Element{v.Message}),
+			model_core.Nested(v, []*model_starlark_pb.List_Element{v.Message}),
 			dlc.encodedListsSeen,
 			&errIter,
 		) {

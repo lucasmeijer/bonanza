@@ -28,7 +28,7 @@ func (c *baseComputer[TReference, TMetadata]) decodeStringDict(ctx context.Conte
 	for key, value := range model_starlark.AllDictLeafEntries(
 		ctx,
 		c.valueReaders.Dict,
-		model_core.NewNestedMessage(d, dict.Dict),
+		model_core.Nested(d, dict.Dict),
 		&iterErr,
 	) {
 		keyStr, ok := key.Message.GetKind().(*model_starlark_pb.Value_Str)

@@ -37,7 +37,7 @@ func AllListLeafElementsSkippingDuplicateParents[TReference object.BasicReferenc
 		func(element model_core.Message[*model_starlark_pb.List_Element, TReference]) (*model_core_pb.Reference, error) {
 			if level, ok := element.Message.Level.(*model_starlark_pb.List_Element_Parent_); ok {
 				listReferenceMessage := level.Parent.Reference
-				listReference, err := model_core.FlattenReference(model_core.NewNestedMessage(element, level.Parent.Reference))
+				listReference, err := model_core.FlattenReference(model_core.Nested(element, level.Parent.Reference))
 				if err != nil {
 					return nil, err
 				}
@@ -60,7 +60,7 @@ func AllListLeafElementsSkippingDuplicateParents[TReference object.BasicReferenc
 		allLeaves(func(entry model_core.Message[*model_starlark_pb.List_Element, TReference]) bool {
 			switch level := entry.Message.Level.(type) {
 			case *model_starlark_pb.List_Element_Leaf:
-				return yield(model_core.NewNestedMessage(entry, level.Leaf))
+				return yield(model_core.Nested(entry, level.Leaf))
 			case *model_starlark_pb.List_Element_Parent_:
 				// Parent that was traversed previously,
 				// which needs to be skipped.

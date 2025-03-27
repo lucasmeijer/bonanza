@@ -32,7 +32,7 @@ func NewFileContentsEntryFromProto[TReference any](fileContents model_core.Messa
 		return FileContentsEntry[TReference]{EndBytes: 0}, nil
 	}
 
-	reference, err := model_core.FlattenReference(model_core.NewNestedMessage(fileContents, fileContents.Message.Reference))
+	reference, err := model_core.FlattenReference(model_core.Nested(fileContents, fileContents.Message.Reference))
 	if err != nil {
 		return FileContentsEntry[TReference]{}, err
 	}
@@ -78,7 +78,7 @@ func (p *fileContentsListObjectParser[TReference]) ParseObject(in model_core.Mes
 		}
 		endBytes += part.TotalSizeBytes
 
-		partReference, err := model_core.FlattenReference(model_core.NewNestedMessage(l, part.Reference))
+		partReference, err := model_core.FlattenReference(model_core.Nested(l, part.Reference))
 		if err != nil {
 			return nil, 0, util.StatusWrapf(err, "Invalid reference for part at index %d", i)
 		}

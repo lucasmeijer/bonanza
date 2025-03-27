@@ -518,7 +518,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRepoDefaultAttrsValue(ctx c
 		}), nil
 	}
 	repoFileContentsEntry, err := model_filesystem.NewFileContentsEntryFromProto(
-		model_core.NewNestedMessage(repoFileProperties, repoFileProperties.Message.Exists.GetContents()),
+		model_core.Nested(repoFileProperties, repoFileProperties.Message.Exists.GetContents()),
 	)
 	if err != nil {
 		return PatchedRepoDefaultAttrsValue{}, fmt.Errorf("invalid contents for file %#v: %w", repoFileLabel.String(), err)
@@ -548,7 +548,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRepoDefaultAttrsValue(ctx c
 }
 
 func (c *baseComputer[TReference, TMetadata]) ComputeTargetCompletionValue(ctx context.Context, key model_core.Message[*model_analysis_pb.TargetCompletion_Key, TReference], e TargetCompletionEnvironment[TReference, TMetadata]) (PatchedTargetCompletionValue, error) {
-	configurationReference := model_core.NewPatchedMessageFromExistingCaptured(e, model_core.NewNestedMessage(key, key.Message.ConfigurationReference))
+	configurationReference := model_core.NewPatchedMessageFromExistingCaptured(e, model_core.Nested(key, key.Message.ConfigurationReference))
 	configuredTarget := e.GetConfiguredTargetValue(
 		model_core.NewPatchedMessage(
 			&model_analysis_pb.ConfiguredTarget_Key{

@@ -75,7 +75,7 @@ func (c *baseComputer[TReference, TMetadata]) constraintValuesToConstraints(ctx 
 				for key, value := range model_starlark.AllStructFields(
 					ctx,
 					listReader,
-					model_core.NewNestedMessage(value, constraintSettingInfoProvider.Struct.Fields),
+					model_core.Nested(value, constraintSettingInfoProvider.Struct.Fields),
 					&errIter,
 				) {
 					switch key {
@@ -294,10 +294,10 @@ func getAttrValueParts[TReference object.BasicReference, TMetadata model_core.Wa
 
 		// Use the value from the rule target if it's not None.
 		if len(valueParts) > 1 {
-			return model_core.NewNestedMessage(publicAttrValue, valueParts), false, nil
+			return model_core.Nested(publicAttrValue, valueParts), false, nil
 		}
 		if _, ok := valueParts[0].Kind.(*model_starlark_pb.Value_None); !ok {
-			return model_core.NewNestedMessage(publicAttrValue, valueParts), false, nil
+			return model_core.Nested(publicAttrValue, valueParts), false, nil
 		}
 	}
 
@@ -306,7 +306,7 @@ func getAttrValueParts[TReference object.BasicReference, TMetadata model_core.Wa
 	if defaultValue == nil {
 		return model_core.Message[[]*model_starlark_pb.Value, TReference]{}, false, fmt.Errorf("missing value for mandatory attr %#v", namedAttr.Message.Name)
 	}
-	return model_core.NewNestedMessage(namedAttr, []*model_starlark_pb.Value{defaultValue}), true, nil
+	return model_core.Nested(namedAttr, []*model_starlark_pb.Value{defaultValue}), true, nil
 }
 
 func (c *baseComputer[TReference, TMetadata]) configureAttrValueParts(
@@ -350,7 +350,7 @@ func (c *baseComputer[TReference, TMetadata]) configureAttrValueParts(
 		}
 		result := model_core.NewMessageFromPatchedReferenced(e, patchedResult)
 		for _, entry := range result.Message.Entries {
-			configurationReferences = append(configurationReferences, model_core.NewNestedMessage(result, entry.OutputConfigurationReference))
+			configurationReferences = append(configurationReferences, model_core.Nested(result, entry.OutputConfigurationReference))
 		}
 	}
 
@@ -358,7 +358,7 @@ func (c *baseComputer[TReference, TMetadata]) configureAttrValueParts(
 	if len(configurationReferences) == 0 {
 		for _, valuePart := range valueParts.Message {
 			decodedPart, err := model_starlark.DecodeValue[TReference, TMetadata](
-				model_core.NewNestedMessage(valueParts, valuePart),
+				model_core.Nested(valueParts, valuePart),
 				/* currentIdentifier = */ nil,
 				c.getValueDecodingOptions(ctx, func(resolvedLabel label.ResolvedLabel) (starlark.Value, error) {
 					// We should leave the target
@@ -426,7 +426,7 @@ func (c *baseComputer[TReference, TMetadata]) configureAttrValueParts(
 
 					return model_starlark.NewTargetReference[TReference, TMetadata](
 						canonicalLabel.AsResolved(),
-						model_core.NewNestedMessage(configuredTarget, configuredTarget.Message.ProviderInstances),
+						model_core.Nested(configuredTarget, configuredTarget.Message.ProviderInstances),
 					), nil
 				} else {
 					return starlark.None, nil
@@ -434,7 +434,7 @@ func (c *baseComputer[TReference, TMetadata]) configureAttrValueParts(
 			})
 			for _, valuePart := range valueParts.Message {
 				decodedPart, err := model_starlark.DecodeValue[TReference, TMetadata](
-					model_core.NewNestedMessage(valueParts, valuePart),
+					model_core.Nested(valueParts, valuePart),
 					/* currentIdentifier = */ nil,
 					valueDecodingOptions,
 				)
@@ -578,7 +578,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 		if !ok {
 			return PatchedConfiguredTargetValue{}, fmt.Errorf("%#v is not a rule definition", ruleIdentifier.String())
 		}
-		ruleDefinition := model_core.NewNestedMessage(ruleValue, d.Definition)
+		ruleDefinition := model_core.Nested(ruleValue, d.Definition)
 
 		thread := c.newStarlarkThread(ctx, e, allBuiltinsModulesNames.Message.BuiltinsModuleNames)
 
@@ -635,7 +635,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 						// No default value provided.
 						continue GetConfigurationFreeAttrValues
 					}
-					valueParts = append(valueParts, model_core.NewNestedMessage(targetValue, noMatch.NoMatchValue))
+					valueParts = append(valueParts, model_core.Nested(targetValue, noMatch.NoMatchValue))
 				}
 
 				// If the value is None, fall back to the
@@ -654,7 +654,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 				if defaultValue == nil {
 					return PatchedConfiguredTargetValue{}, fmt.Errorf("missing value for mandatory attr %#v", namedAttr.Name)
 				}
-				valueParts = append(valueParts, model_core.NewNestedMessage(ruleDefinition, defaultValue))
+				valueParts = append(valueParts, model_core.Nested(ruleDefinition, defaultValue))
 			}
 
 			var attrValue starlark.Value
@@ -691,7 +691,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 		}
 
 		// If provided, apply a user defined incoming edge transition.
-		configurationReference := model_core.NewNestedMessage(key, key.Message.ConfigurationReference)
+		configurationReference := model_core.Nested(key, key.Message.ConfigurationReference)
 		if cfgTransitionIdentifier := ruleDefinition.Message.CfgTransitionIdentifier; cfgTransitionIdentifier != "" {
 			patchedConfigurationReferences, err := c.performUserDefinedTransitionCached(
 				ctx,
@@ -710,7 +710,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 			}
 
 			configurationReferences := model_core.NewMessageFromPatchedReferenced(e, patchedConfigurationReferences)
-			configurationReference = model_core.NewNestedMessage(configurationReferences, entries[0].OutputConfigurationReference)
+			configurationReference = model_core.Nested(configurationReferences, entries[0].OutputConfigurationReference)
 		}
 
 		// Compute non-label attrs that depend on a
@@ -740,8 +740,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 				e,
 				configurationReference,
 				targetPackage,
-				model_core.NewNestedMessage(ruleDefinition, namedAttr),
-				model_core.NewNestedMessage(targetValue, publicAttrValue),
+				model_core.Nested(ruleDefinition, namedAttr),
+				model_core.Nested(targetValue, publicAttrValue),
 			)
 			if err != nil {
 				if errors.Is(err, evaluation.ErrMissingDependency) {
@@ -755,7 +755,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 			var attrOutputs []starlark.Value
 			for _, valuePart := range valueParts.Message {
 				decodedPart, err := model_starlark.DecodeValue[TReference, TMetadata](
-					model_core.NewNestedMessage(valueParts, valuePart),
+					model_core.Nested(valueParts, valuePart),
 					/* currentIdentifier = */ nil,
 					c.getValueDecodingOptions(ctx, func(resolvedLabel label.ResolvedLabel) (starlark.Value, error) {
 						switch namedAttr.Attr.GetType().(type) {
@@ -884,8 +884,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 					e,
 					model_core.NewSimpleMessage[TReference]((*model_core_pb.Reference)(nil)),
 					targetPackage,
-					model_core.NewNestedMessage(ruleDefinition, namedAttr),
-					model_core.NewNestedMessage(targetValue, publicAttrValue),
+					model_core.Nested(ruleDefinition, namedAttr),
+					model_core.Nested(targetValue, publicAttrValue),
 				)
 				if err != nil {
 					if errors.Is(err, evaluation.ErrMissingDependency) {
@@ -899,7 +899,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 				// not contain any providers.
 				for _, valuePart := range valueParts.Message {
 					decodedPart, err := model_starlark.DecodeValue[TReference, TMetadata](
-						model_core.NewNestedMessage(valueParts, valuePart),
+						model_core.Nested(valueParts, valuePart),
 						/* currentIdentifier = */ nil,
 						c.getValueDecodingOptions(ctx, func(resolvedLabel label.ResolvedLabel) (starlark.Value, error) {
 							return model_starlark.NewTargetReference[TReference, TMetadata](
@@ -917,13 +917,13 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 				}
 			} else {
 				for _, transitionEntry := range transition.Message.Entries {
-					outputConfigurationReference := model_core.NewNestedMessage(transition, transitionEntry.OutputConfigurationReference)
+					outputConfigurationReference := model_core.Nested(transition, transitionEntry.OutputConfigurationReference)
 					valueParts, usedDefaultValue, err := getAttrValueParts(
 						e,
 						outputConfigurationReference,
 						targetPackage,
-						model_core.NewNestedMessage(ruleDefinition, namedAttr),
-						model_core.NewNestedMessage(targetValue, publicAttrValue),
+						model_core.Nested(ruleDefinition, namedAttr),
+						model_core.Nested(targetValue, publicAttrValue),
 					)
 					if err != nil {
 						if errors.Is(err, evaluation.ErrMissingDependency) {
@@ -989,7 +989,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 								missingDependencies = true
 								return starlark.None, nil
 							}
-							providerInstances := model_core.NewNestedMessage(configuredTarget, configuredTarget.Message.ProviderInstances)
+							providerInstances := model_core.Nested(configuredTarget, configuredTarget.Message.ProviderInstances)
 
 							defaultInfoProviderIdentifierStr := defaultInfoProviderIdentifier.String()
 							defaultInfoIndex, ok := sort.Find(
@@ -1005,7 +1005,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 							files, err := model_starlark.GetStructFieldValue(
 								ctx,
 								c.valueReaders.List,
-								model_core.NewNestedMessage(providerInstances, providerInstances.Message[defaultInfoIndex].Fields),
+								model_core.Nested(providerInstances, providerInstances.Message[defaultInfoIndex].Fields),
 								"files",
 							)
 							if err != nil {
@@ -1017,14 +1017,14 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 							}
 							for _, element := range valueDepset.Depset.Elements {
 								// TODO: Validate extensions.
-								filesDepsetElements = append(filesDepsetElements, model_core.NewNestedMessage(files, element))
+								filesDepsetElements = append(filesDepsetElements, model_core.Nested(files, element))
 							}
 
 							if executable {
 								filesToRun, err := model_starlark.GetStructFieldValue(
 									ctx,
 									c.valueReaders.List,
-									model_core.NewNestedMessage(providerInstances, providerInstances.Message[defaultInfoIndex].Fields),
+									model_core.Nested(providerInstances, providerInstances.Message[defaultInfoIndex].Fields),
 									"files_to_run",
 								)
 								if err != nil {
@@ -1037,7 +1037,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 								executableField, err := model_starlark.GetStructFieldValue(
 									ctx,
 									c.valueReaders.List,
-									model_core.NewNestedMessage(filesToRun, filesToRunStruct.Struct.Fields),
+									model_core.Nested(filesToRun, filesToRunStruct.Struct.Fields),
 									"executable",
 								)
 								if err != nil {
@@ -1063,7 +1063,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 					})
 					for _, valuePart := range valueParts.Message {
 						decodedPart, err := model_starlark.DecodeValue[TReference, TMetadata](
-							model_core.NewNestedMessage(valueParts, valuePart),
+							model_core.Nested(valueParts, valuePart),
 							/* currentIdentifier = */ nil,
 							valueDecodingOptions,
 						)
@@ -1131,7 +1131,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 			targetLabel:            targetLabel,
 			configurationReference: configurationReference,
 			ruleDefinition:         ruleDefinition,
-			ruleTarget:             model_core.NewNestedMessage(targetValue, ruleTarget),
+			ruleTarget:             model_core.Nested(targetValue, ruleTarget),
 			attr:                   model_starlark.NewStructFromDict[TReference, TMetadata](nil, attrValues),
 			splitAttr:              model_starlark.NewStructFromDict[TReference, TMetadata](nil, splitAttrValues),
 			executable:             model_starlark.NewStructFromDict[TReference, TMetadata](nil, executableValues),
@@ -1168,7 +1168,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 			if !ok {
 				return nil, fmt.Errorf("%#v is not a subrule definition", subruleIdentifierStr)
 			}
-			subruleDefinition := model_core.NewNestedMessage(subruleValue, d.Definition)
+			subruleDefinition := model_core.Nested(subruleValue, d.Definition)
 
 			missingDependencies := false
 
@@ -1193,7 +1193,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 					rc.environment,
 					thread,
 					namedAttr,
-					model_core.NewNestedMessage(rc.ruleDefinition, []*model_starlark_pb.Value{defaultValue}),
+					model_core.Nested(rc.ruleDefinition, []*model_starlark_pb.Value{defaultValue}),
 					rc.configurationReference,
 					rc.ruleIdentifier.GetCanonicalLabel().GetCanonicalPackage(),
 				)
@@ -1221,7 +1221,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 				thread,
 				model_starlark.NewNamedFunction(
 					model_starlark.NewProtoNamedFunctionDefinition[TReference, TMetadata](
-						model_core.NewNestedMessage(subruleDefinition, subruleDefinition.Message.Implementation),
+						model_core.Nested(subruleDefinition, subruleDefinition.Message.Implementation),
 					),
 				),
 				implementationArgs,
@@ -1233,7 +1233,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 			thread,
 			model_starlark.NewNamedFunction(
 				model_starlark.NewProtoNamedFunctionDefinition[TReference, TMetadata](
-					model_core.NewNestedMessage(ruleDefinition, ruleDefinition.Message.Implementation),
+					model_core.Nested(ruleDefinition, ruleDefinition.Message.Implementation),
 				),
 			),
 			/* args = */ starlark.Tuple{rc},
@@ -1439,7 +1439,7 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 			override, err := btree.Find(
 				rc.context,
 				rc.computer.configurationBuildSettingOverrideReader,
-				model_core.NewNestedMessage(configuration, configuration.Message.BuildSettingOverrides),
+				model_core.Nested(configuration, configuration.Message.BuildSettingOverrides),
 				func(entry *model_analysis_pb.Configuration_BuildSettingOverride) (int, *model_core_pb.Reference) {
 					switch level := entry.Level.(type) {
 					case *model_analysis_pb.Configuration_BuildSettingOverride_Leaf_:
@@ -1461,9 +1461,9 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 				if !ok {
 					return nil, errors.New("build setting override is not a valid leaf")
 				}
-				encodedValue = model_core.NewNestedMessage(override, overrideLeaf.Leaf.Value)
+				encodedValue = model_core.Nested(override, overrideLeaf.Leaf.Value)
 			} else {
-				encodedValue = model_core.NewNestedMessage(rc.ruleTarget, rc.ruleTarget.Message.BuildSettingDefault)
+				encodedValue = model_core.Nested(rc.ruleTarget, rc.ruleTarget.Message.BuildSettingDefault)
 			}
 
 			value, err := model_starlark.DecodeValue[TReference, TMetadata](
@@ -1770,7 +1770,7 @@ func (rc *ruleContext[TReference, TMetadata]) doTargetPlatformHasConstraint(thre
 	for platformConstraintSetting, platformConstraintValue := range model_starlark.AllDictLeafEntries(
 		rc.context,
 		rc.computer.valueReaders.Dict,
-		model_core.NewNestedMessage(platformConstraints, platformConstraintsDict.Dict),
+		model_core.Nested(platformConstraints, platformConstraintsDict.Dict),
 		&errIter,
 	) {
 		platformConstraintSettingLabel, ok := platformConstraintSetting.Message.GetKind().(*model_starlark_pb.Value_Label)
@@ -2201,7 +2201,7 @@ func (rcf *ruleContextFragments[TReference, TMetadata]) Attr(thread *starlark.Th
 			return nil, err
 		}
 		fragmentInfo, err = model_starlark.DecodeStruct[TReference, TMetadata](
-			model_core.NewNestedMessage(encodedFragmentInfo, &model_starlark_pb.Struct{
+			model_core.Nested(encodedFragmentInfo, &model_starlark_pb.Struct{
 				ProviderInstanceProperties: &model_starlark_pb.Provider_InstanceProperties{
 					ProviderIdentifier: fragmentInfoProviderIdentifier.String(),
 				},
@@ -2335,7 +2335,7 @@ func (tc *toolchainContext[TReference, TMetadata]) Get(thread *starlark.Thread, 
 			}
 
 			toolchainInfo, err = model_starlark.DecodeStruct[TReference, TMetadata](
-				model_core.NewNestedMessage(encodedToolchainInfo, &model_starlark_pb.Struct{
+				model_core.Nested(encodedToolchainInfo, &model_starlark_pb.Struct{
 					ProviderInstanceProperties: &model_starlark_pb.Provider_InstanceProperties{
 						ProviderIdentifier: toolchainInfoProviderIdentifier.String(),
 					},
@@ -2387,7 +2387,7 @@ func getProviderFromConfiguredTarget[TReference any, TMetadata model_core.Walkab
 			return strings.Compare(providerIdentifierStr, providerInstances[i].ProviderInstanceProperties.GetProviderIdentifier())
 		},
 	); ok {
-		return model_core.NewNestedMessage(configuredTargetValue, providerInstances[providerIndex].Fields), nil
+		return model_core.Nested(configuredTargetValue, providerInstances[providerIndex].Fields), nil
 	}
 	return model_core.Message[*model_starlark_pb.Struct_Fields, TReference]{}, fmt.Errorf("target did not yield provider %#v", providerIdentifierStr)
 }

@@ -43,13 +43,13 @@ func (c *baseComputer[TReference, TMetadata]) ComputeActionResultValue(ctx conte
 	// fingerprint of the action, which the scheduler can use to
 	// keep track of performance characteristics. Compute a hash to
 	// masquerade the actual Command reference.
-	commandReference, err := model_core.FlattenReference(model_core.NewNestedMessage(key, key.Message.CommandReference))
+	commandReference, err := model_core.FlattenReference(model_core.Nested(key, key.Message.CommandReference))
 	if err != nil {
 		return PatchedActionResultValue{}, fmt.Errorf("invalid command reference: %w", err)
 	}
 	commandReferenceSHA256 := sha256.Sum256(commandReference.GetRawReference())
 
-	inputRootReference, err := model_core.FlattenReference(model_core.NewNestedMessage(key, key.Message.InputRootReference))
+	inputRootReference, err := model_core.FlattenReference(model_core.Nested(key, key.Message.InputRootReference))
 	if err != nil {
 		return PatchedActionResultValue{}, fmt.Errorf("invalid input root reference: %w", err)
 	}
@@ -147,5 +147,5 @@ func (c *baseComputer[TReference, TMetadata]) getOutputsFromActionResult(ctx con
 		return model_core.NewSimpleMessage[TReference](&model_command_pb.Outputs{}), nil
 	}
 
-	return model_parser.Dereference(ctx, directoryReaders.CommandOutputs, model_core.NewNestedMessage(actionResult, actionResult.Message.OutputsReference))
+	return model_parser.Dereference(ctx, directoryReaders.CommandOutputs, model_core.Nested(actionResult, actionResult.Message.OutputsReference))
 }

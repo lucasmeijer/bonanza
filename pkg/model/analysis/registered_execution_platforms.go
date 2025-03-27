@@ -50,7 +50,7 @@ func (c *baseComputer[TReference, TMetadata]) extractFromPlatformInfoConstraints
 	for key, value := range model_starlark.AllDictLeafEntries(
 		ctx,
 		c.valueReaders.Dict,
-		model_core.NewNestedMessage(value, dict.Dict),
+		model_core.Nested(value, dict.Dict),
 		&iterErr,
 	) {
 		keyLabel, ok := key.Message.GetKind().(*model_starlark_pb.Value_Label)

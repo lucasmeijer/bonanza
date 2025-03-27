@@ -21,7 +21,7 @@ var templateVariableInfoProviderIdentifier = label.MustNewCanonicalStarlarkIdent
 func (c *baseComputer[TReference, TMetadata]) ComputeMakeVariablesValue(ctx context.Context, key model_core.Message[*model_analysis_pb.MakeVariables_Key, TReference], e MakeVariablesEnvironment[TReference, TMetadata]) (PatchedMakeVariablesValue, error) {
 	allVariables := map[string]string{}
 	missingDependencies := false
-	configurationReference := model_core.NewNestedMessage(key, key.Message.ConfigurationReference)
+	configurationReference := model_core.Nested(key, key.Message.ConfigurationReference)
 	for _, toolchainLabel := range append([]string{"@@bazel_tools+//tools/make:default_make_variables"}, key.Message.Toolchains...) {
 		// Obtain TemplateVariableInfo of the provided toolchain.
 		templateVariableInfoProvider, err := getProviderFromVisibleConfiguredTarget(
@@ -55,7 +55,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeMakeVariablesValue(ctx cont
 		for key, value := range model_starlark.AllDictLeafEntries(
 			ctx,
 			c.valueReaders.Dict,
-			model_core.NewNestedMessage(variables, variablesDict.Dict),
+			model_core.Nested(variables, variablesDict.Dict),
 			&errIter,
 		) {
 			keyStr, ok := key.Message.GetKind().(*model_starlark_pb.Value_Str)

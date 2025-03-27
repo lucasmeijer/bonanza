@@ -60,7 +60,7 @@ func (p *directoryClusterObjectParser[TReference]) ParseObject(in model_core.Mes
 	if err != nil {
 		return model_core.Message[DirectoryCluster, TReference]{}, 0, err
 	}
-	return model_core.NewNestedMessage(in, cluster), len(in.Message), nil
+	return model_core.Nested(in, cluster), len(in.Message), nil
 }
 
 func addDirectoriesToCluster[TReference any](c *DirectoryCluster, d model_core.Message[*model_filesystem_pb.Directory, TReference], dTrace *path.Trace) (int, error) {
@@ -88,7 +88,7 @@ func addDirectoriesToCluster[TReference any](c *DirectoryCluster, d model_core.M
 			}
 			childDirectoryIndex, err := addDirectoriesToCluster(
 				c,
-				model_core.NewNestedMessage(d, contents.ContentsInline),
+				model_core.Nested(d, contents.ContentsInline),
 				dTrace.Append(name),
 			)
 			if err != nil {
@@ -116,9 +116,9 @@ func DirectoryGetLeaves[TReference any](
 ) (model_core.Message[*model_filesystem_pb.Leaves, TReference], error) {
 	switch leaves := directory.Message.Leaves.(type) {
 	case *model_filesystem_pb.Directory_LeavesExternal:
-		return model_parser.Dereference(ctx, reader, model_core.NewNestedMessage(directory, leaves.LeavesExternal.Reference))
+		return model_parser.Dereference(ctx, reader, model_core.Nested(directory, leaves.LeavesExternal.Reference))
 	case *model_filesystem_pb.Directory_LeavesInline:
-		return model_core.NewNestedMessage(directory, leaves.LeavesInline), nil
+		return model_core.Nested(directory, leaves.LeavesInline), nil
 	default:
 		return model_core.Message[*model_filesystem_pb.Leaves, TReference]{}, status.Error(codes.InvalidArgument, "Directory has no leaves")
 	}
@@ -133,9 +133,9 @@ func DirectoryNodeGetContents[TReference any](
 ) (model_core.Message[*model_filesystem_pb.Directory, TReference], error) {
 	switch contents := directoryNode.Message.Contents.(type) {
 	case *model_filesystem_pb.DirectoryNode_ContentsExternal:
-		return model_parser.Dereference(ctx, reader, model_core.NewNestedMessage(directoryNode, contents.ContentsExternal.Reference))
+		return model_parser.Dereference(ctx, reader, model_core.Nested(directoryNode, contents.ContentsExternal.Reference))
 	case *model_filesystem_pb.DirectoryNode_ContentsInline:
-		return model_core.NewNestedMessage(directoryNode, contents.ContentsInline), nil
+		return model_core.Nested(directoryNode, contents.ContentsInline), nil
 	default:
 		return model_core.Message[*model_filesystem_pb.Directory, TReference]{}, status.Error(codes.InvalidArgument, "Directory node has no contents")
 	}

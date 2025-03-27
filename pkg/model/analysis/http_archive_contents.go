@@ -256,7 +256,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeHttpArchiveContentsValue(ct
 	}
 
 	httpFileContentsEntry, err := model_filesystem.NewFileContentsEntryFromProto(
-		model_core.NewNestedMessage(httpFileContentsValue, httpFileContentsValue.Message.Exists.Contents),
+		model_core.Nested(httpFileContentsValue, httpFileContentsValue.Message.Exists.Contents),
 	)
 	if err != nil {
 		return PatchedHttpArchiveContentsValue{}, fmt.Errorf("invalid file contents: %w", err)

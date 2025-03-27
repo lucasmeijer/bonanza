@@ -44,7 +44,7 @@ func Find[
 			} else {
 				// Exact match. We may stop searching.
 				if reference == nil {
-					return model_core.NewNestedMessage(list, list.Message[index]), nil
+					return model_core.Nested(list, list.Message[index]), nil
 				}
 				childReference = reference
 				break
@@ -58,7 +58,7 @@ func Find[
 
 		// Load the child from storage and continue searching.
 		var err error
-		list, err = model_parser.Dereference(ctx, reader, model_core.NewNestedMessage(list, childReference))
+		list, err = model_parser.Dereference(ctx, reader, model_core.Nested(list, childReference))
 		if err != nil {
 			return model_core.Message[TMessagePtr, TReference]{}, err
 		}

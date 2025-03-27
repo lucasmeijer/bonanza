@@ -31,7 +31,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeUsedModuleExtensionValue(ct
 			return PatchedUsedModuleExtensionValue{}, fmt.Errorf("invalid module extensions Starlark identifier %#v: %w", extension.Identifier, err)
 		}
 		if identifier.ToModuleExtension().String() == key.ModuleExtension {
-			patchedExtension := model_core.NewPatchedMessageFromExistingCaptured(e, model_core.NewNestedMessage(usedModuleExtensions, extension))
+			patchedExtension := model_core.NewPatchedMessageFromExistingCaptured(e, model_core.Nested(usedModuleExtensions, extension))
 			return model_core.NewPatchedMessage(
 				&model_analysis_pb.UsedModuleExtension_Value{
 					ModuleExtension: patchedExtension.Message,
