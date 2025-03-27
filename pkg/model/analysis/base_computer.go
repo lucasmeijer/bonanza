@@ -391,7 +391,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeBuildResultValue(ctx contex
 			missingDependencies = true
 			continue
 		}
-		clonedConfigurationReference := model_core.NewMessageFromPatchedReferenced(
+		clonedConfigurationReference := model_core.Unpatch(
 			model_core.CloningObjectManager[TMetadata]{},
 			targetPlatformConfigurationReference,
 		)

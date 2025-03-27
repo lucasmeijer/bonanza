@@ -75,7 +75,11 @@ type ObjectReferencer[TReference, TMetadata any] interface {
 	ReferenceObject(object.LocalReference, TMetadata) TReference
 }
 
-func NewMessageFromPatchedReferenced[TMessage, TReference any, TMetadata ReferenceMetadata](
+// Unpatch performs the opposite of Patch(). Namely, it assigns indices
+// to all references contained in the current message. Metadata that is
+// tracked by the ReferenceMessagePatcher is converted to references by
+// calling into an ObjectReferencer.
+func Unpatch[TMessage, TReference any, TMetadata ReferenceMetadata](
 	referencer ObjectReferencer[TReference, TMetadata],
 	m PatchedMessage[TMessage, TMetadata],
 ) Message[TMessage, TReference] {

@@ -348,7 +348,7 @@ func (c *baseComputer[TReference, TMetadata]) configureAttrValueParts(
 		if err != nil {
 			return nil, err
 		}
-		result := model_core.NewMessageFromPatchedReferenced(e, patchedResult)
+		result := model_core.Unpatch(e, patchedResult)
 		for _, entry := range result.Message.Entries {
 			configurationReferences = append(configurationReferences, model_core.Nested(result, entry.OutputConfigurationReference))
 		}
@@ -709,7 +709,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 				return PatchedConfiguredTargetValue{}, fmt.Errorf("incoming edge transition %#v used by rule %#v is a 1:%d transition, while a 1:1 transition was expected", cfgTransitionIdentifier, ruleIdentifier.String(), l)
 			}
 
-			configurationReferences := model_core.NewMessageFromPatchedReferenced(e, patchedConfigurationReferences)
+			configurationReferences := model_core.Unpatch(e, patchedConfigurationReferences)
 			configurationReference = model_core.Nested(configurationReferences, entries[0].OutputConfigurationReference)
 		}
 
@@ -867,7 +867,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 				}
 				return PatchedConfiguredTargetValue{}, err
 			}
-			transition := model_core.NewMessageFromPatchedReferenced(e, patchedTransition)
+			transition := model_core.Unpatch(e, patchedTransition)
 
 			var attrValue starlark.Value
 			var splitAttrValue *starlark.Dict

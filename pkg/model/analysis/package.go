@@ -108,7 +108,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputePackageValue(ctx context.Co
 			return globValue.Message.MatchedPaths, nil
 		})
 
-		repoDefaultAttrs := model_core.NewMessageFromPatchedReferenced(
+		repoDefaultAttrs := model_core.Unpatch(
 			model_core.CloningObjectManager[TMetadata]{},
 			model_core.Patch(
 				e,
