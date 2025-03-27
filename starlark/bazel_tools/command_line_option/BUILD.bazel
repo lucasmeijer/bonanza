@@ -69,6 +69,12 @@ string_flag(
 )
 
 bool_flag(
+    name = "enable_runfiles",
+    build_setting_default = True,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
     name = "experimental_cc_implementation_deps",
     build_setting_default = True,
     visibility = ["//visibility:public"],
