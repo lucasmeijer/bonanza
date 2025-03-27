@@ -246,7 +246,7 @@ func (builderObjectCapturer) CaptureExistingObject(reference builderReference) b
 	return builderReferenceMetadata{}
 }
 
-func (builderObjectCapturer) PeekCapturedObject(reference object.LocalReference, metadata builderReferenceMetadata) builderReference {
+func (builderObjectCapturer) ReferenceObject(reference object.LocalReference, metadata builderReferenceMetadata) builderReference {
 	return builderReference{
 		LocalReference:   reference,
 		embeddedMetadata: metadata,

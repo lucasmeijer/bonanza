@@ -1543,7 +1543,10 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 					return nil, err
 				}
 
-				targetRegistrar.defaultInheritableAttrs = model_core.PatchedMessageToCloneable(newDefaultAttrs)
+				targetRegistrar.defaultInheritableAttrs = model_core.NewMessageFromPatchedReferenced(
+					model_core.CloningObjectManager[TMetadata]{},
+					newDefaultAttrs,
+				)
 				targetRegistrar.setDefaultInheritableAttrs = true
 				return starlark.None, nil
 			},

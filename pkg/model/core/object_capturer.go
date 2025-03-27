@@ -71,19 +71,12 @@ func NewPatchedMessageFromExistingCaptured[
 	)
 }
 
-// ObjectManager is an extension to ObjectCapturer, allowing metadata to
-// be converted back to references. This can be of use in environments
-// where objects also need to be accessible for reading right after they
-// have been constructed, without explicitly waiting for them to be
-// written to storage.
-type ObjectManager[TReference, TMetadata any] interface {
-	ObjectCapturer[TReference, TMetadata]
-
-	PeekCapturedObject(object.LocalReference, TMetadata) TReference
+type ObjectReferencer[TReference, TMetadata any] interface {
+	ReferenceObject(object.LocalReference, TMetadata) TReference
 }
 
-func PeekPatchedMessage[TMessage, TReference any, TMetadata ReferenceMetadata](
-	objectManager ObjectManager[TReference, TMetadata],
+func NewMessageFromPatchedReferenced[TMessage, TReference any, TMetadata ReferenceMetadata](
+	referencer ObjectReferencer[TReference, TMetadata],
 	m PatchedMessage[TMessage, TMetadata],
 ) Message[TMessage, TReference] {
 	references, metadata := m.Patcher.SortAndSetReferences()
@@ -91,8 +84,18 @@ func PeekPatchedMessage[TMessage, TReference any, TMetadata ReferenceMetadata](
 	for i, m := range metadata {
 		outgoingReferences = append(
 			outgoingReferences,
-			objectManager.PeekCapturedObject(references.GetOutgoingReference(i), m),
+			referencer.ReferenceObject(references.GetOutgoingReference(i), m),
 		)
 	}
 	return NewMessage(m.Message, outgoingReferences)
+}
+
+// ObjectManager is an extension to ObjectCapturer, allowing metadata to
+// be converted back to references. This can be of use in environments
+// where objects also need to be accessible for reading right after they
+// have been constructed, without explicitly waiting for them to be
+// written to storage.
+type ObjectManager[TReference, TMetadata any] interface {
+	ObjectCapturer[TReference, TMetadata]
+	ObjectReferencer[TReference, TMetadata]
 }

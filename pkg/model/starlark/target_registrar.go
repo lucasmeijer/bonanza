@@ -41,7 +41,8 @@ func (tr *TargetRegistrar[TMetadata]) getVisibilityPackageGroup(visibility []pg_
 
 	// Inherit visibility from repo() in the REPO.bazel file
 	// or package() in the BUILD.bazel file.
-	return model_core.NewPatchedMessageFromCloneable(
+	return model_core.NewPatchedMessageFromExistingCaptured(
+		model_core.CloningObjectManager[TMetadata]{},
 		model_core.NewNestedMessage(tr.defaultInheritableAttrs, tr.defaultInheritableAttrs.Message.Visibility),
 	), nil
 }

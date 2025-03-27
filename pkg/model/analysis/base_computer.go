@@ -355,8 +355,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeBuildResultValue(ctx contex
 	rootRepo := rootModule.ToModuleInstance(nil).GetBareCanonicalRepo()
 	rootPackage := rootRepo.GetRootPackage()
 
-	const platformsCommandLineOptionLabel = "@@bazel_tools+//command_line_option:platforms"
-	platformExpectedTransitionOutput, err := getExpectedTransitionOutput[TReference, TMetadata](e, rootPackage, platformsCommandLineOptionLabel)
+	commandLineOptionPlatformsLabelStr := commandLineOptionPlatformsLabel.String()
+	platformExpectedTransitionOutput, err := getExpectedTransitionOutput[TReference, TMetadata](e, rootPackage, commandLineOptionPlatformsLabelStr)
 	if err != nil {
 		return PatchedBuildResultValue{}, err
 	}
@@ -380,7 +380,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeBuildResultValue(ctx contex
 			[]expectedTransitionOutput[TReference]{platformExpectedTransitionOutput},
 			thread,
 			starlark.StringDict{
-				platformsCommandLineOptionLabel: model_starlark.NewLabel[TReference, TMetadata](canonicalTargetPlatform.AsResolved()),
+				commandLineOptionPlatformsLabelStr: model_starlark.NewLabel[TReference, TMetadata](canonicalTargetPlatform.AsResolved()),
 			},
 			valueEncodingOptions,
 		)
@@ -391,7 +391,10 @@ func (c *baseComputer[TReference, TMetadata]) ComputeBuildResultValue(ctx contex
 			missingDependencies = true
 			continue
 		}
-		clonedConfigurationReference := model_core.PatchedMessageToCloneable(targetPlatformConfigurationReference)
+		clonedConfigurationReference := model_core.NewMessageFromPatchedReferenced(
+			model_core.CloningObjectManager[TMetadata]{},
+			targetPlatformConfigurationReference,
+		)
 
 		for _, targetPattern := range buildSpecification.TargetPatterns {
 			apparentTargetPattern, err := rootPackage.AppendTargetPattern(targetPattern)
@@ -405,7 +408,10 @@ func (c *baseComputer[TReference, TMetadata]) ComputeBuildResultValue(ctx contex
 
 			var iterErr error
 			for canonicalTargetLabel := range c.expandCanonicalTargetPattern(ctx, e, canonicalTargetPattern, &iterErr) {
-				patchedConfigurationReference1 := model_core.NewPatchedMessageFromCloneable(clonedConfigurationReference)
+				patchedConfigurationReference1 := model_core.NewPatchedMessageFromExistingCaptured(
+					model_core.CloningObjectManager[TMetadata]{},
+					clonedConfigurationReference,
+				)
 				visibleTargetValue := e.GetVisibleTargetValue(
 					model_core.NewPatchedMessage(
 						&model_analysis_pb.VisibleTarget_Key{
@@ -421,7 +427,10 @@ func (c *baseComputer[TReference, TMetadata]) ComputeBuildResultValue(ctx contex
 					continue
 				}
 
-				patchedConfigurationReference2 := model_core.NewPatchedMessageFromCloneable(clonedConfigurationReference)
+				patchedConfigurationReference2 := model_core.NewPatchedMessageFromExistingCaptured(
+					model_core.CloningObjectManager[TMetadata]{},
+					clonedConfigurationReference,
+				)
 				targetCompletionValue := e.GetTargetCompletionValue(
 					model_core.NewPatchedMessage(
 						&model_analysis_pb.TargetCompletion_Key{

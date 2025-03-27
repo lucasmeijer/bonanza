@@ -28,38 +28,24 @@ var commandLineOptionPlatformsLabel = label.MustNewCanonicalLabel("@@bazel_tools
 
 type getTargetPlatformInfoProviderEnvironment[TReference any, TMetadata any] interface {
 	model_core.ExistingObjectCapturer[TReference, TMetadata]
-	getProviderFromConfiguredTargetEnvironment[TReference]
-
-	GetVisibleTargetValue(model_core.PatchedMessage[*model_analysis_pb.VisibleTarget_Key, dag.ObjectContentsWalker]) model_core.Message[*model_analysis_pb.VisibleTarget_Value, TReference]
+	getProviderFromVisibleConfiguredTargetEnvironment[TReference]
 }
 
 func getTargetPlatformInfoProvider[TReference object.BasicReference, TMetadata BaseComputerReferenceMetadata](
 	e getTargetPlatformInfoProviderEnvironment[TReference, TMetadata],
 	configurationReference model_core.Message[*model_core_pb.Reference, TReference],
 ) (model_core.Message[*model_starlark_pb.Struct_Fields, TReference], error) {
-	patchedConfigurationReference := model_core.NewPatchedMessageFromExistingCaptured(e, configurationReference)
-	platformLabel := e.GetVisibleTargetValue(
-		model_core.NewPatchedMessage(
-			&model_analysis_pb.VisibleTarget_Key{
-				ConfigurationReference: patchedConfigurationReference.Message,
-				FromPackage:            commandLineOptionPlatformsLabel.GetCanonicalPackage().String(),
-				ToLabel:                commandLineOptionPlatformsLabel.String(),
-			},
-			model_core.MapReferenceMetadataToWalkers(patchedConfigurationReference.Patcher),
-		),
-	)
-	if !platformLabel.IsSet() {
-		return model_core.Message[*model_starlark_pb.Struct_Fields, TReference]{}, evaluation.ErrMissingDependency
-	}
-
-	platformInfoProvider, err := getProviderFromConfiguredTarget(
+	platformsLabelStr := commandLineOptionPlatformsLabel.String()
+	platformInfoProvider, err := getProviderFromVisibleConfiguredTarget(
 		e,
-		platformLabel.Message.Label,
-		model_core.NewSimplePatchedMessage[model_core.WalkableReferenceMetadata, *model_core_pb.Reference](nil),
+		commandLineOptionPlatformsLabel.GetCanonicalPackage().String(),
+		platformsLabelStr,
+		model_core.NewSimpleMessage[TReference]((*model_core_pb.Reference)(nil)),
+		e,
 		platformInfoProviderIdentifier,
 	)
 	if err != nil {
-		return model_core.Message[*model_starlark_pb.Struct_Fields, TReference]{}, fmt.Errorf("failed to obtain PlatformInfo provider for target %#v: %w", platformLabel, err)
+		return model_core.Message[*model_starlark_pb.Struct_Fields, TReference]{}, fmt.Errorf("failed to obtain PlatformInfo provider for target %#v: %w", platformsLabelStr, err)
 	}
 	return platformInfoProvider, nil
 }

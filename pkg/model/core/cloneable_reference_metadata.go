@@ -2,8 +2,6 @@ package core
 
 import (
 	"github.com/buildbarn/bonanza/pkg/storage/object"
-
-	"google.golang.org/protobuf/proto"
 )
 
 // CloneableReferenceMetadata is a type of ReferenceMetadata that is
@@ -21,43 +19,27 @@ type CloneableReferenceMetadata interface {
 // that holds on to any metadata that was extracted out of the
 // ReferenceMessagePatcher by PatchedMessageToCloneable(). The metadata
 // is later reinserted into one or more ReferenceMessagePatchers by
-// calling NewPatchedMessageFromCloneable().
+// calling NewPatchedMessageFromExistingCaptured() using
+// ClonedObjectManager.
 type CloneableReference[TMetadata any] struct {
 	object.LocalReference
-	Metadata TMetadata
+	metadata TMetadata
 }
 
-// PatchedMessageToCloneable converts the Protobuf message managed by
-// the ReferenceMessagePatcher to a plain Message, having the originally
-// provided metadata attached.
-//
-// This function can be used in case a PatchedMessage does not need to
-// be returned/propagated immediately and/or needs to be duplicated. It
-// is later possible to reobtain PatchedMessages again by calling
-// NewPatchedMessageFromCloneable().
-func PatchedMessageToCloneable[TMessage any, TMetadata CloneableReferenceMetadata](m PatchedMessage[TMessage, TMetadata]) Message[TMessage, CloneableReference[TMetadata]] {
-	references, metadata := m.Patcher.SortAndSetReferences()
-	outgoingReferences := make(object.OutgoingReferencesList[CloneableReference[TMetadata]], 0, len(metadata))
-	for i, m := range metadata {
-		outgoingReferences = append(outgoingReferences, CloneableReference[TMetadata]{
-			LocalReference: references.GetOutgoingReference(i),
-			Metadata:       m,
-		})
+type CloningObjectManager[TMetadata any] struct{}
+
+var (
+	_ ExistingObjectCapturer[CloneableReference[CloneableReferenceMetadata], CloneableReferenceMetadata] = CloningObjectManager[CloneableReferenceMetadata]{}
+	_ ObjectReferencer[CloneableReference[CloneableReferenceMetadata], CloneableReferenceMetadata]       = CloningObjectManager[CloneableReferenceMetadata]{}
+)
+
+func (CloningObjectManager[TMetadata]) CaptureExistingObject(reference CloneableReference[TMetadata]) TMetadata {
+	return reference.metadata
+}
+
+func (CloningObjectManager[TMetadata]) ReferenceObject(reference object.LocalReference, metadata TMetadata) CloneableReference[TMetadata] {
+	return CloneableReference[TMetadata]{
+		LocalReference: reference,
+		metadata:       metadata,
 	}
-	return NewMessage(m.Message, outgoingReferences)
-}
-
-// NewPatchedMessageFromCloneable performs the inverse of
-// PatchedMessageToCloneable().
-func NewPatchedMessageFromCloneable[
-	TMessage any,
-	TMetadata ReferenceMetadata,
-	TMessagePtr interface {
-		*TMessage
-		proto.Message
-	},
-](m Message[TMessagePtr, CloneableReference[TMetadata]]) PatchedMessage[TMessagePtr, TMetadata] {
-	return NewPatchedMessageFromExisting(m, func(index int) TMetadata {
-		return m.OutgoingReferences.GetOutgoingReference(index).Metadata
-	})
 }

@@ -21,28 +21,15 @@ var templateVariableInfoProviderIdentifier = label.MustNewCanonicalStarlarkIdent
 func (c *baseComputer[TReference, TMetadata]) ComputeMakeVariablesValue(ctx context.Context, key model_core.Message[*model_analysis_pb.MakeVariables_Key, TReference], e MakeVariablesEnvironment[TReference, TMetadata]) (PatchedMakeVariablesValue, error) {
 	allVariables := map[string]string{}
 	missingDependencies := false
+	configurationReference := model_core.NewNestedMessage(key, key.Message.ConfigurationReference)
 	for _, toolchainLabel := range append([]string{"@@bazel_tools+//tools/make:default_make_variables"}, key.Message.Toolchains...) {
 		// Obtain TemplateVariableInfo of the provided toolchain.
-		configurationReference := model_core.NewNestedMessage(key, key.Message.ConfigurationReference)
-		patchedConfigurationReference := model_core.NewPatchedMessageFromExistingCaptured(e, configurationReference)
-		visibleTargetValue := e.GetVisibleTargetValue(
-			model_core.NewPatchedMessage(
-				&model_analysis_pb.VisibleTarget_Key{
-					FromPackage:            key.Message.FromPackage,
-					ToLabel:                toolchainLabel,
-					ConfigurationReference: patchedConfigurationReference.Message,
-				},
-				model_core.MapReferenceMetadataToWalkers(patchedConfigurationReference.Patcher),
-			),
-		)
-		if !visibleTargetValue.IsSet() {
-			missingDependencies = true
-			continue
-		}
-		templateVariableInfoProvider, err := getProviderFromConfiguredTarget(
+		templateVariableInfoProvider, err := getProviderFromVisibleConfiguredTarget(
 			e,
-			visibleTargetValue.Message.Label,
-			model_core.NewPatchedMessageFromExistingCaptured(e, configurationReference),
+			key.Message.FromPackage,
+			toolchainLabel,
+			configurationReference,
+			e,
 			templateVariableInfoProviderIdentifier,
 		)
 		if err != nil {

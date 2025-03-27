@@ -108,8 +108,12 @@ func (c *baseComputer[TReference, TMetadata]) ComputePackageValue(ctx context.Co
 			return globValue.Message.MatchedPaths, nil
 		})
 
-		repoDefaultAttrs := model_core.PatchedMessageToCloneable(
-			model_core.NewPatchedMessageFromExistingCaptured(e, model_core.NewNestedMessage(repoDefaultAttrsValue, repoDefaultAttrsValue.Message.InheritableAttrs)),
+		repoDefaultAttrs := model_core.NewMessageFromPatchedReferenced(
+			model_core.CloningObjectManager[TMetadata]{},
+			model_core.NewPatchedMessageFromExistingCaptured(
+				e,
+				model_core.NewNestedMessage(repoDefaultAttrsValue, repoDefaultAttrsValue.Message.InheritableAttrs),
+			),
 		)
 
 		targetRegistrar := model_starlark.NewTargetRegistrar[TMetadata](c.getInlinedTreeOptions(), e, repoDefaultAttrs)

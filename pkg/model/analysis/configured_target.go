@@ -37,40 +37,20 @@ var (
 	filesToRunProviderIdentifier               = label.MustNewCanonicalStarlarkIdentifier("@@builtins_core+//:exports.bzl%FilesToRun")
 )
 
-type constraintValuesToConstraintsEnvironment[TReference any] interface {
-	GetConfiguredTargetValue(model_core.PatchedMessage[*model_analysis_pb.ConfiguredTarget_Key, dag.ObjectContentsWalker]) model_core.Message[*model_analysis_pb.ConfiguredTarget_Value, TReference]
-	GetVisibleTargetValue(model_core.PatchedMessage[*model_analysis_pb.VisibleTarget_Key, dag.ObjectContentsWalker]) model_core.Message[*model_analysis_pb.VisibleTarget_Value, TReference]
-}
-
 // constraintValuesToConstraints converts a list of labels of constraint
 // values to a list of Constraint messages that include both the
 // constraint setting and constraint value labels. These can be used to
 // perform matching of constraints.
-func (c *baseComputer[TReference, TMetadata]) constraintValuesToConstraints(ctx context.Context, e constraintValuesToConstraintsEnvironment[TReference], fromPackage label.CanonicalPackage, constraintValues []string) ([]*model_analysis_pb.Constraint, error) {
+func (c *baseComputer[TReference, TMetadata]) constraintValuesToConstraints(ctx context.Context, e getProviderFromVisibleConfiguredTargetEnvironment[TReference], fromPackage label.CanonicalPackage, constraintValues []string) ([]*model_analysis_pb.Constraint, error) {
 	constraints := make(map[string]string, len(constraintValues))
 	missingDependencies := false
 	for _, constraintValue := range constraintValues {
-		visibleTarget := e.GetVisibleTargetValue(
-			model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](
-				&model_analysis_pb.VisibleTarget_Key{
-					FromPackage: fromPackage.String(),
-					ToLabel:     constraintValue,
-					// Don't use any configuration
-					// when resolving constraint
-					// values, as that only leads to
-					// confusion.
-				},
-			),
-		)
-		if !visibleTarget.IsSet() {
-			missingDependencies = true
-			continue
-		}
-
-		constrainValueInfoProvider, err := getProviderFromConfiguredTarget(
+		constrainValueInfoProvider, err := getProviderFromVisibleConfiguredTarget(
 			e,
-			visibleTarget.Message.Label,
-			model_core.NewSimplePatchedMessage[model_core.WalkableReferenceMetadata, *model_core_pb.Reference](nil),
+			fromPackage.String(),
+			constraintValue,
+			model_core.NewSimpleMessage[model_core.CloneableReference[TMetadata]]((*model_core_pb.Reference)(nil)),
+			model_core.CloningObjectManager[TMetadata]{},
 			constraintValueInfoProviderIdentifier,
 		)
 		if err != nil {
@@ -368,7 +348,7 @@ func (c *baseComputer[TReference, TMetadata]) configureAttrValueParts(
 		if err != nil {
 			return nil, err
 		}
-		result := model_core.PeekPatchedMessage(e, patchedResult)
+		result := model_core.NewMessageFromPatchedReferenced(e, patchedResult)
 		for _, entry := range result.Message.Entries {
 			configurationReferences = append(configurationReferences, model_core.NewNestedMessage(result, entry.OutputConfigurationReference))
 		}
@@ -729,7 +709,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 				return PatchedConfiguredTargetValue{}, fmt.Errorf("incoming edge transition %#v used by rule %#v is a 1:%d transition, while a 1:1 transition was expected", cfgTransitionIdentifier, ruleIdentifier.String(), l)
 			}
 
-			configurationReferences := model_core.PeekPatchedMessage(e, patchedConfigurationReferences)
+			configurationReferences := model_core.NewMessageFromPatchedReferenced(e, patchedConfigurationReferences)
 			configurationReference = model_core.NewNestedMessage(configurationReferences, entries[0].OutputConfigurationReference)
 		}
 
@@ -887,7 +867,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 				}
 				return PatchedConfiguredTargetValue{}, err
 			}
-			transition := model_core.PeekPatchedMessage(e, patchedTransition)
+			transition := model_core.NewMessageFromPatchedReferenced(e, patchedTransition)
 
 			var attrValue starlark.Value
 			var splitAttrValue *starlark.Dict
@@ -2384,7 +2364,7 @@ type getProviderFromConfiguredTargetEnvironment[TReference any] interface {
 }
 
 // getProviderFromConfiguredTarget looks up a single provider that is
-// provided by a configured target
+// provided by a configured target.
 func getProviderFromConfiguredTarget[TReference any, TMetadata model_core.WalkableReferenceMetadata](e getProviderFromConfiguredTargetEnvironment[TReference], targetLabel string, configurationReference model_core.PatchedMessage[*model_core_pb.Reference, TMetadata], providerIdentifier label.CanonicalStarlarkIdentifier) (model_core.Message[*model_starlark_pb.Struct_Fields, TReference], error) {
 	configuredTargetValue := e.GetConfiguredTargetValue(
 		model_core.NewPatchedMessage(
@@ -2410,6 +2390,47 @@ func getProviderFromConfiguredTarget[TReference any, TMetadata model_core.Walkab
 		return model_core.NewNestedMessage(configuredTargetValue, providerInstances[providerIndex].Fields), nil
 	}
 	return model_core.Message[*model_starlark_pb.Struct_Fields, TReference]{}, fmt.Errorf("target did not yield provider %#v", providerIdentifierStr)
+}
+
+type getProviderFromVisibleConfiguredTargetEnvironment[TReference any] interface {
+	GetConfiguredTargetValue(model_core.PatchedMessage[*model_analysis_pb.ConfiguredTarget_Key, dag.ObjectContentsWalker]) model_core.Message[*model_analysis_pb.ConfiguredTarget_Value, TReference]
+	GetVisibleTargetValue(model_core.PatchedMessage[*model_analysis_pb.VisibleTarget_Key, dag.ObjectContentsWalker]) model_core.Message[*model_analysis_pb.VisibleTarget_Value, TReference]
+}
+
+func getProviderFromVisibleConfiguredTarget[TReference any, TConfigurationReference object.BasicReference, TMetadata model_core.WalkableReferenceMetadata](
+	e getProviderFromVisibleConfiguredTargetEnvironment[TReference],
+	fromPackage string,
+	targetLabel string,
+	configurationReference model_core.Message[*model_core_pb.Reference, TConfigurationReference],
+	configurationObjectCapturer model_core.ExistingObjectCapturer[TConfigurationReference, TMetadata],
+	providerIdentifier label.CanonicalStarlarkIdentifier,
+) (model_core.Message[*model_starlark_pb.Struct_Fields, TReference], error) {
+	patchedConfigurationReference := model_core.NewPatchedMessageFromExistingCaptured(
+		configurationObjectCapturer,
+		configurationReference,
+	)
+	visibleTarget := e.GetVisibleTargetValue(
+		model_core.NewPatchedMessage(
+			&model_analysis_pb.VisibleTarget_Key{
+				FromPackage:            fromPackage,
+				ToLabel:                targetLabel,
+				ConfigurationReference: patchedConfigurationReference.Message,
+			},
+			model_core.MapReferenceMetadataToWalkers(patchedConfigurationReference.Patcher),
+		),
+	)
+	if !visibleTarget.IsSet() {
+		return model_core.Message[*model_starlark_pb.Struct_Fields, TReference]{}, evaluation.ErrMissingDependency
+	}
+	return getProviderFromConfiguredTarget(
+		e,
+		visibleTarget.Message.Label,
+		model_core.NewPatchedMessageFromExistingCaptured(
+			configurationObjectCapturer,
+			configurationReference,
+		),
+		providerIdentifier,
+	)
 }
 
 type args struct{}
