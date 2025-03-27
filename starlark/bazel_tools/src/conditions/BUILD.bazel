@@ -141,22 +141,14 @@ config_setting(
     visibility = ["//visibility:public"],
 )
 
-config_setting(
-    name = "host_windows_x64_constraint",
-    values = {"host_cpu": "x64_windows"},
-)
+constraint_setting(name = "incompatible")
 
-config_setting(
-    name = "host_windows_arm64_constraint",
-    values = {"host_cpu": "arm64_windows"},
-)
-
-alias(
+# TODO: This is currently turned into a no-op, as we don't support
+# matching based on the host CPU. Toolchains should be used to make
+# rules behave differently on Windows.
+constraint_value(
     name = "host_windows",
-    actual = select({
-        ":host_windows_arm64_constraint": ":host_windows_arm64_constraint",
-        "//conditions:default": ":host_windows_x64_constraint",
-    }),
+    constraint_setting = ":incompatible",
     visibility = ["//visibility:public"],
 )
 
