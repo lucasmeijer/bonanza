@@ -1761,11 +1761,11 @@ func (rc *ruleContext[TReference, TMetadata]) doTargetPlatformHasConstraint(thre
 	}
 	constraintSettingLabelValue, err := constraintSettingAttrs.Attr(thread, "label")
 	if err != nil {
-		return nil, errors.New("\"constraint.label\" attribute of constraint value")
+		return nil, fmt.Errorf("\"constraint.label\" attribute of constraint value: %w", err)
 	}
 	var constraintSettingLabel label.ResolvedLabel
 	if err := labelUnpackerInto.UnpackInto(thread, constraintSettingLabelValue, &constraintSettingLabel); err != nil {
-		return nil, errors.New("\"constraint.label\" attribute of constraint value")
+		return nil, fmt.Errorf("\"constraint.label\" attribute of constraint value; %w", err)
 	}
 
 	// Obtain constraints of the target platform.
@@ -1809,7 +1809,18 @@ func (rc *ruleContext[TReference, TMetadata]) doTargetPlatformHasConstraint(thre
 		return nil, fmt.Errorf("failed to iterate platform constraints: %w", errIter)
 	}
 
-	return nil, errors.New("TODO: Check whether constraint value is equal to its default")
+	// Target platform does not contain the constraint setting.
+	// Check whether the constraint value is the constraint
+	// setting's default value.
+	defaultConstraintValue, err := constraintSettingAttrs.Attr(thread, "default_constraint_value")
+	if err != nil {
+		return nil, fmt.Errorf("\"constraint.default_constraint_value\" attribute of constraint value: %w", err)
+	}
+	var defaultConstraintValueLabel *label.ResolvedLabel
+	if err := unpack.IfNotNone(unpack.Pointer(labelUnpackerInto)).UnpackInto(thread, defaultConstraintValue, &defaultConstraintValueLabel); err != nil {
+		return nil, fmt.Errorf("\"constraint.default_constraint_value\" attribute of constraint value; %w", err)
+	}
+	return starlark.Bool(defaultConstraintValueLabel != nil && *defaultConstraintValueLabel == constraintValueLabel), nil
 }
 
 type ruleContextActions[TReference object.BasicReference, TMetadata BaseComputerReferenceMetadata] struct {
