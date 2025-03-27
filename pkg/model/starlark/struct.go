@@ -257,7 +257,7 @@ func (s *Struct[TReference, TMetadata]) EncodeStructFields(path map[starlark.Val
 			}
 			needsCode = needsCode || fieldNeedsCode
 		case model_core.Message[*model_starlark_pb.Value, TReference]:
-			encodedValue = model_core.NewPatchedMessageFromExistingCaptured(options.ObjectCapturer, typedValue)
+			encodedValue = model_core.Patch(options.ObjectCapturer, typedValue)
 		default:
 			panic("unknown value type")
 		}

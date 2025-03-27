@@ -97,5 +97,5 @@ func NewProtoTagClassDefinition[TReference object.BasicReference, TMetadata mode
 }
 
 func (tcd *protoTagClassDefinition[TReference, TMetadata]) Encode(path map[starlark.Value]struct{}, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.TagClass, TMetadata], bool, error) {
-	return model_core.NewPatchedMessageFromExistingCaptured(options.ObjectCapturer, tcd.message), false, nil
+	return model_core.Patch(options.ObjectCapturer, tcd.message), false, nil
 }

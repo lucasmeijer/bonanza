@@ -182,7 +182,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetPatternExpansionValue
 
 			for _, targetLabel := range childTargetPatternExpansion.Message.TargetLabels {
 				if err := treeBuilder.PushChild(
-					model_core.NewPatchedMessageFromExistingCaptured(e, model_core.Nested(childTargetPatternExpansion, targetLabel)),
+					model_core.Patch(e, model_core.Nested(childTargetPatternExpansion, targetLabel)),
 				); err != nil {
 					return PatchedTargetPatternExpansionValue{}, err
 				}

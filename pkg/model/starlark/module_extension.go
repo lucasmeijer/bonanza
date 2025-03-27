@@ -111,7 +111,7 @@ func NewProtoModuleExtensionDefinition[TReference object.BasicReference, TMetada
 }
 
 func (med *protoModuleExtensionDefinition[TReference, TMetadata]) EncodeValue(path map[starlark.Value]struct{}, currentIdentifier *pg_label.CanonicalStarlarkIdentifier, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.Value, TMetadata], bool, error) {
-	patchedMessage := model_core.NewPatchedMessageFromExistingCaptured(options.ObjectCapturer, med.message)
+	patchedMessage := model_core.Patch(options.ObjectCapturer, med.message)
 	return model_core.NewPatchedMessage(
 		&model_starlark_pb.Value{
 			Kind: &model_starlark_pb.Value_ModuleExtension{

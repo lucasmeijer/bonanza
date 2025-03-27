@@ -408,7 +408,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeBuildResultValue(ctx contex
 
 			var iterErr error
 			for canonicalTargetLabel := range c.expandCanonicalTargetPattern(ctx, e, canonicalTargetPattern, &iterErr) {
-				patchedConfigurationReference1 := model_core.NewPatchedMessageFromExistingCaptured(
+				patchedConfigurationReference1 := model_core.Patch(
 					model_core.CloningObjectManager[TMetadata]{},
 					clonedConfigurationReference,
 				)
@@ -427,7 +427,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeBuildResultValue(ctx contex
 					continue
 				}
 
-				patchedConfigurationReference2 := model_core.NewPatchedMessageFromExistingCaptured(
+				patchedConfigurationReference2 := model_core.Patch(
 					model_core.CloningObjectManager[TMetadata]{},
 					clonedConfigurationReference,
 				)
@@ -464,7 +464,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeBuildSpecificationValue(ctx
 		return PatchedBuildSpecificationValue{}, err
 	}
 
-	patchedBuildSpecification := model_core.NewPatchedMessageFromExistingCaptured(e, buildSpecification)
+	patchedBuildSpecification := model_core.Patch(e, buildSpecification)
 	return model_core.NewPatchedMessage(
 		&model_analysis_pb.BuildSpecification_Value{
 			BuildSpecification: patchedBuildSpecification.Message,
@@ -548,7 +548,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRepoDefaultAttrsValue(ctx c
 }
 
 func (c *baseComputer[TReference, TMetadata]) ComputeTargetCompletionValue(ctx context.Context, key model_core.Message[*model_analysis_pb.TargetCompletion_Key, TReference], e TargetCompletionEnvironment[TReference, TMetadata]) (PatchedTargetCompletionValue, error) {
-	configurationReference := model_core.NewPatchedMessageFromExistingCaptured(e, model_core.Nested(key, key.Message.ConfigurationReference))
+	configurationReference := model_core.Patch(e, model_core.Nested(key, key.Message.ConfigurationReference))
 	configuredTarget := e.GetConfiguredTargetValue(
 		model_core.NewPatchedMessage(
 			&model_analysis_pb.ConfiguredTarget_Key{

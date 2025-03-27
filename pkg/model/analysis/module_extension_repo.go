@@ -61,7 +61,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeModuleExtensionRepoValue(ct
 	if definition == nil {
 		return PatchedModuleExtensionRepoValue{}, errors.New("repo does not have a definition")
 	}
-	patchedDefinition := model_core.NewPatchedMessageFromExistingCaptured(e, model_core.Nested(repo, definition))
+	patchedDefinition := model_core.Patch(e, model_core.Nested(repo, definition))
 	return model_core.NewPatchedMessage(
 		&model_analysis_pb.ModuleExtensionRepo_Value{
 			Definition: patchedDefinition.Message,

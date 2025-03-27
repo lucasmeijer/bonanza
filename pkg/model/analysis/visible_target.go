@@ -36,7 +36,7 @@ func getValueFromSelectGroup[TReference object.BasicReference, TMetadata model_c
 		for _, condition := range selectGroup.Conditions {
 			conditionIdentifiers = append(conditionIdentifiers, condition.ConditionIdentifier)
 		}
-		patchedConfigurationReference := model_core.NewPatchedMessageFromExistingCaptured(e, configurationReference)
+		patchedConfigurationReference := model_core.Patch(e, configurationReference)
 		selectValue := e.GetSelectValue(
 			model_core.NewPatchedMessage(
 				&model_analysis_pb.Select_Key{
@@ -215,7 +215,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeVisibleTargetValue(ctx cont
 		}
 
 		// The actual target may also be an alias.
-		patchedConfigurationReference := model_core.NewPatchedMessageFromExistingCaptured(e, configurationReference)
+		patchedConfigurationReference := model_core.Patch(e, configurationReference)
 		actualVisibleTargetValue := e.GetVisibleTargetValue(
 			model_core.NewPatchedMessage(
 				&model_analysis_pb.VisibleTarget_Key{
@@ -319,7 +319,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeVisibleTargetValue(ctx cont
 			}
 		}
 
-		patchedConfigurationReference := model_core.NewPatchedMessageFromExistingCaptured(e, configurationReference)
+		patchedConfigurationReference := model_core.Patch(e, configurationReference)
 		actualVisibleTargetValue := e.GetVisibleTargetValue(
 			model_core.NewPatchedMessage(
 				&model_analysis_pb.VisibleTarget_Key{

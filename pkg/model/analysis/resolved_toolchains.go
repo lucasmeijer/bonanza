@@ -58,7 +58,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeResolvedToolchainsValue(ctx
 	}
 	compatibleToolchainsByType := make([][]*model_analysis_pb.RegisteredToolchain, 0, len(key.Message.Toolchains))
 	for _, toolchain := range key.Message.Toolchains {
-		configurationReference := model_core.NewPatchedMessageFromExistingCaptured(e, model_core.Nested(key, key.Message.ConfigurationReference))
+		configurationReference := model_core.Patch(e, model_core.Nested(key, key.Message.ConfigurationReference))
 		compatibleToolchainsForTypeValue := e.GetCompatibleToolchainsForTypeValue(
 			model_core.NewPatchedMessage(
 				&model_analysis_pb.CompatibleToolchainsForType_Key{

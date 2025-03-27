@@ -216,7 +216,7 @@ func (d *protoNamedFunctionDefinition[TReference, TMetadata]) CallInternal(threa
 }
 
 func (d *protoNamedFunctionDefinition[TReference, TMetadata]) Encode(path map[starlark.Value]struct{}, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.Function, TMetadata], bool, error) {
-	return model_core.NewPatchedMessageFromExistingCaptured(options.ObjectCapturer, d.message), false, nil
+	return model_core.Patch(options.ObjectCapturer, d.message), false, nil
 }
 
 func (d *protoNamedFunctionDefinition[TReference, TMetadata]) Name() string {

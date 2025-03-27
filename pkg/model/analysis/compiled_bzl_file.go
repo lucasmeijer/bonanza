@@ -182,7 +182,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeCompiledBzlFileGlobalValue(
 		return PatchedCompiledBzlFileGlobalValue{}, err
 	}
 
-	patchedGlobal := model_core.NewPatchedMessageFromExistingCaptured(e, global)
+	patchedGlobal := model_core.Patch(e, global)
 	return model_core.NewPatchedMessage(
 		&model_analysis_pb.CompiledBzlFileGlobal_Value{
 			Global: patchedGlobal.Message,

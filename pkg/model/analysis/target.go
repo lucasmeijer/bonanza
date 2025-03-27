@@ -74,7 +74,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetValue(ctx context.Con
 		return PatchedTargetValue{}, errors.New("target does not exist")
 	}
 
-	patchedDefinition := model_core.NewPatchedMessageFromExistingCaptured(e, definition)
+	patchedDefinition := model_core.Patch(e, definition)
 	return model_core.NewPatchedMessage(
 		&model_analysis_pb.Target_Value{
 			Definition: patchedDefinition.Message,

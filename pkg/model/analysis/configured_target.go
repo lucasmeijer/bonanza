@@ -387,7 +387,7 @@ func (c *baseComputer[TReference, TMetadata]) configureAttrValueParts(
 				if err != nil {
 					return nil, err
 				}
-				patchedConfigurationReference1 := model_core.NewPatchedMessageFromExistingCaptured(e, configurationReference)
+				patchedConfigurationReference1 := model_core.Patch(e, configurationReference)
 				resolvedLabelValue := e.GetVisibleTargetValue(
 					model_core.NewPatchedMessage(
 						&model_analysis_pb.VisibleTarget_Key{
@@ -409,7 +409,7 @@ func (c *baseComputer[TReference, TMetadata]) configureAttrValueParts(
 					}
 
 					// Obtain the providers of the target.
-					patchedConfigurationReference2 := model_core.NewPatchedMessageFromExistingCaptured(e, configurationReference)
+					patchedConfigurationReference2 := model_core.Patch(e, configurationReference)
 					configuredTarget := e.GetConfiguredTargetValue(
 						model_core.NewPatchedMessage(
 							&model_analysis_pb.ConfiguredTarget_Key{
@@ -953,7 +953,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 						if err != nil {
 							return nil, err
 						}
-						patchedConfigurationReference1 := model_core.NewPatchedMessageFromExistingCaptured(e, outputConfigurationReference)
+						patchedConfigurationReference1 := model_core.Patch(e, outputConfigurationReference)
 						resolvedLabelValue := e.GetVisibleTargetValue(
 							model_core.NewPatchedMessage(
 								&model_analysis_pb.VisibleTarget_Key{
@@ -975,7 +975,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 							}
 
 							// Obtain the providers of the target.
-							patchedConfigurationReference2 := model_core.NewPatchedMessageFromExistingCaptured(e, outputConfigurationReference)
+							patchedConfigurationReference2 := model_core.Patch(e, outputConfigurationReference)
 							configuredTarget := e.GetConfiguredTargetValue(
 								model_core.NewPatchedMessage(
 									&model_analysis_pb.ConfiguredTarget_Key{
@@ -1565,7 +1565,7 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 		}, nil
 	case "var":
 		if rc.varDict == nil {
-			configurationReference := model_core.NewPatchedMessageFromExistingCaptured(
+			configurationReference := model_core.Patch(
 				rc.environment,
 				rc.configurationReference,
 			)
@@ -2191,7 +2191,7 @@ func (rcf *ruleContextFragments[TReference, TMetadata]) Attr(thread *starlark.Th
 		encodedFragmentInfo, err := getProviderFromConfiguredTarget(
 			rc.environment,
 			fragmentsPackage.AppendTargetName(targetName).String(),
-			model_core.NewPatchedMessageFromExistingCaptured(
+			model_core.Patch(
 				rc.environment,
 				rc.configurationReference,
 			),
@@ -2284,7 +2284,7 @@ func (tc *toolchainContext[TReference, TMetadata]) Get(thread *starlark.Thread, 
 		if err != nil {
 			return nil, true, err
 		}
-		configurationReference := model_core.NewPatchedMessageFromExistingCaptured(
+		configurationReference := model_core.Patch(
 			rc.environment,
 			rc.configurationReference,
 		)
@@ -2324,7 +2324,7 @@ func (tc *toolchainContext[TReference, TMetadata]) Get(thread *starlark.Thread, 
 			encodedToolchainInfo, err := getProviderFromConfiguredTarget(
 				rc.environment,
 				toolchainIdentifier,
-				model_core.NewPatchedMessageFromExistingCaptured(
+				model_core.Patch(
 					rc.environment,
 					rc.configurationReference,
 				),
@@ -2405,7 +2405,7 @@ func getProviderFromVisibleConfiguredTarget[TReference any, TConfigurationRefere
 	configurationObjectCapturer model_core.ExistingObjectCapturer[TConfigurationReference, TMetadata],
 	providerIdentifier label.CanonicalStarlarkIdentifier,
 ) (model_core.Message[*model_starlark_pb.Struct_Fields, TReference], error) {
-	patchedConfigurationReference := model_core.NewPatchedMessageFromExistingCaptured(
+	patchedConfigurationReference := model_core.Patch(
 		configurationObjectCapturer,
 		configurationReference,
 	)
@@ -2425,7 +2425,7 @@ func getProviderFromVisibleConfiguredTarget[TReference any, TConfigurationRefere
 	return getProviderFromConfiguredTarget(
 		e,
 		visibleTarget.Message.Label,
-		model_core.NewPatchedMessageFromExistingCaptured(
+		model_core.Patch(
 			configurationObjectCapturer,
 			configurationReference,
 		),

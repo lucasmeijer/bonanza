@@ -110,7 +110,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputePackageValue(ctx context.Co
 
 		repoDefaultAttrs := model_core.NewMessageFromPatchedReferenced(
 			model_core.CloningObjectManager[TMetadata]{},
-			model_core.NewPatchedMessageFromExistingCaptured(
+			model_core.Patch(
 				e,
 				model_core.Nested(repoDefaultAttrsValue, repoDefaultAttrsValue.Message.InheritableAttrs),
 			),

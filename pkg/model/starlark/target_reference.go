@@ -163,7 +163,7 @@ func (tr *TargetReference[TReference, TMetadata]) Get(thread *starlark.Thread, v
 }
 
 func (tr *TargetReference[TReference, TMetadata]) EncodeValue(path map[starlark.Value]struct{}, currentIdentifier *pg_label.CanonicalStarlarkIdentifier, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.Value, TMetadata], bool, error) {
-	return model_core.NewPatchedMessageFromExistingCaptured(
+	return model_core.Patch(
 		options.ObjectCapturer,
 		model_core.Nested(tr.encodedProviders, &model_starlark_pb.Value{
 			Kind: &model_starlark_pb.Value_TargetReference{

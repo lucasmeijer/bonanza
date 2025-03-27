@@ -45,11 +45,11 @@ type ObjectCapturer[TReference, TMetadata any] interface {
 	ExistingObjectCapturer[TReference, TMetadata]
 }
 
-// NewPatchedMessageFromExistingCaptured is identical to
-// NewPatchedMessageFromExisting, except that it automatically creates
-// metadata for all references contained the message using the provided
-// capturer.
-func NewPatchedMessageFromExistingCaptured[
+// Patch an existing message, copying the message and causing all
+// containing references to be managed by a ReferenceMessagePatcher. For
+// each references contained within, metadata is created by calling into
+// an ExistingObjectCapturer.
+func Patch[
 	TMessage any,
 	TMetadata ReferenceMetadata,
 	TMessagePtr interface {

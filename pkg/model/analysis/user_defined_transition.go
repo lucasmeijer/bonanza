@@ -227,7 +227,7 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 		}
 		if cmp < 0 {
 			// Preserve existing build setting.
-			treeBuilder.PushChild(model_core.NewPatchedMessageFromExistingCaptured(e, existingOverride))
+			treeBuilder.PushChild(model_core.Patch(e, existingOverride))
 		} else {
 			// Either replace or remove an existing build
 			// setting override, or inject a new one.
@@ -615,7 +615,7 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransitionCached
 	// First attempt to call into the UserDefinedTransition
 	// function. This function is capable of computing transitions
 	// that don't depend on the "attr" parameter.
-	patchedConfigurationReference := model_core.NewPatchedMessageFromExistingCaptured(e, configurationReference)
+	patchedConfigurationReference := model_core.Patch(e, configurationReference)
 	transitionValue := e.GetUserDefinedTransitionValue(
 		model_core.NewPatchedMessage(
 			&model_analysis_pb.UserDefinedTransition_Key{
@@ -641,7 +641,7 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransitionCached
 			attrParameter,
 		)
 	case *model_analysis_pb.UserDefinedTransition_Value_Success_:
-		return model_core.NewPatchedMessageFromExistingCaptured(e, model_core.Nested(transitionValue, result.Success)), nil
+		return model_core.Patch(e, model_core.Nested(transitionValue, result.Success)), nil
 	default:
 		return performUserDefinedTransitionResult[TMetadata]{}, errors.New("unexpected user defined transition result type")
 	}
@@ -658,7 +658,7 @@ func (c *baseComputer[TReference, TMetadata]) performTransition(
 	switch tr := transitionReference.GetKind().(type) {
 	case *model_starlark_pb.Transition_Reference_ExecGroup:
 		// TODO: Perform an actual exec transition!
-		patchedConfigurationReference := model_core.NewPatchedMessageFromExistingCaptured(e, configurationReference)
+		patchedConfigurationReference := model_core.Patch(e, configurationReference)
 		return model_core.NewPatchedMessage(
 			&model_analysis_pb.UserDefinedTransition_Value_Success{
 				Entries: []*model_analysis_pb.UserDefinedTransition_Value_Success_Entry{{
@@ -676,7 +676,7 @@ func (c *baseComputer[TReference, TMetadata]) performTransition(
 		), false, nil
 	case *model_starlark_pb.Transition_Reference_Target:
 		// Don't transition. Use the current target.
-		patchedConfigurationReference := model_core.NewPatchedMessageFromExistingCaptured(e, configurationReference)
+		patchedConfigurationReference := model_core.Patch(e, configurationReference)
 		return model_core.NewPatchedMessage(
 			&model_analysis_pb.UserDefinedTransition_Value_Success{
 				Entries: []*model_analysis_pb.UserDefinedTransition_Value_Success_Entry{{

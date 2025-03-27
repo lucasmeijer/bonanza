@@ -3008,7 +3008,7 @@ func (c *baseComputer[TReference, TMetadata]) createMerkleTreeFromChangeTracking
 	if r := rootDirectory.currentReference; r.IsSet() {
 		// Directory remained completely unmodified. Simply
 		// return the original directory.
-		m := model_core.NewPatchedMessageFromExistingCaptured(e, r)
+		m := model_core.Patch(e, r)
 		return model_core.NewPatchedMessage(
 			m.Message,
 			model_core.MapReferenceMetadataToWalkers(m.Patcher),
@@ -3130,7 +3130,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRepoValue(ctx context.Conte
 				func(i int) int { return strings.Compare(moduleName, modules[i].Name) },
 			); ok {
 				// Found matching module.
-				rootDirectoryReference := model_core.NewPatchedMessageFromExistingCaptured(e, model_core.Nested(buildSpecification, modules[i].RootDirectoryReference))
+				rootDirectoryReference := model_core.Patch(e, model_core.Nested(buildSpecification, modules[i].RootDirectoryReference))
 				return model_core.NewPatchedMessage(
 					&model_analysis_pb.Repo_Value{
 						RootDirectoryReference: rootDirectoryReference.Message,

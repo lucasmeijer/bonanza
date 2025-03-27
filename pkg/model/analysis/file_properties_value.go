@@ -218,7 +218,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFilePropertiesValue(ctx con
 		return PatchedFilePropertiesValue{}, errors.New("path resolves to a directory")
 	}
 
-	patchedFileProperties := model_core.NewPatchedMessageFromExistingCaptured(e, resolver.fileProperties)
+	patchedFileProperties := model_core.Patch(e, resolver.fileProperties)
 	return model_core.NewPatchedMessage(
 		&model_analysis_pb.FileProperties_Value{
 			Exists: patchedFileProperties.Message,

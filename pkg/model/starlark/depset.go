@@ -213,7 +213,7 @@ func (e *depsetChildrenEncoder[TReference, TMetadata]) encode(children any) erro
 		}
 	case model_core.Message[*model_starlark_pb.List_Element, TReference]:
 		if err := e.treeBuilder.PushChild(
-			model_core.NewPatchedMessageFromExistingCaptured(e.options.ObjectCapturer, v),
+			model_core.Patch(e.options.ObjectCapturer, v),
 		); err != nil {
 			return err
 		}

@@ -19,8 +19,7 @@ type CloneableReferenceMetadata interface {
 // that holds on to any metadata that was extracted out of the
 // ReferenceMessagePatcher by PatchedMessageToCloneable(). The metadata
 // is later reinserted into one or more ReferenceMessagePatchers by
-// calling NewPatchedMessageFromExistingCaptured() using
-// ClonedObjectManager.
+// calling Patch() using ClonedObjectManager.
 type CloneableReference[TMetadata any] struct {
 	object.LocalReference
 	metadata TMetadata
