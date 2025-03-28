@@ -12,6 +12,7 @@ ExecutionInfo = provider()
 FeatureFlagInfo = provider()
 FilesToRunProvider = provider()
 InstrumentedFilesInfo = provider()
+JavaPluginInfo = provider()
 OutputGroupInfo = provider(dict_like = True)
 PackageSpecificationInfo = provider()
 PlatformInfo = provider()
@@ -255,6 +256,13 @@ genrule = rule(
         "srcs": attr.label_list(allow_files = True),
         "tools": attr.label_list(allow_files = True),
     },
+)
+
+def _java_plugins_flag_alias_impl(ctx):
+    return [JavaPluginInfo()]
+
+java_plugins_flag_alias = rule(
+    implementation = _java_plugins_flag_alias_impl,
 )
 
 def _java_proto_library_impl(ctx):
@@ -995,8 +1003,9 @@ def builtins_internal_java_common_internal_do_not_use__google_legacy_api_enabled
 def builtins_internal_java_common_internal_do_not_use__incompatible_java_info_merge_runtime_module_flags():
     return "TODO"
 
-def builtins_internal_java_common_internal_do_not_use_check_provider_instances():
-    return "TODO"
+def builtins_internal_java_common_internal_do_not_use_check_provider_instances(providers, what, provider_type):
+    # TODO.
+    pass
 
 def builtins_internal_java_common_internal_do_not_use_collect_native_deps_dirs():
     return "TODO"
@@ -1040,6 +1049,7 @@ exported_rules = {
     "filegroup": filegroup,
     "genrule": genrule,
     "glob": native.glob,
+    "java_plugins_flag_alias": java_plugins_flag_alias,
     "java_proto_library": java_proto_library,
     "label_flag": native.label_flag,
     "label_setting": native.label_setting,

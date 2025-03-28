@@ -104,6 +104,25 @@ cpp_fragment = rule(
     },
 )
 
+def _java_fragment_impl(ctx):
+    disallow_java_import_empty_jars = ctx.attr._disallow_java_import_empty_jars[BuildSettingInfo].value
+    disallow_java_import_exports = ctx.attr._disallow_java_import_exports[BuildSettingInfo].value
+    use_ijars = ctx.attr._use_ijars[BuildSettingInfo].value
+    return [FragmentInfo(
+        disallow_java_import_empty_jars = lambda: disallow_java_import_empty_jars,
+        disallow_java_import_exports = lambda: disallow_java_import_exports,
+        use_ijars = lambda: use_ijars,
+    )]
+
+java_fragment = rule(
+    _java_fragment_impl,
+    attrs = {
+        "_disallow_java_import_empty_jars": attr.label(default = "//command_line_option:incompatible_disallow_java_import_empty_jars"),
+        "_disallow_java_import_exports": attr.label(default = "//command_line_option:incompatible_disallow_java_import_exports"),
+        "_use_ijars": attr.label(default = "//command_line_option:use_ijars"),
+    },
+)
+
 def _platform_fragment_impl(ctx):
     return [FragmentInfo(
         host_platform = ctx.attr._host_platform.label,

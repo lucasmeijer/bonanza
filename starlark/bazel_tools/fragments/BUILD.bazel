@@ -2,6 +2,7 @@ load(
     ":fragments.bzl",
     "apple_fragment",
     "cpp_fragment",
+    "java_fragment",
     "platform_fragment",
     "proto_fragment",
 )
@@ -9,6 +10,8 @@ load(
 apple_fragment(name = "apple")
 
 cpp_fragment(name = "cpp")
+
+java_fragment(name = "java")
 
 platform_fragment(name = "platform")
 

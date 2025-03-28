@@ -860,6 +860,8 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 					}
 				case "java":
 					switch name {
+					case "launcher":
+						return NewLabel[TReference, TMetadata](pg_label.MustNewResolvedLabel("@@bazel_tools+//command_line_option:java_launcher")), nil
 					case "java_toolchain_bytecode_optimizer":
 						return NewLabel[TReference, TMetadata](pg_label.MustNewResolvedLabel("@@bazel_tools+//command_line_option:proguard_top")), nil
 					case "local_java_optimization_configuration":
