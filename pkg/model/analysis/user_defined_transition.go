@@ -7,6 +7,7 @@ import (
 	"iter"
 	"maps"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -309,25 +310,37 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 	), nil
 }
 
-type getBuildSettingValueEnvironment[TReference any] interface {
+type getBuildSettingValueEnvironment[TReference any, TMetadata any] interface {
+	model_core.ExistingObjectCapturer[TReference, TMetadata]
+	GetConfiguredTargetValue(model_core.PatchedMessage[*model_analysis_pb.ConfiguredTarget_Key, dag.ObjectContentsWalker]) model_core.Message[*model_analysis_pb.ConfiguredTarget_Value, TReference]
 	GetTargetValue(*model_analysis_pb.Target_Key) model_core.Message[*model_analysis_pb.Target_Value, TReference]
 	GetVisibleTargetValue(model_core.PatchedMessage[*model_analysis_pb.VisibleTarget_Key, dag.ObjectContentsWalker]) model_core.Message[*model_analysis_pb.VisibleTarget_Value, TReference]
 }
 
-func (c *baseComputer[TReference, TMetadata]) getBuildSettingValue(ctx context.Context, e getBuildSettingValueEnvironment[TReference], fromPackage label.CanonicalPackage, buildSettingLabel string, configuration model_core.Message[*model_analysis_pb.Configuration, TReference]) (model_core.Message[*model_starlark_pb.Value, TReference], error) {
+var featureFlagInfoProviderIdentifier = label.MustNewCanonicalStarlarkIdentifier("@@builtins_core+//:exports.bzl%FeatureFlagInfo")
+
+func (c *baseComputer[TReference, TMetadata]) getBuildSettingValue(ctx context.Context, e getBuildSettingValueEnvironment[TReference, TMetadata], fromPackage label.CanonicalPackage, buildSettingLabel string, configurationReference model_core.Message[*model_core_pb.Reference, TReference]) (model_core.Message[*model_starlark_pb.Value, TReference], error) {
+	patchedConfigurationReference := model_core.Patch(e, configurationReference)
 	visibleTargetValue := e.GetVisibleTargetValue(
-		model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](
+		model_core.NewPatchedMessage(
 			&model_analysis_pb.VisibleTarget_Key{
-				FromPackage:        fromPackage.String(),
-				ToLabel:            buildSettingLabel,
-				StopAtLabelSetting: true,
+				ConfigurationReference: patchedConfigurationReference.Message,
+				FromPackage:            fromPackage.String(),
+				ToLabel:                buildSettingLabel,
+				StopAtLabelSetting:     true,
 			},
+			model_core.MapReferenceMetadataToWalkers(patchedConfigurationReference.Patcher),
 		),
 	)
 	if !visibleTargetValue.IsSet() {
 		return model_core.Message[*model_starlark_pb.Value, TReference]{}, evaluation.ErrMissingDependency
 	}
 	visibleBuildSettingLabel := visibleTargetValue.Message.Label
+
+	configuration, err := model_parser.MaybeDereference(ctx, c.configurationReader, configurationReference)
+	if err != nil {
+		return model_core.Message[*model_starlark_pb.Value, TReference]{}, err
+	}
 
 	// Determine the current value of the build setting.
 	if buildSettingOverride, err := btree.Find(
@@ -389,11 +402,47 @@ func (c *baseComputer[TReference, TMetadata]) getBuildSettingValue(ctx context.C
 		}
 		return model_core.NewSimpleMessage[TReference](buildSettingDefault), nil
 	case *model_starlark_pb.Target_Definition_RuleTarget:
-		// Build setting is written in Starlark.
-		if targetKind.RuleTarget.BuildSettingDefault == nil {
-			return model_core.Message[*model_starlark_pb.Value, TReference]{}, fmt.Errorf("rule %#v used by build setting %#v does not have \"build_setting\" set", targetKind.RuleTarget.RuleIdentifier, visibleBuildSettingLabel)
+		if d := targetKind.RuleTarget.BuildSettingDefault; d != nil {
+			// Build setting that is written in Starlark.
+			return model_core.Nested(targetValue, d), nil
 		}
-		return model_core.Nested(targetValue, targetKind.RuleTarget.BuildSettingDefault), nil
+
+		// Not a build setting, but the target may provide
+		// FeatureFlagInfo if configured.
+		patchedConfigurationReference := model_core.Patch(e, configurationReference)
+		configuredTarget := e.GetConfiguredTargetValue(
+			model_core.NewPatchedMessage(
+				&model_analysis_pb.ConfiguredTarget_Key{
+					Label:                  visibleBuildSettingLabel,
+					ConfigurationReference: patchedConfigurationReference.Message,
+				},
+				model_core.MapReferenceMetadataToWalkers(patchedConfigurationReference.Patcher),
+			),
+		)
+		if !configuredTarget.IsSet() {
+			return model_core.Message[*model_starlark_pb.Value, TReference]{}, evaluation.ErrMissingDependency
+		}
+		featureFlagInfoProviderIdentifierStr := featureFlagInfoProviderIdentifier.String()
+		providerInstances := configuredTarget.Message.ProviderInstances
+		featureFlagInfoIndex, ok := sort.Find(
+			len(providerInstances),
+			func(i int) int {
+				return strings.Compare(featureFlagInfoProviderIdentifierStr, providerInstances[i].ProviderInstanceProperties.GetProviderIdentifier())
+			},
+		)
+		if !ok {
+			return model_core.Message[*model_starlark_pb.Value, TReference]{}, fmt.Errorf("rule %#v used by build setting %#v does not have \"build_setting\" set, nor does it yield provider FeatureFlagInfo", targetKind.RuleTarget.RuleIdentifier, visibleBuildSettingLabel)
+		}
+		featureFlagValue, err := model_starlark.GetStructFieldValue(
+			ctx,
+			c.valueReaders.List,
+			model_core.Nested(configuredTarget, providerInstances[featureFlagInfoIndex].Fields),
+			"value",
+		)
+		if err != nil {
+			return model_core.Message[*model_starlark_pb.Value, TReference]{}, fmt.Errorf("failed to obtain field \"value\" of FeatureFlagInfo provider of target %#v: %w", visibleBuildSettingLabel, err)
+		}
+		return featureFlagValue, nil
 	default:
 		return model_core.Message[*model_starlark_pb.Value, TReference]{}, fmt.Errorf("target %#v is not a build setting or rule target", visibleBuildSettingLabel)
 	}
@@ -401,6 +450,7 @@ func (c *baseComputer[TReference, TMetadata]) getBuildSettingValue(ctx context.C
 
 type performUserDefinedTransitionEnvironment[TReference, TMetadata any] interface {
 	model_core.ObjectManager[TReference, TMetadata]
+	getBuildSettingValueEnvironment[TReference, TMetadata]
 	getExpectedTransitionOutputEnvironment[TReference]
 	starlarkThreadEnvironment[TReference]
 
@@ -475,7 +525,7 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx c
 			// declared?
 			canonicalBuildSettingLabel.GetCanonicalPackage(),
 			canonicalBuildSettingLabel.String(),
-			configuration,
+			configurationReference,
 		)
 		if err != nil {
 			if errors.Is(err, evaluation.ErrMissingDependency) {

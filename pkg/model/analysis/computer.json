@@ -510,6 +510,7 @@
             "CompiledBzlFileDecodedGlobals",
             "CompiledBzlFileFunctionFactory",
             "CompiledBzlFileGlobal",
+            "ConfiguredTarget",
             "RootModule",
             "Target",
             "VisibleTarget"

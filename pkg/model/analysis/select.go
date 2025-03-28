@@ -8,7 +8,6 @@ import (
 	"github.com/buildbarn/bonanza/pkg/evaluation"
 	"github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
 	model_starlark "github.com/buildbarn/bonanza/pkg/model/starlark"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
 	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
@@ -20,11 +19,6 @@ var configSettingInfoProviderIdentifier = label.MustNewCanonicalStarlarkIdentifi
 
 func (c *baseComputer[TReference, TMetadata]) ComputeSelectValue(ctx context.Context, key model_core.Message[*model_analysis_pb.Select_Key, TReference], e SelectEnvironment[TReference, TMetadata]) (PatchedSelectValue, error) {
 	configurationReference := model_core.Nested(key, key.Message.ConfigurationReference)
-	configuration, err := model_parser.MaybeDereference(ctx, c.configurationReader, configurationReference)
-	if err != nil {
-		return PatchedSelectValue{}, err
-	}
-
 	missingDependencies := false
 	var platformConstraints []*model_analysis_pb.Constraint
 CheckConditions:
@@ -114,7 +108,7 @@ CheckConditions:
 				e,
 				configSettingLabel.GetCanonicalPackage(),
 				buildSettingLabel.Label,
-				configuration,
+				configurationReference,
 			)
 			if err != nil {
 				if errors.Is(err, evaluation.ErrMissingDependency) {
