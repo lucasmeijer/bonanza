@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
 	"math/big"
 	"slices"
 	"strings"
@@ -59,6 +60,35 @@ func newListBuilder[TReference any, TMetadata model_core.CloneableReferenceMetad
 	return newSplitBTreeBuilder(
 		options,
 		/* parentNodeComputer = */ func(createdObject model_core.CreatedObject[TMetadata], childNodes []*model_starlark_pb.List_Element) (model_core.PatchedMessage[*model_starlark_pb.List_Element, TMetadata], error) {
+			// Compute the total number of elements
+			// contained in the new list.
+			//
+			// For depsets it is easy to craft instances
+			// that have more than 2^64-1 elements due to
+			// excessive repetition. Make sure to clamp the
+			// value in that case, so that consumers know
+			// they can't use this field to jump to
+			// arbitrary elements.
+			count := uint64(0)
+		CountChildren:
+			for _, childNode := range childNodes {
+				switch level := childNode.Level.(type) {
+				case *model_starlark_pb.List_Element_Leaf:
+					if count == math.MaxUint64 {
+						break CountChildren
+					}
+					count++
+				case *model_starlark_pb.List_Element_Parent_:
+					if count > math.MaxUint64-level.Parent.Count {
+						count = math.MaxUint64
+						break CountChildren
+					}
+					count += level.Parent.Count
+				default:
+					return model_core.PatchedMessage[*model_starlark_pb.List_Element, TMetadata]{}, errors.New("invalid list element level")
+				}
+			}
+
 			patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
 			return model_core.NewPatchedMessage(
 				&model_starlark_pb.List_Element{
@@ -68,6 +98,7 @@ func newListBuilder[TReference any, TMetadata model_core.CloneableReferenceMetad
 								createdObject.Contents.GetReference(),
 								options.ObjectCapturer.CaptureCreatedObject(createdObject),
 							),
+							Count: count,
 						},
 					},
 				},

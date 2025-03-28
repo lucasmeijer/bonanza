@@ -422,7 +422,14 @@ message LabelSetting {
 message List {
   message Element {
     message Parent {
+      // Reference to an object containing additional list elements.
       bonanza.model.core.Reference reference = 1;
+
+      // The total number of leaf elements in the list that is
+      // referenced. If the total number of leaf elements exceeds
+      // 2^64-1, the count should be clamped to that value. This may
+      // happen for depsets, which may contain a lot of repetition.
+      uint64 count = 2;
     }
 
     oneof level {
