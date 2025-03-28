@@ -1292,19 +1292,20 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 					panic("unknown type")
 				}
 				sort.Strings(fieldNames)
+				fieldNames = slices.Compact(fieldNames)
 
-				provider := NewProvider[TReference](
-					NewProviderInstanceProperties(nil, dictLike),
-					slices.Compact(fieldNames),
-					init,
-				)
+				instanceProperties := NewProviderInstanceProperties(nil, dictLike)
+
+				// If an init function is provided, we're
+				// supposed to return both the provider with
+				// and without the init function.
+				bareProvider := NewProvider[TReference, TMetadata](instanceProperties, fieldNames, nil)
 				if init == nil {
-					return provider, nil
+					return bareProvider, nil
 				}
 				return starlark.Tuple{
-					provider,
-					// TODO: Return raw provider value!
-					starlark.None,
+					NewProvider(instanceProperties, fieldNames, init),
+					bareProvider,
 				}, nil
 			},
 		),
