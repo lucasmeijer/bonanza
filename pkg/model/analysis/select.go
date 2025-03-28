@@ -17,6 +17,10 @@ import (
 var configSettingInfoProviderIdentifier = label.MustNewCanonicalStarlarkIdentifier("@@builtins_core+//:exports.bzl%ConfigSettingInfo")
 
 func (c *baseComputer[TReference, TMetadata]) ComputeSelectValue(ctx context.Context, key model_core.Message[*model_analysis_pb.Select_Key, TReference], e SelectEnvironment[TReference, TMetadata]) (PatchedSelectValue, error) {
+	fromPackage, err := label.NewCanonicalPackage(key.Message.FromPackage)
+	if err != nil {
+		return PatchedSelectValue{}, fmt.Errorf("invalid package: %w", err)
+	}
 	configurationReference := model_core.Nested(key, key.Message.ConfigurationReference)
 	missingDependencies := false
 	var platformConstraints []*model_analysis_pb.Constraint
@@ -25,7 +29,7 @@ CheckConditions:
 	for i, conditionIdentifier := range key.Message.ConditionIdentifiers {
 		configSettingInfo, configSettingLabelStr, err := getProviderFromVisibleConfiguredTarget(
 			e,
-			key.Message.FromPackage,
+			fromPackage.String(),
 			conditionIdentifier,
 			configurationReference,
 			e,
@@ -120,7 +124,7 @@ CheckConditions:
 				return PatchedSelectValue{}, err
 			}
 
-			equal, err := compareBuildSettingValue(expectedValue.Str, actualValue)
+			equal, err := c.compareBuildSettingValue(e, expectedValue.Str, actualValue, fromPackage)
 			if err != nil {
 				return PatchedSelectValue{}, fmt.Errorf("failed to compare key %#v of \"flag_values\" field of ConfigSettingInfo provider of config setting %#v: %w", buildSettingLabel.Label, conditionIdentifier, err)
 			}
@@ -146,7 +150,7 @@ CheckConditions:
 	), nil
 }
 
-func compareBuildSettingValue[TReference any](expectedValue string, actualValue model_core.Message[*model_starlark_pb.Value, TReference]) (bool, error) {
+func (c *baseComputer[TReference, TMetadata]) compareBuildSettingValue(e resolveApparentEnvironment[TReference], expectedValue string, actualValue model_core.Message[*model_starlark_pb.Value, TReference], fromPackage label.CanonicalPackage) (bool, error) {
 	switch typedValue := actualValue.Message.GetKind().(type) {
 	case *model_starlark_pb.Value_Bool:
 		switch expectedValue {
@@ -158,6 +162,20 @@ func compareBuildSettingValue[TReference any](expectedValue string, actualValue 
 			return false, fmt.Errorf("boolean values can only be compared against \"0\", \"1\", \"false\", \"true\", \"False\" and \"True\", not %#v", expectedValue)
 		}
 		return false, nil
+	case *model_starlark_pb.Value_Label:
+		// Parse label to obtain a canonical representation.
+		apparentLabel, err := fromPackage.AppendLabel(expectedValue)
+		if err != nil {
+			return false, fmt.Errorf("invalid label %#v: %w", expectedValue, err)
+		}
+		// TODO: Apparently Bazel allows this to succeed for
+		// unknown repo names. We should likely support that as
+		// well?
+		canonicalLabel, err := resolveApparent(e, fromPackage.GetCanonicalRepo(), apparentLabel)
+		if err != nil {
+			return false, fmt.Errorf("failed to resolve label %#v: %w", expectedValue, err)
+		}
+		return canonicalLabel.String() == typedValue.Label, nil
 	case *model_starlark_pb.Value_Str:
 		return expectedValue == typedValue.Str, nil
 	default:
