@@ -39,6 +39,18 @@ label_flag(
     visibility = ["//visibility:public"],
 )
 
+string_flag(
+    name = "cpu",
+    build_setting_default = "",
+    visibility = ["//visibility:public"],
+)
+
+label_flag(
+    name = "crosstool_top",
+    build_setting_default = "//tools/cpp:toolchain",
+    visibility = ["//visibility:public"],
+)
+
 label_flag(
     name = "cs_fdo_profile",
     build_setting_default = None,
