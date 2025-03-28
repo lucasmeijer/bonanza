@@ -230,36 +230,16 @@ func (e *depsetChildrenEncoder[TReference, TMetadata]) encode(children any) erro
 }
 
 func (d *Depset[TReference, TMetadata]) Encode(path map[starlark.Value]struct{}, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.Depset, TMetadata], bool, error) {
-	treeBuilder := newSplitBTreeBuilder(
-		options,
-		/* parentNodeComputer = */ func(createdObject model_core.CreatedObject[TMetadata], childNodes []*model_starlark_pb.List_Element) (model_core.PatchedMessage[*model_starlark_pb.List_Element, TMetadata], error) {
-			patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
-			return model_core.NewPatchedMessage(
-				&model_starlark_pb.List_Element{
-					Level: &model_starlark_pb.List_Element_Parent_{
-						Parent: &model_starlark_pb.List_Element_Parent{
-							Reference: patcher.AddReference(
-								createdObject.Contents.GetReference(),
-								options.ObjectCapturer.CaptureCreatedObject(createdObject),
-							),
-						},
-					},
-				},
-				patcher,
-			), nil
-		},
-	)
-
 	e := depsetChildrenEncoder[TReference, TMetadata]{
 		path:        path,
 		options:     options,
-		treeBuilder: treeBuilder,
+		treeBuilder: newListBuilder(options),
 	}
 	if err := e.encode(d.children); err != nil {
 		return model_core.PatchedMessage[*model_starlark_pb.Depset, TMetadata]{}, false, err
 	}
 
-	elements, err := treeBuilder.FinalizeList()
+	elements, err := e.treeBuilder.FinalizeList()
 	if err != nil {
 		return model_core.PatchedMessage[*model_starlark_pb.Depset, TMetadata]{}, false, err
 	}
