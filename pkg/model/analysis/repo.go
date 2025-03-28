@@ -1320,10 +1320,21 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doDownload(thread *
 			// TODO: Set auth!
 		},
 	})
-	if !block {
-		return nil, errors.New("non-blocking downloads are not implemented yet")
-	}
 
+	// Depending on whether "block" is set to true or not,
+	// immediately attempt to insert the downloaded file into the
+	// file system or delay it until result.wait() is called.
+	if block {
+		return mrc.completeDownload(output, executable, integrityMessage, fileContentsValue)
+	}
+	return model_starlark.NewStructFromDict[TReference, TMetadata](nil, map[string]any{
+		"wait": starlark.NewBuiltin("repository_ctx.download.wait", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			return mrc.completeDownload(output, executable, integrityMessage, fileContentsValue)
+		}),
+	}), nil
+}
+
+func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) completeDownload(output *model_starlark.BarePath, executable bool, integrity *model_analysis_pb.SubresourceIntegrity, fileContentsValue model_core.Message[*model_analysis_pb.HttpFileContents_Value, TReference]) (starlark.Value, error) {
 	if !fileContentsValue.IsSet() {
 		return nil, evaluation.ErrMissingDependency
 	}
@@ -1361,7 +1372,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doDownload(thread *
 		return nil, err
 	}
 
-	return createDownloadSuccessResult[TReference, TMetadata](integrityMessage, exists.Sha256), nil
+	return createDownloadSuccessResult[TReference, TMetadata](integrity, exists.Sha256), nil
 }
 
 func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doDownloadAndExtract(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
