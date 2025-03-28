@@ -1081,6 +1081,7 @@ exported_toplevels = {
     "coverage_common": struct(
         instrumented_files_info = coverage_common_instrumented_files_info,
     ),
+    "exec_transition": transition,
     "json": struct(
         decode = json.decode,
         encode = json.encode,
