@@ -181,6 +181,7 @@ def _constraint_value_impl(ctx):
             constraints = {
                 constraint_setting.label: _get_effective_constraint_value(constraint_setting, ctx.label),
             },
+            flag_values = {},
         ),
         ConstraintValueInfo(
             constraint = constraint_setting,
