@@ -106,4 +106,3 @@ alias(
     actual = "@rules_python//python:autodetecting_toolchain",
     deprecation = "Use @rules_python//python:autodetecting_toolchain",
 )
-
