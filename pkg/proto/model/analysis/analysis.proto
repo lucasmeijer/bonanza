@@ -1040,7 +1040,7 @@ message Select {
     // match that are not specializations of each other. In that case
     // the caller should check whether the values associated with the
     // conditions are identical.
-    repeated int32 condition_indices = 1;
+    repeated uint32 condition_indices = 1;
   }
 }
 

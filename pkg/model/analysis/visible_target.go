@@ -52,7 +52,14 @@ func getValueFromSelectGroup[TReference object.BasicReference, TMetadata model_c
 			return nil, evaluation.ErrMissingDependency
 		}
 		if len(selectValue.Message.ConditionIndices) > 0 {
-			return nil, errors.New("TODO: Implement conditions matching!")
+			if len(selectValue.Message.ConditionIndices) > 1 {
+				return nil, errors.New("TODO: Multiple matches!")
+			}
+			index := selectValue.Message.ConditionIndices[0]
+			if index >= uint32(len(selectGroup.Conditions)) {
+				return nil, fmt.Errorf("condition index %d is out of bounds, as the select group only has %d conditions", index, len(selectGroup.Conditions))
+			}
+			return selectGroup.Conditions[index].Value, nil
 		}
 	}
 

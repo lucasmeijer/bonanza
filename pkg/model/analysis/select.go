@@ -10,7 +10,6 @@ import (
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	model_starlark "github.com/buildbarn/bonanza/pkg/model/starlark"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
-	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
 	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
 	"github.com/buildbarn/bonanza/pkg/storage/dag"
 )
@@ -21,8 +20,9 @@ func (c *baseComputer[TReference, TMetadata]) ComputeSelectValue(ctx context.Con
 	configurationReference := model_core.Nested(key, key.Message.ConfigurationReference)
 	missingDependencies := false
 	var platformConstraints []*model_analysis_pb.Constraint
+	var matchingIndices []uint32
 CheckConditions:
-	for _, conditionIdentifier := range key.Message.ConditionIdentifiers {
+	for i, conditionIdentifier := range key.Message.ConditionIdentifiers {
 		configSettingInfo, configSettingLabelStr, err := getProviderFromVisibleConfiguredTarget(
 			e,
 			key.Message.FromPackage,
@@ -50,10 +50,7 @@ CheckConditions:
 		}
 		if len(configSettingConstraints) > 0 {
 			if platformConstraints == nil {
-				platformInfo, err := getTargetPlatformInfoProvider(
-					e,
-					model_core.NewSimpleMessage[TReference]((*model_core_pb.Reference)(nil)),
-				)
+				platformInfo, err := getTargetPlatformInfoProvider(e, configurationReference)
 				if err != nil {
 					if errors.Is(err, evaluation.ErrMissingDependency) {
 						missingDependencies = true
@@ -93,7 +90,7 @@ CheckConditions:
 			return PatchedSelectValue{}, fmt.Errorf("invalid condition identifier %#v: %w", configSettingLabel)
 		}
 		var errIter error
-		for key := range model_starlark.AllDictLeafEntries(
+		for key, value := range model_starlark.AllDictLeafEntries(
 			ctx,
 			c.valueReaders.Dict,
 			model_core.Nested(flagValuesField, flagValuesDict.Dict),
@@ -103,7 +100,12 @@ CheckConditions:
 			if !ok {
 				return PatchedSelectValue{}, fmt.Errorf("\"flag_values\" field of ConfigSettingInfo provider of config setting %#v contains a key that is not a label", conditionIdentifier)
 			}
-			_, err := c.getBuildSettingValue(
+			expectedValue, ok := value.Message.GetKind().(*model_starlark_pb.Value_Str)
+			if !ok {
+				return PatchedSelectValue{}, fmt.Errorf("key %#v of \"flag_values\" field of ConfigSettingInfo provider of config setting %#v is not a string", buildSettingLabel.Label, conditionIdentifier)
+			}
+
+			actualValue, err := c.getBuildSettingValue(
 				ctx,
 				e,
 				configSettingLabel.GetCanonicalPackage(),
@@ -118,14 +120,47 @@ CheckConditions:
 				return PatchedSelectValue{}, err
 			}
 
-			// TODO: Compare!
+			equal, err := compareBuildSettingValue(expectedValue.Str, actualValue)
+			if err != nil {
+				return PatchedSelectValue{}, fmt.Errorf("failed to compare key %#v of \"flag_values\" field of ConfigSettingInfo provider of config setting %#v: %w", buildSettingLabel.Label, conditionIdentifier, err)
+			}
+			if !equal {
+				continue CheckConditions
+			}
 		}
 		if errIter != nil {
 			return PatchedSelectValue{}, fmt.Errorf("failed to iterate \"flag_values\" field of ConfigSettingInfo provider of config setting %#v: %w", conditionIdentifier, errIter)
 		}
+
+		// TODO: Check specializations!
+		matchingIndices = append(matchingIndices, uint32(i))
 	}
 	if missingDependencies {
 		return PatchedSelectValue{}, evaluation.ErrMissingDependency
 	}
-	return model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](&model_analysis_pb.Select_Value{}), nil
+
+	return model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](
+		&model_analysis_pb.Select_Value{
+			ConditionIndices: matchingIndices,
+		},
+	), nil
+}
+
+func compareBuildSettingValue[TReference any](expectedValue string, actualValue model_core.Message[*model_starlark_pb.Value, TReference]) (bool, error) {
+	switch typedValue := actualValue.Message.GetKind().(type) {
+	case *model_starlark_pb.Value_Bool:
+		switch expectedValue {
+		case "0", "false", "False":
+			return !typedValue.Bool, nil
+		case "1", "true", "True":
+			return typedValue.Bool, nil
+		default:
+			return false, fmt.Errorf("boolean values can only be compared against \"0\", \"1\", \"false\", \"true\", \"False\" and \"True\", not %#v", expectedValue)
+		}
+		return false, nil
+	case *model_starlark_pb.Value_Str:
+		return expectedValue == typedValue.Str, nil
+	default:
+		return false, errors.New("build setting value is of an unknown type")
+	}
 }
