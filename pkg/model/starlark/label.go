@@ -1,7 +1,6 @@
 package starlark
 
 import (
-	"errors"
 	"fmt"
 	go_path "path"
 
@@ -126,8 +125,7 @@ type (
 )
 
 const (
-	CanonicalRepoResolverKey = "canonical_repo_resolver"
-	RootModuleResolverKey    = "root_module_resolver"
+	LabelResolverKey = "label_resolver"
 )
 
 type labelOrStringUnpackerInto[TReference any, TMetadata model_core.CloneableReferenceMetadata] struct {
@@ -143,55 +141,22 @@ func NewLabelOrStringUnpackerInto[TReference any, TMetadata model_core.Cloneable
 func (ui *labelOrStringUnpackerInto[TReference, TMetadata]) UnpackInto(thread *starlark.Thread, v starlark.Value, dst *pg_label.ResolvedLabel) error {
 	switch typedV := v.(type) {
 	case starlark.String:
-		// Label value is a bare string. Parse it.
+		// Label value is a bare string. Parse and resolve it.
+		labelResolver := thread.Local(LabelResolverKey)
+		if labelResolver == nil {
+			return fmt.Errorf("label %#v is provided as a string instead of a Label, but such labels cannot be resolved from within this context", string(typedV))
+		}
+
 		apparentLabel, err := ui.basePackage.AppendLabel(string(typedV))
 		if err != nil {
 			return err
 		}
-		if canonicalLabel, ok := apparentLabel.AsCanonical(); ok {
-			*dst = canonicalLabel.AsResolved()
-			return nil
-		}
-
-		if apparentRepo, ok := apparentLabel.GetApparentRepo(); ok {
-			// Label value has an apparent repo name. Resolve it.
-			canonicalRepoResolver := thread.Local(CanonicalRepoResolverKey)
-			if canonicalRepoResolver == nil {
-				return fmt.Errorf("label has apparent repo %#v, which cannot be resolved to a canonical repo from within this context", apparentRepo.String())
-			}
-			canonicalRepo, err := canonicalRepoResolver.(CanonicalRepoResolver)(ui.basePackage.GetCanonicalRepo(), apparentRepo)
-			if err != nil {
-				return fmt.Errorf("failed to resolve apparent repo %#v: %w", apparentRepo.String(), err)
-			}
-			if canonicalRepo == nil {
-				// Repo does not exist. Still permit the
-				// label to be constructed, so that
-				// analysis of other targets may pass.
-				*dst = apparentLabel.AsResolvedWithError(
-					fmt.Sprintf(
-						"unknown repo '%s' requested from %s",
-						apparentRepo.String(),
-						ui.basePackage.GetCanonicalRepo().String(),
-					),
-				)
-			} else {
-				*dst = apparentLabel.WithCanonicalRepo(*canonicalRepo).AsResolved()
-			}
-			return nil
-		}
-
-		// Label is prefixed with "@@". Resolve to the root module.
-		rootModuleResolver := thread.Local(RootModuleResolverKey)
-		if rootModuleResolver == nil {
-			return errors.New("label is prefixed with \"@@\", which cannot be resolved to the root module from within this context")
-		}
-		rootModule, err := rootModuleResolver.(RootModuleResolver)()
+		resolvedLabel, err := pg_label.Resolve(labelResolver.(pg_label.Resolver), ui.basePackage.GetCanonicalRepo(), apparentLabel)
 		if err != nil {
-			return fmt.Errorf("failed to resolve root module: %w", err)
+			return err
 		}
-		*dst = apparentLabel.
-			WithCanonicalRepo(rootModule.ToModuleInstance(nil).GetBareCanonicalRepo()).
-			AsResolved()
+
+		*dst = resolvedLabel
 		return nil
 	case label[TReference, TMetadata]:
 		// Label value is already wrapped in Label().

@@ -28,8 +28,8 @@ type moduleExtensionUser struct {
 }
 
 type usedModuleExtensionOptions[TReference object.BasicReference, TMetadata BaseComputerReferenceMetadata] struct {
-	environment UsedModuleExtensionsEnvironment[TReference, TMetadata]
-	patcher     *model_core.ReferenceMessagePatcher[TMetadata]
+	labelResolver label.Resolver
+	patcher       *model_core.ReferenceMessagePatcher[TMetadata]
 }
 
 type usedModuleExtensionProxy[TReference object.BasicReference, TMetadata BaseComputerReferenceMetadata] struct {
@@ -103,7 +103,7 @@ func (h *usedModuleExtensionExtractingModuleDotBazelHandler[TReference, TMetadat
 	// Look up the module extension properties, so that we obtain
 	// the canonical identifier of the Starlark module_extension
 	// declaration.
-	canonicalExtensionBzlFile, err := resolveApparent(h.options.environment, h.moduleInstance.GetBareCanonicalRepo(), extensionBzlFile)
+	canonicalExtensionBzlFile, err := label.Canonicalize(h.options.labelResolver, h.moduleInstance.GetBareCanonicalRepo(), extensionBzlFile)
 	if err != nil {
 		return nil, err
 	}
@@ -163,8 +163,8 @@ func (usedModuleExtensionExtractingModuleDotBazelHandler[TReference, TMetadata])
 
 func (c *baseComputer[TReference, TMetadata]) ComputeUsedModuleExtensionsValue(ctx context.Context, key *model_analysis_pb.UsedModuleExtensions_Key, e UsedModuleExtensionsEnvironment[TReference, TMetadata]) (PatchedUsedModuleExtensionsValue, error) {
 	options := usedModuleExtensionOptions[TReference, TMetadata]{
-		environment: e,
-		patcher:     model_core.NewReferenceMessagePatcher[TMetadata](),
+		labelResolver: newLabelResolver(e),
+		patcher:       model_core.NewReferenceMessagePatcher[TMetadata](),
 	}
 	usedModuleExtensions := map[label.ModuleExtension]*usedModuleExtension{}
 	isRoot := true

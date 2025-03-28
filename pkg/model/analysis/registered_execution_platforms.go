@@ -27,6 +27,7 @@ type registeredExecutionPlatformExtractingModuleDotBazelHandler[TReference objec
 	computer              *baseComputer[TReference, TMetadata]
 	context               context.Context
 	environment           RegisteredExecutionPlatformsEnvironment[TReference, TMetadata]
+	labelResolver         label.Resolver
 	moduleInstance        label.ModuleInstance
 	ignoreDevDependencies bool
 	executionPlatforms    *[]*model_analysis_pb.ExecutionPlatform
@@ -80,7 +81,7 @@ func (h *registeredExecutionPlatformExtractingModuleDotBazelHandler[TReference, 
 	if !devDependency || !h.ignoreDevDependencies {
 		listReader := h.computer.valueReaders.List
 		for _, apparentPlatformTargetPattern := range platformTargetPatterns {
-			canonicalPlatformTargetPattern, err := resolveApparent(h.environment, h.moduleInstance.GetBareCanonicalRepo(), apparentPlatformTargetPattern)
+			canonicalPlatformTargetPattern, err := label.Canonicalize(h.labelResolver, h.moduleInstance.GetBareCanonicalRepo(), apparentPlatformTargetPattern)
 			if err != nil {
 				return err
 			}
@@ -173,6 +174,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRegisteredExecutionPlatform
 			computer:              c,
 			context:               ctx,
 			environment:           e,
+			labelResolver:         newLabelResolver(e),
 			moduleInstance:        moduleInstance,
 			ignoreDevDependencies: ignoreDevDependencies,
 			executionPlatforms:    &executionPlatforms,

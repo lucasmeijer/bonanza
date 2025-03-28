@@ -15,6 +15,7 @@ go_library(
         "module_extension.go",
         "module_instance.go",
         "module_version.go",
+        "resolve.go",
         "resolved_label.go",
         "starlark_identifier.go",
         "target_name.go",

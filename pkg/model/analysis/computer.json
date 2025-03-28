@@ -415,8 +415,10 @@
       },
       "RepoDefaultAttrs": {
          "dependsOn": [
+            "CanonicalRepoName",
             "FileProperties",
-            "FileReader"
+            "FileReader",
+            "RootModule"
          ]
       },
       "RepositoryRuleObject": {

@@ -23,6 +23,8 @@ type ApparentTargetPattern struct {
 	value string
 }
 
+var _ Canonicalizable[CanonicalTargetPattern] = ApparentTargetPattern{}
+
 func newValidApparentTargetPattern(value string) ApparentTargetPattern {
 	return ApparentTargetPattern{value: removeTargetPatternTargetNameIfRedundant(value)}
 }

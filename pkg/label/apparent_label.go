@@ -25,6 +25,8 @@ type ApparentLabel struct {
 	value string
 }
 
+var _ Canonicalizable[CanonicalLabel] = ApparentLabel{}
+
 func newValidApparentLabel(value string) ApparentLabel {
 	return ApparentLabel{value: removeLabelTargetNameIfRedundant(value)}
 }

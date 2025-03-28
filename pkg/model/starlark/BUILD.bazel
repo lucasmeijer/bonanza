@@ -62,6 +62,7 @@ go_test(
     name = "starlark_test",
     srcs = [
         "mocks_encoding_test.go",
+        "mocks_label_test.go",
         "mocks_starlark_test.go",
         "package_group_test.go",
         "parse_repo_dot_bazel_test.go",
@@ -85,6 +86,17 @@ gomock(
     out = "mocks_encoding_test.go",
     interfaces = ["BinaryEncoder"],
     library = "//pkg/model/encoding",
+    mockgen_model_library = "@org_uber_go_mock//mockgen/model",
+    mockgen_tool = "@org_uber_go_mock//mockgen",
+    package = "starlark_test",
+)
+
+gomock(
+    name = "mocks_label",
+    out = "mocks_label_test.go",
+    interfaces = ["Resolver"],
+    library = "//pkg/label",
+    mock_names = {"Resolver": "MockLabelResolver"},
     mockgen_model_library = "@org_uber_go_mock//mockgen/model",
     mockgen_tool = "@org_uber_go_mock//mockgen",
     package = "starlark_test",

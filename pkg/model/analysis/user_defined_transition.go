@@ -40,7 +40,7 @@ type expectedTransitionOutput[TReference any] struct {
 }
 
 type getExpectedTransitionOutputEnvironment[TReference any] interface {
-	resolveApparentEnvironment[TReference]
+	labelResolverEnvironment[TReference]
 
 	GetCompiledBzlFileGlobalValue(*model_analysis_pb.CompiledBzlFileGlobal_Key) model_core.Message[*model_analysis_pb.CompiledBzlFileGlobal_Value, TReference]
 	GetTargetValue(*model_analysis_pb.Target_Key) model_core.Message[*model_analysis_pb.Target_Value, TReference]
@@ -59,7 +59,7 @@ func getExpectedTransitionOutput[TReference object.BasicReference, TMetadata mod
 	if err != nil {
 		return expectedTransitionOutput[TReference]{}, fmt.Errorf("invalid build setting label %#v: %w", output, err)
 	}
-	canonicalBuildSettingLabel, err := resolveApparent(e, transitionPackage.GetCanonicalRepo(), apparentBuildSettingLabel)
+	canonicalBuildSettingLabel, err := label.Canonicalize(newLabelResolver(e), transitionPackage.GetCanonicalRepo(), apparentBuildSettingLabel)
 	if err != nil {
 		return expectedTransitionOutput[TReference]{}, err
 	}
@@ -508,7 +508,7 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx c
 		if err != nil {
 			return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("invalid build setting label %#v: %w", input, err)
 		}
-		canonicalBuildSettingLabel, err := resolveApparent(e, transitionRepo, apparentBuildSettingLabel)
+		canonicalBuildSettingLabel, err := label.Canonicalize(newLabelResolver(e), transitionRepo, apparentBuildSettingLabel)
 		if err != nil {
 			if errors.Is(err, evaluation.ErrMissingDependency) {
 				missingDependencies = true

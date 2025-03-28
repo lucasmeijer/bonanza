@@ -25,16 +25,20 @@ func ParseRepoDotBazel[TReference any, TMetadata model_core.CloneableReferenceMe
 	filename pg_label.CanonicalLabel,
 	inlinedTreeOptions *inlinedtree.Options,
 	objectCapturer model_core.CreatedObjectCapturer[TMetadata],
+	labelResolver pg_label.Resolver,
 ) (model_core.PatchedMessage[*model_starlark_pb.InheritableAttrs, TMetadata], error) {
+	thread := &starlark.Thread{
+		Name: "main",
+		Print: func(_ *starlark.Thread, msg string) {
+			// TODO: Provide logging sink.
+			fmt.Println(msg)
+		},
+	}
+	thread.SetLocal(LabelResolverKey, labelResolver)
+
 	var defaultAttrs model_core.PatchedMessage[*model_starlark_pb.InheritableAttrs, TMetadata]
 	_, err := starlark.ExecFile(
-		&starlark.Thread{
-			Name: "main",
-			Print: func(_ *starlark.Thread, msg string) {
-				// TODO: Provide logging sink.
-				fmt.Println(msg)
-			},
-		},
+		thread,
 		filename.String(),
 		contents,
 		starlark.StringDict{

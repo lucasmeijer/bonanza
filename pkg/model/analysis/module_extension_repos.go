@@ -77,7 +77,7 @@ func (t bazelModuleTag) AttrNames() []string {
 var repoRulesExtensionName = label.MustNewStarlarkIdentifier("_repo_rules")
 
 type useRepoRuleCapturingModuleDotBazelHandler[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata] struct {
-	environment           ModuleExtensionReposEnvironment[TReference, TMetadata]
+	labelResolver         label.Resolver
 	moduleRepo            label.CanonicalRepo
 	ignoreDevDependencies bool
 	valueEncodingOptions  *model_starlark.ValueEncodingOptions[TReference, TMetadata]
@@ -111,7 +111,7 @@ func (h *useRepoRuleCapturingModuleDotBazelHandler[TReference, TMetadata]) UseRe
 			return nil
 		}
 
-		canonicalRepoRuleBzlFile, err := resolveApparent(h.environment, h.moduleRepo, repoRuleBzlFile)
+		canonicalRepoRuleBzlFile, err := label.Canonicalize(h.labelResolver, h.moduleRepo, repoRuleBzlFile)
 		if err != nil {
 			return err
 		}
@@ -198,8 +198,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeModuleExtensionReposValue(c
 		moduleInstance := moduleExtension.GetModuleInstance()
 		moduleRepo := moduleInstance.GetBareCanonicalRepo()
 		handler := useRepoRuleCapturingModuleDotBazelHandler[TReference, TMetadata]{
-			environment: e,
-			moduleRepo:  moduleRepo,
+			labelResolver: newLabelResolver(e),
+			moduleRepo:    moduleRepo,
 			ignoreDevDependencies: rootModuleValue.Message.IgnoreRootModuleDevDependencies ||
 				moduleInstance.GetModule().String() != rootModuleValue.Message.RootModuleName,
 			valueEncodingOptions: c.getValueEncodingOptions(e, nil),

@@ -71,7 +71,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRegisteredRepoPlatformValue
 	if err != nil {
 		return PatchedRegisteredRepoPlatformValue{}, fmt.Errorf("invalid repo platform label %#v: %w", repoPlatformStr, err)
 	}
-	repoPlatformLabel, err := resolveApparent(e, rootRepo, apparentRepoPlatformLabel)
+	repoPlatformLabel, err := label.Canonicalize(newLabelResolver(e), rootRepo, apparentRepoPlatformLabel)
 	if err != nil {
 		return PatchedRegisteredRepoPlatformValue{}, fmt.Errorf("failed to resolve repo platform label %#v: %w", apparentRepoPlatformLabel.String(), err)
 	}

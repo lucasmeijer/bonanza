@@ -30,6 +30,7 @@ type registeredToolchainExtractingModuleDotBazelHandler[TReference object.BasicR
 	context                    context.Context
 	computer                   *baseComputer[TReference, TMetadata]
 	environment                RegisteredToolchainsEnvironment[TReference, TMetadata]
+	labelResolver              label.Resolver
 	moduleInstance             label.ModuleInstance
 	ignoreDevDependencies      bool
 	registeredToolchainsByType map[string][]*model_analysis_pb.RegisteredToolchain
@@ -52,7 +53,7 @@ func (h *registeredToolchainExtractingModuleDotBazelHandler[TReference, TMetadat
 		missingDependencies := false
 		listReader := h.computer.valueReaders.List
 		for _, apparentToolchainTargetPattern := range toolchainTargetPatterns {
-			canonicalToolchainTargetPattern, err := resolveApparent(h.environment, h.moduleInstance.GetBareCanonicalRepo(), apparentToolchainTargetPattern)
+			canonicalToolchainTargetPattern, err := label.Canonicalize(h.labelResolver, h.moduleInstance.GetBareCanonicalRepo(), apparentToolchainTargetPattern)
 			if err != nil {
 				if errors.Is(err, evaluation.ErrMissingDependency) {
 					missingDependencies = true
@@ -275,6 +276,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRegisteredToolchainsValue(c
 			context:                    ctx,
 			computer:                   c,
 			environment:                e,
+			labelResolver:              newLabelResolver(e),
 			moduleInstance:             moduleInstance,
 			ignoreDevDependencies:      ignoreDevDependencies,
 			registeredToolchainsByType: registeredToolchainsByType,

@@ -21,6 +21,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeSelectValue(ctx context.Con
 	if err != nil {
 		return PatchedSelectValue{}, fmt.Errorf("invalid package: %w", err)
 	}
+	labelResolver := newLabelResolver(e)
 	configurationReference := model_core.Nested(key, key.Message.ConfigurationReference)
 	missingDependencies := false
 	var platformConstraints []*model_analysis_pb.Constraint
@@ -124,7 +125,7 @@ CheckConditions:
 				return PatchedSelectValue{}, err
 			}
 
-			equal, err := c.compareBuildSettingValue(e, expectedValue.Str, actualValue, fromPackage)
+			equal, err := c.compareBuildSettingValue(labelResolver, expectedValue.Str, actualValue, fromPackage)
 			if err != nil {
 				return PatchedSelectValue{}, fmt.Errorf("failed to compare key %#v of \"flag_values\" field of ConfigSettingInfo provider of config setting %#v: %w", buildSettingLabel.Label, conditionIdentifier, err)
 			}
@@ -150,7 +151,7 @@ CheckConditions:
 	), nil
 }
 
-func (c *baseComputer[TReference, TMetadata]) compareBuildSettingValue(e resolveApparentEnvironment[TReference], expectedValue string, actualValue model_core.Message[*model_starlark_pb.Value, TReference], fromPackage label.CanonicalPackage) (bool, error) {
+func (c *baseComputer[TReference, TMetadata]) compareBuildSettingValue(labelResolver label.Resolver, expectedValue string, actualValue model_core.Message[*model_starlark_pb.Value, TReference], fromPackage label.CanonicalPackage) (bool, error) {
 	switch typedValue := actualValue.Message.GetKind().(type) {
 	case *model_starlark_pb.Value_Bool:
 		switch expectedValue {
@@ -168,14 +169,11 @@ func (c *baseComputer[TReference, TMetadata]) compareBuildSettingValue(e resolve
 		if err != nil {
 			return false, fmt.Errorf("invalid label %#v: %w", expectedValue, err)
 		}
-		// TODO: Apparently Bazel allows this to succeed for
-		// unknown repo names. We should likely support that as
-		// well?
-		canonicalLabel, err := resolveApparent(e, fromPackage.GetCanonicalRepo(), apparentLabel)
+		resolvedLabel, err := label.Resolve(labelResolver, fromPackage.GetCanonicalRepo(), apparentLabel)
 		if err != nil {
 			return false, fmt.Errorf("failed to resolve label %#v: %w", expectedValue, err)
 		}
-		return canonicalLabel.String() == typedValue.Label, nil
+		return resolvedLabel.String() == typedValue.Label, nil
 	case *model_starlark_pb.Value_Str:
 		return expectedValue == typedValue.Str, nil
 	default:

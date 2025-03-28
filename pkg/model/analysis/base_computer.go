@@ -167,58 +167,9 @@ func (c *baseComputer[TReference, TMetadata]) getInlinedTreeOptions() *inlinedtr
 	}
 }
 
-type resolveApparentEnvironment[TReference any] interface {
-	GetCanonicalRepoNameValue(*model_analysis_pb.CanonicalRepoName_Key) model_core.Message[*model_analysis_pb.CanonicalRepoName_Value, TReference]
-	GetRootModuleValue(*model_analysis_pb.RootModule_Key) model_core.Message[*model_analysis_pb.RootModule_Value, TReference]
-}
-
-type canonicalizable[T any] interface {
-	AsCanonical() (T, bool)
-	GetApparentRepo() (label.ApparentRepo, bool)
-	WithCanonicalRepo(canonicalRepo label.CanonicalRepo) T
-}
-
-func resolveApparent[TCanonical any, TApparent canonicalizable[TCanonical], TReference any](e resolveApparentEnvironment[TReference], fromRepo label.CanonicalRepo, toApparent TApparent) (TCanonical, error) {
-	if toCanonical, ok := toApparent.AsCanonical(); ok {
-		// Label was already canonical. Nothing to do.
-		return toCanonical, nil
-	}
-
-	if toApparentRepo, ok := toApparent.GetApparentRepo(); ok {
-		// Label is prefixed with an apparent repo. Resolve the repo.
-		v := e.GetCanonicalRepoNameValue(&model_analysis_pb.CanonicalRepoName_Key{
-			FromCanonicalRepo: fromRepo.String(),
-			ToApparentRepo:    toApparentRepo.String(),
-		})
-		var bad TCanonical
-		if !v.IsSet() {
-			return bad, evaluation.ErrMissingDependency
-		}
-		if v.Message.ToCanonicalRepo == "" {
-			return bad, fmt.Errorf("unknown apparent repo @%s referenced by repo @@%s", toApparentRepo.String(), fromRepo.String())
-		}
-		toCanonicalRepo, err := label.NewCanonicalRepo(v.Message.ToCanonicalRepo)
-		if err != nil {
-			return bad, fmt.Errorf("invalid canonical repo name %#v: %w", v.Message.ToCanonicalRepo, err)
-		}
-		return toApparent.WithCanonicalRepo(toCanonicalRepo), nil
-	}
-
-	// Label is prefixed with "@@". Resolve to the root module.
-	v := e.GetRootModuleValue(&model_analysis_pb.RootModule_Key{})
-	var bad TCanonical
-	if !v.IsSet() {
-		return bad, evaluation.ErrMissingDependency
-	}
-	rootModule, err := label.NewModule(v.Message.RootModuleName)
-	if err != nil {
-		return bad, fmt.Errorf("invalid root module name %#v: %w", v.Message.RootModuleName, err)
-	}
-	return toApparent.WithCanonicalRepo(rootModule.ToModuleInstance(nil).GetBareCanonicalRepo()), nil
-}
-
 type loadBzlGlobalsEnvironment[TReference any] interface {
-	resolveApparentEnvironment[TReference]
+	labelResolverEnvironment[TReference]
+
 	GetBuiltinsModuleNamesValue(key *model_analysis_pb.BuiltinsModuleNames_Key) model_core.Message[*model_analysis_pb.BuiltinsModuleNames_Value, TReference]
 	GetCompiledBzlFileDecodedGlobalsValue(key *model_analysis_pb.CompiledBzlFileDecodedGlobals_Key) (starlark.StringDict, bool)
 }
@@ -233,7 +184,7 @@ func (c *baseComputer[TReference, TMetadata]) loadBzlGlobals(e loadBzlGlobalsEnv
 		return nil, fmt.Errorf("invalid label %#v in load() statement: %w", loadLabelStr, err)
 	}
 	canonicalRepo := canonicalPackage.GetCanonicalRepo()
-	canonicalLoadLabel, err := resolveApparent(e, canonicalRepo, apparentLoadLabel)
+	canonicalLoadLabel, err := label.Canonicalize(newLabelResolver(e), canonicalRepo, apparentLoadLabel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve label %#v in load() statement: %w", apparentLoadLabel.String(), err)
 	}
@@ -293,32 +244,7 @@ func (c *baseComputer[TReference, TMetadata]) newStarlarkThread(ctx context.Cont
 		Steps: 1000,
 	}
 
-	thread.SetLocal(model_starlark.CanonicalRepoResolverKey, func(fromCanonicalRepo label.CanonicalRepo, toApparentRepo label.ApparentRepo) (*label.CanonicalRepo, error) {
-		v := e.GetCanonicalRepoNameValue(&model_analysis_pb.CanonicalRepoName_Key{
-			FromCanonicalRepo: fromCanonicalRepo.String(),
-			ToApparentRepo:    toApparentRepo.String(),
-		})
-		if !v.IsSet() {
-			return nil, evaluation.ErrMissingDependency
-		}
-		if v.Message.ToCanonicalRepo == "" {
-			return nil, nil
-		}
-		canonicalRepo, err := label.NewCanonicalRepo(v.Message.ToCanonicalRepo)
-		if err != nil {
-			return nil, err
-		}
-		return &canonicalRepo, nil
-	})
-
-	thread.SetLocal(model_starlark.RootModuleResolverKey, func() (label.Module, error) {
-		v := e.GetRootModuleValue(&model_analysis_pb.RootModule_Key{})
-		var badModule label.Module
-		if !v.IsSet() {
-			return badModule, evaluation.ErrMissingDependency
-		}
-		return label.NewModule(v.Message.RootModuleName)
-	})
+	thread.SetLocal(model_starlark.LabelResolverKey, newLabelResolver(e))
 	thread.SetLocal(model_starlark.FunctionFactoryResolverKey, func(filename label.CanonicalLabel) (*starlark.FunctionFactory, error) {
 		// Prevent modules containing builtin Starlark code from
 		// depending on itself.
@@ -364,12 +290,13 @@ func (c *baseComputer[TReference, TMetadata]) ComputeBuildResultValue(ctx contex
 	thread := c.newStarlarkThread(ctx, e, buildSpecification.BuiltinsModuleNames)
 	valueEncodingOptions := c.getValueEncodingOptions(e, nil)
 	missingDependencies := false
+	labelResolver := newLabelResolver(e)
 	for _, targetPlatform := range buildSpecification.TargetPlatforms {
 		apparentTargetPlatform, err := label.NewApparentLabel(targetPlatform)
 		if err != nil {
 			return PatchedBuildResultValue{}, fmt.Errorf("invalid target platform %#v: %w", targetPlatform, err)
 		}
-		canonicalTargetPlatform, err := resolveApparent(e, rootRepo, apparentTargetPlatform)
+		canonicalTargetPlatform, err := label.Canonicalize(labelResolver, rootRepo, apparentTargetPlatform)
 		if err != nil {
 			return PatchedBuildResultValue{}, fmt.Errorf("failed to resolve target platform %#v: %w", targetPlatform, err)
 		}
@@ -401,7 +328,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeBuildResultValue(ctx contex
 			if err != nil {
 				return PatchedBuildResultValue{}, fmt.Errorf("invalid target pattern %#v: %w", targetPattern, err)
 			}
-			canonicalTargetPattern, err := resolveApparent(e, rootRepo, apparentTargetPattern)
+			canonicalTargetPattern, err := label.Canonicalize(labelResolver, rootRepo, apparentTargetPattern)
 			if err != nil {
 				return PatchedBuildResultValue{}, err
 			}
@@ -534,6 +461,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRepoDefaultAttrsValue(ctx c
 		canonicalRepo.GetRootPackage().AppendTargetName(repoFileName),
 		c.getInlinedTreeOptions(),
 		e,
+		newLabelResolver(e),
 	)
 	if err != nil {
 		return PatchedRepoDefaultAttrsValue{}, fmt.Errorf("failed to parse %#v: %w", repoFileLabel.String(), err)

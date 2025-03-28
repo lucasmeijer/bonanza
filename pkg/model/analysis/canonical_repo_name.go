@@ -65,3 +65,53 @@ func (c *baseComputer[TReference, TMetadata]) ComputeCanonicalRepoNameValue(ctx 
 	// Unknown repo.
 	return model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](&model_analysis_pb.CanonicalRepoName_Value{}), nil
 }
+
+type labelResolverEnvironment[TReference any] interface {
+	GetCanonicalRepoNameValue(*model_analysis_pb.CanonicalRepoName_Key) model_core.Message[*model_analysis_pb.CanonicalRepoName_Value, TReference]
+	GetRootModuleValue(*model_analysis_pb.RootModule_Key) model_core.Message[*model_analysis_pb.RootModule_Value, TReference]
+}
+
+// labelResolver is an implementation of label.Resolver that is built on
+// top of the CanonicalRepoName and RootModule analysis functions. It is
+// provided to make resolution of apparent labels and target patterns
+// to their canonical counterparts work.
+type labelResolver[TReference any] struct {
+	environment labelResolverEnvironment[TReference]
+}
+
+func newLabelResolver[TReference any](e labelResolverEnvironment[TReference]) label.Resolver {
+	return &labelResolver[TReference]{
+		environment: e,
+	}
+}
+
+func (r *labelResolver[TReference]) GetCanonicalRepo(fromCanonicalRepo label.CanonicalRepo, toApparentRepo label.ApparentRepo) (*label.CanonicalRepo, error) {
+	v := r.environment.GetCanonicalRepoNameValue(&model_analysis_pb.CanonicalRepoName_Key{
+		FromCanonicalRepo: fromCanonicalRepo.String(),
+		ToApparentRepo:    toApparentRepo.String(),
+	})
+	if !v.IsSet() {
+		return nil, evaluation.ErrMissingDependency
+	}
+	if v.Message.ToCanonicalRepo == "" {
+		return nil, nil
+	}
+	toCanonicalRepo, err := label.NewCanonicalRepo(v.Message.ToCanonicalRepo)
+	if err != nil {
+		return nil, fmt.Errorf("invalid canonical repo name %#v: %w", v.Message.ToCanonicalRepo, err)
+	}
+	return &toCanonicalRepo, nil
+}
+
+func (r *labelResolver[TReference]) GetRootModule() (label.Module, error) {
+	v := r.environment.GetRootModuleValue(&model_analysis_pb.RootModule_Key{})
+	var bad label.Module
+	if !v.IsSet() {
+		return bad, evaluation.ErrMissingDependency
+	}
+	rootModule, err := label.NewModule(v.Message.RootModuleName)
+	if err != nil {
+		return bad, fmt.Errorf("invalid root module name %#v: %w", v.Message.RootModuleName, err)
+	}
+	return rootModule, nil
+}

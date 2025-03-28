@@ -23,6 +23,8 @@ func TestParseModuleDotBazel(t *testing.T) {
 		// If no calls to repo() are made, the resulting
 		// attributes should be identical to the constant
 		// message value we provide.
+		labelResolver := NewMockLabelResolver(ctrl)
+
 		defaultAttrs, err := model_starlark.ParseRepoDotBazel[object.LocalReference](
 			"",
 			label.MustNewCanonicalLabel("@@foo+//:REPO.bazel"),
@@ -32,6 +34,7 @@ func TestParseModuleDotBazel(t *testing.T) {
 				MaximumSizeBytes: 0,
 			},
 			model_core.CreatedObjectCapturer[model_core.CloneableReferenceMetadata](nil),
+			labelResolver,
 		)
 		require.NoError(t, err)
 		testutil.RequireEqualProto(t, &model_starlark.DefaultInheritableAttrs, defaultAttrs.Message)
@@ -41,6 +44,8 @@ func TestParseModuleDotBazel(t *testing.T) {
 		// It should be valid to call repo() without any
 		// arguments. In that case the returned attributes
 		// should also be equal to the default.
+		labelResolver := NewMockLabelResolver(ctrl)
+
 		defaultAttrs, err := model_starlark.ParseRepoDotBazel[object.LocalReference](
 			"repo()",
 			label.MustNewCanonicalLabel("@@foo+//:REPO.bazel"),
@@ -50,6 +55,7 @@ func TestParseModuleDotBazel(t *testing.T) {
 				MaximumSizeBytes: 0,
 			},
 			model_core.CreatedObjectCapturer[model_core.CloneableReferenceMetadata](nil),
+			labelResolver,
 		)
 		require.NoError(t, err)
 		testutil.RequireEqualProto(t, &model_starlark.DefaultInheritableAttrs, defaultAttrs.Message)
@@ -57,6 +63,8 @@ func TestParseModuleDotBazel(t *testing.T) {
 
 	t.Run("RedundantCalls", func(t *testing.T) {
 		// Calling repo() times is not permitted.
+		labelResolver := NewMockLabelResolver(ctrl)
+
 		_, err := model_starlark.ParseRepoDotBazel[object.LocalReference](
 			"repo()\nrepo()",
 			label.MustNewCanonicalLabel("@@foo+//:REPO.bazel"),
@@ -66,6 +74,7 @@ func TestParseModuleDotBazel(t *testing.T) {
 				MaximumSizeBytes: 0,
 			},
 			model_core.CreatedObjectCapturer[model_core.CloneableReferenceMetadata](nil),
+			labelResolver,
 		)
 		require.EqualError(t, err, "repo: function can only be invoked once")
 	})
@@ -74,6 +83,8 @@ func TestParseModuleDotBazel(t *testing.T) {
 		// default_applicable_licenses is an alias of
 		// default_package_metadata. It's not possible to
 		// provide both arguments at once.
+		labelResolver := NewMockLabelResolver(ctrl)
+
 		_, err := model_starlark.ParseRepoDotBazel[object.LocalReference](
 			`repo(
 				default_applicable_licenses = ["//:license"],
@@ -86,6 +97,7 @@ func TestParseModuleDotBazel(t *testing.T) {
 				MaximumSizeBytes: 0,
 			},
 			model_core.CreatedObjectCapturer[model_core.CloneableReferenceMetadata](nil),
+			labelResolver,
 		)
 		require.EqualError(t, err, "repo: default_applicable_licenses and default_package_metadata are mutually exclusive")
 	})
@@ -95,6 +107,7 @@ func TestParseModuleDotBazel(t *testing.T) {
 		// provided.
 		objectCapturer := NewMockCreatedObjectCapturerForTesting(ctrl)
 		objectCapturer.EXPECT().CaptureCreatedObject(gomock.Any()).AnyTimes()
+		labelResolver := NewMockLabelResolver(ctrl)
 
 		defaultAttrs, err := model_starlark.ParseRepoDotBazel[object.LocalReference](
 			`repo(
@@ -112,6 +125,7 @@ func TestParseModuleDotBazel(t *testing.T) {
 				MaximumSizeBytes: 0,
 			},
 			objectCapturer,
+			labelResolver,
 		)
 		require.NoError(t, err)
 		testutil.RequireEqualProto(t, &model_starlark_pb.InheritableAttrs{
