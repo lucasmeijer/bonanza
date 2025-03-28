@@ -395,7 +395,7 @@ func GetStructFieldValue[TReference any](
 	}
 
 	keys := structFields.Message.Keys
-	index, ok := sort.Find(
+	keyIndex, ok := sort.Find(
 		len(keys),
 		func(i int) int { return strings.Compare(key, keys[i]) },
 	)
@@ -403,28 +403,40 @@ func GetStructFieldValue[TReference any](
 		return model_core.Message[*model_starlark_pb.Value, TReference]{}, errors.New("struct field not found")
 	}
 
-	contiguousLength := len(keys)
 	list := model_core.Nested(structFields, structFields.Message.Values)
+	valueIndex := uint64(keyIndex)
+	leafCount := uint64(len(keys))
+GetValueAtIndex:
 	for {
 		// List elements may never refer to empty nested lists,
 		// meaning that if the length of a list is equal to the
 		// expected total number of elements, each list element
 		// contains exactly one value. This allows us to jump
 		// directly to the right spot.
-		if len(list.Message) == contiguousLength {
-			list.Message = list.Message[index:]
-			index = 0
+		if uint64(len(list.Message)) == leafCount {
+			list.Message = list.Message[valueIndex:]
+			valueIndex = 0
 		}
 
 		for _, element := range list.Message {
 			switch level := element.Level.(type) {
 			case *model_starlark_pb.List_Element_Parent_:
-				panic("TODO")
+				if valueIndex < level.Parent.Count {
+					var err error
+					list, err = model_parser.Dereference(ctx, reader, model_core.Nested(list, level.Parent.Reference))
+					if err != nil {
+						return model_core.Message[*model_starlark_pb.Value, TReference]{}, err
+					}
+					leafCount = level.Parent.Count
+					continue GetValueAtIndex
+				} else {
+					valueIndex -= level.Parent.Count
+				}
 			case *model_starlark_pb.List_Element_Leaf:
-				if index == 0 {
+				if valueIndex == 0 {
 					return model_core.Nested(list, level.Leaf), nil
 				}
-				index--
+				valueIndex--
 			}
 		}
 		return model_core.Message[*model_starlark_pb.Value, TReference]{}, errors.New("number of keys does not match number of values")
