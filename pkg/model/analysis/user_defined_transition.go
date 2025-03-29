@@ -382,10 +382,19 @@ func (c *baseComputer[TReference, TMetadata]) getBuildSettingValue(ctx context.C
 	case *model_starlark_pb.Target_Definition_LabelSetting:
 		// Build setting is a label_setting() or
 		// label_flag().
-		buildSettingDefault := &model_starlark_pb.Value{
-			Kind: &model_starlark_pb.Value_Label{
-				Label: targetKind.LabelSetting.BuildSettingDefault,
-			},
+		var buildSettingDefault *model_starlark_pb.Value
+		if targetKind.LabelSetting.BuildSettingDefault == "" {
+			buildSettingDefault = &model_starlark_pb.Value{
+				Kind: &model_starlark_pb.Value_None{
+					None: &emptypb.Empty{},
+				},
+			}
+		} else {
+			buildSettingDefault = &model_starlark_pb.Value{
+				Kind: &model_starlark_pb.Value_Label{
+					Label: targetKind.LabelSetting.BuildSettingDefault,
+				},
+			}
 		}
 		if targetKind.LabelSetting.SingletonList {
 			buildSettingDefault = &model_starlark_pb.Value{
