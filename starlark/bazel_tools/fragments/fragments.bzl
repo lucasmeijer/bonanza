@@ -4,7 +4,7 @@ FragmentInfo = provider()
 
 def _apple_fragment_impl(ctx):
     return [FragmentInfo(
-        include_xcode_exec_requirements = ctx.attr._include_xcode_exec_requirements[BuildSettingInfo].value,
+        include_xcode_exec_requirements = ctx.attr._include_xcode_execution_requirements[BuildSettingInfo].value,
         ios_minimum_os_flag = ctx.attr._ios_minimum_os[BuildSettingInfo].value,
         ios_sdk_version_flag = ctx.attr._ios_sdk_version[BuildSettingInfo].value,
         macos_minimum_os_flag = ctx.attr._macos_minimum_os[BuildSettingInfo].value,
@@ -24,7 +24,7 @@ apple_fragment = rule(
     _apple_fragment_impl,
     attrs = {
         "_apple_platform_type": attr.label(default = "//command_line_option:apple_platform_type"),
-        "_include_xcode_exec_requirements": attr.label(default = "//command_line_option:experimental_include_xcode_exec_requirements"),
+        "_include_xcode_execution_requirements": attr.label(default = "//command_line_option:experimental_include_xcode_execution_requirements"),
         "_ios_minimum_os": attr.label(default = "//command_line_option:ios_minimum_os"),
         "_ios_sdk_version": attr.label(default = "//command_line_option:ios_sdk_version"),
         "_macos_minimum_os": attr.label(default = "//command_line_option:macos_minimum_os"),
