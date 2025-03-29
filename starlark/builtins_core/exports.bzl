@@ -239,6 +239,7 @@ def _genrule_impl(ctx):
         arguments = ["-c", ctx.expand_location(ctx.attr.cmd_bash or ctx.attr.cmd)],
         outputs = ctx.outputs.outs,
     )
+    return [DefaultInfo(files = depset(ctx.outputs.outs))]
 
 genrule = rule(
     implementation = _genrule_impl,
