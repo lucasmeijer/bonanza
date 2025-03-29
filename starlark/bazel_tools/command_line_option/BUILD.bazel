@@ -1,12 +1,136 @@
-load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag", "string_list_flag")
+load(
+    "@bazel_skylib//rules:common_settings.bzl",
+    "bool_flag",
+    "int_flag",
+    "string_flag",
+    "string_list_flag",
+)
 load(":settings.bzl", "label_list_flag")
 
 package(default_visibility = ["//visibility:public"])
+
+bool_flag(
+    name = "all feature flag values are present (internal)",
+    build_setting_default = True,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "allow_analysis_failures",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "allow_unresolved_symlinks",
+    build_setting_default = True,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "android_databinding_use_androidx",
+    build_setting_default = True,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "android_databinding_use_v3_4_args",
+    build_setting_default = True,
+    visibility = ["//visibility:public"],
+)
+
+string_flag(
+    name = "android_manifest_merger",
+    build_setting_default = "android",
+    values = [
+        "android",
+        "force_android",
+        "legacy",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+string_flag(
+    name = "android_manifest_merger_order",
+    build_setting_default = "alphabetical",
+    values = [
+        "alphabetical",
+        "alphabetical_by_configuration",
+        "dependency",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+label_flag(
+    name = "apple_crosstool_top",
+    build_setting_default = "//tools/cpp:toolchain",
+    visibility = ["//visibility:public"],
+)
 
 string_flag(
     name = "apple_platform_type",
     # TODO: This should be inferred from the platform somehow.
     build_setting_default = "macos",
+    visibility = ["//visibility:public"],
+)
+
+string_flag(
+    name = "archived_tree_artifact_mnemonics_filter",
+    build_setting_default = "-.*",
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "break_build_on_parallel_dex2oat_failure",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "build_python_zip",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "build_runfile_links",
+    build_setting_default = True,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "build_runfile_manifests",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+int_flag(
+    name = "bytecode_optimization_pass_actions",
+    build_setting_default = 1,
+    visibility = ["//visibility:public"],
+)
+
+string_list_flag(
+    name = "cc_proto_library_header_suffixes",
+    build_setting_default = [".pb.h"],
+    visibility = ["//visibility:public"],
+)
+
+string_list_flag(
+    name = "cc_proto_library_source_suffixes",
+    build_setting_default = [".pb.cc"],
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "check_licenses",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "check_visibility",
+    build_setting_default = True,
     visibility = ["//visibility:public"],
 )
 
@@ -69,6 +193,42 @@ string_list_flag(
     visibility = ["//visibility:public"],
 )
 
+bool_flag(
+    name = "desugar_for_android",
+    build_setting_default = True,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "desugar_java8_libs",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+string_list_flag(
+    name = "dexopts_supported_in_dexmerger",
+    build_setting_default = [
+        "--minimal-main-dex",
+        "--set-max-idx-number",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+string_list_flag(
+    name = "dexopts_supported_in_dexsharder",
+    build_setting_default = ["--minimal-main-dex"],
+    visibility = ["//visibility:public"],
+)
+
+string_list_flag(
+    name = "dexopts_supported_in_incremental_dexing",
+    build_setting_default = [
+        "--no-optimize",
+        "--no-locals",
+    ],
+    visibility = ["//visibility:public"],
+)
+
 string_flag(
     name = "dynamic_mode",
     build_setting_default = "default",
@@ -87,8 +247,213 @@ bool_flag(
 )
 
 bool_flag(
+    name = "enforce_constraints",
+    build_setting_default = True,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "enforce_proguard_file_extension",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "experimental_add_test_support_to_compile_time_deps",
+    build_setting_default = True,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "experimental_allow_android_library_deps_without_srcs",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "experimental_allow_runtime_deps_on_neverlink",
+    build_setting_default = True,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "experimental_always_filter_duplicate_classes_from_android_test",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "experimental_android_assume_minsdkversion",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "experimental_android_compress_java_resources",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "experimental_android_databinding_v2",
+    build_setting_default = True,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "experimental_android_library_exports_manifest_default",
+    build_setting_default = True,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "experimental_android_resource_cycle_shrinking",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "experimental_android_resource_name_obfuscation",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "experimental_android_resource_path_shortening",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "experimental_android_resource_shrinking",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "experimental_android_rewrite_dexes_with_rex",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "experimental_android_use_parallel_dex2oat",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+# TODO: Should be a string_keyed_label_dict_flag().
+string_list_flag(
+    name = "experimental_bytecode_optimizers",
+    build_setting_default = [],
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
     name = "experimental_cc_implementation_deps",
     build_setting_default = True,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "experimental_check_desugar_deps",
+    build_setting_default = True,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "experimental_collect_code_coverage_for_generated_files",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "experimental_cpp_compile_resource_estimation",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "experimental_cpp_modules",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "experimental_debug_selects_always_succeed",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "experimental_disable_instrumentation_manifest_merge",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "experimental_disallow_legacy_java_toolchain_flags",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "experimental_enable_jspecify",
+    build_setting_default = True,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "experimental_exclude_defines_from_exec_config",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "experimental_exclude_starlark_flags_from_exec_config",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+label_flag(
+    name = "experimental_exec_config",
+    build_setting_default = "@_builtins//:common/builtin_exec_platforms.bzl%bazel_exec_transition",
+    visibility = ["//visibility:public"],
+)
+
+string_flag(
+    name = "experimental_exec_configuration_distinguisher",
+    build_setting_default = "off",
+    values = [
+        "diff_to_affected",
+        "full_hash",
+        "legacy",
+        "off",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "experimental_extended_sanity_checks",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "experimental_filter_library_jar_with_program_jar",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "experimental_filter_r_jars_from_android_test",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+string_flag(
+    name = "experimental_fix_deps_tool",
+    build_setting_default = "add_dep",
     visibility = ["//visibility:public"],
 )
 
@@ -99,7 +464,19 @@ bool_flag(
 )
 
 bool_flag(
-    name = "experimental_include_xcode_exec_requirements",
+    name = "experimental_get_android_java_resources_from_optimized_jar",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+string_flag(
+    name = "experimental_import_deps_checking",
+    build_setting_default = "",
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "experimental_include_xcode_execution_requirements",
     build_setting_default = False,
     visibility = ["//visibility:public"],
 )
