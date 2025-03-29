@@ -551,6 +551,9 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx c
 				return model_starlark.NewLabel[TReference, TMetadata](resolvedLabel), nil
 			}),
 		)
+		if err != nil {
+			return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("failed to decode value for input %#v: %w", input, err)
+		}
 		if err := inputs.SetKey(thread, starlark.String(input), v); err != nil {
 			return performUserDefinedTransitionResult[TMetadata]{}, err
 		}

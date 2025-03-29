@@ -515,7 +515,7 @@ func DecodeValue[TReference object.BasicReference, TMetadata model_core.Cloneabl
 	case *model_starlark_pb.Value_Label:
 		resolvedLabel, err := pg_label.NewResolvedLabel(typedValue.Label)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("invalid label %#v: %w", typedValue.Label, err)
 		}
 		return options.LabelCreator(resolvedLabel)
 	case *model_starlark_pb.Value_Provider:
