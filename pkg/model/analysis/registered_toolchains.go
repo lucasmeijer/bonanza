@@ -62,7 +62,13 @@ func (h *registeredToolchainExtractingModuleDotBazelHandler[TReference, TMetadat
 				return err
 			}
 			var iterErr error
-			for canonicalToolchainLabel := range h.computer.expandCanonicalTargetPattern(h.context, h.environment, canonicalToolchainTargetPattern, &iterErr) {
+			for canonicalToolchainLabel := range h.computer.expandCanonicalTargetPattern(
+				h.context,
+				h.environment,
+				canonicalToolchainTargetPattern,
+				/* includeManualTargets = */ true,
+				&iterErr,
+			) {
 				visibleTargetValue := h.environment.GetVisibleTargetValue(
 					model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](
 						&model_analysis_pb.VisibleTarget_Key{

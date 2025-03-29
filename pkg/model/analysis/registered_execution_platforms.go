@@ -86,7 +86,13 @@ func (h *registeredExecutionPlatformExtractingModuleDotBazelHandler[TReference, 
 				return err
 			}
 			var iterErr error
-			for canonicalPlatformLabel := range h.computer.expandCanonicalTargetPattern(h.context, h.environment, canonicalPlatformTargetPattern, &iterErr) {
+			for canonicalPlatformLabel := range h.computer.expandCanonicalTargetPattern(
+				h.context,
+				h.environment,
+				canonicalPlatformTargetPattern,
+				/* includeManualTargets = */ true,
+				&iterErr,
+			) {
 				canonicalPlatformLabelStr := canonicalPlatformLabel.String()
 				platformInfoProvider, err := getProviderFromConfiguredTarget(
 					h.environment,

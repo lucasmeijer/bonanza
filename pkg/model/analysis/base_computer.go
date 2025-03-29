@@ -334,7 +334,13 @@ func (c *baseComputer[TReference, TMetadata]) ComputeBuildResultValue(ctx contex
 			}
 
 			var iterErr error
-			for canonicalTargetLabel := range c.expandCanonicalTargetPattern(ctx, e, canonicalTargetPattern, &iterErr) {
+			for canonicalTargetLabel := range c.expandCanonicalTargetPattern(
+				ctx,
+				e,
+				canonicalTargetPattern,
+				/* includeManualTargets = */ false,
+				&iterErr,
+			) {
 				patchedConfigurationReference1 := model_core.Patch(
 					model_core.CloningObjectManager[TMetadata]{},
 					clonedConfigurationReference,

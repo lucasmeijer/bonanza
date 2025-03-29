@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"sort"
+	"strings"
 
 	"github.com/buildbarn/bonanza/pkg/evaluation"
 	"github.com/buildbarn/bonanza/pkg/label"
@@ -25,6 +27,7 @@ func (c *baseComputer[TReference, TMetadata]) expandCanonicalTargetPattern(
 	ctx context.Context,
 	e expandCanonicalTargetPatternEnvironment[TReference],
 	targetPattern label.CanonicalTargetPattern,
+	includeManualTargets bool,
 	errOut *error,
 ) iter.Seq[label.CanonicalLabel] {
 	return func(yield func(canonicalLabel label.CanonicalLabel) bool) {
@@ -37,7 +40,8 @@ func (c *baseComputer[TReference, TMetadata]) expandCanonicalTargetPattern(
 		}
 
 		targetPatternExpansion := e.GetTargetPatternExpansionValue(&model_analysis_pb.TargetPatternExpansion_Key{
-			TargetPattern: targetPattern.String(),
+			TargetPattern:        targetPattern.String(),
+			IncludeManualTargets: includeManualTargets,
 		})
 		if !targetPatternExpansion.IsSet() {
 			*errOut = evaluation.ErrMissingDependency
@@ -137,7 +141,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetPatternExpansionValue
 			)); err != nil {
 				return PatchedTargetPatternExpansionValue{}, err
 			}
-		} else if err := c.addPackageToTargetPatternExpansion(ctx, canonicalPackage, packageValue, includeFileTargets, treeBuilder); err != nil {
+		} else if err := c.addPackageToTargetPatternExpansion(ctx, canonicalPackage, packageValue, includeFileTargets, key.IncludeManualTargets, treeBuilder); err != nil {
 			return PatchedTargetPatternExpansionValue{}, err
 		}
 	} else if basePackage, includeFileTargets, ok := canonicalTargetPattern.AsRecursiveTargetPattern(); ok {
@@ -155,7 +159,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetPatternExpansionValue
 			if packageValue := e.GetPackageValue(&model_analysis_pb.Package_Key{
 				Label: basePackage.String(),
 			}); packageValue.IsSet() {
-				if err := c.addPackageToTargetPatternExpansion(ctx, basePackage, packageValue, includeFileTargets, treeBuilder); err != nil {
+				if err := c.addPackageToTargetPatternExpansion(ctx, basePackage, packageValue, includeFileTargets, key.IncludeManualTargets, treeBuilder); err != nil {
 					return PatchedTargetPatternExpansionValue{}, err
 				}
 			} else {
@@ -173,7 +177,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetPatternExpansionValue
 				return PatchedTargetPatternExpansionValue{}, fmt.Errorf("invalid package path %#v: %w", packagePath)
 			}
 			childTargetPatternExpansion := e.GetTargetPatternExpansionValue(&model_analysis_pb.TargetPatternExpansion_Key{
-				TargetPattern: childTargetPattern.String(),
+				TargetPattern:        childTargetPattern.String(),
+				IncludeManualTargets: key.IncludeManualTargets,
 			})
 			if missingDependencies || !childTargetPatternExpansion.IsSet() {
 				missingDependencies = true
@@ -214,6 +219,7 @@ func (c *baseComputer[TReference, TMetadata]) addPackageToTargetPatternExpansion
 	canonicalPackage label.CanonicalPackage,
 	packageValue model_core.Message[*model_analysis_pb.Package_Value, TReference],
 	includeFileTargets bool,
+	includeManualTargets bool,
 	treeBuilder btree.Builder[*model_analysis_pb.TargetPatternExpansion_Value_TargetLabel, TMetadata],
 ) error {
 	var errIter error
@@ -234,7 +240,7 @@ func (c *baseComputer[TReference, TMetadata]) addPackageToTargetPatternExpansion
 			return errors.New("not a valid leaf entry")
 		}
 		reportTarget := false
-		switch level.Leaf.Definition.GetKind().(type) {
+		switch definition := level.Leaf.Definition.GetKind().(type) {
 		case *model_starlark_pb.Target_Definition_Alias:
 			reportTarget = true
 		case *model_starlark_pb.Target_Definition_LabelSetting:
@@ -244,7 +250,17 @@ func (c *baseComputer[TReference, TMetadata]) addPackageToTargetPatternExpansion
 				reportTarget = true
 			}
 		case *model_starlark_pb.Target_Definition_RuleTarget:
-			reportTarget = true
+			// Optionally filter out targets that have tag "manual".
+			if includeManualTargets {
+				reportTarget = true
+			} else {
+				tags := definition.RuleTarget.Tags
+				_, isManual := sort.Find(
+					len(tags),
+					func(i int) int { return strings.Compare("manual", tags[i]) },
+				)
+				reportTarget = !isManual
+			}
 		case *model_starlark_pb.Target_Definition_SourceFileTarget:
 			if includeFileTargets {
 				reportTarget = true

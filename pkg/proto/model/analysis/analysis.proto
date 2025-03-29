@@ -1096,6 +1096,11 @@ message TargetPatternExpansion {
     // The target pattern that needs to be expanded to a set of targets.
     // The target pattern MUST include a canonical repo name.
     string target_pattern = 1;
+
+    // Whether to include targets that have tag "manual". These should
+    // be excluded as part of "bazel build", but included as part of
+    // "bazel query".
+    bool include_manual_targets = 2;
   }
 
   message Value {
