@@ -736,16 +736,18 @@ func (c *baseComputer[TReference, TMetadata]) performTransition(
 	// See if any transitions need to be applied.
 	switch tr := transitionReference.GetKind().(type) {
 	case *model_starlark_pb.Transition_Reference_ExecGroup:
-		// TODO: Perform an actual exec transition!
-		patchedConfigurationReference := model_core.Patch(e, configurationReference)
-		return model_core.NewPatchedMessage(
-			&model_analysis_pb.UserDefinedTransition_Value_Success{
-				Entries: []*model_analysis_pb.UserDefinedTransition_Value_Success_Entry{{
-					OutputConfigurationReference: patchedConfigurationReference.Message,
-				}},
-			},
-			patchedConfigurationReference.Patcher,
-		), false, nil
+		// Invoke the exec transition.
+		// TODO: Start off with an empty output configuration.
+		// TODO: This should override platforms.
+		// TODO: Respect --experimental_exec_config.
+		configurationReferences, err := c.performUserDefinedTransitionCached(
+			ctx,
+			e,
+			"@@builtins_bzl+//:common/builtin_exec_platforms.bzl%bazel_exec_transition",
+			configurationReference,
+			attrParameter,
+		)
+		return configurationReferences, false, err
 	case *model_starlark_pb.Transition_Reference_None:
 		// Use the empty configuration.
 		return model_core.NewSimplePatchedMessage[TMetadata](
