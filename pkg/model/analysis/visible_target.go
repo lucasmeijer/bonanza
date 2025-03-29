@@ -302,20 +302,23 @@ func (c *baseComputer[TReference, TMetadata]) ComputeVisibleTargetValue(ctx cont
 				}
 				value = listLeaf.Leaf
 			}
-			labelValue, ok := value.GetKind().(*model_starlark_pb.Value_Label)
-			if !ok {
+			switch labelValue := value.GetKind().(type) {
+			case *model_starlark_pb.Value_Label:
+				overrideLabel, err := label.NewResolvedLabel(labelValue.Label)
+				if err != nil {
+					return PatchedVisibleTargetValue{}, fmt.Errorf("invalid build setting override label value %#v: %w", labelValue.Label, err)
+				}
+				canonicalOverrideLabel, err := overrideLabel.AsCanonical()
+				if err != nil {
+					return PatchedVisibleTargetValue{}, err
+				}
+				nextFromPackage = canonicalOverrideLabel.GetCanonicalPackage().String()
+				nextToLabel = overrideLabel.String()
+			case *model_starlark_pb.Value_None:
+				return model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](&model_analysis_pb.VisibleTarget_Value{}), nil
+			default:
 				return PatchedVisibleTargetValue{}, errors.New("build setting override value is not a label")
 			}
-			overrideLabel, err := label.NewResolvedLabel(labelValue.Label)
-			if err != nil {
-				return PatchedVisibleTargetValue{}, fmt.Errorf("invalid build setting override label value %#v: %w", labelValue.Label, err)
-			}
-			canonicalOverrideLabel, err := overrideLabel.AsCanonical()
-			if err != nil {
-				return PatchedVisibleTargetValue{}, err
-			}
-			nextFromPackage = canonicalOverrideLabel.GetCanonicalPackage().String()
-			nextToLabel = overrideLabel.String()
 		} else {
 			// Use the default target associated with the
 			// label setting. Validate that the default

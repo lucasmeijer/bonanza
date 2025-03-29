@@ -102,7 +102,7 @@ func getExpectedTransitionOutput[TReference object.BasicReference, TMetadata mod
 				unpack.List(labelSettingUnpackerInto),
 			})
 		} else {
-			canonicalizer = labelSettingUnpackerInto
+			canonicalizer = unpack.IfNotNone(labelSettingUnpackerInto)
 		}
 		defaultValue = model_core.NewSimpleMessage[TReference](
 			&model_starlark_pb.Value{
