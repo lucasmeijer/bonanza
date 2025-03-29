@@ -17,6 +17,8 @@ import (
 	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
 	"github.com/buildbarn/bonanza/pkg/storage/dag"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
+
+	"google.golang.org/protobuf/proto"
 )
 
 type getValueFromSelectGroupEnvironment[TReference, TMetadata any] interface {
@@ -32,9 +34,9 @@ func getValueFromSelectGroup[TReference object.BasicReference, TMetadata model_c
 	selectGroup *model_starlark_pb.Select_Group,
 	permitNoMatch bool,
 ) (*model_starlark_pb.Value, error) {
-	if len(selectGroup.Conditions) > 0 {
-		conditionIdentifiers := make([]string, 0, len(selectGroup.Conditions))
-		for _, condition := range selectGroup.Conditions {
+	if conditions := selectGroup.Conditions; len(conditions) > 0 {
+		conditionIdentifiers := make([]string, 0, len(conditions))
+		for _, condition := range conditions {
 			conditionIdentifiers = append(conditionIdentifiers, condition.ConditionIdentifier)
 		}
 		patchedConfigurationReference := model_core.Patch(e, configurationReference)
@@ -52,14 +54,24 @@ func getValueFromSelectGroup[TReference object.BasicReference, TMetadata model_c
 			return nil, evaluation.ErrMissingDependency
 		}
 		if len(selectValue.Message.ConditionIndices) > 0 {
-			if len(selectValue.Message.ConditionIndices) > 1 {
-				return nil, errors.New("TODO: Multiple matches!")
+			firstIndex := selectValue.Message.ConditionIndices[0]
+			if firstIndex >= uint32(len(conditions)) {
+				return nil, fmt.Errorf("condition index %d is out of bounds, as the select group only has %d conditions", firstIndex, len(conditions))
 			}
-			index := selectValue.Message.ConditionIndices[0]
-			if index >= uint32(len(selectGroup.Conditions)) {
-				return nil, fmt.Errorf("condition index %d is out of bounds, as the select group only has %d conditions", index, len(selectGroup.Conditions))
+			firstConditionValue := conditions[firstIndex].Value
+
+			// It is valid if multiple conditions match.
+			// However, in that case the resulting values
+			// must be identical.
+			for _, additionalIndex := range selectValue.Message.ConditionIndices {
+				if additionalIndex >= uint32(len(conditions)) {
+					return nil, fmt.Errorf("condition index %d is out of bounds, as the select group only has %d conditions", additionalIndex, len(conditions))
+				}
+				if !proto.Equal(firstConditionValue, conditions[additionalIndex].Value) {
+					return nil, fmt.Errorf("both conditions %#v and %#v match, but their resulting values differ", conditions[firstIndex].ConditionIdentifier, conditions[additionalIndex].ConditionIdentifier)
+				}
 			}
-			return selectGroup.Conditions[index].Value, nil
+			return firstConditionValue, nil
 		}
 	}
 
