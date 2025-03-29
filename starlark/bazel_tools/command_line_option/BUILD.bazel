@@ -1389,15 +1389,27 @@ label_flag(
     visibility = ["//visibility:public"],
 )
 
+string_flag(
+    name = "propeller_optimize_absolute_cc_profile",
+    build_setting_default = "",
+    visibility = ["//visibility:public"],
+)
+
+string_flag(
+    name = "propeller_optimize_absolute_ld_profile",
+    build_setting_default = "",
+    visibility = ["//visibility:public"],
+)
+
 label_flag(
     name = "proto_compiler",
     build_setting_default = "//tools/proto:protoc",
     visibility = ["//visibility:public"],
 )
 
-string_list_flag(
-    name = "protocopt",
-    build_setting_default = [],
+bool_flag(
+    name = "proto_profile",
+    build_setting_default = True,
     visibility = ["//visibility:public"],
 )
 
@@ -1428,6 +1440,12 @@ label_flag(
 label_flag(
     name = "proto_toolchain_for_javalite",
     build_setting_default = "//tools/proto:javalite_toolchain",
+    visibility = ["//visibility:public"],
+)
+
+string_list_flag(
+    name = "protocopt",
+    build_setting_default = [],
     visibility = ["//visibility:public"],
 )
 
