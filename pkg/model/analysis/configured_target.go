@@ -806,11 +806,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 					return PatchedConfiguredTargetValue{}, fmt.Errorf("value of attr %#v contains multiple labels, which is not expected for attrs of type output", namedAttr.Name)
 				}
 			case *model_starlark_pb.Attr_OutputList:
-				if len(attrOutputs) == 0 {
-					outputsValues[namedAttr.Name] = starlark.None
-				} else {
-					outputsValues[namedAttr.Name] = starlark.NewList(attrOutputs)
-				}
+				outputsValues[namedAttr.Name] = starlark.NewList(attrOutputs)
 			}
 		}
 		if missingDependencies {
