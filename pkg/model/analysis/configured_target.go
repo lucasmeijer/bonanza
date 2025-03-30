@@ -1853,6 +1853,8 @@ func (rca *ruleContextActions[TReference, TMetadata]) Attr(thread *starlark.Thre
 		return starlark.NewBuiltin("ctx.actions.declare_directory", rca.doDeclareDirectory), nil
 	case "declare_file":
 		return starlark.NewBuiltin("ctx.actions.declare_file", rca.doDeclareFile), nil
+	case "declare_symlink":
+		return starlark.NewBuiltin("ctx.actions.declare_symlink", rca.doDeclareSymlink), nil
 	case "expand_template":
 		return starlark.NewBuiltin("ctx.actions.expand_template", rca.doExpandTemplate), nil
 	case "run":
@@ -1943,6 +1945,33 @@ func (rca *ruleContextActions[TReference, TMetadata]) doDeclareFile(thread *star
 		Package:             rc.targetLabel.GetCanonicalPackage().String(),
 		PackageRelativePath: filename.String(),
 		Type:                model_starlark_pb.File_FILE,
+	}), nil
+}
+
+func (rca *ruleContextActions[TReference, TMetadata]) doDeclareSymlink(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	if len(args) > 1 {
+		return nil, fmt.Errorf("%s: got %d positional arguments, want at most 1", b.Name(), len(args))
+	}
+	var filename label.TargetName
+	var sibling *model_starlark.File[TReference, TMetadata]
+	if err := starlark.UnpackArgs(
+		b.Name(), args, kwargs,
+		"filename", unpack.Bind(thread, &filename, unpack.TargetName),
+		"sibling?", unpack.Bind(thread, &sibling, unpack.IfNotNone(unpack.Pointer(unpack.Type[model_starlark.File[TReference, TMetadata]]("File")))),
+	); err != nil {
+		return nil, err
+	}
+
+	rc := rca.ruleContext
+	return model_starlark.NewFile[TReference, TMetadata](&model_starlark_pb.File{
+		Owner: &model_starlark_pb.File_Owner{
+			// TODO: Fill in a proper hash.
+			Cfg:        []byte{0xbe, 0x8a, 0x60, 0x1c, 0xe3, 0x03, 0x44, 0xf0},
+			TargetName: rc.targetLabel.GetTargetName().String(),
+		},
+		Package:             rc.targetLabel.GetCanonicalPackage().String(),
+		PackageRelativePath: filename.String(),
+		Type:                model_starlark_pb.File_SYMLINK,
 	}), nil
 }
 
