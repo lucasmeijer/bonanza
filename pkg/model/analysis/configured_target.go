@@ -1477,27 +1477,9 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 		}
 		return rc.buildSettingValue, nil
 	case "configuration":
-		// TODO: Should we move this into a rule like we do for
-		// ctx.fragments?
-		return model_starlark.NewStructFromDict[TReference, TMetadata](nil, map[string]any{
-			"coverage_enabled": starlark.False,
-			"has_separate_genfiles_directory": starlark.NewBuiltin("ctx.configuration.has_separate_genfiles_directory", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-				return starlark.False, nil
-			}),
-			// TODO: Use ";" on Windows.
-			"host_path_separator": starlark.String(":"),
-			"is_sibling_repository_layout": starlark.NewBuiltin("ctx.configuration.is_sibling_repository_layout", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-				return starlark.True, nil
-			}),
-			"is_tool_configuration": starlark.NewBuiltin("ctx.configuration.is_tool_configuration", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-				// TODO: Check whether "//command_line_option:is exec configuration" is set!
-				return starlark.False, nil
-			}),
-			"stamp_binaries": starlark.NewBuiltin("ctx.configuration.stamp_binaries", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-				// TODO: Check whether --stamp is set!
-				return starlark.False, nil
-			}),
-		}), nil
+		// Implement ctx.configuration as if it is a specially
+		// named fragment.
+		return rc.getFragment("configuration")
 	case "coverage_instrumented":
 		return starlark.NewBuiltin("ctx.coverage_instrumented", rc.doCoverageInstrumented), nil
 	case "bin_dir":
@@ -1606,6 +1588,44 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 	default:
 		return nil, nil
 	}
+}
+
+func (rc *ruleContext[TReference, TMetadata]) getFragment(name string) (starlark.Value, error) {
+	fragmentInfo, ok := rc.fragments[name]
+	if !ok {
+		targetName, err := label.NewTargetName(name)
+		if err != nil {
+			return nil, fmt.Errorf("invalid target name %#v: %w", name, err)
+		}
+		encodedFragmentInfo, err := getProviderFromConfiguredTarget(
+			rc.environment,
+			fragmentsPackage.AppendTargetName(targetName).String(),
+			model_core.Patch(
+				rc.environment,
+				rc.configurationReference,
+			),
+			fragmentInfoProviderIdentifier,
+		)
+		if err != nil {
+			return nil, err
+		}
+		fragmentInfo, err = model_starlark.DecodeStruct[TReference, TMetadata](
+			model_core.Nested(encodedFragmentInfo, &model_starlark_pb.Struct{
+				ProviderInstanceProperties: &model_starlark_pb.Provider_InstanceProperties{
+					ProviderIdentifier: fragmentInfoProviderIdentifier.String(),
+				},
+				Fields: encodedFragmentInfo.Message,
+			}),
+			rc.computer.getValueDecodingOptions(rc.context, func(resolvedLabel label.ResolvedLabel) (starlark.Value, error) {
+				return model_starlark.NewLabel[TReference, TMetadata](resolvedLabel), nil
+			}),
+		)
+		if err != nil {
+			return nil, err
+		}
+		rc.fragments[name] = fragmentInfo
+	}
+	return fragmentInfo, nil
 }
 
 var ruleContextAttrNames = []string{
@@ -2178,42 +2198,7 @@ func (ruleContextFragments[TReference, TMetadata]) Hash(thread *starlark.Thread)
 }
 
 func (rcf *ruleContextFragments[TReference, TMetadata]) Attr(thread *starlark.Thread, name string) (starlark.Value, error) {
-	rc := rcf.ruleContext
-	fragmentInfo, ok := rc.fragments[name]
-	if !ok {
-		targetName, err := label.NewTargetName(name)
-		if err != nil {
-			return nil, fmt.Errorf("invalid target name %#v: %w", name, err)
-		}
-		encodedFragmentInfo, err := getProviderFromConfiguredTarget(
-			rc.environment,
-			fragmentsPackage.AppendTargetName(targetName).String(),
-			model_core.Patch(
-				rc.environment,
-				rc.configurationReference,
-			),
-			fragmentInfoProviderIdentifier,
-		)
-		if err != nil {
-			return nil, err
-		}
-		fragmentInfo, err = model_starlark.DecodeStruct[TReference, TMetadata](
-			model_core.Nested(encodedFragmentInfo, &model_starlark_pb.Struct{
-				ProviderInstanceProperties: &model_starlark_pb.Provider_InstanceProperties{
-					ProviderIdentifier: fragmentInfoProviderIdentifier.String(),
-				},
-				Fields: encodedFragmentInfo.Message,
-			}),
-			rc.computer.getValueDecodingOptions(rc.context, func(resolvedLabel label.ResolvedLabel) (starlark.Value, error) {
-				return model_starlark.NewLabel[TReference, TMetadata](resolvedLabel), nil
-			}),
-		)
-		if err != nil {
-			return nil, err
-		}
-		rc.fragments[name] = fragmentInfo
-	}
-	return fragmentInfo, nil
+	return rcf.ruleContext.getFragment(name)
 }
 
 func (ruleContextFragments[TReference, TMetadata]) AttrNames() []string {

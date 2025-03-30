@@ -38,6 +38,33 @@ apple_fragment = rule(
     },
 )
 
+def _configuration_fragment_impl(ctx):
+    has_separate_genfiles_directory = not ctx.attr._merge_genfiles_directory[BuildSettingInfo].value
+    is_exec_configuration = ctx.attr._is_exec_configuration[BuildSettingInfo].value
+    stamp = ctx.attr._stamp[BuildSettingInfo].value
+    return [FragmentInfo(
+        # TODO: Fill this in properly!
+        coverage_enabled = False,
+        # TODO: What needs to go here?
+        default_shell_env = {},
+        has_separate_genfiles_directory = lambda: has_separate_genfiles_directory,
+        # TODO: Have a helper rule that checks whether the exec platform
+        # is Windows.
+        host_path_separator = ":",
+        is_sibling_repository_layout = lambda: True,
+        is_tool_configuration = lambda: is_exec_configuration,
+        stamp_binaries = lambda: stamp,
+    )]
+
+configuration_fragment = rule(
+    _configuration_fragment_impl,
+    attrs = {
+        "_is_exec_configuration": attr.label(default = "//command_line_option:is exec configuration"),
+        "_merge_genfiles_directory": attr.label(default = "//command_line_option:incompatible_merge_genfiles_directory"),
+        "_stamp": attr.label(default = "//command_line_option:stamp"),
+    },
+)
+
 def _cpp_fragment_impl(ctx):
     compilation_mode = ctx.attr._compilation_mode[BuildSettingInfo].value
     dynamic_mode = ctx.attr._dynamic_mode[BuildSettingInfo].value.upper()
