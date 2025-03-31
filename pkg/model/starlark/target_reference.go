@@ -16,6 +16,9 @@ import (
 	"go.starlark.net/syntax"
 )
 
+// TargetReference is a Starlark value corresponding to the Target type.
+// These are the values that rule implementations may access through
+// ctx.attr or ctx.split_attr.
 type TargetReference[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata] struct {
 	label            pg_label.ResolvedLabel
 	encodedProviders model_core.Message[[]*model_starlark_pb.Struct, TReference]
@@ -23,6 +26,10 @@ type TargetReference[TReference object.BasicReference, TMetadata model_core.Clon
 	decodedProviders []atomic.Pointer[Struct[TReference, TMetadata]]
 }
 
+// NewTargetReference creates a new Starlark Target value corresponding
+// to a given label, exposing struct instances corresponding to a set of
+// providers. This function expects these struct instances to be
+// alphabetically sorted by provider identifier.
 func NewTargetReference[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](label pg_label.ResolvedLabel, providers model_core.Message[[]*model_starlark_pb.Struct, TReference]) starlark.Value {
 	return &TargetReference[TReference, TMetadata]{
 		label:            label,
@@ -42,20 +49,27 @@ func (tr *TargetReference[TReference, TMetadata]) String() string {
 	return fmt.Sprintf("<target %s>", tr.label.String())
 }
 
+// Type returns the name of the type of a Starlark Target value.
 func (TargetReference[TReference, TMetadata]) Type() string {
 	return "Target"
 }
 
-func (TargetReference[TReference, TMetadata]) Freeze() {
-}
+// Freeze the contents of a Starlark Target value. This function has no
+// effect, as a Target value is immutable.
+func (TargetReference[TReference, TMetadata]) Freeze() {}
 
+// Truth returns whether the Starlark Target value evaluates to true or
+// false when implicitly converted to a Boolean value. Starlark Target
+// values always convert to true.
 func (TargetReference[TReference, TMetadata]) Truth() starlark.Bool {
 	return starlark.True
 }
 
+// Hash a Starlark Target value, so that it can be used as the key of a
+// dictionary. As we assume that the number of targets having the same
+// label, but a different configuration is fairly low, we simply hash
+// the target's label.
 func (tr *TargetReference[TReference, TMetadata]) Hash(thread *starlark.Thread) (uint32, error) {
-	// Assume that the number of target references with the same
-	// label, but a different configuration are fairly low.
 	return starlark.String(tr.label.String()).Hash(thread)
 }
 
@@ -72,6 +86,8 @@ func (tr *TargetReference[TReference, TMetadata]) equal(thread *starlark.Thread,
 	return true, nil
 }
 
+// CompareSameType can be used to compare Starlark Target values for
+// equality.
 func (tr *TargetReference[TReference, TMetadata]) CompareSameType(thread *starlark.Thread, op syntax.Token, other starlark.Value, depth int) (bool, error) {
 	switch op {
 	case syntax.EQL:
@@ -86,6 +102,13 @@ func (tr *TargetReference[TReference, TMetadata]) CompareSameType(thread *starla
 
 var defaultInfoProviderIdentifier = pg_label.MustNewCanonicalStarlarkIdentifier("@@builtins_core+//:exports.bzl%DefaultInfo")
 
+// Attr returns the value of an attribute of a Starlark Target value.
+//
+// The only attribute provided by the Target value itself is "label",
+// which returns the label of the configured target. The other
+// attributes are merely forwarded to the DefaultInfo provider. This
+// allows these commonly used fields to be accessed with less
+// indirection.
 func (tr *TargetReference[TReference, TMetadata]) Attr(thread *starlark.Thread, name string) (starlark.Value, error) {
 	switch name {
 	case "label":
@@ -110,6 +133,7 @@ var targetReferenceAttrNames = []string{
 	"label",
 }
 
+// AttrNames returns the attribute names of a Starlark Target value.
 func (tr *TargetReference[TReference, TMetadata]) AttrNames() []string {
 	return targetReferenceAttrNames
 }
@@ -146,6 +170,8 @@ func (tr *TargetReference[TReference, TMetadata]) getProviderValue(thread *starl
 	return strukt, nil
 }
 
+// Get the value of a given provider from the Starlark Target value.
+// This is called when a rule invokes ctx.attr.myattr[MyProviderInfo].
 func (tr *TargetReference[TReference, TMetadata]) Get(thread *starlark.Thread, v starlark.Value) (starlark.Value, bool, error) {
 	provider, ok := v.(*Provider[TReference, TMetadata])
 	if !ok {
@@ -162,6 +188,9 @@ func (tr *TargetReference[TReference, TMetadata]) Get(thread *starlark.Thread, v
 	return providerValue, true, nil
 }
 
+// EncodeValue encodes a Starlark Target value to a Protobuf message, so
+// that it can be written to storage and restored at a later point in
+// time.
 func (tr *TargetReference[TReference, TMetadata]) EncodeValue(path map[starlark.Value]struct{}, currentIdentifier *pg_label.CanonicalStarlarkIdentifier, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.Value, TMetadata], bool, error) {
 	return model_core.Patch(
 		options.ObjectCapturer,

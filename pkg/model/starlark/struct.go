@@ -22,12 +22,25 @@ import (
 	"go.starlark.net/syntax"
 )
 
+// Struct value that is either created using struct() or by calling into
+// a provider.
+//
+// We assume that the number of fields in a struct is small enough, that
+// the keys of a struct don't exceed the maximum size of an object in
+// storage. This allows us to store all keys in a sorted list. The
+// values of the fields may then be stored in a separate B-tree backed
+// list. This allows functions like dir() and hasattr() to perform well
+// and not read an excessive amount of data from storage.
 type Struct[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata] struct {
+	// Constant fields.
 	providerInstanceProperties *ProviderInstanceProperties
 	keys                       []string
 	values                     []any
-	decodedValues              []atomic.Pointer[starlark.Value]
-	hash                       uint32
+
+	// Mutable fields.
+	decodedValues []atomic.Pointer[starlark.Value]
+	frozen        bool
+	hash          uint32
 }
 
 var (
@@ -37,6 +50,11 @@ var (
 	_ starlark.Mapping                                                             = (*Struct[object.LocalReference, model_core.CloneableReferenceMetadata])(nil)
 )
 
+// NewStructFromDict creates a Starlark struct value that has the fields
+// that are specified in a map. Values may either be decoded or encoded,
+// having types starlark.Value and
+// model_core.Message[*model_starlark_pb.Value, TReference],
+// respectively.
 func NewStructFromDict[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](providerInstanceProperties *ProviderInstanceProperties, entries map[string]any) *Struct[TReference, TMetadata] {
 	keys := make([]string, 0, len(entries))
 	for k := range entries {
@@ -79,12 +97,34 @@ func (s *Struct[TReference, TMetadata]) String() string {
 	return sb.String()
 }
 
+// Type returns the name of the type of a Starlark struct value.
+//
+// Even though we could implement this function so that it returns the
+// name of the provider for provider instances, this is not what Bazel
+// does.
 func (Struct[TReference, TMetadata]) Type() string {
 	return "struct"
 }
 
-func (Struct[TReference, TMetadata]) Freeze() {}
+// Freeze a Starlark struct value and any value contained inside of it.
+// Even though the struct itself is immutable, a struct is permitted to
+// contain fields having mutable values. We therefore need to traverse
+// all fields.
+func (s *Struct[TReference, TMetadata]) Freeze() {
+	if !s.frozen {
+		s.frozen = true
 
+		for _, v := range s.values {
+			if typedValue, ok := v.(starlark.Value); ok {
+				typedValue.Freeze()
+			}
+		}
+	}
+}
+
+// Truth returns whethe a Starlark struct value evaluates to true or
+// false when implicitly converted to a Boolean value. Structs always
+// evaluate to true, even if they are empty.
 func (Struct[TReference, TMetadata]) Truth() starlark.Bool {
 	return starlark.True
 }
@@ -115,6 +155,9 @@ func (s *Struct[TReference, TMetadata]) Hash(thread *starlark.Thread) (uint32, e
 		if h == 0 {
 			h = 1
 		}
+
+		// As we assume that hashable values are immutable, it
+		// is safe to cache the hash for later use.
 		s.hash = h
 	}
 	return s.hash, nil
@@ -142,6 +185,14 @@ func (s *Struct[TReference, TMetadata]) fieldAtIndex(thread *starlark.Thread, in
 		if err != nil {
 			return nil, err
 		}
+
+		// If Freeze() has already been called against this
+		// struct, we should ensure that looking up the field
+		// does not cause the struct to become partially
+		// unfrozen.
+		if s.frozen {
+			decodedValue.Freeze()
+		}
 		s.decodedValues[index].Store(&decodedValue)
 		return decodedValue, nil
 	default:
@@ -149,6 +200,8 @@ func (s *Struct[TReference, TMetadata]) fieldAtIndex(thread *starlark.Thread, in
 	}
 }
 
+// Attr returns the value of a field contained in a Starlark struct
+// value.
 func (s *Struct[TReference, TMetadata]) Attr(thread *starlark.Thread, name string) (starlark.Value, error) {
 	index, ok := sort.Find(
 		len(s.keys),
@@ -160,10 +213,13 @@ func (s *Struct[TReference, TMetadata]) Attr(thread *starlark.Thread, name strin
 	return s.fieldAtIndex(thread, index)
 }
 
+// AttrNames returns the names of the fields contained in a Starlark
+// struct value.
 func (s *Struct[TReference, TMetadata]) AttrNames() []string {
 	return s.keys
 }
 
+// Get a field contained in a Starlark struct value.
 func (s *Struct[TReference, TMetadata]) Get(thread *starlark.Thread, key starlark.Value) (starlark.Value, bool, error) {
 	if s.providerInstanceProperties == nil || !s.providerInstanceProperties.dictLike {
 		return nil, true, errors.New("only structs that were instantiated through a provider that was declared with dict_like=True may be accessed like a dict")
@@ -222,6 +278,9 @@ func (s *Struct[TReference, TMetadata]) equals(thread *starlark.Thread, other *S
 	return true, nil
 }
 
+// CompareSameType compares two Starlark struct values for equality.
+// Structs are considered equal if the names and values of each field
+// are equal.
 func (s *Struct[TReference, TMetadata]) CompareSameType(thread *starlark.Thread, op syntax.Token, other starlark.Value, depth int) (bool, error) {
 	switch op {
 	case syntax.EQL:
@@ -234,6 +293,11 @@ func (s *Struct[TReference, TMetadata]) CompareSameType(thread *starlark.Thread,
 	}
 }
 
+// ToDict returns the fields contained in a Starlark struct value in the
+// form of a dictionary. The resulting values may either be decoded or
+// encoded, having types starlark.Value and
+// model_core.Message[*model_starlark_pb.Value, TReference],
+// respectively.
 func (s *Struct[TReference, TMetadata]) ToDict() map[string]any {
 	dict := make(map[string]any, len(s.keys))
 	for i, k := range s.keys {
@@ -242,6 +306,14 @@ func (s *Struct[TReference, TMetadata]) ToDict() map[string]any {
 	return dict
 }
 
+// EncodeStructFields encodes the fields of a Starlark struct value to a
+// list of a list of Protobuf messages. This allows the fields to be
+// written to storage and reloaded later.
+//
+// This method differs from Encode() and EncodeValue() in that it
+// returns a bare list of fields. This should be used in cases where a
+// value is expected to only be a struct, and any provider identifier
+// may be discarded.
 func (s *Struct[TReference, TMetadata]) EncodeStructFields(path map[starlark.Value]struct{}, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.Struct_Fields, TMetadata], bool, error) {
 	listBuilder := newListBuilder[TReference, TMetadata](options)
 	needsCode := false
@@ -278,6 +350,8 @@ func (s *Struct[TReference, TMetadata]) EncodeStructFields(path map[starlark.Val
 		return model_core.PatchedMessage[*model_starlark_pb.Struct_Fields, TMetadata]{}, false, err
 	}
 
+	// TODO: Should we use inlinedtree here to values in a separate
+	// object if it turns out the keys push us over the limit?
 	return model_core.NewPatchedMessage(
 		&model_starlark_pb.Struct_Fields{
 			Keys:   s.keys,
@@ -287,6 +361,14 @@ func (s *Struct[TReference, TMetadata]) EncodeStructFields(path map[starlark.Val
 	), needsCode, nil
 }
 
+// Encode a Starlark struct value and all of its fields to a Struct
+// Protobuf message. This allows it to be written to storage and
+// reloaded later.
+//
+// This method differs from EncodeValue() in that it returns a bare
+// Struct message. This should be used in cases where a value is
+// expected to only be a struct or provider instance, such as the return
+// value of a rule implementation function.
 func (s *Struct[TReference, TMetadata]) Encode(path map[starlark.Value]struct{}, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.Struct, TMetadata], bool, error) {
 	var providerInstanceProperties *model_starlark_pb.Provider_InstanceProperties
 	if pip := s.providerInstanceProperties; pip != nil {
@@ -311,6 +393,9 @@ func (s *Struct[TReference, TMetadata]) Encode(path map[starlark.Value]struct{},
 	), needsCode, nil
 }
 
+// EncodeValue encodes a Starlark struct value and all of its fields to
+// a Starlark value Protobuf message. This allows it to be written to
+// storage and reloaded later.
 func (s *Struct[TReference, TMetadata]) EncodeValue(path map[starlark.Value]struct{}, currentIdentifier *pg_label.CanonicalStarlarkIdentifier, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.Value, TMetadata], bool, error) {
 	encodedStruct, needsCode, err := s.Encode(path, options)
 	if err != nil {
@@ -326,6 +411,10 @@ func (s *Struct[TReference, TMetadata]) EncodeValue(path map[starlark.Value]stru
 	), needsCode, nil
 }
 
+// GetProviderIdentifier returns the identifier of the provider that was
+// used to construct this Starlark struct value. This method fails if
+// this Starlark struct value was created by calling struct(), as
+// opposed to using a provider.
 func (s *Struct[TReference, TMetadata]) GetProviderIdentifier() (pg_label.CanonicalStarlarkIdentifier, error) {
 	var bad pg_label.CanonicalStarlarkIdentifier
 	pip := s.providerInstanceProperties
@@ -338,6 +427,8 @@ func (s *Struct[TReference, TMetadata]) GetProviderIdentifier() (pg_label.Canoni
 	return *pip.Identifier, nil
 }
 
+// AllStructFields iterates over all fields contained in a Starlark
+// struct that has been encoded and is backed by storage.
 func AllStructFields[TReference any](
 	ctx context.Context,
 	reader model_parser.ParsedObjectReader[TReference, model_core.Message[[]*model_starlark_pb.List_Element, TReference]],
@@ -384,6 +475,9 @@ func AllStructFields[TReference any](
 	}
 }
 
+// GetStructFieldValue returns the value that is associated with a field
+// of a struct. This function assumes that the struct was created
+// previous and is backed by storage.
 func GetStructFieldValue[TReference any](
 	ctx context.Context,
 	reader model_parser.ParsedObjectReader[TReference, model_core.Message[[]*model_starlark_pb.List_Element, TReference]],
@@ -394,6 +488,7 @@ func GetStructFieldValue[TReference any](
 		return model_core.Message[*model_starlark_pb.Value, TReference]{}, errors.New("no struct fields provided")
 	}
 
+	// Look up the index of the provided key.
 	keys := structFields.Message.Keys
 	keyIndex, ok := sort.Find(
 		len(keys),
@@ -403,6 +498,8 @@ func GetStructFieldValue[TReference any](
 		return model_core.Message[*model_starlark_pb.Value, TReference]{}, errors.New("struct field not found")
 	}
 
+	// Look up the value with the given index. Values are stored in
+	// a list, having the same length as the list of keys.
 	list := model_core.Nested(structFields, structFields.Message.Values)
 	valueIndex := uint64(keyIndex)
 	leafCount := uint64(len(keys))

@@ -668,9 +668,7 @@ func DecodeValue[TReference object.BasicReference, TMetadata model_core.Cloneabl
 			if currentIdentifier == nil {
 				return nil, errors.New("encoded subrule does not have a name")
 			}
-			return NewSubrule(currentIdentifier, NewProtoSubruleDefinition[TReference, TMetadata](
-				model_core.Nested(encodedValue, subruleKind.Definition),
-			)), nil
+			return NewSubrule(currentIdentifier, NewProtoSubruleDefinition[TReference, TMetadata]()), nil
 		default:
 			return nil, errors.New("encoded subrule does not have a reference or definition")
 		}

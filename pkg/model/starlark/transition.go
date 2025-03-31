@@ -16,6 +16,10 @@ import (
 	"go.starlark.net/syntax"
 )
 
+// Transition is a Starlark value type that corresponds to a predeclared
+// or user defined transition. Transitions can be used to mutate a
+// configuration, either as part of an incoming or outgoing edge in the
+// build graph.
 type Transition[TReference any, TMetadata model_core.CloneableReferenceMetadata] struct {
 	TransitionDefinition[TReference, TMetadata]
 }
@@ -25,6 +29,9 @@ var (
 	_ NamedGlobal                                                                  = (*Transition[object.LocalReference, model_core.CloneableReferenceMetadata])(nil)
 )
 
+// NewTransition creates a new Starlark transition value having a given
+// definition. This function is typically invoked when exec_transition()
+// or transition() is called.
 func NewTransition[TReference any, TMetadata model_core.CloneableReferenceMetadata](definition TransitionDefinition[TReference, TMetadata]) starlark.Value {
 	return &Transition[TReference, TMetadata]{
 		TransitionDefinition: definition,
@@ -35,20 +42,32 @@ func (Transition[TReference, TMetadata]) String() string {
 	return "<transition>"
 }
 
+// Type returns a string representation of the type of a transition.
 func (Transition[TReference, TMetadata]) Type() string {
 	return "transition"
 }
 
+// Freeze the definition of the transition. As transitions are
+// immutable, this function has no effect.
 func (Transition[TReference, TMetadata]) Freeze() {}
 
+// Truth returns whether the transition is a truthy or a falsy.
+// Transitions are always truthy.
 func (Transition[TReference, TMetadata]) Truth() starlark.Bool {
 	return starlark.True
 }
 
+// Hash the transition object, so that it may be used as the key in a
+// dictionary. This is currently not supported.
 func (Transition[TReference, TMetadata]) Hash(thread *starlark.Thread) (uint32, error) {
 	return 0, errors.New("transition cannot be hashed")
 }
 
+// TransitionDefinition contains the definition of a configuration
+// transition. For user defined transitions this may contain all of the
+// transition's properties (inputs, outputs, reference to an
+// implementation function). For predeclared transitions ("exec",
+// "target", config.none(), etc.), the definition may be trivial.
 type TransitionDefinition[TReference any, TMetadata model_core.CloneableReferenceMetadata] interface {
 	EncodableValue[TReference, TMetadata]
 	AssignIdentifier(identifier pg_label.CanonicalStarlarkIdentifier)
@@ -60,6 +79,10 @@ type referenceTransitionDefinition[TReference any, TMetadata model_core.Cloneabl
 	reference *model_starlark_pb.Transition_Reference
 }
 
+// NewReferenceTransitionDefinition creates a reference to a transition.
+// These may either refer to a user defined transition using its
+// Starlark identifier, or a predeclared transition ("exec", "target",
+// config.none(), etc.).
 func NewReferenceTransitionDefinition[TReference any, TMetadata model_core.CloneableReferenceMetadata](reference *model_starlark_pb.Transition_Reference) TransitionDefinition[TReference, TMetadata] {
 	return &referenceTransitionDefinition[TReference, TMetadata]{
 		reference: reference,
@@ -95,6 +118,8 @@ func (td *referenceTransitionDefinition[TReference, TMetadata]) EncodeValue(path
 	), false, nil
 }
 
+// References to transitions that are used frequently (e.g., "exec",
+// "target", config.none()).
 var (
 	DefaultExecGroupTransitionReference = model_starlark_pb.Transition_Reference{
 		Kind: &model_starlark_pb.Transition_Reference_ExecGroup{
@@ -126,6 +151,9 @@ type userDefinedTransitionDefinition[TReference any, TMetadata model_core.Clonea
 	outputs        []string
 }
 
+// NewUserDefinedTransitionDefinition creates an object holding the
+// properties of a new user defined transition, as normally done by
+// exec_transition() or transition().
 func NewUserDefinedTransitionDefinition[TReference any, TMetadata model_core.CloneableReferenceMetadata](identifier *pg_label.CanonicalStarlarkIdentifier, implementation NamedFunction[TReference, TMetadata], inputs, outputs []string) TransitionDefinition[TReference, TMetadata] {
 	return &userDefinedTransitionDefinition[TReference, TMetadata]{
 		LateNamedValue: LateNamedValue{
@@ -203,6 +231,10 @@ func (td *userDefinedTransitionDefinition[TReference, TMetadata]) EncodeValue(pa
 
 type transitionDefinitionUnpackerInto[TReference any, TMetadata model_core.CloneableReferenceMetadata] struct{}
 
+// NewTransitionDefinitionUnpackerInto is capable of unpacking arguments
+// to a Starlark function that are expected to refer to a configuration
+// transition. These may either be user defined transitions, or strings
+// referring to predefined transitions (i.e., "exec" or "target").
 func NewTransitionDefinitionUnpackerInto[TReference any, TMetadata model_core.CloneableReferenceMetadata]() unpack.UnpackerInto[TransitionDefinition[TReference, TMetadata]] {
 	return transitionDefinitionUnpackerInto[TReference, TMetadata]{}
 }

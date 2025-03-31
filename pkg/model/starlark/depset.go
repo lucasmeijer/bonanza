@@ -157,20 +157,31 @@ func (Depset[TReference, TMetadata]) String() string {
 	return "<depset>"
 }
 
+// Type returns the name of the type of a depset value.
 func (Depset[TReference, TMetadata]) Type() string {
 	return "depset"
 }
 
+// Freeze the contents of the depset. As we assume that all values
+// contained in the depset are hashable and therefore immutable, this
+// method does nothing.
 func (Depset[TReference, TMetadata]) Freeze() {}
 
+// Truth returns whether a depset value evaluates to true or false if
+// implicitly converted to a Boolean value. All depsets evaluate to
+// true.
 func (Depset[TReference, TMetadata]) Truth() starlark.Bool {
 	return starlark.True
 }
 
+// Hash a depset value. As depsets only offer reference equality, the
+// hash value provides little value.
 func (d *Depset[TReference, TMetadata]) Hash(thread *starlark.Thread) (uint32, error) {
 	return d.hash, nil
 }
 
+// CompareSameType can be used to compare depsets for equality. Depsets
+// only offer reference equality.
 func (d *Depset[TReference, TMetadata]) CompareSameType(thread *starlark.Thread, op syntax.Token, other starlark.Value, depth int) (bool, error) {
 	switch op {
 	case syntax.EQL:
@@ -229,6 +240,9 @@ func (e *depsetChildrenEncoder[TReference, TMetadata]) encode(children any) erro
 	return nil
 }
 
+// Encode a depset value to a Protobuf message. This method is identical
+// to EncodeValue(), except that can be used in cases where the value
+// may only be a depset.
 func (d *Depset[TReference, TMetadata]) Encode(path map[starlark.Value]struct{}, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.Depset, TMetadata], bool, error) {
 	e := depsetChildrenEncoder[TReference, TMetadata]{
 		path:        path,
@@ -253,6 +267,19 @@ func (d *Depset[TReference, TMetadata]) Encode(path map[starlark.Value]struct{},
 	), e.needsCode, nil
 }
 
+// EncodeValue encodes a depset value to a Starlark value Protobuf
+// message.
+//
+// Whereas the depset.to_list() function only returns unique occurrences
+// of every element, an encoded depset may still contain duplicates.
+//
+// Even though we use the same message format as regular lists, there is
+// no guarantee that all leaves are stored at the same depth. The reason
+// for this is that when merging depset, we never attempt to reload any
+// existing lists from torage. If a depset with a non-zero height is
+// encountered, we merely copy over its top level elements. Even though
+// this leads to an imbalance, it does lead to faster deduplication in
+// depset.to_list().
 func (d *Depset[TReference, TMetadata]) EncodeValue(path map[starlark.Value]struct{}, currentIdentifier *pg_label.CanonicalStarlarkIdentifier, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.Value, TMetadata], bool, error) {
 	encodedDepset, needsCode, err := d.Encode(path, options)
 	if err != nil {
@@ -268,6 +295,9 @@ func (d *Depset[TReference, TMetadata]) EncodeValue(path map[starlark.Value]stru
 	), needsCode, nil
 }
 
+// Attr can be used to access attributes of the depset. Depsets only
+// provide a single method named to_list(), which can be used to convert
+// it to a deduplicated list.
 func (d *Depset[TReference, TMetadata]) Attr(thread *starlark.Thread, name string) (starlark.Value, error) {
 	switch name {
 	case "to_list":
@@ -281,6 +311,7 @@ var depsetAttrNames = []string{
 	"to_list",
 }
 
+// AttrNames returns the names of the attributes of the depset object.
 func (d *Depset[TReference, TMetadata]) AttrNames() []string {
 	return depsetAttrNames
 }
@@ -349,6 +380,9 @@ func (dlc *depsetToListConverter[TReference, TMetadata]) appendChildren(children
 	return nil
 }
 
+// ToList extracts all elements contained in the depset and returns them
+// as a list. If the depset contains duplicate elements, only the first
+// occurrence is retained.
 func (d *Depset[TReference, TMetadata]) ToList(thread *starlark.Thread) (*starlark.List, error) {
 	dlc := depsetToListConverter[TReference, TMetadata]{
 		thread:           thread,

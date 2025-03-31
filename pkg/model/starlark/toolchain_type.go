@@ -14,6 +14,10 @@ import (
 	"go.starlark.net/syntax"
 )
 
+// ToolchainType corresponds to a Starlark toolchain type object, as
+// normally created by the config_common.toolchain_type() function.
+// These objects can be used to refer to toolchains, expressing whether
+// the dependency on a toolchain is mandatory or optional.
 type ToolchainType[TReference any, TMetadata model_core.CloneableReferenceMetadata] struct {
 	toolchainType pg_label.ResolvedLabel
 	mandatory     bool
@@ -25,6 +29,8 @@ var (
 	_ EncodableValue[object.LocalReference, model_core.CloneableReferenceMetadata] = (*ToolchainType[object.LocalReference, model_core.CloneableReferenceMetadata])(nil)
 )
 
+// NewToolchainType returns a Starlark toolchain type object, as
+// normally created by the config_common.toolchain_type() function.
 func NewToolchainType[TReference any, TMetadata model_core.CloneableReferenceMetadata](toolchainType pg_label.ResolvedLabel, mandatory bool) *ToolchainType[TReference, TMetadata] {
 	return &ToolchainType[TReference, TMetadata]{
 		toolchainType: toolchainType,
@@ -36,20 +42,32 @@ func (ToolchainType[TReference, TMetadata]) String() string {
 	return "<config_common.toolchain_type>"
 }
 
+// Type returns the type name of the Starlark toolchain type object.
 func (ToolchainType[TReference, TMetadata]) Type() string {
 	return "config_common.toolchain_type"
 }
 
+// Freeze the contents of the toolchain type object. As toolchain type
+// objects are immutable, this method has no effect.
 func (ToolchainType[TReference, TMetadata]) Freeze() {}
 
+// Truth returns whether the Starlark toolchain type object should
+// evaluate to true or false when implicitly converted to a Boolean
+// value. Toolchain type objects always evaluate to true.
 func (ToolchainType[TReference, TMetadata]) Truth() starlark.Bool {
 	return starlark.True
 }
 
+// Hash the Starlark toolchain type object, so that it can be used as a
+// key in a dictionary. This method is not implemented for toolchain
+// type objects.
 func (ToolchainType[TReference, TMetadata]) Hash(thread *starlark.Thread) (uint32, error) {
 	return 0, errors.New("config_common.toolchain_type cannot be hashed")
 }
 
+// Attr can be used to access attributes of the Starlark toolchain type
+// object. These attributes correspond to the properties that were used
+// to construct the toolchain type object.
 func (tt *ToolchainType[TReference, TMetadata]) Attr(thread *starlark.Thread, name string) (starlark.Value, error) {
 	switch name {
 	case "mandatory":
@@ -61,6 +79,20 @@ func (tt *ToolchainType[TReference, TMetadata]) Attr(thread *starlark.Thread, na
 	}
 }
 
+var toolchainTypeAttrNames = []string{
+	"mandatory",
+	"toolchain_type",
+}
+
+// AttrNames returns the names of the attributes of the Starlark
+// toolchain type object. These attributes can be used to access the
+// properties that were used to construct the toolchain type object.
+func (tt *ToolchainType[TReference, TMetadata]) AttrNames() []string {
+	return toolchainTypeAttrNames
+}
+
+// Encode the properties of a Starlark toolchain type value in the form
+// of a Protobuf message, so that it can be written to storage.
 func (tt *ToolchainType[TReference, TMetadata]) Encode() *model_starlark_pb.ToolchainType {
 	return &model_starlark_pb.ToolchainType{
 		ToolchainType: tt.toolchainType.String(),
@@ -68,6 +100,9 @@ func (tt *ToolchainType[TReference, TMetadata]) Encode() *model_starlark_pb.Tool
 	}
 }
 
+// Merge two toolchain type objects together that have the same
+// toolchain type label. This is used when constructing exec group
+// objects to filter any toolchain types that are specified redundantly.
 func (tt *ToolchainType[TReference, TMetadata]) Merge(other *ToolchainType[TReference, TMetadata]) *ToolchainType[TReference, TMetadata] {
 	return &ToolchainType[TReference, TMetadata]{
 		toolchainType: tt.toolchainType,
@@ -75,15 +110,11 @@ func (tt *ToolchainType[TReference, TMetadata]) Merge(other *ToolchainType[TRefe
 	}
 }
 
-var toolchainTypeAttrNames = []string{
-	"mandatory",
-	"toolchain_type",
-}
-
-func (tt *ToolchainType[TReference, TMetadata]) AttrNames() []string {
-	return toolchainTypeAttrNames
-}
-
+// EncodeValue encodes the properties of a Starlark toolchain type value
+// in the form of a Starlark value Protobuf message, so that it can be
+// written to storage. As toolchain types contain relatively little
+// information, the resulting message never contains any outgoing
+// references.
 func (tt *ToolchainType[TReference, TMetadata]) EncodeValue(path map[starlark.Value]struct{}, currentIdentifier *pg_label.CanonicalStarlarkIdentifier, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.Value, TMetadata], bool, error) {
 	return model_core.NewSimplePatchedMessage[TMetadata](
 		&model_starlark_pb.Value{
@@ -96,6 +127,13 @@ func (tt *ToolchainType[TReference, TMetadata]) EncodeValue(path map[starlark.Va
 
 type toolchainTypeUnpackerInto[TReference any, TMetadata model_core.CloneableReferenceMetadata] struct{}
 
+// NewToolchainTypeUnpackerInto is capable of unpacking arguments that
+// are provided to functions that accept toolchain types.
+//
+// Toolchain types may either be provided in the form of strings or
+// labels, or as values explicitly constructed using the
+// toolchain_type() function. When the former is used, toolchain type
+// dependencies are assumed to be mandatory.
 func NewToolchainTypeUnpackerInto[TReference any, TMetadata model_core.CloneableReferenceMetadata]() unpack.UnpackerInto[*ToolchainType[TReference, TMetadata]] {
 	return toolchainTypeUnpackerInto[TReference, TMetadata]{}
 }

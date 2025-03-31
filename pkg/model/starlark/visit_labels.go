@@ -1,15 +1,24 @@
 package starlark
 
 import (
+	"fmt"
+
 	pg_label "github.com/buildbarn/bonanza/pkg/label"
 
 	"go.starlark.net/starlark"
 )
 
+// HasLabels can be implemented by Starlark values that potentially
+// contain label values. This allows the labels contained within to be
+// visited by calling VisitLabels().
 type HasLabels interface {
 	VisitLabels(thread *starlark.Thread, path map[starlark.Value]struct{}, visitor func(pg_label.ResolvedLabel) error) error
 }
 
+// VisitLabels recursively visits a Starlark value and reports any
+// labels that are contained within. This method can, for example, be
+// used to walk all labels contained in rule attributes to determine
+// their dependencies.
 func VisitLabels(thread *starlark.Thread, v starlark.Value, path map[starlark.Value]struct{}, visitor func(pg_label.ResolvedLabel) error) error {
 	if _, ok := path[v]; !ok {
 		path[v] = struct{}{}
@@ -44,7 +53,7 @@ func VisitLabels(thread *starlark.Thread, v starlark.Value, path map[starlark.Va
 		case starlark.NoneType:
 
 		default:
-			panic("unsupported type " + v.Type())
+			return fmt.Errorf("cannot visit labels contained in value of type %s", v.Type())
 		}
 		delete(path, v)
 	}
