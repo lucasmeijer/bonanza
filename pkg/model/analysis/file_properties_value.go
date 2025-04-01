@@ -36,10 +36,6 @@ type reposFilePropertiesResolver[TReference object.BasicReference, TMetadata any
 
 var _ path.ComponentWalker = (*reposFilePropertiesResolver[object.LocalReference, model_core.ReferenceMetadata])(nil)
 
-func (r *reposFilePropertiesResolver[TReference, TMetadata]) getCurrentLeaves() (model_core.Message[*model_filesystem_pb.Leaves, TReference], error) {
-	return model_filesystem.DirectoryGetLeaves(r.context, r.leavesReader, r.stack[len(r.stack)-1])
-}
-
 func (r *reposFilePropertiesResolver[TReference, TMetadata]) dereferenceCurrentDirectory() error {
 	if r.currentDirectoryReference.IsSet() {
 		d, err := model_parser.Dereference(r.context, r.directoryReader, r.currentDirectoryReference)
@@ -94,7 +90,7 @@ func (r *reposFilePropertiesResolver[TReference, TMetadata]) OnDirectory(name pa
 		}, nil
 	}
 
-	leaves, err := r.getCurrentLeaves()
+	leaves, err := model_filesystem.DirectoryGetLeaves(r.context, r.leavesReader, d)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +135,7 @@ func (r *reposFilePropertiesResolver[TReference, TMetadata]) OnTerminal(name pat
 		return nil, errors.New("path resolves to a directory, while a file was expected")
 	}
 
-	leaves, err := r.getCurrentLeaves()
+	leaves, err := model_filesystem.DirectoryGetLeaves(r.context, r.leavesReader, d)
 	if err != nil {
 		return nil, err
 	}
