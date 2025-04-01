@@ -49,7 +49,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeCompatibleToolchainsForType
 		return PatchedCompatibleToolchainsForTypeValue{}, evaluation.ErrMissingDependency
 	}
 
-	platformInfoProvider, err := getTargetPlatformInfoProvider(e, model_core.Nested(key, key.Message.ConfigurationReference))
+	configurationReference := model_core.Nested(key, key.Message.ConfigurationReference)
+	platformInfoProvider, err := getTargetPlatformInfoProvider(e, configurationReference)
 	if err != nil {
 		return PatchedCompatibleToolchainsForTypeValue{}, err
 	}
@@ -63,12 +64,47 @@ func (c *baseComputer[TReference, TMetadata]) ComputeCompatibleToolchainsForType
 		return PatchedCompatibleToolchainsForTypeValue{}, fmt.Errorf("failed to extract constraints from PlatformInfo provider of target platform: %w", err)
 	}
 
+	missingDependencies := false
 	allToolchains := registeredToolchains.Message.Toolchains
 	var compatibleToolchains []*model_analysis_pb.RegisteredToolchain
+FindCompatibleToolchains:
 	for _, toolchain := range allToolchains {
-		if constraintsAreCompatible(constraints, toolchain.TargetCompatibleWith) {
-			compatibleToolchains = append(compatibleToolchains, toolchain)
+		if !constraintsAreCompatible(constraints, toolchain.TargetCompatibleWith) {
+			// Missing incompatible constraint value.
+			continue FindCompatibleToolchains
 		}
+
+		for _, targetSetting := range toolchain.TargetSettings {
+			targetSettingLabel, err := label.NewCanonicalLabel(targetSetting)
+			if err != nil {
+				return PatchedCompatibleToolchainsForTypeValue{}, fmt.Errorf("invalid target setting label %#v: %w", targetSettingLabel, err)
+			}
+			patchedConfigurationReference := model_core.Patch(e, configurationReference)
+			selectValue := e.GetSelectValue(
+				model_core.NewPatchedMessage(
+					&model_analysis_pb.Select_Key{
+						ConditionIdentifiers:   []string{targetSetting},
+						ConfigurationReference: patchedConfigurationReference.Message,
+						// Visibility for target settings is already
+						// validated when configuring the toolchain target.
+						FromPackage: targetSettingLabel.GetCanonicalPackage().String(),
+					},
+					model_core.MapReferenceMetadataToWalkers(patchedConfigurationReference.Patcher),
+				),
+			)
+			if !selectValue.IsSet() {
+				missingDependencies = true
+				continue
+			}
+			if len(selectValue.Message.ConditionIndices) == 0 {
+				// Incompatible target setting.
+				continue FindCompatibleToolchains
+			}
+		}
+		compatibleToolchains = append(compatibleToolchains, toolchain)
+	}
+	if missingDependencies {
+		return PatchedCompatibleToolchainsForTypeValue{}, evaluation.ErrMissingDependency
 	}
 
 	return model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](&model_analysis_pb.CompatibleToolchainsForType_Value{

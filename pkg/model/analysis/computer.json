@@ -58,6 +58,7 @@
          "dependsOn": [
             "ConfiguredTarget",
             "RegisteredToolchainsForType",
+            "Select",
             "Target",
             "VisibleTarget"
          ],
