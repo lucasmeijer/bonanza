@@ -1349,6 +1349,7 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 				attrs := map[pg_label.StarlarkIdentifier]*Attr[TReference, TMetadata]{}
 				var buildSetting *BuildSetting
 				var cfg *Transition[TReference, TMetadata]
+				defaultExecGroup := true
 				doc := ""
 				execGroups := map[string]*ExecGroup[TReference, TMetadata]{}
 				executable := false
@@ -1370,6 +1371,7 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 					"attrs?", unpack.Bind(thread, &attrs, unpack.Dict(unpack.StarlarkIdentifier, unpack.Type[*Attr[TReference, TMetadata]]("attr.*"))),
 					"build_setting?", unpack.Bind(thread, &buildSetting, unpack.IfNotNone(unpack.Type[*BuildSetting]("config.*"))),
 					"cfg?", unpack.Bind(thread, &cfg, unpack.IfNotNone(unpack.Type[*Transition[TReference, TMetadata]]("transition"))),
+					"default_exec_group?", unpack.Bind(thread, &defaultExecGroup, unpack.Bool),
 					"doc?", unpack.Bind(thread, &doc, unpack.String),
 					"executable?", unpack.Bind(thread, &executable, unpack.Bool),
 					"exec_compatible_with?", unpack.Bind(thread, &execCompatibleWith, unpack.List(NewLabelOrStringUnpackerInto[TReference, TMetadata](CurrentFilePackage(thread, 1)))),
@@ -1387,10 +1389,21 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 					return nil, err
 				}
 
-				if _, ok := execGroups[""]; ok {
-					return nil, errors.New("cannot explicitly declare exec_group with name \"\"")
+				// Some of the core rules like config_setting(),
+				// constraint_value(), and platform() don't
+				// perform any execution. We don't want to give
+				// those rules any exec groups, because that
+				// would cause cyclic dependencies during
+				// evaluation. Omit the default exec group for
+				// such rules.
+				if defaultExecGroup {
+					if _, ok := execGroups[""]; ok {
+						return nil, errors.New("cannot explicitly declare exec_group with name \"\"")
+					}
+					execGroups[""] = NewExecGroup(execCompatibleWith, toolchains)
+				} else if len(execCompatibleWith) > 0 || len(toolchains) > 0 {
+					return nil, fmt.Errorf("default_exec_group=False is incompatible with the exec_compatible_with and toolchains options")
 				}
-				execGroups[""] = NewExecGroup(execCompatibleWith, toolchains)
 
 				// Convert predeclared outputs to
 				// attr.output(), with the filename
