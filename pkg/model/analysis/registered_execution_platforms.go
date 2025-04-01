@@ -146,6 +146,7 @@ func (h *registeredExecutionPlatformExtractingModuleDotBazelHandler[TReference, 
 				}
 
 				*h.executionPlatforms = append(*h.executionPlatforms, &model_analysis_pb.ExecutionPlatform{
+					Label:             canonicalPlatformLabelStr,
 					Constraints:       constraints,
 					ExecPkixPublicKey: execPKIXPublicKey,
 				})

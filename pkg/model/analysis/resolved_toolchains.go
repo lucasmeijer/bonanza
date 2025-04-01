@@ -147,6 +147,7 @@ CheckExecutionPlatform:
 		}
 		return model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](&model_analysis_pb.ResolvedToolchains_Value{
 			ToolchainIdentifiers: toolchainIdentifiers,
+			PlatformLabel:        executionPlatform.Label,
 		}), nil
 	}
 

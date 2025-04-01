@@ -810,17 +810,21 @@ message Constraint {
 }
 
 message ExecutionPlatform {
+  // Canonical label of the platform target. When this platform is
+  // selected, the --platforms flag will be assigned to this target.
+  string label = 1;
+
   // Constraints that apply to the execution platform, such as the
   // CPU architecture or operating system. Constraints are sorted
   // alphabetically by setting.
   //
   // Constraints for which the value is equal to the default value of
   // the setting are omitted.
-  repeated Constraint constraints = 1;
+  repeated Constraint constraints = 2;
 
   // The X25519 public key that identifies the platform that should be
   // used to execute the action in PKIX, ASN.1 DER form.
-  bytes exec_pkix_public_key = 2;
+  bytes exec_pkix_public_key = 3;
 
   // TODO: Also add flags, required_settings, etc.?
 }
@@ -992,13 +996,15 @@ message ResolvedToolchains {
   }
 
   message Value {
-    // TODO: Put the name of the selected execution platform in here.
-
     // Identifiers of the resolved toolchains, using the same order as
     // the toolchain types in the key. Any optional toolchains that
     // could not be resolved will have their identifier set to the
     // empty string.
     repeated string toolchain_identifiers = 1;
+
+    // Label of an execution platform that is capable of running actions
+    // using executables that are part of the resolved toolchains.
+    string platform_label = 2;
   }
 }
 
