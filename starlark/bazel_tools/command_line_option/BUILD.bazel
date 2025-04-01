@@ -153,6 +153,12 @@ bool_flag(
     visibility = ["//visibility:public"],
 )
 
+bool_flag(
+    name = "collect_code_coverage",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
 string_flag(
     name = "compilation_mode",
     build_setting_default = "fastbuild",
