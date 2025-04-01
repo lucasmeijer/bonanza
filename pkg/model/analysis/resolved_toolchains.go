@@ -59,11 +59,28 @@ func (c *baseComputer[TReference, TMetadata]) ComputeResolvedToolchainsValue(ctx
 	}
 	compatibleToolchainsByType := make([][]*model_analysis_pb.RegisteredToolchain, 0, len(key.Message.Toolchains))
 	for _, toolchain := range key.Message.Toolchains {
+		toolchainTypeLabel, err := label.NewCanonicalLabel(toolchain.ToolchainType)
+		if err != nil {
+			return PatchedResolvedToolchainsValue{}, fmt.Errorf("invalid toolchain %#v label: %w", toolchain, err)
+		}
+		visibleToolchainType := e.GetVisibleTargetValue(
+			model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](
+				&model_analysis_pb.VisibleTarget_Key{
+					FromPackage: toolchainTypeLabel.GetCanonicalPackage().String(),
+					ToLabel:     toolchainTypeLabel.String(),
+				},
+			),
+		)
+		if !visibleToolchainType.IsSet() {
+			missingDependencies = true
+			continue
+		}
+
 		configurationReference := model_core.Patch(e, model_core.Nested(key, key.Message.ConfigurationReference))
 		compatibleToolchainsForTypeValue := e.GetCompatibleToolchainsForTypeValue(
 			model_core.NewPatchedMessage(
 				&model_analysis_pb.CompatibleToolchainsForType_Key{
-					ToolchainType:          toolchain.ToolchainType,
+					ToolchainType:          visibleToolchainType.Message.Label,
 					ConfigurationReference: configurationReference.Message,
 				},
 				model_core.MapReferenceMetadataToWalkers(configurationReference.Patcher),
@@ -73,6 +90,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeResolvedToolchainsValue(ctx
 			missingDependencies = true
 			continue
 		}
+
 		compatibleToolchainsForType := compatibleToolchainsForTypeValue.Message.Toolchains
 		if len(compatibleToolchainsForType) == 0 && toolchain.Mandatory {
 			return PatchedResolvedToolchainsValue{}, fmt.Errorf("dependency on toolchain type %#v is mandatory, but no toolchains exist that are compatible with the target", toolchain.ToolchainType)
