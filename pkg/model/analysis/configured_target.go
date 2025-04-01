@@ -318,6 +318,7 @@ func (c *baseComputer[TReference, TMetadata]) configureAttrValueParts(
 	valueParts model_core.Message[[]*model_starlark_pb.Value, TReference],
 	configurationReference model_core.Message[*model_core_pb.Reference, TReference],
 	visibilityFromPackage label.CanonicalPackage,
+	execGroupPlatformLabels map[string]string,
 ) (starlark.Value, error) {
 	// See if any transitions need to be applied.
 	var cfg *model_starlark_pb.Transition_Reference
@@ -345,6 +346,7 @@ func (c *baseComputer[TReference, TMetadata]) configureAttrValueParts(
 			model_starlark.NewStructFromDict[TReference, TMetadata](nil, map[string]any{
 				// TODO!
 			}),
+			execGroupPlatformLabels,
 		)
 		if err != nil {
 			return nil, err
@@ -809,6 +811,52 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 				outputsValues[namedAttr.Name] = starlark.NewList(attrOutputs)
 			}
 		}
+
+		// Resolve all toolchains and execution platforms.
+		namedExecGroups := ruleDefinition.Message.ExecGroups
+		execGroups := make([]ruleContextExecGroupState, 0, len(namedExecGroups))
+		execGroupPlatformLabels := map[string]string{}
+		for _, namedExecGroup := range namedExecGroups {
+			execGroupDefinition := namedExecGroup.ExecGroup
+			if execGroupDefinition == nil {
+				return PatchedConfiguredTargetValue{}, fmt.Errorf("missing definition of exec group %#v", namedExecGroup.Name)
+			}
+			execCompatibleWith, err := c.constraintValuesToConstraints(
+				ctx,
+				e,
+				targetPackage,
+				execGroupDefinition.ExecCompatibleWith,
+			)
+			if err != nil {
+				return PatchedConfiguredTargetValue{}, fmt.Errorf("invalid constraint values for exec group %#v: %w", namedExecGroup.Name)
+			}
+			patchedConfigurationReference := model_core.Patch(e, configurationReference)
+			resolvedToolchains := e.GetResolvedToolchainsValue(
+				model_core.NewPatchedMessage(
+					&model_analysis_pb.ResolvedToolchains_Key{
+						ExecCompatibleWith:     execCompatibleWith,
+						ConfigurationReference: patchedConfigurationReference.Message,
+						Toolchains:             execGroupDefinition.Toolchains,
+					},
+					model_core.MapReferenceMetadataToWalkers(patchedConfigurationReference.Patcher),
+				),
+			)
+			if !resolvedToolchains.IsSet() {
+				missingDependencies = true
+				continue
+			}
+			toolchainIdentifiers := resolvedToolchains.Message.ToolchainIdentifiers
+			if actual, expected := len(toolchainIdentifiers), len(execGroupDefinition.Toolchains); actual != expected {
+				return PatchedConfiguredTargetValue{}, fmt.Errorf("obtained %d resolved toolchains, while exec group %#v depends on %d toolchains", actual, namedExecGroup.Name, expected)
+			}
+
+			execGroups = append(execGroups, ruleContextExecGroupState{
+				toolchainIdentifiers: toolchainIdentifiers,
+				toolchainInfos:       make([]starlark.Value, len(toolchainIdentifiers)),
+			})
+			execGroupPlatformLabels[namedExecGroup.Name] = resolvedToolchains.Message.PlatformLabel
+		}
+
 		if missingDependencies {
 			return PatchedConfiguredTargetValue{}, evaluation.ErrMissingDependency
 		}
@@ -856,7 +904,14 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 			// Perform outgoing edge transition. User
 			// defined transitions get access to all
 			// non-label attr values.
-			patchedTransition, mayHaveMultipleConfigurations, err := c.performTransition(ctx, e, labelOptions.Cfg, configurationReference, edgeTransitionAttrValuesStruct)
+			patchedTransition, mayHaveMultipleConfigurations, err := c.performTransition(
+				ctx,
+				e,
+				labelOptions.Cfg,
+				configurationReference,
+				edgeTransitionAttrValuesStruct,
+				execGroupPlatformLabels,
+			)
 			if err != nil {
 				if errors.Is(err, evaluation.ErrMissingDependency) {
 					missingDependencies = true
@@ -1135,7 +1190,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 			file:                   model_starlark.NewStructFromDict[TReference, TMetadata](nil, fileValues),
 			files:                  model_starlark.NewStructFromDict[TReference, TMetadata](nil, filesValues),
 			outputs:                model_starlark.NewStructFromDict[TReference, TMetadata](nil, outputsValues),
-			execGroups:             make([]*ruleContextExecGroupState, len(ruleDefinition.Message.ExecGroups)),
+			execGroups:             execGroups,
 			fragments:              map[string]*model_starlark.Struct[TReference, TMetadata]{},
 		}
 		thread.SetLocal(model_starlark.CurrentCtxKey, rc)
@@ -1193,6 +1248,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 					model_core.Nested(rc.ruleDefinition, []*model_starlark_pb.Value{defaultValue}),
 					rc.configurationReference,
 					rc.ruleIdentifier.GetCanonicalLabel().GetCanonicalPackage(),
+					execGroupPlatformLabels,
 				)
 				if err != nil {
 					if errors.Is(err, evaluation.ErrMissingDependency) {
@@ -1385,7 +1441,7 @@ type ruleContext[TReference object.BasicReference, TMetadata BaseComputerReferen
 	file                   starlark.Value
 	files                  starlark.Value
 	outputs                starlark.Value
-	execGroups             []*ruleContextExecGroupState
+	execGroups             []ruleContextExecGroupState
 	tags                   *starlark.List
 	varDict                *starlark.Dict
 	fragments              map[string]*model_starlark.Struct[TReference, TMetadata]
@@ -2284,46 +2340,7 @@ func (tc *toolchainContext[TReference, TMetadata]) Get(thread *starlark.Thread, 
 		return nil, false, fmt.Errorf("exec group %#v does not depend on toolchain type %#v", namedExecGroup.Name, toolchainType)
 	}
 
-	execGroup := rc.execGroups[tc.execGroupIndex]
-	if execGroup == nil {
-		execCompatibleWith, err := rc.computer.constraintValuesToConstraints(
-			rc.context,
-			rc.environment,
-			rc.targetLabel.GetCanonicalPackage(),
-			execGroupDefinition.ExecCompatibleWith,
-		)
-		if err != nil {
-			return nil, true, err
-		}
-		configurationReference := model_core.Patch(
-			rc.environment,
-			rc.configurationReference,
-		)
-		resolvedToolchains := rc.environment.GetResolvedToolchainsValue(
-			model_core.NewPatchedMessage(
-				&model_analysis_pb.ResolvedToolchains_Key{
-					ExecCompatibleWith:     execCompatibleWith,
-					ConfigurationReference: configurationReference.Message,
-					Toolchains:             execGroupDefinition.Toolchains,
-				},
-				model_core.MapReferenceMetadataToWalkers(configurationReference.Patcher),
-			),
-		)
-		if !resolvedToolchains.IsSet() {
-			return nil, true, evaluation.ErrMissingDependency
-		}
-		toolchainIdentifiers := resolvedToolchains.Message.ToolchainIdentifiers
-		if actual, expected := len(toolchainIdentifiers), len(toolchains); actual != expected {
-			return nil, true, fmt.Errorf("obtained %d resolved toolchains, while %d were expected", actual, expected)
-		}
-
-		execGroup = &ruleContextExecGroupState{
-			toolchainIdentifiers: toolchainIdentifiers,
-			toolchainInfos:       make([]starlark.Value, len(toolchains)),
-		}
-		rc.execGroups[tc.execGroupIndex] = execGroup
-	}
-
+	execGroup := &rc.execGroups[tc.execGroupIndex]
 	toolchainInfo := execGroup.toolchainInfos[toolchainIndex]
 	if toolchainInfo == nil {
 		toolchainIdentifier := execGroup.toolchainIdentifiers[toolchainIndex]

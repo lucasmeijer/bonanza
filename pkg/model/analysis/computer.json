@@ -115,6 +115,7 @@
             "CompiledBzlFileFunctionFactory",
             "CompiledBzlFileGlobal",
             "ConfiguredTarget",
+            "ExecTransition",
             "MakeVariables",
             "ResolvedToolchains",
             "RootModule",
@@ -153,6 +154,20 @@
          "nativeValueType": {
             "type": "*DirectoryReaders[TReference]"
          }
+      },
+      "ExecTransition": {
+         "dependsOn": [
+            "BuiltinsModuleNames",
+            "CanonicalRepoName",
+            "CompiledBzlFileDecodedGlobals",
+            "CompiledBzlFileFunctionFactory",
+            "CompiledBzlFileGlobal",
+            "ConfiguredTarget",
+            "RootModule",
+            "Target",
+            "VisibleTarget"
+         ],
+         "keyContainsReferences": true
       },
       "FileAccessParameters": {
          "dependsOn": [

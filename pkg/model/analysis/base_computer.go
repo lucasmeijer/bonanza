@@ -281,36 +281,11 @@ func (c *baseComputer[TReference, TMetadata]) ComputeBuildResultValue(ctx contex
 	rootRepo := rootModule.ToModuleInstance(nil).GetBareCanonicalRepo()
 	rootPackage := rootRepo.GetRootPackage()
 
-	commandLineOptionPlatformsLabelStr := commandLineOptionPlatformsLabel.String()
-	platformExpectedTransitionOutput, err := getExpectedTransitionOutput[TReference, TMetadata](e, rootPackage, commandLineOptionPlatformsLabelStr)
-	if err != nil {
-		return PatchedBuildResultValue{}, err
-	}
-
 	thread := c.newStarlarkThread(ctx, e, buildSpecification.BuiltinsModuleNames)
-	valueEncodingOptions := c.getValueEncodingOptions(e, nil)
 	missingDependencies := false
 	labelResolver := newLabelResolver(e)
 	for _, targetPlatform := range buildSpecification.TargetPlatforms {
-		apparentTargetPlatform, err := label.NewApparentLabel(targetPlatform)
-		if err != nil {
-			return PatchedBuildResultValue{}, fmt.Errorf("invalid target platform %#v: %w", targetPlatform, err)
-		}
-		canonicalTargetPlatform, err := label.Canonicalize(labelResolver, rootRepo, apparentTargetPlatform)
-		if err != nil {
-			return PatchedBuildResultValue{}, fmt.Errorf("failed to resolve target platform %#v: %w", targetPlatform, err)
-		}
-		targetPlatformConfigurationReference, err := c.applyTransition(
-			ctx,
-			e,
-			model_core.NewSimpleMessage[TReference](&model_analysis_pb.Configuration{}),
-			[]expectedTransitionOutput[TReference]{platformExpectedTransitionOutput},
-			thread,
-			starlark.StringDict{
-				commandLineOptionPlatformsLabelStr: model_starlark.NewLabel[TReference, TMetadata](canonicalTargetPlatform.AsResolved()),
-			},
-			valueEncodingOptions,
-		)
+		targetPlatformConfigurationReference, err := c.createInitialConfiguration(ctx, e, thread, rootPackage, targetPlatform)
 		if err != nil {
 			if !errors.Is(err, evaluation.ErrMissingDependency) {
 				return PatchedBuildResultValue{}, fmt.Errorf("failed to transition to target platform %#v: %w", targetPlatform, err)

@@ -466,12 +466,10 @@ type performUserDefinedTransitionEnvironment[TReference, TMetadata any] interfac
 	GetCompiledBzlFileGlobalValue(*model_analysis_pb.CompiledBzlFileGlobal_Key) model_core.Message[*model_analysis_pb.CompiledBzlFileGlobal_Value, TReference]
 }
 
-type performUserDefinedTransitionResult[TMetadata model_core.ReferenceMetadata] = model_core.PatchedMessage[*model_analysis_pb.UserDefinedTransition_Value_Success, TMetadata]
-
-func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx context.Context, e performUserDefinedTransitionEnvironment[TReference, TMetadata], transitionIdentifierStr string, configurationReference model_core.Message[*model_core_pb.Reference, TReference], attrParameter starlark.Value) (performUserDefinedTransitionResult[TMetadata], error) {
+func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx context.Context, e performUserDefinedTransitionEnvironment[TReference, TMetadata], thread *starlark.Thread, transitionIdentifierStr string, configurationReference model_core.Message[*model_core_pb.Reference, TReference], attrParameter starlark.Value) ([]expectedTransitionOutput[TReference], map[string]map[string]starlark.Value, error) {
 	transitionIdentifier, err := label.NewCanonicalStarlarkIdentifier(transitionIdentifierStr)
 	if err != nil {
-		return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("invalid transition identifier: %w", err)
+		return nil, nil, fmt.Errorf("invalid transition identifier: %w", err)
 	}
 
 	allBuiltinsModulesNames := e.GetBuiltinsModuleNamesValue(&model_analysis_pb.BuiltinsModuleNames_Key{})
@@ -479,28 +477,21 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx c
 		Identifier: transitionIdentifier.String(),
 	})
 	if !allBuiltinsModulesNames.IsSet() || !transitionValue.IsSet() {
-		return performUserDefinedTransitionResult[TMetadata]{}, evaluation.ErrMissingDependency
+		return nil, nil, evaluation.ErrMissingDependency
 	}
 	v, ok := transitionValue.Message.Global.GetKind().(*model_starlark_pb.Value_Transition)
 	if !ok {
-		return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("%#v is not a transition", transitionIdentifier.String())
+		return nil, nil, fmt.Errorf("%#v is not a transition", transitionIdentifier.String())
 	}
 	d, ok := v.Transition.Kind.(*model_starlark_pb.Transition_Definition_)
 	if !ok {
-		return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("%#v is not a rule definition", transitionIdentifier.String())
+		return nil, nil, fmt.Errorf("%#v is not a rule definition", transitionIdentifier.String())
 	}
 	transitionDefinition := model_core.Nested(transitionValue, d.Definition)
 
 	transitionFilename := transitionIdentifier.GetCanonicalLabel()
 	transitionPackage := transitionFilename.GetCanonicalPackage()
 	transitionRepo := transitionPackage.GetCanonicalRepo()
-
-	configuration, err := model_parser.MaybeDereference(ctx, c.configurationReader, configurationReference)
-	if err != nil {
-		return performUserDefinedTransitionResult[TMetadata]{}, err
-	}
-
-	thread := c.newStarlarkThread(ctx, e, allBuiltinsModulesNames.Message.BuiltinsModuleNames)
 
 	// Collect inputs to provide to the implementation function.
 	missingDependencies := false
@@ -515,7 +506,7 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx c
 		}
 		apparentBuildSettingLabel, err := pkg.AppendLabel(input)
 		if err != nil {
-			return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("invalid build setting label %#v: %w", input, err)
+			return nil, nil, fmt.Errorf("invalid build setting label %#v: %w", input, err)
 		}
 		canonicalBuildSettingLabel, err := label.Canonicalize(newLabelResolver(e), transitionRepo, apparentBuildSettingLabel)
 		if err != nil {
@@ -523,7 +514,7 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx c
 				missingDependencies = true
 				continue
 			}
-			return performUserDefinedTransitionResult[TMetadata]{}, err
+			return nil, nil, err
 		}
 
 		encodedValue, err := c.getBuildSettingValue(
@@ -541,7 +532,7 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx c
 				missingDependencies = true
 				continue
 			}
-			return performUserDefinedTransitionResult[TMetadata]{}, err
+			return nil, nil, err
 		}
 
 		v, err := model_starlark.DecodeValue[TReference, TMetadata](
@@ -552,10 +543,10 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx c
 			}),
 		)
 		if err != nil {
-			return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("failed to decode value for input %#v: %w", input, err)
+			return nil, nil, fmt.Errorf("failed to decode value for input %#v: %w", input, err)
 		}
 		if err := inputs.SetKey(thread, starlark.String(input), v); err != nil {
-			return performUserDefinedTransitionResult[TMetadata]{}, err
+			return nil, nil, err
 		}
 	}
 	inputs.Freeze()
@@ -572,7 +563,7 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx c
 			}
 		}
 		if existing, ok := expectedOutputLabels[expectedOutput.label]; ok {
-			return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("outputs %#v and %#v both refer to build setting %#v", existing, output, expectedOutput.label)
+			return nil, nil, fmt.Errorf("outputs %#v and %#v both refer to build setting %#v", existing, output, expectedOutput.label)
 		}
 		expectedOutputLabels[expectedOutput.label] = output
 		expectedOutputs = append(expectedOutputs, expectedOutput)
@@ -582,11 +573,10 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx c
 	})
 
 	if missingDependencies {
-		return performUserDefinedTransitionResult[TMetadata]{}, evaluation.ErrMissingDependency
+		return nil, nil, evaluation.ErrMissingDependency
 	}
 
 	// Invoke transition implementation function.
-	valueEncodingOptions := c.getValueEncodingOptions(e, nil)
 	outputs, err := starlark.Call(
 		thread,
 		model_starlark.NewNamedFunction(
@@ -604,10 +594,10 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx c
 		if !errors.Is(err, evaluation.ErrMissingDependency) && !errors.Is(err, errTransitionDependsOnAttrs) {
 			var evalErr *starlark.EvalError
 			if errors.As(err, &evalErr) {
-				return performUserDefinedTransitionResult[TMetadata]{}, errors.New(evalErr.Backtrace())
+				return nil, nil, errors.New(evalErr.Backtrace())
 			}
 		}
-		return performUserDefinedTransitionResult[TMetadata]{}, err
+		return nil, nil, err
 	}
 
 	// Process return value of transition implementation function.
@@ -617,7 +607,7 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx c
 		// 1:2+ transition in the form of a list.
 		var outputsList []map[string]starlark.Value
 		if err := unpack.List(unpack.Dict(unpack.String, unpack.Any)).UnpackInto(thread, typedOutputs, &outputsList); err != nil {
-			return performUserDefinedTransitionResult[TMetadata]{}, err
+			return nil, nil, err
 		}
 		outputsDict = make(map[string]map[string]starlark.Value, len(outputsList))
 		for i, outputs := range outputsList {
@@ -640,29 +630,59 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx c
 		if gotEntries && dictOfDicts {
 			// 1:2+ transition in the form of a dictionary.
 			if err := unpack.Dict(unpack.String, unpack.Dict(unpack.String, unpack.Any)).UnpackInto(thread, typedOutputs, &outputsDict); err != nil {
-				return performUserDefinedTransitionResult[TMetadata]{}, err
+				return nil, nil, err
 			}
 		} else {
 			// 1:1 transition. These are implicitly converted to a
 			// singleton list.
 			var outputs map[string]starlark.Value
 			if err := unpack.Dict(unpack.String, unpack.Any).UnpackInto(thread, typedOutputs, &outputs); err != nil {
-				return performUserDefinedTransitionResult[TMetadata]{}, err
+				return nil, nil, err
 			}
 			outputsDict = map[string]map[string]starlark.Value{
 				"0": outputs,
 			}
 		}
 	default:
-		return performUserDefinedTransitionResult[TMetadata]{}, errors.New("transition did not yield a list or dict")
+		return nil, nil, errors.New("transition did not yield a list or dict")
 	}
+	return expectedOutputs, outputsDict, nil
+}
+
+type performAndApplyUserDefinedTransitionResult[TMetadata model_core.ReferenceMetadata] = model_core.PatchedMessage[*model_analysis_pb.UserDefinedTransition_Value_Success, TMetadata]
+
+func (c *baseComputer[TReference, TMetadata]) performAndApplyUserDefinedTransition(ctx context.Context, e performUserDefinedTransitionEnvironment[TReference, TMetadata], transitionIdentifierStr string, configurationReference model_core.Message[*model_core_pb.Reference, TReference], attrParameter starlark.Value) (performAndApplyUserDefinedTransitionResult[TMetadata], error) {
+	allBuiltinsModulesNames := e.GetBuiltinsModuleNamesValue(&model_analysis_pb.BuiltinsModuleNames_Key{})
+	if !allBuiltinsModulesNames.IsSet() {
+		return performAndApplyUserDefinedTransitionResult[TMetadata]{}, evaluation.ErrMissingDependency
+	}
+	thread := c.newStarlarkThread(ctx, e, allBuiltinsModulesNames.Message.BuiltinsModuleNames)
+
+	expectedOutputs, outputsDict, err := c.performUserDefinedTransition(ctx, e, thread, transitionIdentifierStr, configurationReference, attrParameter)
+	if err != nil {
+		return performAndApplyUserDefinedTransitionResult[TMetadata]{}, err
+	}
+
+	configuration, err := model_parser.MaybeDereference(ctx, c.configurationReader, configurationReference)
+	if err != nil {
+		return performAndApplyUserDefinedTransitionResult[TMetadata]{}, err
+	}
+	valueEncodingOptions := c.getValueEncodingOptions(e, nil)
 
 	patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
 	entries := make([]*model_analysis_pb.UserDefinedTransition_Value_Success_Entry, 0, len(outputsDict))
 	for i, key := range slices.Sorted(maps.Keys(outputsDict)) {
-		outputConfigurationReference, err := c.applyTransition(ctx, e, configuration, expectedOutputs, thread, outputsDict[key], valueEncodingOptions)
+		outputConfigurationReference, err := c.applyTransition(
+			ctx,
+			e,
+			configuration,
+			expectedOutputs,
+			thread,
+			outputsDict[key],
+			valueEncodingOptions,
+		)
 		if err != nil {
-			return performUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("key %#v: %w", i, err)
+			return performAndApplyUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("key %#v: %w", i, err)
 		}
 		entries = append(entries, &model_analysis_pb.UserDefinedTransition_Value_Success_Entry{
 			Key:                          key,
@@ -690,7 +710,7 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransitionCached
 	transitionIdentifierStr string,
 	configurationReference model_core.Message[*model_core_pb.Reference, TReference],
 	attrParameter starlark.Value,
-) (performUserDefinedTransitionResult[TMetadata], error) {
+) (performAndApplyUserDefinedTransitionResult[TMetadata], error) {
 	// First attempt to call into the UserDefinedTransition
 	// function. This function is capable of computing transitions
 	// that don't depend on the "attr" parameter.
@@ -705,14 +725,14 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransitionCached
 		),
 	)
 	if !transitionValue.IsSet() {
-		return performUserDefinedTransitionResult[TMetadata]{}, evaluation.ErrMissingDependency
+		return performAndApplyUserDefinedTransitionResult[TMetadata]{}, evaluation.ErrMissingDependency
 	}
 
 	switch result := transitionValue.Message.Result.(type) {
 	case *model_analysis_pb.UserDefinedTransition_Value_TransitionDependsOnAttrs:
 		// It turns out this user defined transition accesses
 		// the "attr" parameter. Compute it manually.
-		return c.performUserDefinedTransition(
+		return c.performAndApplyUserDefinedTransition(
 			ctx,
 			e,
 			transitionIdentifierStr,
@@ -722,32 +742,55 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransitionCached
 	case *model_analysis_pb.UserDefinedTransition_Value_Success_:
 		return model_core.Patch(e, model_core.Nested(transitionValue, result.Success)), nil
 	default:
-		return performUserDefinedTransitionResult[TMetadata]{}, errors.New("unexpected user defined transition result type")
+		return performAndApplyUserDefinedTransitionResult[TMetadata]{}, errors.New("unexpected user defined transition result type")
 	}
+}
+
+type performTransitionEnvironment[TReference any, TMetadata model_core.ReferenceMetadata] interface {
+	performUserDefinedTransitionCachedEnvironment[TReference, TMetadata]
+
+	GetExecTransitionValue(model_core.PatchedMessage[*model_analysis_pb.ExecTransition_Key, dag.ObjectContentsWalker]) model_core.Message[*model_analysis_pb.ExecTransition_Value, TReference]
 }
 
 func (c *baseComputer[TReference, TMetadata]) performTransition(
 	ctx context.Context,
-	e performUserDefinedTransitionCachedEnvironment[TReference, TMetadata],
+	e performTransitionEnvironment[TReference, TMetadata],
 	transitionReference *model_starlark_pb.Transition_Reference,
 	configurationReference model_core.Message[*model_core_pb.Reference, TReference],
 	attrParameter starlark.Value,
-) (performUserDefinedTransitionResult[TMetadata], bool, error) {
+	execGroupPlatformLabels map[string]string,
+) (performAndApplyUserDefinedTransitionResult[TMetadata], bool, error) {
 	// See if any transitions need to be applied.
 	switch tr := transitionReference.GetKind().(type) {
 	case *model_starlark_pb.Transition_Reference_ExecGroup:
-		// Invoke the exec transition.
-		// TODO: Start off with an empty output configuration.
-		// TODO: This should override platforms.
-		// TODO: Respect --experimental_exec_config.
-		configurationReferences, err := c.performUserDefinedTransitionCached(
-			ctx,
-			e,
-			"@@builtins_bzl+//:common/builtin_exec_platforms.bzl%bazel_exec_transition",
-			configurationReference,
-			attrParameter,
+		platformLabel, ok := execGroupPlatformLabels[tr.ExecGroup]
+		if !ok {
+			return performAndApplyUserDefinedTransitionResult[TMetadata]{}, false, fmt.Errorf("unknown exec group %#v", tr.ExecGroup)
+		}
+
+		inputConfigurationReference := model_core.Patch(e, configurationReference)
+		execTransition := e.GetExecTransitionValue(
+			model_core.NewPatchedMessage(
+				&model_analysis_pb.ExecTransition_Key{
+					PlatformLabel:               platformLabel,
+					InputConfigurationReference: inputConfigurationReference.Message,
+				},
+				model_core.MapReferenceMetadataToWalkers(inputConfigurationReference.Patcher),
+			),
 		)
-		return configurationReferences, false, err
+		if !execTransition.IsSet() {
+			return performAndApplyUserDefinedTransitionResult[TMetadata]{}, false, evaluation.ErrMissingDependency
+		}
+
+		outputConfigurationReference := model_core.Patch(e, model_core.Nested(execTransition, execTransition.Message.OutputConfigurationReference))
+		return model_core.NewPatchedMessage(
+			&model_analysis_pb.UserDefinedTransition_Value_Success{
+				Entries: []*model_analysis_pb.UserDefinedTransition_Value_Success_Entry{{
+					OutputConfigurationReference: outputConfigurationReference.Message,
+				}},
+			},
+			outputConfigurationReference.Patcher,
+		), false, nil
 	case *model_starlark_pb.Transition_Reference_None:
 		// Use the empty configuration.
 		return model_core.NewSimplePatchedMessage[TMetadata](
@@ -781,12 +824,12 @@ func (c *baseComputer[TReference, TMetadata]) performTransition(
 		)
 		return configurationReferences, true, err
 	default:
-		return performUserDefinedTransitionResult[TMetadata]{}, false, errors.New("unknown transition type")
+		return performAndApplyUserDefinedTransitionResult[TMetadata]{}, false, errors.New("unknown transition type")
 	}
 }
 
 func (c *baseComputer[TReference, TMetadata]) ComputeUserDefinedTransitionValue(ctx context.Context, key model_core.Message[*model_analysis_pb.UserDefinedTransition_Key, TReference], e UserDefinedTransitionEnvironment[TReference, TMetadata]) (PatchedUserDefinedTransitionValue, error) {
-	entries, err := c.performUserDefinedTransition(
+	entries, err := c.performAndApplyUserDefinedTransition(
 		ctx,
 		e,
 		key.Message.TransitionIdentifier,

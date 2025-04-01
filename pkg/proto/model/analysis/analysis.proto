@@ -264,6 +264,23 @@ message DirectoryReaders {
   message Key {}
 }
 
+message ExecTransition {
+  message Key {
+    // The label of the platform that was resolved for the exec group
+    // referenced by the attribute.
+    string platform_label = 1;
+
+    // The configuration from which inputs need to be sourced.
+    bonanza.model.core.Reference input_configuration_reference = 2;
+  }
+
+  message Value {
+    // The configuration that should be used to configure the attribute
+    // that has cfg = "exec" or cfg = exec_group(...).
+    bonanza.model.core.Reference output_configuration_reference = 2;
+  }
+}
+
 message FileAccessParameters {
   message Key {}
 
