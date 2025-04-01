@@ -124,6 +124,7 @@ func (h *registeredToolchainExtractingModuleDotBazelHandler[TReference, TMetadat
 					return fmt.Errorf("toolchain %#v: %w", toolchainLabelStr, err)
 				}
 
+				var targetSettings []string
 				var toolchain, toolchainType *string
 				var errIter error
 				for key, value := range model_starlark.AllStructFields(
@@ -134,9 +135,26 @@ func (h *registeredToolchainExtractingModuleDotBazelHandler[TReference, TMetadat
 				) {
 					switch key {
 					case "target_settings":
-						_, ok := value.Message.Kind.(*model_starlark_pb.Value_List)
+						l, ok := value.Message.Kind.(*model_starlark_pb.Value_List)
 						if !ok {
 							return fmt.Errorf("target_settings field of DeclaredToolchainInfo of toolchain %#v is not a list", toolchainLabelStr)
+						}
+						var errIter error
+						for targetSetting := range model_starlark.AllListLeafElementsSkippingDuplicateParents(
+							h.context,
+							listReader,
+							model_core.Nested(value, l.List.Elements),
+							map[object.LocalReference]struct{}{},
+							&errIter,
+						) {
+							targetSettingLabel, ok := targetSetting.Message.Kind.(*model_starlark_pb.Value_Label)
+							if !ok {
+								return fmt.Errorf("target_settings field of DeclaredToolchainInfo of toolchain %#v contains an element that is not a label", toolchainLabelStr)
+							}
+							targetSettings = append(targetSettings, targetSettingLabel.Label)
+						}
+						if errIter != nil {
+							return errIter
 						}
 					case "toolchain":
 						l, ok := value.Message.Kind.(*model_starlark_pb.Value_Label)
@@ -238,13 +256,14 @@ func (h *registeredToolchainExtractingModuleDotBazelHandler[TReference, TMetadat
 				}
 
 				if !missingDependencies {
+					slices.Sort(targetSettings)
 					h.registeredToolchainsByType[*toolchainType] = append(
 						h.registeredToolchainsByType[*toolchainType],
 						&model_analysis_pb.RegisteredToolchain{
 							ExecCompatibleWith:   execCompatibleWith,
 							TargetCompatibleWith: targetCompatibleWith,
-							// TODO: Set TargetSettings!
-							Toolchain: *toolchain,
+							TargetSettings:       slices.Compact(targetSettings),
+							Toolchain:            *toolchain,
 						},
 					)
 				}
