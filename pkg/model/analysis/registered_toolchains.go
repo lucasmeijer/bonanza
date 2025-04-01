@@ -245,7 +245,6 @@ func (h *registeredToolchainExtractingModuleDotBazelHandler[TReference, TMetadat
 							TargetCompatibleWith: targetCompatibleWith,
 							// TODO: Set TargetSettings!
 							Toolchain: *toolchain,
-							Package:   toolchainLabel.GetCanonicalPackage().String(),
 						},
 					)
 				}

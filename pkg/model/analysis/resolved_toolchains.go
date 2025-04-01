@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/buildbarn/bonanza/pkg/evaluation"
+	"github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
 	"github.com/buildbarn/bonanza/pkg/storage/dag"
@@ -122,11 +123,15 @@ CheckExecutionPlatform:
 				// Optional toolchain that is missing.
 				toolchainIdentifiers = append(toolchainIdentifiers, "")
 			} else {
+				resolvedToolchainLabel, err := label.NewCanonicalLabel(resolvedToolchain.Toolchain)
+				if err != nil {
+					return PatchedResolvedToolchainsValue{}, fmt.Errorf("invalid toolchain label %#v: %w", resolvedToolchain.Toolchain, err)
+				}
 				visibleTarget := e.GetVisibleTargetValue(
 					model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](
 						&model_analysis_pb.VisibleTarget_Key{
-							FromPackage: resolvedToolchain.Package,
-							ToLabel:     resolvedToolchain.Toolchain,
+							FromPackage: resolvedToolchainLabel.GetCanonicalPackage().String(),
+							ToLabel:     resolvedToolchainLabel.String(),
 							// Don't specify a configuration, as
 							// the toolchain() itself is also
 							// evaluated without one.

@@ -912,11 +912,6 @@ message RegisteredToolchain {
   // As toolchain targets are typically placed in other repos, this
   // label may still refer to an alias that needs to be expanded.
   string toolchain = 4;
-
-  // The package in which the toolchain() target is declared. This is
-  // recorded to be able to check visibility from the toolchain() to the
-  // actual tool or tool suite.
-  string package = 5;
 }
 
 message RegisteredToolchains {
