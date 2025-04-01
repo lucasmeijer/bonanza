@@ -452,9 +452,9 @@ bool_flag(
     visibility = ["//visibility:public"],
 )
 
-label_flag(
+string_flag(
     name = "experimental_exec_config",
-    build_setting_default = "@_builtins//:common/builtin_exec_platforms.bzl%bazel_exec_transition",
+    build_setting_default = "@@builtins_bzl+//:common/builtin_exec_platforms.bzl%bazel_exec_transition",
     visibility = ["//visibility:public"],
 )
 
