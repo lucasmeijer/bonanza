@@ -119,7 +119,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeGlobValue(ctx context.Conte
 		nil,
 		&matcher,
 	); err != nil {
-		return PatchedGlobValue{}, nil
+		return PatchedGlobValue{}, err
 	}
 
 	// Bazel's implementation of glob() sorts results
