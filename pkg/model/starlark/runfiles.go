@@ -106,7 +106,10 @@ func (r *Runfiles[TReference, TMetadata]) CompareSameType(thread *starlark.Threa
 func (r *Runfiles[TReference, TMetadata]) Attr(thread *starlark.Thread, name string) (starlark.Value, error) {
 	switch name {
 	case "empty_filenames":
-		return nil, errors.New("TODO: Implement runfiles.empty_filenames")
+		// TODO: There seems to be no way to actually set empty
+		// filenames from within Starlark. Does this mean it's
+		// valid to always return an empty set?
+		return NewDepset[TReference, TMetadata](thread, nil, nil, model_starlark_pb.Depset_DEFAULT)
 	case "files":
 		return r.files, nil
 	case "merge":
