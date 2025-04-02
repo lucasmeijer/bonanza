@@ -154,6 +154,68 @@ config_setting = rule(
     provides = [ConfigSettingInfo],
 )
 
+def configuration_field(fragment, name):
+    # Don't provide actual support for late-bound defaults. Instead map
+    # each of them to the respective command line option used by Bazel.
+    if fragment == "apple":
+        return Label("@bazel_tools//command_line_option:xcode_version_config")
+    if fragment == "bazel_py":
+        if name == "python_top":
+            return Label("@bazel_tools//command_line_option:python_top")
+    if fragment == "coverage":
+        if name == "output_generator":
+            # This configuration field should not map to lcov_merger if
+            # coverage is disabled, as that would cause cyclic
+            # dependencies otherwise. Let this map to an alias that only
+            # points to lcov_merger if --collect_code_coverage is set.
+            return Label("@bazel_tools//tools/coverage:coverage_output_generator")
+    if fragment == "cpp":
+        if name == "cs_fdo_profile":
+            return Label("@bazel_tools//command_line_option:cs_fdo_profile")
+        if name == "custom_malloc":
+            return Label("@bazel_tools//command_line_option:custom_malloc")
+        if name == "fdo_optimize":
+            return Label("@bazel_tools//command_line_option:fdo_optimize")
+        if name == "fdo_prefetch_hints":
+            return Label("@bazel_tools//command_line_option:fdo_prefetch_hints")
+        if name == "fdo_profile":
+            return Label("@bazel_tools//command_line_option:fdo_profile")
+        if name == "libc_top":
+            return Label("@bazel_tools//command_line_option:grte_top")
+        if name == "memprof_profile":
+            return Label("@bazel_tools//command_line_option:memprof_profile")
+        if name == "propeller_optimize":
+            return Label("@bazel_tools//command_line_option:propeller_optimize")
+        if name == "proto_profile_path":
+            return Label("@bazel_tools//command_line_option:proto_profile_path")
+        if name == "target_libc_top_DO_NOT_USE_ONLY_FOR_CC_TOOLCHAIN":
+            return None
+        if name == "xbinary_fdo":
+            return Label("@bazel_tools//command_line_option:xbinary_fdo")
+        if name == "zipper":
+            return None
+    if fragment == "java":
+        if name == "launcher":
+            return Label("@bazel_tools//command_line_option:java_launcher")
+        if name == "java_toolchain_bytecode_optimizer":
+            return Label("@bazel_tools//command_line_option:proguard_top")
+        if name == "local_java_optimization_configuration":
+            return Label("@bazel_tools//command_line_option:experimental_local_java_optimization_configuration")
+    if fragment == "proto":
+        if name == "proto_compiler":
+            return Label("@bazel_tools//command_line_option:proto_compiler")
+        if name == "proto_toolchain_for_cc":
+            return Label("@bazel_tools//command_line_option:proto_toolchain_for_cc")
+        if name == "proto_toolchain_for_java":
+            return Label("@bazel_tools//command_line_option:proto_toolchain_for_java")
+        if name == "proto_toolchain_for_java_lite":
+            return Label("@bazel_tools//command_line_option:proto_toolchain_for_javalite")
+    if fragment == "py":
+        if name == "native_rules_allowlist":
+            return Label("@bazel_tools//command_line_option:python_native_rules_allowlist")
+
+    fail("this implementation of configuration_field() does not support fragment %s and name %s" % (fragment, name))
+
 def _constraint_setting_impl(ctx):
     default_constraint_value = ctx.attr.default_constraint_value
     return [ConstraintSettingInfo(
@@ -1096,6 +1158,7 @@ exported_toplevels = {
         FeatureFlagInfo = FeatureFlagInfo,
         toolchain_type = config_common.toolchain_type,
     ),
+    "configuration_field": configuration_field,
     "coverage_common": struct(
         instrumented_files_info = coverage_common_instrumented_files_info,
     ),
