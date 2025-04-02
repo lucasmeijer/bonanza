@@ -18,7 +18,6 @@ PackageSpecificationInfo = provider()
 PlatformInfo = provider()
 ProguardSpecProvider = provider()
 PyInfo = provider()
-RunEnvironmentInfo = provider()
 StaticallyLinkedMarkerProvider = provider()
 ToolchainInfo = provider()
 ToolchainTypeInfo = provider()
@@ -66,6 +65,14 @@ def _default_info_init(*, data_runfiles = None, default_runfiles = None, executa
     }
 
 DefaultInfo, _DefaultInfoRaw = provider(init = _default_info_init)
+
+def _run_environment_info_init(environment = {}, inherited_environment = []):
+    return {
+        "environment": environment,
+        "inherited_environment": inherited_environment,
+    }
+
+RunEnvironmentInfo, _RunEnvironmentInfoRaw = provider(init = _run_environment_info_init)
 
 def _template_variable_info_init(variables):
     return {"variables": variables}
