@@ -79,10 +79,10 @@ of command line flags and `.bazelrc` files.
 
 Bonanza is at this point still highly experimental. It is currently
 capable of analyzing a slightly altered copy of the bb-storage source
-tree and configuring most of the targets contained within. This means
+tree and configuring all of the targets contained within. This means
 that Bonanza is already complete enough that Starlark rules such as ones
-provided by rules\_go, rules\_js, and rules\_oci can be evaluated and
-run to completion.
+provided by rules\_go, rules\_js, rules\_oci, and rules\_python can be
+evaluated and run to completion.
 
 Calls to `ctx.actions.*()` made by rule implementations are currently
 still no-ops, meaning that no build graph at the action level is being
