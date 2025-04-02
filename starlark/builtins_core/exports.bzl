@@ -1114,6 +1114,9 @@ def builtins_internal_java_common_internal_do_not_use_wrap_java_info():
 def builtins_internal_py_builtins_get_current_os_name():
     return "unknown"
 
+def builtins_internal_py_builtins_get_label_repo_runfiles_path(label):
+    return "/".join(["..", label.repo_name] + label.package.split("/"))
+
 def builtins_json_encode_indent(x, **kwargs):
     return json.indent(json.encode(x), **kwargs)
 
@@ -1251,6 +1254,7 @@ exported_toplevels["_builtins"] = struct(
         objc_internal = struct(),
         py_builtins = struct(
             get_current_os_name = builtins_internal_py_builtins_get_current_os_name,
+            get_label_repo_runfiles_path = builtins_internal_py_builtins_get_label_repo_runfiles_path,
         ),
     ),
     toplevel = struct(**exported_toplevels),
