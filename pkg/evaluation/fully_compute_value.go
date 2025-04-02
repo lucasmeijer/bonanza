@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"slices"
 
 	"github.com/buildbarn/bonanza/pkg/encoding/varint"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
@@ -72,11 +71,27 @@ func (ks *keyState[TReference, TMetadata]) getKeyType() string {
 	return string(ks.key.Message.ProtoReflect().Descriptor().FullName().Parent().Name())
 }
 
-func (ks *keyState[TReference, TMetadata]) getDependencyCycle(cyclePath *[]*keyState[TReference, TMetadata], seen map[*keyState[TReference, TMetadata]]int) int {
-	// TODO: Reimplement obtaining dependency cycles, now that we've
-	// changed the direction in which key states reference each
-	// other.
-	return -1
+func (ks *keyState[TReference, TMetadata]) getDependencyCycle(
+	cyclePath *[]*keyState[TReference, TMetadata],
+	seen map[*keyState[TReference, TMetadata]]int,
+	missingDependencies map[*keyState[TReference, TMetadata]][]*keyState[TReference, TMetadata],
+) int {
+	pathLength := len(*cyclePath)
+	for _, ksDep := range missingDependencies[ks] {
+		*cyclePath = append(*cyclePath, ksDep)
+		if index, ok := seen[ksDep]; ok {
+			return index
+		}
+		seen[ksDep] = pathLength
+
+		if index := ksDep.getDependencyCycle(cyclePath, seen, missingDependencies); index >= 0 {
+			return index
+		}
+
+		*cyclePath = (*cyclePath)[:pathLength]
+		delete(seen, ksDep)
+	}
+	panic("failed to find cyclic dependency")
 }
 
 type valueState[TReference object.BasicReference, TMetadata any] interface {
@@ -249,20 +264,25 @@ func FullyComputeValue[TReference object.BasicReference, TMetadata any](
 	for !requestedValueState.value.IsSet() {
 		ks := p.firstPendingKey
 		if ks == nil {
-			var stack []*keyState[TReference, TMetadata]
+			stack := []*keyState[TReference, TMetadata]{requestedKeyState}
+			seen := map[*keyState[TReference, TMetadata]]int{
+				requestedKeyState: 0,
+			}
+			missingDependencies := map[*keyState[TReference, TMetadata]][]*keyState[TReference, TMetadata]{}
+			for _, ks := range p.keys {
+				for ksBlocked := range ks.blocking {
+					missingDependencies[ksBlocked] = append(missingDependencies[ksBlocked], ks)
+				}
+			}
+			cycleStart := requestedKeyState.getDependencyCycle(&stack, seen, missingDependencies)
+
 			traceLongestKeyType := 0
-			for ksIter := ks; ksIter != nil; ksIter = ksIter.parent {
-				stack = append(stack, ksIter)
+			for _, ksIter := range stack {
 				if l := len(ksIter.getKeyType()); traceLongestKeyType < l {
 					traceLongestKeyType = l
 				}
 			}
-			slices.Reverse(stack)
-			seen := make(map[*keyState[TReference, TMetadata]]int, len(stack))
-			for index, ksIter := range stack {
-				seen[ksIter] = index
-			}
-			cycleStart := ks.getDependencyCycle(&stack, seen)
+
 			var cycleStr []byte
 			for index, ksIter := range stack {
 				if index == cycleStart || index == len(stack)-1 {
