@@ -1123,7 +1123,11 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 							return PatchedConfiguredTargetValue{}, fmt.Errorf("decode value part: %w", err)
 						}
 						if isScalar && mayHaveMultipleConfigurations {
-							decodedPart = starlark.NewList([]starlark.Value{decodedPart})
+							if decodedPart == starlark.None {
+								decodedPart = starlark.NewList(nil)
+							} else {
+								decodedPart = starlark.NewList([]starlark.Value{decodedPart})
+							}
 						}
 						if err := concatenateAttrValueParts(thread, &attrValue, decodedPart); err != nil {
 							return PatchedConfiguredTargetValue{}, fmt.Errorf("concatenate attr value parts: %w", err)
