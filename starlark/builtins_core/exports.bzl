@@ -1111,6 +1111,9 @@ def builtins_internal_java_common_internal_do_not_use_tokenize_javacopts():
 def builtins_internal_java_common_internal_do_not_use_wrap_java_info():
     return "TODO"
 
+def builtins_internal_py_builtins_are_action_listeners_enabled(ctx):
+    return False
+
 def builtins_internal_py_builtins_get_current_os_name():
     return "unknown"
 
@@ -1253,6 +1256,7 @@ exported_toplevels["_builtins"] = struct(
         ),
         objc_internal = struct(),
         py_builtins = struct(
+            are_action_listeners_enabled = builtins_internal_py_builtins_are_action_listeners_enabled,
             get_current_os_name = builtins_internal_py_builtins_get_current_os_name,
             get_label_repo_runfiles_path = builtins_internal_py_builtins_get_label_repo_runfiles_path,
         ),
