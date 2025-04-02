@@ -38,6 +38,20 @@ apple_fragment = rule(
     },
 )
 
+def _bazel_py_fragment_impl(ctx):
+    return [FragmentInfo(
+        python_import_all_repositories = ctx.attr._python_import_all_repositories[BuildSettingInfo].value,
+        python_path = ctx.attr._python_path[BuildSettingInfo].value,
+    )]
+
+bazel_py_fragment = rule(
+    _bazel_py_fragment_impl,
+    attrs = {
+        "_python_import_all_repositories": attr.label(default = "//command_line_option:experimental_python_import_all_repositories"),
+        "_python_path": attr.label(default = "//command_line_option:python_path"),
+    },
+)
+
 def _configuration_fragment_impl(ctx):
     has_separate_genfiles_directory = not ctx.attr._merge_genfiles_directory[BuildSettingInfo].value
     is_exec_configuration = ctx.attr._is_exec_configuration[BuildSettingInfo].value
@@ -190,5 +204,19 @@ proto_fragment = rule(
     _proto_fragment_impl,
     attrs = {
         "_protocopt": attr.label(default = "//command_line_option:protocopt"),
+    },
+)
+
+def _py_fragment_impl(ctx):
+    return [FragmentInfo(
+        default_to_explicit_init_py = ctx.attr._default_to_explicit_init_py[BuildSettingInfo].value,
+        use_toolchains = ctx.attr._use_python_toolchains[BuildSettingInfo].value,
+    )]
+
+py_fragment = rule(
+    _py_fragment_impl,
+    attrs = {
+        "_default_to_explicit_init_py": attr.label(default = "//command_line_option:incompatible_default_to_explicit_init_py"),
+        "_use_python_toolchains": attr.label(default = "//command_line_option:incompatible_use_python_toolchains"),
     },
 )

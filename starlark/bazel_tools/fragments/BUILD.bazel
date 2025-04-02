@@ -1,14 +1,18 @@
 load(
     ":fragments.bzl",
     "apple_fragment",
+    "bazel_py_fragment",
     "configuration_fragment",
     "cpp_fragment",
     "java_fragment",
     "platform_fragment",
     "proto_fragment",
+    "py_fragment",
 )
 
 apple_fragment(name = "apple")
+
+bazel_py_fragment(name = "bazel_py")
 
 configuration_fragment(name = "configuration")
 
@@ -19,3 +23,5 @@ java_fragment(name = "java")
 platform_fragment(name = "platform")
 
 proto_fragment(name = "proto")
+
+py_fragment(name = "py")
