@@ -168,10 +168,10 @@ func (Depset[TReference, TMetadata]) Type() string {
 func (Depset[TReference, TMetadata]) Freeze() {}
 
 // Truth returns whether a depset value evaluates to true or false if
-// implicitly converted to a Boolean value. All depsets evaluate to
-// true.
-func (Depset[TReference, TMetadata]) Truth() starlark.Bool {
-	return starlark.True
+// implicitly converted to a Boolean value. Only non-empty depsets
+// evaluate to true.
+func (d *Depset[TReference, TMetadata]) Truth() starlark.Bool {
+	return starlark.Bool(d.children != nil)
 }
 
 // Hash a depset value. As depsets only offer reference equality, the
