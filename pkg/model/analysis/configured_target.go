@@ -1736,7 +1736,17 @@ func toSymlinkEntryDepset[TReference object.BasicReference, TMetadata BaseComput
 	case *model_starlark.Depset[TReference, TMetadata]:
 		return typedV
 	case map[string]string:
-		panic("TODO: convert dict of strings to SymlinkEntry list")
+		entries := make([]any, 0, len(typedV))
+		for _, path := range slices.Sorted(maps.Keys(typedV)) {
+			entries = append(entries, model_starlark.NewStructFromDict[TReference, TMetadata](
+				nil,
+				map[string]any{
+					"path":        path,
+					"target_file": typedV[path],
+				},
+			))
+		}
+		return model_starlark.NewDepsetFromList[TReference, TMetadata](entries, model_starlark_pb.Depset_DEFAULT)
 	case nil:
 		return model_starlark.NewDepsetFromList[TReference, TMetadata](nil, model_starlark_pb.Depset_DEFAULT)
 	default:
