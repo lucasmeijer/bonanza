@@ -209,6 +209,7 @@ proto_fragment = rule(
 
 def _py_fragment_impl(ctx):
     return [FragmentInfo(
+        build_python_zip = ctx.attr._build_python_zip[BuildSettingInfo].value,
         default_to_explicit_init_py = ctx.attr._default_to_explicit_init_py[BuildSettingInfo].value,
         use_toolchains = ctx.attr._use_python_toolchains[BuildSettingInfo].value,
     )]
@@ -216,6 +217,7 @@ def _py_fragment_impl(ctx):
 py_fragment = rule(
     _py_fragment_impl,
     attrs = {
+        "_build_python_zip": attr.label(default = "//command_line_option:build_python_zip"),
         "_default_to_explicit_init_py": attr.label(default = "//command_line_option:incompatible_default_to_explicit_init_py"),
         "_use_python_toolchains": attr.label(default = "//command_line_option:incompatible_use_python_toolchains"),
     },
