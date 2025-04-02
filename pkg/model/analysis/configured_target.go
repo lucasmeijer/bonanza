@@ -968,6 +968,9 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 					}
 				}
 			} else {
+				if executable {
+					executableValues[namedAttr.Name] = starlark.None
+				}
 				for _, transitionEntry := range transition.Message.Entries {
 					outputConfigurationReference := model_core.Nested(transition, transitionEntry.OutputConfigurationReference)
 					valueParts, usedDefaultValue, err := getAttrValueParts(
