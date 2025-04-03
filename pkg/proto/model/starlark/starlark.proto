@@ -117,8 +117,7 @@ message Attr {
 
     bool allow_none = 2;
 
-    // Only allow file targets corresponding to a single file. If this
-    // field is set, LabelOptions.allow_files must be set as well.
+    // Only allow file targets corresponding to a single file.
     bool allow_single_file = 3;
 
     // True if the dependency has to be executable. This means the label
