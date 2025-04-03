@@ -6,8 +6,8 @@ import (
 	"maps"
 	"slices"
 	"sort"
-	"unicode/utf8"
 
+	"github.com/buildbarn/bonanza/pkg/glob"
 	pg_label "github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
@@ -19,44 +19,41 @@ import (
 	"go.starlark.net/syntax"
 )
 
-type allowFilesBoolUnpackerInto struct{}
-
-func (allowFilesBoolUnpackerInto) UnpackInto(thread *starlark.Thread, v starlark.Value, dst *[]string) error {
-	var allowFiles bool
-	if err := unpack.Bool.UnpackInto(thread, v, &allowFiles); err != nil {
-		return err
-	}
-	if allowFiles {
-		*dst = []string{""}
-	} else {
-		*dst = nil
-	}
-	return nil
-}
-
-func (allowFilesBoolUnpackerInto) Canonicalize(thread *starlark.Thread, v starlark.Value) (starlark.Value, error) {
-	var allowFiles bool
-	if err := unpack.Bool.UnpackInto(thread, v, &allowFiles); err != nil {
-		return nil, err
-	}
-	if allowFiles {
-		return starlark.NewList([]starlark.Value{starlark.String("")}), nil
-	}
-	return starlark.NewList(nil), nil
-}
-
-func (allowFilesBoolUnpackerInto) GetConcatenationOperator() syntax.Token {
-	return syntax.PLUS
-}
-
 // allowFilesUnpackerInto can be used to unpack allow_files arguments,
 // which either take a list of permitted file extensions or a Boolean
 // value. When the Boolean value is set to true, all file extensions are
 // accepted.
-var allowFilesUnpackerInto = unpack.IfNotNone(unpack.Or([]unpack.UnpackerInto[[]string]{
-	allowFilesBoolUnpackerInto{},
-	unpack.List(unpack.String),
-}))
+type allowFilesUnpackerInto struct{}
+
+func (allowFilesUnpackerInto) UnpackInto(thread *starlark.Thread, v starlark.Value, dst **glob.NFA) error {
+	switch typedV := v.(type) {
+	case starlark.Bool:
+		if typedV {
+			*dst = &glob.NFAMatchingEverything
+		} else {
+			*dst = &glob.NFAMatchingNothing
+		}
+	default:
+		var suffixes []string
+		if err := unpack.List(unpack.String).UnpackInto(thread, v, &suffixes); err != nil {
+			return err
+		}
+		nfa, err := glob.NewNFAFromSuffixes(suffixes)
+		if err != nil {
+			return err
+		}
+		*dst = nfa
+	}
+	return nil
+}
+
+func (allowFilesUnpackerInto) Canonicalize(thread *starlark.Thread, v starlark.Value) (starlark.Value, error) {
+	return v, nil
+}
+
+func (allowFilesUnpackerInto) GetConcatenationOperator() syntax.Token {
+	return syntax.PLUS
+}
 
 const (
 	CanonicalPackageKey = "canonical_package"
@@ -65,46 +62,6 @@ const (
 )
 
 type GlobExpander = func(include, exclude []string, includeDirectories bool) ([]string, error)
-
-// sortAndDeduplicateSuffixes sorts the strings in a given list,
-// lexicographically comparing characters in reverse order. Any entries
-// that have another entry as its suffix are also dropped.
-//
-// This function can be used to normalize a list of file extensions that
-// should be matched. By sorting the strings in reverse order, it is
-// possible to do efficient lookups.
-func sortAndDeduplicateSuffixes(list []string) []string {
-	slices.SortFunc(
-		list,
-		func(s1, s2 string) int {
-			for {
-				r1, len1 := utf8.DecodeLastRuneInString(s1)
-				r2, len2 := utf8.DecodeLastRuneInString(s2)
-				switch {
-				case len1 == 0 && len2 == 0:
-					return 0
-				case len1 == 0:
-					return -1
-				case len2 == 0:
-					return 1
-				case r1 < r2:
-					return -1
-				case r1 > r2:
-					return 1
-				}
-				s1 = s1[:len(s1)-len1]
-				s2 = s2[:len(s2)-len2]
-			}
-		},
-	)
-	return slices.CompactFunc(
-		list,
-		func(a, b string) bool {
-			diff := len(b) - len(a)
-			return diff >= 0 && a == b[diff:]
-		},
-	)
-}
 
 func labelSetting[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple, flag bool) (starlark.Value, error) {
 	targetRegistrar := thread.Local(TargetRegistrarKey).(*TargetRegistrar[TMetadata])
@@ -307,9 +264,9 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 						return nil, fmt.Errorf("%s: got %d positional arguments, want 0", b.Name(), len(args))
 					}
 
-					var allowFiles []string
+					var allowFiles *glob.NFA
 					var allowRules []string
-					var allowSingleFile []string
+					var allowSingleFile *glob.NFA
 					var aspects []*Aspect[TReference, TMetadata]
 					var cfg TransitionDefinition[TReference, TMetadata]
 					var defaultValue starlark.Value = starlark.None
@@ -320,9 +277,9 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 					providers := [][]*Provider[TReference, TMetadata]{{}}
 					if err := starlark.UnpackArgs(
 						b.Name(), args, kwargs,
-						"allow_files?", unpack.Bind(thread, &allowFiles, allowFilesUnpackerInto),
+						"allow_files?", unpack.Bind(thread, &allowFiles, allowFilesUnpackerInto{}),
 						"allow_rules?", unpack.Bind(thread, &allowRules, unpack.IfNotNone(unpack.List(unpack.String))),
-						"allow_single_file?", unpack.Bind(thread, &allowSingleFile, allowFilesUnpackerInto),
+						"allow_single_file?", unpack.Bind(thread, &allowSingleFile, allowFilesUnpackerInto{}),
 						"aspects?", unpack.Bind(thread, &aspects, unpack.List(unpack.Type[*Aspect[TReference, TMetadata]]("aspect"))),
 						"cfg?", unpack.Bind(thread, &cfg, transitionDefinitionUnpackerInto),
 						"default?", &defaultValue,
@@ -334,11 +291,13 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 					); err != nil {
 						return nil, err
 					}
-					if len(allowSingleFile) > 0 {
-						if len(allowFiles) > 0 {
+					if allowSingleFile != nil {
+						if allowFiles != nil {
 							return nil, errors.New("allow_files and allow_single_file cannot be specified at the same time")
 						}
 						allowFiles = allowSingleFile
+					} else if allowFiles == nil {
+						allowFiles = &glob.NFAMatchingNothing
 					}
 					if cfg == nil {
 						if executable {
@@ -347,7 +306,7 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 						cfg = targetTransitionDefinition
 					}
 
-					attrType := NewLabelAttrType[TReference, TMetadata](!mandatory, len(allowSingleFile) > 0, executable, sortAndDeduplicateSuffixes(allowFiles), cfg)
+					attrType := NewLabelAttrType[TReference, TMetadata](!mandatory, allowSingleFile != nil, executable, allowFiles.Bytes(), cfg)
 					if mandatory {
 						defaultValue = nil
 					} else {
@@ -369,7 +328,7 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 					}
 
 					allowEmpty := true
-					var allowFiles []string
+					allowFiles := &glob.NFAMatchingNothing
 					var aspects []*Aspect[TReference, TMetadata]
 					cfg := targetTransitionDefinition
 					var defaultValue starlark.Value = starlark.NewDict(0)
@@ -381,7 +340,7 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 						// Positional arguments.
 						"allow_empty?", unpack.Bind(thread, &allowEmpty, unpack.Bool),
 						// Keyword arguments.
-						"allow_files?", unpack.Bind(thread, &allowFiles, allowFilesUnpackerInto),
+						"allow_files?", unpack.Bind(thread, &allowFiles, allowFilesUnpackerInto{}),
 						"aspects?", unpack.Bind(thread, &aspects, unpack.List(unpack.Type[*Aspect[TReference, TMetadata]]("aspect"))),
 						"cfg?", unpack.Bind(thread, &cfg, transitionDefinitionUnpackerInto),
 						"default?", &defaultValue,
@@ -392,7 +351,7 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 						return nil, err
 					}
 
-					attrType := NewLabelKeyedStringDictAttrType[TReference, TMetadata](sortAndDeduplicateSuffixes(allowFiles), cfg)
+					attrType := NewLabelKeyedStringDictAttrType[TReference, TMetadata](allowFiles.Bytes(), cfg)
 					if mandatory {
 						defaultValue = nil
 					} else {
@@ -414,7 +373,7 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 					}
 
 					allowEmpty := true
-					var allowFiles []string
+					allowFiles := &glob.NFAMatchingNothing
 					var allowRules []string
 					var aspects []*Aspect[TReference, TMetadata]
 					cfg := targetTransitionDefinition
@@ -428,7 +387,7 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 						// Positional arguments.
 						"allow_empty?", unpack.Bind(thread, &allowEmpty, unpack.Bool),
 						// Keyword arguments.
-						"allow_files?", unpack.Bind(thread, &allowFiles, allowFilesUnpackerInto),
+						"allow_files?", unpack.Bind(thread, &allowFiles, allowFilesUnpackerInto{}),
 						"allow_rules?", unpack.Bind(thread, &allowRules, unpack.IfNotNone(unpack.List(unpack.String))),
 						"aspects?", unpack.Bind(thread, &aspects, unpack.List(unpack.Type[*Aspect[TReference, TMetadata]]("aspect"))),
 						"cfg?", unpack.Bind(thread, &cfg, transitionDefinitionUnpackerInto),
@@ -441,7 +400,7 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 						return nil, err
 					}
 
-					attrType := NewLabelListAttrType[TReference, TMetadata](sortAndDeduplicateSuffixes(allowFiles), cfg)
+					attrType := NewLabelListAttrType[TReference, TMetadata](allowFiles.Bytes(), cfg)
 					if mandatory {
 						defaultValue = nil
 					} else {

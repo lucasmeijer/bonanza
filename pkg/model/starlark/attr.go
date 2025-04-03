@@ -243,11 +243,11 @@ type labelAttrType[TReference any, TMetadata model_core.CloneableReferenceMetada
 	allowNone       bool
 	allowSingleFile bool
 	executable      bool
-	valueAllowFiles []string
+	valueAllowFiles []byte
 	valueCfg        TransitionDefinition[TReference, TMetadata]
 }
 
-func NewLabelAttrType[TReference any, TMetadata model_core.CloneableReferenceMetadata](allowNone, allowSingleFile, executable bool, valueAllowFiles []string, valueCfg TransitionDefinition[TReference, TMetadata]) AttrType {
+func NewLabelAttrType[TReference any, TMetadata model_core.CloneableReferenceMetadata](allowNone, allowSingleFile, executable bool, valueAllowFiles []byte, valueCfg TransitionDefinition[TReference, TMetadata]) AttrType {
 	return &labelAttrType[TReference, TMetadata]{
 		allowNone:       allowNone,
 		allowSingleFile: allowSingleFile,
@@ -293,11 +293,11 @@ func (labelAttrType[TReference, TMetadata]) IsOutput() (string, bool) {
 }
 
 type labelKeyedStringDictAttrType[TReference any, TMetadata model_core.CloneableReferenceMetadata] struct {
-	dictKeyAllowFiles []string
+	dictKeyAllowFiles []byte
 	dictKeyCfg        TransitionDefinition[TReference, TMetadata]
 }
 
-func NewLabelKeyedStringDictAttrType[TReference any, TMetadata model_core.CloneableReferenceMetadata](dictKeyAllowFiles []string, dictKeyCfg TransitionDefinition[TReference, TMetadata]) AttrType {
+func NewLabelKeyedStringDictAttrType[TReference any, TMetadata model_core.CloneableReferenceMetadata](dictKeyAllowFiles []byte, dictKeyCfg TransitionDefinition[TReference, TMetadata]) AttrType {
 	return &labelKeyedStringDictAttrType[TReference, TMetadata]{
 		dictKeyAllowFiles: dictKeyAllowFiles,
 		dictKeyCfg:        dictKeyCfg,
@@ -333,11 +333,11 @@ func (labelKeyedStringDictAttrType[TReference, TMetadata]) IsOutput() (string, b
 }
 
 type labelListAttrType[TReference any, TMetadata model_core.CloneableReferenceMetadata] struct {
-	listValueAllowFiles []string
+	listValueAllowFiles []byte
 	listValueCfg        TransitionDefinition[TReference, TMetadata]
 }
 
-func NewLabelListAttrType[TReference any, TMetadata model_core.CloneableReferenceMetadata](listValueAllowFiles []string, listValueCfg TransitionDefinition[TReference, TMetadata]) AttrType {
+func NewLabelListAttrType[TReference any, TMetadata model_core.CloneableReferenceMetadata](listValueAllowFiles []byte, listValueCfg TransitionDefinition[TReference, TMetadata]) AttrType {
 	return &labelListAttrType[TReference, TMetadata]{
 		listValueAllowFiles: listValueAllowFiles,
 		listValueCfg:        listValueCfg,

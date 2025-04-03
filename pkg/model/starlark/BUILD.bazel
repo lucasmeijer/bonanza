@@ -39,6 +39,7 @@ go_library(
     importpath = "github.com/buildbarn/bonanza/pkg/model/starlark",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/glob",
         "//pkg/label",
         "//pkg/model/core",
         "//pkg/model/core/btree",

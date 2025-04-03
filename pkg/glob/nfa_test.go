@@ -7,16 +7,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func testNFAEqualBytes(t *testing.T, includes, excludes []string, expectedBytes []byte) {
-	nfa1, err := glob.NewNFAFromPatterns(includes, excludes)
-	require.NoError(t, err)
-	actualBytes1 := nfa1.Bytes()
-	require.Equal(t, expectedBytes, actualBytes1)
-
-	nfa2, err := glob.NewNFAFromBytes(expectedBytes)
-	require.NoError(t, err)
-	actualBytes2 := nfa2.Bytes()
-	require.Equal(t, expectedBytes, actualBytes2)
+func TestPredeclaredNFAs(t *testing.T) {
+	require.Equal(t, []byte{0x80}, glob.NFAMatchingNothing.Bytes())
+	require.Equal(
+		t,
+		[]byte{
+			/*      */ 0x88,
+			/* ꘎꘎/  */ 0x84,
+			/* ꘎꘎/꘎ */ 0x81,
+		},
+		glob.NFAMatchingEverything.Bytes(),
+	)
 }
 
 func TestNewNFAFromPatterns(t *testing.T) {
@@ -53,6 +54,18 @@ func TestNewNFAFromPatterns(t *testing.T) {
 	})
 
 	t.Run("Success", func(t *testing.T) {
+		testNFAEqualBytes := func(t *testing.T, includes, excludes []string, expectedBytes []byte) {
+			nfa1, err := glob.NewNFAFromPatterns(includes, excludes)
+			require.NoError(t, err)
+			actualBytes1 := nfa1.Bytes()
+			require.Equal(t, expectedBytes, actualBytes1)
+
+			nfa2, err := glob.NewNFAFromBytes(expectedBytes)
+			require.NoError(t, err)
+			actualBytes2 := nfa2.Bytes()
+			require.Equal(t, expectedBytes, actualBytes2)
+		}
+
 		t.Run("Empty", func(t *testing.T) {
 			testNFAEqualBytes(t, nil, nil, []byte{0x80})
 		})
@@ -272,6 +285,61 @@ func TestNewNFAFromPatterns(t *testing.T) {
 					/* ꘎.tcc */ 0x81,
 					/* ꘎.tlh */ 0x81,
 					/* ꘎.tli */ 0x81,
+				},
+			)
+		})
+	})
+}
+
+func TestNewNFAFromSuffixes(t *testing.T) {
+	t.Run("Failure", func(t *testing.T) {
+		t.Run("Slashes", func(t *testing.T) {
+			_, err := glob.NewNFAFromSuffixes([]string{"/foo"})
+			require.EqualError(t, err, "filename suffix \"/foo\" contains slashes")
+		})
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		testNFAEqualBytes := func(t *testing.T, suffixes []string, expectedBytes []byte) {
+			nfa1, err := glob.NewNFAFromSuffixes(suffixes)
+			require.NoError(t, err)
+			actualBytes1 := nfa1.Bytes()
+			require.Equal(t, expectedBytes, actualBytes1)
+
+			nfa2, err := glob.NewNFAFromBytes(expectedBytes)
+			require.NoError(t, err)
+			actualBytes2 := nfa2.Bytes()
+			require.Equal(t, expectedBytes, actualBytes2)
+		}
+
+		t.Run("Empty", func(t *testing.T) {
+			testNFAEqualBytes(t, nil, []byte{0x80})
+		})
+
+		t.Run("Everything", func(t *testing.T) {
+			// An empty suffix should match any path.
+			testNFAEqualBytes(
+				t,
+				[]string{""},
+				[]byte{
+					/*      */ 0x88,
+					/* ꘎꘎/  */ 0x84,
+					/* ꘎꘎/꘎ */ 0x81,
+				},
+			)
+		})
+
+		t.Run("Extensions", func(t *testing.T) {
+			testNFAEqualBytes(
+				t,
+				[]string{".c", ".h"},
+				[]byte{
+					/*        */ 0x88,
+					/* ꘎꘎/    */ 0x84,
+					/* ꘎꘎/꘎   */ 0x90, '.',
+					/* ꘎꘎/꘎.  */ 0xa0, 'c', 'h',
+					/* ꘎꘎/꘎.c */ 0x81,
+					/* ꘎꘎/꘎.h */ 0x81,
 				},
 			)
 		})

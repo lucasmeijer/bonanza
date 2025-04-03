@@ -90,18 +90,28 @@ func (s *state) setStarStarSlashIndex(i uint32) {
 	s.wildcards = s.wildcards&^(stateMask<<stateBits) | (uint64(i) << stateBits)
 }
 
-func (s *state) propagateHasPositiveEndState(states []state) {
-	const hasPositiveEndState = 1 << (2 * stateBits)
-	if s.getEndState() == endStatePositive ||
-		states[s.getStarIndex()].getHasPositiveEndState() ||
-		states[s.getStarStarSlashIndex()].getHasPositiveEndState() {
-		s.wildcards |= hasPositiveEndState
-		return
-	}
-	for index := s.getFirstRuneIndex(); index != 0; index = states[index].getNextRuneIndex() {
-		if states[index].getHasPositiveEndState() {
+const hasPositiveEndState = 1 << (2 * stateBits)
+
+// propagateHasPositiveEndState walks the NFA in reverse order, setting
+// a bit on all states that have a path to at least one positive end
+// state. This information is used by the matching algorithm to
+// terminate early in case a path has a prefix that is known to not
+// permit any matches.
+func propagateHasPositiveEndState(states []state) {
+Propagate:
+	for currentState := len(states) - 1; currentState > 0; currentState-- {
+		s := &states[currentState]
+		if s.getEndState() == endStatePositive ||
+			states[s.getStarIndex()].getHasPositiveEndState() ||
+			states[s.getStarStarSlashIndex()].getHasPositiveEndState() {
 			s.wildcards |= hasPositiveEndState
-			return
+			continue Propagate
+		}
+		for index := s.getFirstRuneIndex(); index != 0; index = states[index].getNextRuneIndex() {
+			if states[index].getHasPositiveEndState() {
+				s.wildcards |= hasPositiveEndState
+				continue Propagate
+			}
 		}
 	}
 }
@@ -335,6 +345,21 @@ type NFA struct {
 	states []state
 }
 
+// NFAMatchingNothing is a predeclared NFA that never matches any paths.
+var NFAMatchingNothing = NFA{
+	states: []state{{}},
+}
+
+// NFAMatchingEverything is a predeclared NFA that matches all non-empty
+// paths.
+var NFAMatchingEverything = NFA{
+	states: []state{
+		{wildcards: 1<<stateBits | hasPositiveEndState},
+		{wildcards: 2 | hasPositiveEndState},
+		{wildcards: uint64(endStatePositive)<<(2*stateBits+1) | hasPositiveEndState},
+	},
+}
+
 // NewNFAFromPatterns compiles a set of glob patterns into a
 // nondeterministic finite automaton (NFA) that is capable of matching
 // paths.
@@ -351,9 +376,37 @@ func NewNFAFromPatterns(includes, excludes []string) (*NFA, error) {
 		}
 	}
 
-	for currentState := len(states) - 1; currentState > 0; currentState-- {
-		states[currentState].propagateHasPositiveEndState(states)
+	propagateHasPositiveEndState(states)
+	return &NFA{states: states}, nil
+}
+
+// NewNFAFromSuffixes compiles a set of filename suffixes into a
+// nondeterministic finite automaton (NFA) that is capable of matching
+// paths having one of the provided suffixes.
+func NewNFAFromSuffixes(suffixes []string) (*NFA, error) {
+	states := []state{{}}
+	for _, suffix := range suffixes {
+		currentState, err := getOrAddStarStarSlash(&states, 0)
+		if err != nil {
+			return nil, err
+		}
+		currentState, err = getOrAddStar(&states, currentState)
+		if err != nil {
+			return nil, err
+		}
+		for _, r := range suffix {
+			if r == '/' {
+				return nil, fmt.Errorf("filename suffix %#v contains slashes", suffix)
+			}
+			currentState, err = getOrAddRune(&states, currentState, r)
+			if err != nil {
+				return nil, err
+			}
+		}
+		states[currentState].setEndState(endStatePositive)
 	}
+
+	propagateHasPositiveEndState(states)
 	return &NFA{states: states}, nil
 }
 
@@ -408,10 +461,7 @@ func NewNFAFromBytes(b []byte) (*NFA, error) {
 		}
 	}
 
-	// Perform a backward pass to propagate state properties.
-	for currentState := len(states) - 1; currentState > 0; currentState-- {
-		states[currentState].propagateHasPositiveEndState(states)
-	}
+	propagateHasPositiveEndState(states)
 	return &NFA{states: states}, nil
 }
 

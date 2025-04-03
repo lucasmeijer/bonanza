@@ -85,14 +85,15 @@ message Attr {
     // with the label.
     Transition.Reference cfg = 3;
 
-    // If non-empty, allow file targets having one of the file
-    // extensions listed. If file targets with any name should be
-    // allowed, the list should contain the empty string.
+    // A nondeterministic finite automaton (NFA) that describes the
+    // pattern of package relative paths of file targets that this
+    // attribute accepts.
     //
-    // Extensions should be sorted by lexicographically comparing the
-    // runes in each string in reverse order. Elements may not be
-    // suffixes of each other.
-    repeated string allow_files = 4;
+    // If this attribute accepts file targets with arbitrary names, this
+    // field is set to an NFA that matches all paths. Conversely, if
+    // this attribute accepts no file targets, it is set to an NFA that
+    // does not match any paths.
+    bytes allow_files = 4;
   }
 
   // Options that apply to all attribute types containing dicts or
