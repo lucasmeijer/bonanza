@@ -1,6 +1,7 @@
 package core
 
 import (
+	"github.com/buildbarn/bonanza/pkg/encoding/varint"
 	model_encoding "github.com/buildbarn/bonanza/pkg/model/encoding"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 
@@ -97,6 +98,11 @@ func (m PatchedMessage[T, TMetadata]) SortAndSetReferences() (Message[T, object.
 	}, metadata
 }
 
+var marshalOptions = proto.MarshalOptions{
+	Deterministic: true,
+	UseCachedSize: true,
+}
+
 // MarshalAndEncodePatchedMessage marshals a Protobuf message, encodes
 // it, and converts it to an object that can be written to storage.
 func MarshalAndEncodePatchedMessage[TMessage proto.Message, TMetadata ReferenceMetadata](
@@ -105,9 +111,41 @@ func MarshalAndEncodePatchedMessage[TMessage proto.Message, TMetadata ReferenceM
 	encoder model_encoding.BinaryEncoder,
 ) (CreatedObject[TMetadata], error) {
 	references, metadata := m.Patcher.SortAndSetReferences()
-	data, err := proto.MarshalOptions{Deterministic: true}.Marshal(m.Message)
+	data, err := marshalOptions.Marshal(m.Message)
 	if err != nil {
 		return CreatedObject[TMetadata]{}, err
+	}
+	encodedData, err := encoder.EncodeBinary(data)
+	if err != nil {
+		return CreatedObject[TMetadata]{}, err
+	}
+	contents, err := referenceFormat.NewContents(references, encodedData)
+	if err != nil {
+		return CreatedObject[TMetadata]{}, err
+	}
+	return CreatedObject[TMetadata]{
+		Contents: contents,
+		Metadata: metadata,
+	}, nil
+}
+
+// MarshalAndEncodePatchedListMessage marshals a list of Protobuf
+// messages, encodes them, and converts them to a single object that can
+// be written to storage.
+func MarshalAndEncodePatchedListMessage[TMessage proto.Message, TMetadata ReferenceMetadata](
+	m PatchedMessage[[]TMessage, TMetadata],
+	referenceFormat object.ReferenceFormat,
+	encoder model_encoding.BinaryEncoder,
+) (CreatedObject[TMetadata], error) {
+	references, metadata := m.Patcher.SortAndSetReferences()
+	var data []byte
+	for _, node := range m.Message {
+		data = varint.AppendForward(data, marshalOptions.Size(node))
+		var err error
+		data, err = marshalOptions.MarshalAppend(data, node)
+		if err != nil {
+			return CreatedObject[TMetadata]{}, err
+		}
 	}
 	encodedData, err := encoder.EncodeBinary(data)
 	if err != nil {

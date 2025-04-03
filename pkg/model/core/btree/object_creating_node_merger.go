@@ -2,13 +2,11 @@ package btree
 
 import (
 	"github.com/buildbarn/bb-storage/pkg/util"
-	"github.com/buildbarn/bonanza/pkg/encoding/varint"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	model_encoding "github.com/buildbarn/bonanza/pkg/model/encoding"
 	model_filesystem_pb "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 
-	"google.golang.org/grpc/codes"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -26,28 +24,14 @@ type ParentNodeComputer[TNode proto.Message, TMetadata model_core.ReferenceMetad
 func NewObjectCreatingNodeMerger[TNode proto.Message, TMetadata model_core.ReferenceMetadata](encoder model_encoding.BinaryEncoder, referenceFormat object.ReferenceFormat, parentNodeComputer ParentNodeComputer[TNode, TMetadata]) NodeMerger[TNode, TMetadata] {
 	return func(list model_core.PatchedMessage[[]TNode, TMetadata]) (model_core.PatchedMessage[TNode, TMetadata], error) {
 		// Marshal each of the messages, prepending its size.
-		references, metadata := list.Patcher.SortAndSetReferences()
-		var data []byte
-		for i, node := range list.Message {
-			data = varint.AppendForward(data, proto.Size(node))
-			var err error
-			data, err = marshalOptions.MarshalAppend(data, node)
-			if err != nil {
-				return model_core.PatchedMessage[TNode, TMetadata]{}, util.StatusWrapfWithCode(err, codes.InvalidArgument, "Failed to marshal node at index %d", i)
-			}
-		}
-		encodedData, err := encoder.EncodeBinary(data)
+		createdObject, err := model_core.MarshalAndEncodePatchedListMessage(list, referenceFormat, encoder)
 		if err != nil {
-			return model_core.PatchedMessage[TNode, TMetadata]{}, util.StatusWrap(err, "Failed to encode object")
-		}
-		contents, err := referenceFormat.NewContents(references, encodedData)
-		if err != nil {
-			return model_core.PatchedMessage[TNode, TMetadata]{}, util.StatusWrap(err, "Failed to create object contents")
+			return model_core.PatchedMessage[TNode, TMetadata]{}, util.StatusWrap(err, "Failed to marshal list")
 		}
 
 		// Construct a parent node that references the object containing
 		// the children.
-		parentNode, err := parentNodeComputer(model_core.CreatedObject[TMetadata]{Contents: contents, Metadata: metadata}, list.Message)
+		parentNode, err := parentNodeComputer(createdObject, list.Message)
 		if err != nil {
 			return model_core.PatchedMessage[TNode, TMetadata]{}, util.StatusWrap(err, "Failed to compute parent node")
 		}

@@ -19,6 +19,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/ds",
+        "//pkg/encoding/varint",
         "//pkg/model/encoding",
         "//pkg/proto/model/core",
         "//pkg/storage/dag",
