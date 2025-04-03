@@ -56,6 +56,8 @@ go_library(
         "select.go",
         "stable_input_root_path.go",
         "target.go",
+        "target_completion.go",
+        "target_output.go",
         "target_pattern_expansion.go",
         "used_module_extension.go",
         "used_module_extensions.go",

@@ -498,8 +498,13 @@
       },
       "TargetCompletion": {
          "dependsOn": [
-            "ConfiguredTarget"
+            "ConfiguredTarget",
+            "FileProperties",
+            "TargetOutput"
          ],
+         "keyContainsReferences": true
+      },
+      "TargetOutput": {
          "keyContainsReferences": true
       },
       "TargetPatternExpansion": {

@@ -450,20 +450,3 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRepoDefaultAttrsValue(ctx c
 		model_core.MapReferenceMetadataToWalkers(defaultAttrs.Patcher),
 	), nil
 }
-
-func (c *baseComputer[TReference, TMetadata]) ComputeTargetCompletionValue(ctx context.Context, key model_core.Message[*model_analysis_pb.TargetCompletion_Key, TReference], e TargetCompletionEnvironment[TReference, TMetadata]) (PatchedTargetCompletionValue, error) {
-	configurationReference := model_core.Patch(e, model_core.Nested(key, key.Message.ConfigurationReference))
-	configuredTarget := e.GetConfiguredTargetValue(
-		model_core.NewPatchedMessage(
-			&model_analysis_pb.ConfiguredTarget_Key{
-				Label:                  key.Message.Label,
-				ConfigurationReference: configurationReference.Message,
-			},
-			model_core.MapReferenceMetadataToWalkers(configurationReference.Patcher),
-		),
-	)
-	if !configuredTarget.IsSet() {
-		return PatchedTargetCompletionValue{}, evaluation.ErrMissingDependency
-	}
-	return model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](&model_analysis_pb.TargetCompletion_Value{}), nil
-}

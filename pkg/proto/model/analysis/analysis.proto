@@ -1100,6 +1100,25 @@ message TargetCompletion {
   message Value {}
 }
 
+message TargetOutput {
+  message Key {
+    // The label of the target that produces the output file, directory,
+    // or symbolic link.
+    string target_label = 1;
+
+    // The path of the output file, directory, or symbolic link,
+    // relative to the output directory of the specified package and
+    // configuration.
+    string package_relative_path = 2;
+
+    // The configuration that needs to be applied when building the
+    // output.
+    bonanza.model.core.Reference configuration_reference = 3;
+  }
+
+  message Value {}
+}
+
 message TargetPatternExpansion {
   message Key {
     // The target pattern that needs to be expanded to a set of targets.
