@@ -1,7 +1,7 @@
 package starlark
 
 import (
-	"encoding/hex"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"hash/fnv"
@@ -12,8 +12,6 @@ import (
 	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 
-	"google.golang.org/protobuf/proto"
-
 	"go.starlark.net/starlark"
 	"go.starlark.net/syntax"
 )
@@ -21,7 +19,7 @@ import (
 const externalDirectoryName = "external"
 
 type File[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata] struct {
-	definition *model_starlark_pb.File
+	definition model_core.Message[*model_starlark_pb.File, TReference]
 }
 
 var (
@@ -30,7 +28,7 @@ var (
 	_ starlark.HasAttrs                                                            = File[object.LocalReference, model_core.CloneableReferenceMetadata]{}
 )
 
-func NewFile[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](definition *model_starlark_pb.File) File[TReference, TMetadata] {
+func NewFile[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](definition model_core.Message[*model_starlark_pb.File, TReference]) File[TReference, TMetadata] {
 	return File[TReference, TMetadata]{
 		definition: definition,
 	}
@@ -52,59 +50,79 @@ func (File[TReference, TMetadata]) Truth() starlark.Bool {
 }
 
 func (f File[TReference, TMetadata]) Hash(thread *starlark.Thread) (uint32, error) {
-	data, err := proto.Marshal(f.definition)
-	if err != nil {
-		return 0, err
-	}
+	d := f.definition.Message
 	h := fnv.New32a()
-	h.Write(data)
+	h.Write([]byte(d.Package))
+	h.Write([]byte(":"))
+	h.Write([]byte(d.PackageRelativePath))
 	return h.Sum32(), nil
 }
 
 func (f File[TReference, TMetadata]) CompareSameType(thread *starlark.Thread, op syntax.Token, other starlark.Value, depth int) (bool, error) {
 	switch op {
 	case syntax.EQL:
-		return proto.Equal(f.definition, other.(File[TReference, TMetadata]).definition), nil
+		return model_core.MessagesEqual(f.definition, other.(File[TReference, TMetadata]).definition), nil
 	case syntax.NEQ:
-		return !proto.Equal(f.definition, other.(File[TReference, TMetadata]).definition), nil
+		return !model_core.MessagesEqual(f.definition, other.(File[TReference, TMetadata]).definition), nil
 	default:
 		return false, errors.New("File can only be compared for equality")
 	}
 }
 
-func (f File[TReference, TMetadata]) appendOwner(parts []string) []string {
-	if o := f.definition.Owner; o != nil {
+func (f File[TReference, TMetadata]) appendOwner(parts []string) ([]string, error) {
+	if o := f.definition.Message.Owner; o != nil {
+		// Place output files in a directory that has the
+		// configuration reference in its name. In addition to
+		// ensuring that output files for different
+		// configurations don't collide, it makes it easy to
+		// inspect the configuration that was used to build.
+		configurationSlug := "_"
+		if o.ConfigurationReference != nil {
+			configurationReference, err := model_core.FlattenReference(
+				model_core.Nested(f.definition, o.ConfigurationReference),
+			)
+			if err != nil {
+				return nil, err
+			}
+			configurationSlug = base64.RawURLEncoding.EncodeToString(configurationReference.GetRawReference())
+		}
+
 		parts = append(
 			parts,
 			"bazel-out",
-			hex.EncodeToString(o.Cfg),
+			configurationSlug,
 			"bin",
 		)
 	}
-	return parts
+	return parts, nil
 }
 
 func (f File[TReference, TMetadata]) getPath() (string, error) {
-	canonicalPackage, err := pg_label.NewCanonicalPackage(f.definition.Package)
+	d := f.definition.Message
+	canonicalPackage, err := pg_label.NewCanonicalPackage(d.Package)
 	if err != nil {
-		return "", fmt.Errorf("invalid canonical package %#v: %w", f.definition.Package, err)
+		return "", fmt.Errorf("invalid canonical package %#v: %w", d.Package, err)
 	}
-	parts := f.appendOwner(make([]string, 0, 7))
+	parts, err := f.appendOwner(make([]string, 0, 7))
+	if err != nil {
+		return "", err
+	}
 	return go_path.Join(
 		append(
 			parts,
 			externalDirectoryName,
 			canonicalPackage.GetCanonicalRepo().String(),
 			canonicalPackage.GetPackagePath(),
-			f.definition.PackageRelativePath,
+			d.PackageRelativePath,
 		)...,
 	), nil
 }
 
 func (f File[TReference, TMetadata]) Attr(thread *starlark.Thread, name string) (starlark.Value, error) {
+	d := f.definition.Message
 	switch name {
 	case "basename":
-		return starlark.String(go_path.Base(f.definition.PackageRelativePath)), nil
+		return starlark.String(go_path.Base(d.PackageRelativePath)), nil
 	case "dirname":
 		p, err := f.getPath()
 		if err != nil {
@@ -112,7 +130,7 @@ func (f File[TReference, TMetadata]) Attr(thread *starlark.Thread, name string) 
 		}
 		return starlark.String(go_path.Dir(p)), nil
 	case "extension":
-		p := f.definition.PackageRelativePath
+		p := d.PackageRelativePath
 		for i := len(p) - 1; i >= 0 && p[i] != '/'; i-- {
 			if p[i] == '.' {
 				return starlark.String(p[i+1:]), nil
@@ -120,22 +138,22 @@ func (f File[TReference, TMetadata]) Attr(thread *starlark.Thread, name string) 
 		}
 		return starlark.String(""), nil
 	case "is_directory":
-		return starlark.Bool(f.definition.Type == model_starlark_pb.File_DIRECTORY), nil
+		return starlark.Bool(d.Type == model_starlark_pb.File_DIRECTORY), nil
 	case "is_source":
-		return starlark.Bool(f.definition.Owner == nil), nil
+		return starlark.Bool(d.Owner == nil), nil
 	case "is_symlink":
-		return starlark.Bool(f.definition.Type == model_starlark_pb.File_SYMLINK), nil
+		return starlark.Bool(d.Type == model_starlark_pb.File_SYMLINK), nil
 	case "owner":
-		canonicalPackage, err := pg_label.NewCanonicalPackage(f.definition.Package)
+		canonicalPackage, err := pg_label.NewCanonicalPackage(d.Package)
 		if err != nil {
-			return nil, fmt.Errorf("invalid canonical package %#v: %w", f.definition.Package, err)
+			return nil, fmt.Errorf("invalid canonical package %#v: %w", d.Package, err)
 		}
 
 		// If the file is an output file, return the label of
 		// the target that generates it. If it is a source file,
 		// return a label of the file itself.
-		targetNameStr := f.definition.PackageRelativePath
-		if o := f.definition.Owner; o != nil {
+		targetNameStr := d.PackageRelativePath
+		if o := d.Owner; o != nil {
 			targetNameStr = o.TargetName
 		}
 		targetName, err := pg_label.NewTargetName(targetNameStr)
@@ -151,11 +169,14 @@ func (f File[TReference, TMetadata]) Attr(thread *starlark.Thread, name string) 
 		}
 		return starlark.String(p), nil
 	case "root":
-		canonicalPackage, err := pg_label.NewCanonicalPackage(f.definition.Package)
+		canonicalPackage, err := pg_label.NewCanonicalPackage(d.Package)
 		if err != nil {
-			return nil, fmt.Errorf("invalid canonical package %#v: %w", f.definition.Package, err)
+			return nil, fmt.Errorf("invalid canonical package %#v: %w", d.Package, err)
 		}
-		parts := f.appendOwner(make([]string, 0, 6))
+		parts, err := f.appendOwner(make([]string, 0, 6))
+		if err != nil {
+			return nil, err
+		}
 		return newStructFromLists[TReference, TMetadata](
 			nil,
 			[]string{"path"},
@@ -170,15 +191,15 @@ func (f File[TReference, TMetadata]) Attr(thread *starlark.Thread, name string) 
 			},
 		), nil
 	case "short_path":
-		canonicalPackage, err := pg_label.NewCanonicalPackage(f.definition.Package)
+		canonicalPackage, err := pg_label.NewCanonicalPackage(d.Package)
 		if err != nil {
-			return nil, fmt.Errorf("invalid canonical package %#v: %w", f.definition.Package, err)
+			return nil, fmt.Errorf("invalid canonical package %#v: %w", d.Package, err)
 		}
 		return starlark.String(go_path.Join(
 			"..",
 			canonicalPackage.GetCanonicalRepo().String(),
 			canonicalPackage.GetPackagePath(),
-			f.definition.PackageRelativePath,
+			d.PackageRelativePath,
 		)), nil
 	default:
 		return nil, nil
@@ -203,11 +224,13 @@ func (File[TReference, TMetadata]) AttrNames() []string {
 }
 
 func (f File[TReference, TMetadata]) EncodeValue(path map[starlark.Value]struct{}, currentIdentifier *pg_label.CanonicalStarlarkIdentifier, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.Value, TMetadata], bool, error) {
-	return model_core.NewSimplePatchedMessage[TMetadata](
+	d := model_core.Patch(options.ObjectCapturer, f.definition)
+	return model_core.NewPatchedMessage(
 		&model_starlark_pb.Value{
 			Kind: &model_starlark_pb.Value_File{
-				File: f.definition,
+				File: d.Message,
 			},
 		},
+		d.Patcher,
 	), false, nil
 }

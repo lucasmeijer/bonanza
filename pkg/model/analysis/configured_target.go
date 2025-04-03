@@ -203,13 +203,13 @@ var emptyRunfilesValue = &model_starlark_pb.Value{
 
 var defaultInfoProviderInstanceProperties = model_starlark.NewProviderInstanceProperties(&defaultInfoProviderIdentifier, false)
 
-func getSingleFileConfiguredTargetValue(file *model_starlark_pb.File) PatchedConfiguredTargetValue {
+func getSingleFileConfiguredTargetValue[TMetadata model_core.WalkableReferenceMetadata](file model_core.PatchedMessage[*model_starlark_pb.File, TMetadata]) PatchedConfiguredTargetValue {
 	fileValue := &model_starlark_pb.Value{
 		Kind: &model_starlark_pb.Value_File{
-			File: file,
+			File: file.Message,
 		},
 	}
-	return model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](
+	return model_core.NewPatchedMessage(
 		&model_analysis_pb.ConfiguredTarget_Value{
 			ProviderInstances: []*model_starlark_pb.Struct{{
 				ProviderInstanceProperties: &model_starlark_pb.Provider_InstanceProperties{
@@ -253,6 +253,7 @@ func getSingleFileConfiguredTargetValue(file *model_starlark_pb.File) PatchedCon
 				},
 			}},
 		},
+		model_core.MapReferenceMetadataToWalkers(file.Patcher),
 	)
 }
 
@@ -549,15 +550,21 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 		), nil
 	case *model_starlark_pb.Target_Definition_PredeclaredOutputFileTarget:
 		// Handcraft a DefaultInfo provider for this source file.
-		return getSingleFileConfiguredTargetValue(&model_starlark_pb.File{
-			Owner: &model_starlark_pb.File_Owner{
-				Cfg:        []byte{0xbe, 0x8a, 0x60, 0x1c, 0xe3, 0x03, 0x44, 0xf0},
-				TargetName: targetKind.PredeclaredOutputFileTarget.OwnerTargetName,
-			},
-			Package:             targetLabel.GetCanonicalPackage().String(),
-			PackageRelativePath: targetLabel.GetTargetName().String(),
-			Type:                model_starlark_pb.File_FILE,
-		}), nil
+		configurationReference := model_core.Patch(e, model_core.Nested(key, key.Message.ConfigurationReference))
+		return getSingleFileConfiguredTargetValue(
+			model_core.NewPatchedMessage(
+				&model_starlark_pb.File{
+					Owner: &model_starlark_pb.File_Owner{
+						ConfigurationReference: configurationReference.Message,
+						TargetName:             targetKind.PredeclaredOutputFileTarget.OwnerTargetName,
+					},
+					Package:             targetLabel.GetCanonicalPackage().String(),
+					PackageRelativePath: targetLabel.GetTargetName().String(),
+					Type:                model_starlark_pb.File_FILE,
+				},
+				configurationReference.Patcher,
+			),
+		), nil
 	case *model_starlark_pb.Target_Definition_RuleTarget:
 		ruleTarget := targetKind.RuleTarget
 		ruleIdentifier, err := label.NewCanonicalStarlarkIdentifier(ruleTarget.RuleIdentifier)
@@ -770,16 +777,17 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 							if canonicalPackage != targetPackage {
 								return nil, fmt.Errorf("output attr %#v contains to label %#v, which refers to a different package", namedAttr.Name, canonicalLabel.String())
 							}
-							attrOutputs = append(attrOutputs, model_starlark.NewFile[TReference, TMetadata](&model_starlark_pb.File{
-								Owner: &model_starlark_pb.File_Owner{
-									// TODO: Fill in a proper hash.
-									Cfg:        []byte{0xbe, 0x8a, 0x60, 0x1c, 0xe3, 0x03, 0x44, 0xf0},
-									TargetName: targetLabel.GetTargetName().String(),
-								},
-								Package:             canonicalPackage.String(),
-								PackageRelativePath: canonicalLabel.GetTargetName().String(),
-								Type:                model_starlark_pb.File_FILE,
-							}))
+							attrOutputs = append(attrOutputs, model_starlark.NewFile[TReference, TMetadata](
+								model_core.Nested(configurationReference, &model_starlark_pb.File{
+									Owner: &model_starlark_pb.File_Owner{
+										ConfigurationReference: configurationReference.Message,
+										TargetName:             targetLabel.GetTargetName().String(),
+									},
+									Package:             canonicalPackage.String(),
+									PackageRelativePath: canonicalLabel.GetTargetName().String(),
+									Type:                model_starlark_pb.File_FILE,
+								}),
+							))
 							return model_starlark.NewLabel[TReference, TMetadata](resolvedLabel), nil
 						default:
 							return nil, fmt.Errorf("value of attr %#v contains labels, which is not expected for this type", namedAttr.Name)
@@ -1421,11 +1429,15 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 		), nil
 	case *model_starlark_pb.Target_Definition_SourceFileTarget:
 		// Handcraft a DefaultInfo provider for this source file.
-		return getSingleFileConfiguredTargetValue(&model_starlark_pb.File{
-			Package:             targetLabel.GetCanonicalPackage().String(),
-			PackageRelativePath: targetLabel.GetTargetName().String(),
-			Type:                model_starlark_pb.File_FILE,
-		}), nil
+		return getSingleFileConfiguredTargetValue(
+			model_core.NewSimplePatchedMessage[TMetadata](
+				&model_starlark_pb.File{
+					Package:             targetLabel.GetCanonicalPackage().String(),
+					PackageRelativePath: targetLabel.GetTargetName().String(),
+					Type:                model_starlark_pb.File_FILE,
+				},
+			),
+		), nil
 	default:
 		return PatchedConfiguredTargetValue{}, errors.New("only source file targets and rule targets can be configured")
 	}
@@ -1566,16 +1578,19 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 			ruleContext: rc,
 		}, nil
 	case "info_file":
-		// Fill all of this in properly.
-		return model_starlark.NewFile[TReference, TMetadata](&model_starlark_pb.File{
-			Owner: &model_starlark_pb.File_Owner{
-				Cfg:        []byte{0xbe, 0x8a, 0x60, 0x1c, 0xe3, 0x03, 0x44, 0xf0},
-				TargetName: "stamp",
-			},
-			Package:             "@@builtins_core+",
-			PackageRelativePath: "stable-status.txt",
-			Type:                model_starlark_pb.File_FILE,
-		}), nil
+		// TODO: Fill all of this in properly.
+		return model_starlark.NewFile[TReference, TMetadata](
+			model_core.NewSimpleMessage[TReference](
+				&model_starlark_pb.File{
+					Owner: &model_starlark_pb.File_Owner{
+						TargetName: "stamp",
+					},
+					Package:             "@@builtins_core+",
+					PackageRelativePath: "stable-status.txt",
+					Type:                model_starlark_pb.File_FILE,
+				},
+			),
+		), nil
 	case "label":
 		return model_starlark.NewLabel[TReference, TMetadata](rc.targetLabel.AsResolved()), nil
 	case "outputs":
@@ -1630,16 +1645,19 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 		}
 		return rc.varDict, nil
 	case "version_file":
-		// Fill all of this in properly.
-		return model_starlark.NewFile[TReference, TMetadata](&model_starlark_pb.File{
-			Owner: &model_starlark_pb.File_Owner{
-				Cfg:        []byte{0xbe, 0x8a, 0x60, 0x1c, 0xe3, 0x03, 0x44, 0xf0},
-				TargetName: "stamp",
-			},
-			Package:             "@@builtins_core+",
-			PackageRelativePath: "volatile-status.txt",
-			Type:                model_starlark_pb.File_FILE,
-		}), nil
+		// TODO: Fill all of this in properly.
+		return model_starlark.NewFile[TReference, TMetadata](
+			model_core.NewSimpleMessage[TReference](
+				&model_starlark_pb.File{
+					Owner: &model_starlark_pb.File_Owner{
+						TargetName: "stamp",
+					},
+					Package:             "@@builtins_core+",
+					PackageRelativePath: "volatile-status.txt",
+					Type:                model_starlark_pb.File_FILE,
+				},
+			),
+		), nil
 	case "workspace_name":
 		return starlark.String("_main"), nil
 	default:
@@ -1984,16 +2002,20 @@ func (rca *ruleContextActions[TReference, TMetadata]) doDeclareDirectory(thread 
 	}
 
 	rc := rca.ruleContext
-	return model_starlark.NewFile[TReference, TMetadata](&model_starlark_pb.File{
-		Owner: &model_starlark_pb.File_Owner{
-			// TODO: Fill in a proper hash.
-			Cfg:        []byte{0xbe, 0x8a, 0x60, 0x1c, 0xe3, 0x03, 0x44, 0xf0},
-			TargetName: rc.targetLabel.GetTargetName().String(),
-		},
-		Package:             rc.targetLabel.GetCanonicalPackage().String(),
-		PackageRelativePath: filename.String(),
-		Type:                model_starlark_pb.File_DIRECTORY,
-	}), nil
+	return model_starlark.NewFile[TReference, TMetadata](
+		model_core.Nested(
+			rc.configurationReference,
+			&model_starlark_pb.File{
+				Owner: &model_starlark_pb.File_Owner{
+					ConfigurationReference: rc.configurationReference.Message,
+					TargetName:             rc.targetLabel.GetTargetName().String(),
+				},
+				Package:             rc.targetLabel.GetCanonicalPackage().String(),
+				PackageRelativePath: filename.String(),
+				Type:                model_starlark_pb.File_DIRECTORY,
+			},
+		),
+	), nil
 }
 
 func (rca *ruleContextActions[TReference, TMetadata]) doDeclareFile(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -2011,16 +2033,20 @@ func (rca *ruleContextActions[TReference, TMetadata]) doDeclareFile(thread *star
 	}
 
 	rc := rca.ruleContext
-	return model_starlark.NewFile[TReference, TMetadata](&model_starlark_pb.File{
-		Owner: &model_starlark_pb.File_Owner{
-			// TODO: Fill in a proper hash.
-			Cfg:        []byte{0xbe, 0x8a, 0x60, 0x1c, 0xe3, 0x03, 0x44, 0xf0},
-			TargetName: rc.targetLabel.GetTargetName().String(),
-		},
-		Package:             rc.targetLabel.GetCanonicalPackage().String(),
-		PackageRelativePath: filename.String(),
-		Type:                model_starlark_pb.File_FILE,
-	}), nil
+	return model_starlark.NewFile[TReference, TMetadata](
+		model_core.Nested(
+			rc.configurationReference,
+			&model_starlark_pb.File{
+				Owner: &model_starlark_pb.File_Owner{
+					ConfigurationReference: rc.configurationReference.Message,
+					TargetName:             rc.targetLabel.GetTargetName().String(),
+				},
+				Package:             rc.targetLabel.GetCanonicalPackage().String(),
+				PackageRelativePath: filename.String(),
+				Type:                model_starlark_pb.File_FILE,
+			},
+		),
+	), nil
 }
 
 func (rca *ruleContextActions[TReference, TMetadata]) doDeclareSymlink(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -2038,16 +2064,20 @@ func (rca *ruleContextActions[TReference, TMetadata]) doDeclareSymlink(thread *s
 	}
 
 	rc := rca.ruleContext
-	return model_starlark.NewFile[TReference, TMetadata](&model_starlark_pb.File{
-		Owner: &model_starlark_pb.File_Owner{
-			// TODO: Fill in a proper hash.
-			Cfg:        []byte{0xbe, 0x8a, 0x60, 0x1c, 0xe3, 0x03, 0x44, 0xf0},
-			TargetName: rc.targetLabel.GetTargetName().String(),
-		},
-		Package:             rc.targetLabel.GetCanonicalPackage().String(),
-		PackageRelativePath: filename.String(),
-		Type:                model_starlark_pb.File_SYMLINK,
-	}), nil
+	return model_starlark.NewFile[TReference, TMetadata](
+		model_core.Nested(
+			rc.configurationReference,
+			&model_starlark_pb.File{
+				Owner: &model_starlark_pb.File_Owner{
+					ConfigurationReference: rc.configurationReference.Message,
+					TargetName:             rc.targetLabel.GetTargetName().String(),
+				},
+				Package:             rc.targetLabel.GetCanonicalPackage().String(),
+				PackageRelativePath: filename.String(),
+				Type:                model_starlark_pb.File_SYMLINK,
+			},
+		),
+	), nil
 }
 
 func (rca *ruleContextActions[TReference, TMetadata]) doExpandTemplate(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {

@@ -305,17 +305,16 @@ message ExecGroup {
 
 message File {
   message Owner {
-    // Identifier of the configuration that is used to build the file.
-    bytes cfg = 1;
+    // Configuration that is used to build the file.
+    bonanza.model.core.Reference configuration_reference = 1;
 
     // Name of the target inside the canonical package that creates
     // this file.
     string target_name = 2;
   }
 
-  // If not set, the file is a source file.
-  //
-  // If set, the file is the output of a configured target.
+  // If set, the file is the output of a configured target. Otherwise,
+  // it is a source file.
   Owner owner = 1;
 
   // Canonical package that contains the file.

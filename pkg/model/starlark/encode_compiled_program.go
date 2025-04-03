@@ -500,7 +500,7 @@ func DecodeValue[TReference object.BasicReference, TMetadata model_core.Cloneabl
 
 		return NewExecGroup(execCompatibleWith, toolchains), nil
 	case *model_starlark_pb.Value_File:
-		return NewFile[TReference, TMetadata](typedValue.File), nil
+		return NewFile[TReference, TMetadata](model_core.Nested(encodedValue, typedValue.File)), nil
 	case *model_starlark_pb.Value_Function:
 		return NewNamedFunction(NewProtoNamedFunctionDefinition[TReference, TMetadata](
 			model_core.Nested(encodedValue, typedValue.Function),
