@@ -13,7 +13,6 @@ import (
 	"github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/model/core/btree"
-	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
 	model_starlark "github.com/buildbarn/bonanza/pkg/model/starlark"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
 	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
@@ -1490,21 +1489,16 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 				return nil, errors.New("rule is not a build setting")
 			}
 
-			configuration, err := model_parser.MaybeDereference(rc.context, rc.computer.configurationReader, rc.configurationReference)
-			if err != nil {
-				return nil, err
-			}
-
 			targetLabelStr := rc.targetLabel.String()
 			override, err := btree.Find(
 				rc.context,
-				rc.computer.configurationBuildSettingOverrideReader,
-				model_core.Nested(configuration, configuration.Message.GetBuildSettingOverrides()),
-				func(entry *model_analysis_pb.Configuration_BuildSettingOverride) (int, *model_core_pb.Reference) {
+				rc.computer.buildSettingOverrideReader,
+				getBuildSettingOverridesFromReference(rc.configurationReference),
+				func(entry *model_analysis_pb.BuildSettingOverride) (int, *model_core_pb.Reference) {
 					switch level := entry.Level.(type) {
-					case *model_analysis_pb.Configuration_BuildSettingOverride_Leaf_:
+					case *model_analysis_pb.BuildSettingOverride_Leaf_:
 						return strings.Compare(targetLabelStr, level.Leaf.Label), nil
-					case *model_analysis_pb.Configuration_BuildSettingOverride_Parent_:
+					case *model_analysis_pb.BuildSettingOverride_Parent_:
 						return strings.Compare(targetLabelStr, level.Parent.FirstLabel), level.Parent.Reference
 					default:
 						return 0, nil
@@ -1517,7 +1511,7 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 
 			var encodedValue model_core.Message[*model_starlark_pb.Value, TReference]
 			if override.IsSet() {
-				overrideLeaf, ok := override.Message.Level.(*model_analysis_pb.Configuration_BuildSettingOverride_Leaf_)
+				overrideLeaf, ok := override.Message.Level.(*model_analysis_pb.BuildSettingOverride_Leaf_)
 				if !ok {
 					return nil, errors.New("build setting override is not a valid leaf")
 				}

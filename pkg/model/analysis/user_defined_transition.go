@@ -15,7 +15,6 @@ import (
 	"github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/model/core/btree"
-	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
 	model_starlark "github.com/buildbarn/bonanza/pkg/model/starlark"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
 	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
@@ -24,7 +23,6 @@ import (
 	"github.com/buildbarn/bonanza/pkg/storage/dag"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"go.starlark.net/starlark"
@@ -151,10 +149,23 @@ func getExpectedTransitionOutput[TReference object.BasicReference, TMetadata mod
 	}, nil
 }
 
+func getBuildSettingOverridesFromReference[TReference any](configurationReference model_core.Message[*model_core_pb.Reference, TReference]) model_core.Message[[]*model_analysis_pb.BuildSettingOverride, TReference] {
+	if configurationReference.Message == nil {
+		return model_core.Nested(configurationReference, ([]*model_analysis_pb.BuildSettingOverride)(nil))
+	}
+	return model_core.Nested(configurationReference, []*model_analysis_pb.BuildSettingOverride{{
+		Level: &model_analysis_pb.BuildSettingOverride_Parent_{
+			Parent: &model_analysis_pb.BuildSettingOverride_Parent{
+				Reference: configurationReference.Message,
+			},
+		},
+	}})
+}
+
 func (c *baseComputer[TReference, TMetadata]) applyTransition(
 	ctx context.Context,
 	e model_core.ObjectCapturer[TReference, TMetadata],
-	configuration model_core.Message[*model_analysis_pb.Configuration, TReference],
+	configurationReference model_core.Message[*model_core_pb.Reference, TReference],
 	expectedOutputs []expectedTransitionOutput[TReference],
 	thread *starlark.Thread,
 	outputs map[string]starlark.Value,
@@ -167,10 +178,10 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 	var errIter error
 	existingIter, existingIterStop := iter.Pull(btree.AllLeaves(
 		ctx,
-		c.configurationBuildSettingOverrideReader,
-		model_core.Nested(configuration, configuration.Message.GetBuildSettingOverrides()),
-		func(override model_core.Message[*model_analysis_pb.Configuration_BuildSettingOverride, TReference]) (*model_core_pb.Reference, error) {
-			if level, ok := override.Message.Level.(*model_analysis_pb.Configuration_BuildSettingOverride_Parent_); ok {
+		c.buildSettingOverrideReader,
+		getBuildSettingOverridesFromReference(configurationReference),
+		func(override model_core.Message[*model_analysis_pb.BuildSettingOverride, TReference]) (*model_core_pb.Reference, error) {
+			if level, ok := override.Message.Level.(*model_analysis_pb.BuildSettingOverride_Parent_); ok {
 				return level.Parent.Reference, nil
 			}
 			return nil, nil
@@ -186,19 +197,19 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 		btree.NewObjectCreatingNodeMerger(
 			c.getValueObjectEncoder(),
 			c.getReferenceFormat(),
-			/* parentNodeComputer = */ func(createdObject model_core.CreatedObject[TMetadata], childNodes []*model_analysis_pb.Configuration_BuildSettingOverride) (model_core.PatchedMessage[*model_analysis_pb.Configuration_BuildSettingOverride, TMetadata], error) {
+			/* parentNodeComputer = */ func(createdObject model_core.CreatedObject[TMetadata], childNodes []*model_analysis_pb.BuildSettingOverride) (model_core.PatchedMessage[*model_analysis_pb.BuildSettingOverride, TMetadata], error) {
 				var firstLabel string
 				switch firstEntry := childNodes[0].Level.(type) {
-				case *model_analysis_pb.Configuration_BuildSettingOverride_Leaf_:
+				case *model_analysis_pb.BuildSettingOverride_Leaf_:
 					firstLabel = firstEntry.Leaf.Label
-				case *model_analysis_pb.Configuration_BuildSettingOverride_Parent_:
+				case *model_analysis_pb.BuildSettingOverride_Parent_:
 					firstLabel = firstEntry.Parent.FirstLabel
 				}
 				patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
 				return model_core.NewPatchedMessage(
-					&model_analysis_pb.Configuration_BuildSettingOverride{
-						Level: &model_analysis_pb.Configuration_BuildSettingOverride_Parent_{
-							Parent: &model_analysis_pb.Configuration_BuildSettingOverride_Parent{
+					&model_analysis_pb.BuildSettingOverride{
+						Level: &model_analysis_pb.BuildSettingOverride_Parent_{
+							Parent: &model_analysis_pb.BuildSettingOverride_Parent{
 								Reference: patcher.AddReference(
 									createdObject.Contents.GetReference(),
 									e.CaptureCreatedObject(createdObject),
@@ -221,7 +232,7 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 		} else if len(expectedOutputs) == 0 {
 			cmp = -1
 		} else {
-			level, ok := existingOverride.Message.Level.(*model_analysis_pb.Configuration_BuildSettingOverride_Leaf_)
+			level, ok := existingOverride.Message.Level.(*model_analysis_pb.BuildSettingOverride_Leaf_)
 			if !ok {
 				return model_core.PatchedMessage[*model_core_pb.Reference, TMetadata]{}, errors.New("build setting override is not a valid leaf")
 			}
@@ -260,9 +271,9 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 			if sortedEncodedValue, _ := encodedValue.SortAndSetReferences(); !model_core.MessagesEqual(sortedEncodedValue, expectedOutput.defaultValue) {
 				treeBuilder.PushChild(
 					model_core.NewPatchedMessage(
-						&model_analysis_pb.Configuration_BuildSettingOverride{
-							Level: &model_analysis_pb.Configuration_BuildSettingOverride_Leaf_{
-								Leaf: &model_analysis_pb.Configuration_BuildSettingOverride_Leaf{
+						&model_analysis_pb.BuildSettingOverride{
+							Level: &model_analysis_pb.BuildSettingOverride_Leaf_{
+								Leaf: &model_analysis_pb.BuildSettingOverride_Leaf{
 									Label: expectedOutput.label,
 									Value: encodedValue.Message,
 								},
@@ -284,16 +295,12 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 	if err != nil {
 		return model_core.PatchedMessage[*model_core_pb.Reference, TMetadata]{}, fmt.Errorf("failed to finalize build setting overrides: %w", err)
 	}
-
-	newConfiguration := &model_analysis_pb.Configuration{
-		BuildSettingOverrides: buildSettingOverrides.Message,
-	}
-	if proto.Size(newConfiguration) == 0 {
+	if len(buildSettingOverrides.Message) == 0 {
 		return model_core.NewSimplePatchedMessage[TMetadata, *model_core_pb.Reference](nil), nil
 	}
 
-	createdConfiguration, err := model_core.MarshalAndEncodePatchedMessage(
-		model_core.NewPatchedMessage(newConfiguration, buildSettingOverrides.Patcher),
+	createdConfiguration, err := model_core.MarshalAndEncodePatchedListMessage(
+		buildSettingOverrides,
 		c.getReferenceFormat(),
 		c.getValueObjectEncoder(),
 	)
@@ -337,21 +344,16 @@ func (c *baseComputer[TReference, TMetadata]) getBuildSettingValue(ctx context.C
 	}
 	visibleBuildSettingLabel := visibleTargetValue.Message.Label
 
-	configuration, err := model_parser.MaybeDereference(ctx, c.configurationReader, configurationReference)
-	if err != nil {
-		return model_core.Message[*model_starlark_pb.Value, TReference]{}, err
-	}
-
 	// Determine the current value of the build setting.
 	if buildSettingOverride, err := btree.Find(
 		ctx,
-		c.configurationBuildSettingOverrideReader,
-		model_core.Nested(configuration, configuration.Message.GetBuildSettingOverrides()),
-		func(entry *model_analysis_pb.Configuration_BuildSettingOverride) (int, *model_core_pb.Reference) {
+		c.buildSettingOverrideReader,
+		getBuildSettingOverridesFromReference(configurationReference),
+		func(entry *model_analysis_pb.BuildSettingOverride) (int, *model_core_pb.Reference) {
 			switch level := entry.Level.(type) {
-			case *model_analysis_pb.Configuration_BuildSettingOverride_Leaf_:
+			case *model_analysis_pb.BuildSettingOverride_Leaf_:
 				return strings.Compare(visibleBuildSettingLabel, level.Leaf.Label), nil
-			case *model_analysis_pb.Configuration_BuildSettingOverride_Parent_:
+			case *model_analysis_pb.BuildSettingOverride_Parent_:
 				return strings.Compare(visibleBuildSettingLabel, level.Parent.FirstLabel), level.Parent.Reference
 			default:
 				return 0, nil
@@ -363,7 +365,7 @@ func (c *baseComputer[TReference, TMetadata]) getBuildSettingValue(ctx context.C
 		// Configuration contains an override for the
 		// build setting. Use the value contained in the
 		// configuration.
-		level, ok := buildSettingOverride.Message.Level.(*model_analysis_pb.Configuration_BuildSettingOverride_Leaf_)
+		level, ok := buildSettingOverride.Message.Level.(*model_analysis_pb.BuildSettingOverride_Leaf_)
 		if !ok {
 			return model_core.Message[*model_starlark_pb.Value, TReference]{}, fmt.Errorf("build setting override for label setting %#v is not a valid leaf", visibleBuildSettingLabel)
 		}
@@ -663,23 +665,17 @@ func (c *baseComputer[TReference, TMetadata]) performAndApplyUserDefinedTransiti
 		return performAndApplyUserDefinedTransitionResult[TMetadata]{}, err
 	}
 
-	configuration, err := model_parser.MaybeDereference(ctx, c.configurationReader, configurationReference)
-	if err != nil {
-		return performAndApplyUserDefinedTransitionResult[TMetadata]{}, err
-	}
-	valueEncodingOptions := c.getValueEncodingOptions(e, nil)
-
 	patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
 	entries := make([]*model_analysis_pb.UserDefinedTransition_Value_Success_Entry, 0, len(outputsDict))
 	for i, key := range slices.Sorted(maps.Keys(outputsDict)) {
 		outputConfigurationReference, err := c.applyTransition(
 			ctx,
 			e,
-			configuration,
+			configurationReference,
 			expectedOutputs,
 			thread,
 			outputsDict[key],
-			valueEncodingOptions,
+			c.getValueEncodingOptions(e, nil),
 		)
 		if err != nil {
 			return performAndApplyUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("key %#v: %w", i, err)

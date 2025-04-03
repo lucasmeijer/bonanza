@@ -52,8 +52,7 @@ type baseComputer[TReference object.BasicReference, TMetadata BaseComputerRefere
 	valueReaders                                 model_starlark.ValueReaders[TReference]
 	buildSpecificationReader                     model_parser.ParsedObjectReader[TReference, model_core.Message[*model_build_pb.BuildSpecification, TReference]]
 	commandOutputsReader                         model_parser.ParsedObjectReader[TReference, model_core.Message[*model_command_pb.Outputs, TReference]]
-	configurationBuildSettingOverrideReader      model_parser.ParsedObjectReader[TReference, model_core.Message[[]*model_analysis_pb.Configuration_BuildSettingOverride, TReference]]
-	configurationReader                          model_parser.ParsedObjectReader[TReference, model_core.Message[*model_analysis_pb.Configuration, TReference]]
+	buildSettingOverrideReader                   model_parser.ParsedObjectReader[TReference, model_core.Message[[]*model_analysis_pb.BuildSettingOverride, TReference]]
 	moduleExtensionReposValueRepoReader          model_parser.ParsedObjectReader[TReference, model_core.Message[[]*model_analysis_pb.ModuleExtensionRepos_Value_Repo, TReference]]
 	packageValueTargetReader                     model_parser.ParsedObjectReader[TReference, model_core.Message[[]*model_analysis_pb.Package_Value_Target, TReference]]
 	targetPatternExpansionValueTargetLabelReader model_parser.ParsedObjectReader[TReference, model_core.Message[[]*model_analysis_pb.TargetPatternExpansion_Value_TargetLabel, TReference]]
@@ -107,13 +106,9 @@ func NewBaseComputer[TReference object.BasicReference, TMetadata BaseComputerRef
 			parsedObjectPoolIngester,
 			model_parser.NewMessageObjectParser[TReference, model_command_pb.Outputs](),
 		),
-		configurationBuildSettingOverrideReader: model_parser.LookupParsedObjectReader(
+		buildSettingOverrideReader: model_parser.LookupParsedObjectReader(
 			parsedObjectPoolIngester,
-			model_parser.NewMessageListObjectParser[TReference, model_analysis_pb.Configuration_BuildSettingOverride](),
-		),
-		configurationReader: model_parser.LookupParsedObjectReader(
-			parsedObjectPoolIngester,
-			model_parser.NewMessageObjectParser[TReference, model_analysis_pb.Configuration](),
+			model_parser.NewMessageListObjectParser[TReference, model_analysis_pb.BuildSettingOverride](),
 		),
 		moduleExtensionReposValueRepoReader: model_parser.LookupParsedObjectReader(
 			parsedObjectPoolIngester,

@@ -178,43 +178,34 @@ message CompiledBzlFileGlobal {
   }
 }
 
-// TODO: Maybe this message should be removed? It may be sufficient to
-// purely express the configuration in the form of a B-tree of build
-// settings?
-message Configuration {
-  message BuildSettingOverride {
-    message Leaf {
-      // The canonical label of the build setting target.
-      string label = 1;
+message BuildSettingOverride {
+  message Leaf {
+    // The canonical label of the build setting target.
+    string label = 1;
 
-      // The value that is assigned to the build setting.
-      bonanza.model.starlark.Value value = 2;
-    }
-
-    message Parent {
-      // Reference to an object of type RepoList that contains
-      // properties of repos in the module extension.
-      bonanza.model.core.Reference reference = 1;
-
-      // The name of the first repo contained in this B-tree.
-      // This field can be used to efficiently look up repos
-      // contained in the B-tree.
-      string first_label = 2;
-    }
-
-    oneof level {
-      // Properties of a single build setting for which an override is
-      // in place.
-      Leaf leaf = 1;
-
-      // More build setting overrides are stored in another object.
-      Parent parent = 2;
-    }
+    // The value that is assigned to the build setting.
+    bonanza.model.starlark.Value value = 2;
   }
 
-  // Build settings that are currently assigned to a value that differs
-  // from their default value.
-  repeated BuildSettingOverride build_setting_overrides = 1;
+  message Parent {
+    // Reference to an object of type RepoList that contains
+    // properties of repos in the module extension.
+    bonanza.model.core.Reference reference = 1;
+
+    // The name of the first repo contained in this B-tree.
+    // This field can be used to efficiently look up repos
+    // contained in the B-tree.
+    string first_label = 2;
+  }
+
+  oneof level {
+    // Properties of a single build setting for which an override is
+    // in place.
+    Leaf leaf = 1;
+
+    // More build setting overrides are stored in another object.
+    Parent parent = 2;
+  }
 }
 
 message ConfiguredTarget {

@@ -11,7 +11,6 @@ import (
 	"github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/model/core/btree"
-	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
 	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
 	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
@@ -265,30 +264,25 @@ func (c *baseComputer[TReference, TMetadata]) ComputeVisibleTargetValue(ctx cont
 
 		// Determine if there is an override in place for this
 		// label setting.
-		configuration, err := model_parser.MaybeDereference(
-			ctx,
-			c.configurationReader,
-			model_core.Nested(key, key.Message.ConfigurationReference),
-		)
-		if err != nil {
-			return PatchedVisibleTargetValue{}, err
-		}
 		toLabelStr := toLabel.String()
 		override, err := btree.Find(
 			ctx,
-			c.configurationBuildSettingOverrideReader,
-			model_core.Nested(configuration, configuration.Message.GetBuildSettingOverrides()),
-			func(entry *model_analysis_pb.Configuration_BuildSettingOverride) (int, *model_core_pb.Reference) {
+			c.buildSettingOverrideReader,
+			getBuildSettingOverridesFromReference(model_core.Nested(key, key.Message.ConfigurationReference)),
+			func(entry *model_analysis_pb.BuildSettingOverride) (int, *model_core_pb.Reference) {
 				switch level := entry.Level.(type) {
-				case *model_analysis_pb.Configuration_BuildSettingOverride_Leaf_:
+				case *model_analysis_pb.BuildSettingOverride_Leaf_:
 					return strings.Compare(toLabelStr, level.Leaf.Label), nil
-				case *model_analysis_pb.Configuration_BuildSettingOverride_Parent_:
+				case *model_analysis_pb.BuildSettingOverride_Parent_:
 					return strings.Compare(toLabelStr, level.Parent.FirstLabel), level.Parent.Reference
 				default:
 					return 0, nil
 				}
 			},
 		)
+		if err != nil {
+			return PatchedVisibleTargetValue{}, err
+		}
 
 		var nextFromPackage string
 		var nextToLabel string
@@ -298,7 +292,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeVisibleTargetValue(ctx cont
 			// visibility checking, as the user is free to
 			// specify a target that is not visible from the
 			// label setting's perspective.
-			leaf, ok := override.Message.Level.(*model_analysis_pb.Configuration_BuildSettingOverride_Leaf_)
+			leaf, ok := override.Message.Level.(*model_analysis_pb.BuildSettingOverride_Leaf_)
 			if !ok {
 				return PatchedVisibleTargetValue{}, errors.New("build setting override is not a valid leaf")
 			}

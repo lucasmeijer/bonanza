@@ -9,7 +9,6 @@ import (
 	"github.com/buildbarn/bonanza/pkg/evaluation"
 	"github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
 	model_starlark "github.com/buildbarn/bonanza/pkg/model/starlark"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
 	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
@@ -53,7 +52,7 @@ func (c *baseComputer[TReference, TMetadata]) createInitialConfiguration(
 	return c.applyTransition(
 		ctx,
 		e,
-		model_core.NewSimpleMessage[TReference](&model_analysis_pb.Configuration{}),
+		model_core.NewSimpleMessage[TReference]((*model_core_pb.Reference)(nil)),
 		[]expectedTransitionOutput[TReference]{platformExpectedTransitionOutput},
 		thread,
 		starlark.StringDict{
@@ -124,18 +123,13 @@ func (c *baseComputer[TReference, TMetadata]) ComputeExecTransitionValue(ctx con
 	if err != nil {
 		return PatchedExecTransitionValue{}, err
 	}
-	initialOutputConfigurationReference := model_core.Unpatch(e, patchedInitialOutputConfigurationReference)
-	initialOutputConfiguration, err := model_parser.MaybeDereference(ctx, c.configurationReader, initialOutputConfigurationReference)
-	if err != nil {
-		return PatchedExecTransitionValue{}, err
-	}
 
 	// Extend the new configuration to include any build settings
 	// yielded by the exec transition.
 	outputConfigurationReference, err := c.applyTransition(
 		ctx,
 		e,
-		initialOutputConfiguration,
+		model_core.Unpatch(e, patchedInitialOutputConfigurationReference),
 		expectedOutputs,
 		thread,
 		outputs,
