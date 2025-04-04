@@ -50,9 +50,10 @@ type baseComputer[TReference object.BasicReference, TMetadata BaseComputerRefere
 	// TODO: These should likely be removed and instantiated later
 	// on, so that we can encrypt all data in storage.
 	valueReaders                                 model_starlark.ValueReaders[TReference]
+	buildSettingOverrideReader                   model_parser.ParsedObjectReader[TReference, model_core.Message[[]*model_analysis_pb.BuildSettingOverride, TReference]]
 	buildSpecificationReader                     model_parser.ParsedObjectReader[TReference, model_core.Message[*model_build_pb.BuildSpecification, TReference]]
 	commandOutputsReader                         model_parser.ParsedObjectReader[TReference, model_core.Message[*model_command_pb.Outputs, TReference]]
-	buildSettingOverrideReader                   model_parser.ParsedObjectReader[TReference, model_core.Message[[]*model_analysis_pb.BuildSettingOverride, TReference]]
+	configuredTargetOutputReader                 model_parser.ParsedObjectReader[TReference, model_core.Message[[]*model_analysis_pb.ConfiguredTarget_Value_Output, TReference]]
 	moduleExtensionReposValueRepoReader          model_parser.ParsedObjectReader[TReference, model_core.Message[[]*model_analysis_pb.ModuleExtensionRepos_Value_Repo, TReference]]
 	packageValueTargetReader                     model_parser.ParsedObjectReader[TReference, model_core.Message[[]*model_analysis_pb.Package_Value_Target, TReference]]
 	targetPatternExpansionValueTargetLabelReader model_parser.ParsedObjectReader[TReference, model_core.Message[[]*model_analysis_pb.TargetPatternExpansion_Value_TargetLabel, TReference]]
@@ -102,13 +103,17 @@ func NewBaseComputer[TReference object.BasicReference, TMetadata BaseComputerRef
 				model_parser.NewMessageObjectParser[TReference, model_build_pb.BuildSpecification](),
 			),
 		),
-		commandOutputsReader: model_parser.LookupParsedObjectReader(
-			parsedObjectPoolIngester,
-			model_parser.NewMessageObjectParser[TReference, model_command_pb.Outputs](),
-		),
 		buildSettingOverrideReader: model_parser.LookupParsedObjectReader(
 			parsedObjectPoolIngester,
 			model_parser.NewMessageListObjectParser[TReference, model_analysis_pb.BuildSettingOverride](),
+		),
+		configuredTargetOutputReader: model_parser.LookupParsedObjectReader(
+			parsedObjectPoolIngester,
+			model_parser.NewMessageListObjectParser[TReference, model_analysis_pb.ConfiguredTarget_Value_Output](),
+		),
+		commandOutputsReader: model_parser.LookupParsedObjectReader(
+			parsedObjectPoolIngester,
+			model_parser.NewMessageObjectParser[TReference, model_command_pb.Outputs](),
 		),
 		moduleExtensionReposValueRepoReader: model_parser.LookupParsedObjectReader(
 			parsedObjectPoolIngester,

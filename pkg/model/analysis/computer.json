@@ -505,6 +505,9 @@
          "keyContainsReferences": true
       },
       "TargetOutput": {
+         "dependsOn": [
+            "ConfiguredTarget"
+         ],
          "keyContainsReferences": true
       },
       "TargetPatternExpansion": {
