@@ -1782,7 +1782,7 @@ func (ruleContext[TReference, TMetadata]) doRunfiles(thread *starlark.Thread, b 
 	})
 	if err := starlark.UnpackArgs(
 		b.Name(), args, kwargs,
-		"files?", unpack.Bind(thread, &files, unpack.List(unpack.Canonicalize(unpack.Type[model_starlark.File[TReference, TMetadata]]("File")))),
+		"files?", unpack.Bind(thread, &files, unpack.List(unpack.Canonicalize(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File")))),
 		"transitive_files?", unpack.Bind(thread, &transitiveFiles, unpack.IfNotNone(unpack.Type[*model_starlark.Depset[TReference, TMetadata]]("depset"))),
 		"collect_data?", unpack.Bind(thread, &collectData, unpack.Bool),
 		"collect_default?", unpack.Bind(thread, &collectDefault, unpack.Bool),
@@ -1996,7 +1996,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doDeclareDirectory(thread 
 	if err := starlark.UnpackArgs(
 		b.Name(), args, kwargs,
 		"filename", unpack.Bind(thread, &filename, unpack.TargetName),
-		"sibling?", unpack.Bind(thread, &sibling, unpack.IfNotNone(unpack.Pointer(unpack.Type[model_starlark.File[TReference, TMetadata]]("File")))),
+		"sibling?", unpack.Bind(thread, &sibling, unpack.IfNotNone(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File"))),
 	); err != nil {
 		return nil, err
 	}
@@ -2027,7 +2027,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doDeclareFile(thread *star
 	if err := starlark.UnpackArgs(
 		b.Name(), args, kwargs,
 		"filename", unpack.Bind(thread, &filename, unpack.TargetName),
-		"sibling?", unpack.Bind(thread, &sibling, unpack.IfNotNone(unpack.Pointer(unpack.Type[model_starlark.File[TReference, TMetadata]]("File")))),
+		"sibling?", unpack.Bind(thread, &sibling, unpack.IfNotNone(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File"))),
 	); err != nil {
 		return nil, err
 	}
@@ -2058,7 +2058,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doDeclareSymlink(thread *s
 	if err := starlark.UnpackArgs(
 		b.Name(), args, kwargs,
 		"filename", unpack.Bind(thread, &filename, unpack.TargetName),
-		"sibling?", unpack.Bind(thread, &sibling, unpack.IfNotNone(unpack.Pointer(unpack.Type[model_starlark.File[TReference, TMetadata]]("File")))),
+		"sibling?", unpack.Bind(thread, &sibling, unpack.IfNotNone(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File"))),
 	); err != nil {
 		return nil, err
 	}
@@ -2084,15 +2084,15 @@ func (rca *ruleContextActions[TReference, TMetadata]) doExpandTemplate(thread *s
 	if len(args) != 0 {
 		return nil, fmt.Errorf("%s: got %d positional arguments, want 0", b.Name(), len(args))
 	}
-	var output model_starlark.File[TReference, TMetadata]
-	var template model_starlark.File[TReference, TMetadata]
+	var output *model_starlark.File[TReference, TMetadata]
+	var template *model_starlark.File[TReference, TMetadata]
 	isExecutable := false
 	var substitutions map[string]string
 	if err := starlark.UnpackArgs(
 		b.Name(), args, kwargs,
 		// Required arguments.
-		"output", unpack.Bind(thread, &output, unpack.Type[model_starlark.File[TReference, TMetadata]]("File")),
-		"template", unpack.Bind(thread, &template, unpack.Type[model_starlark.File[TReference, TMetadata]]("File")),
+		"output", unpack.Bind(thread, &output, unpack.Type[*model_starlark.File[TReference, TMetadata]]("File")),
+		"template", unpack.Bind(thread, &template, unpack.Type[*model_starlark.File[TReference, TMetadata]]("File")),
 		// Optional arguments.
 		// TODO: Add TemplateDict and computed_substitutions.
 		"is_executable?", unpack.Bind(thread, &isExecutable, unpack.Bool),
@@ -2109,7 +2109,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 		return nil, fmt.Errorf("%s: got %d positional arguments, want 0", b.Name(), len(fnArgs))
 	}
 	var executable any
-	var outputs []model_starlark.File[TReference, TMetadata]
+	var outputs []*model_starlark.File[TReference, TMetadata]
 	var arguments []any
 	var env map[string]string
 	execGroup := ""
@@ -2126,10 +2126,10 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 		// Required arguments.
 		"executable", unpack.Bind(thread, &executable, unpack.Or([]unpack.UnpackerInto[any]{
 			unpack.Decay(unpack.String),
-			unpack.Decay(unpack.Type[model_starlark.File[TReference, TMetadata]]("File")),
+			unpack.Decay(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File")),
 			unpack.Decay(unpack.Type[*model_starlark.Struct[TReference, TMetadata]]("struct")),
 		})),
-		"outputs", unpack.Bind(thread, &outputs, unpack.List(unpack.Type[model_starlark.File[TReference, TMetadata]]("File"))),
+		"outputs", unpack.Bind(thread, &outputs, unpack.List(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File"))),
 		// Optional arguments.
 		"arguments?", unpack.Bind(thread, &arguments, unpack.List(unpack.Or([]unpack.UnpackerInto[any]{
 			unpack.Decay(unpack.Type[*args]("Args")),
@@ -2140,7 +2140,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 		"execution_requirements?", unpack.Bind(thread, &executionRequirements, unpack.Dict(unpack.String, unpack.String)),
 		"inputs?", unpack.Bind(thread, &inputs, unpack.Or([]unpack.UnpackerInto[any]{
 			unpack.Decay(unpack.Type[*model_starlark.Depset[TReference, TMetadata]]("depset")),
-			unpack.Decay(unpack.List(unpack.Type[model_starlark.File[TReference, TMetadata]]("File"))),
+			unpack.Decay(unpack.List(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File"))),
 		})),
 		"mnemonic?", unpack.Bind(thread, &mnemonic, unpack.IfNotNone(unpack.String)),
 		"progress_message?", unpack.Bind(thread, &progressMessage, unpack.IfNotNone(unpack.String)),
@@ -2150,7 +2150,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 			unpack.Singleton(unpack.Decay(unpack.Type[*model_starlark.Depset[TReference, TMetadata]]("depset"))),
 			unpack.List(unpack.Or([]unpack.UnpackerInto[any]{
 				unpack.Decay(unpack.Type[*model_starlark.Depset[TReference, TMetadata]]("depset")),
-				unpack.Decay(unpack.Type[model_starlark.File[TReference, TMetadata]]("File")),
+				unpack.Decay(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File")),
 				unpack.Decay(unpack.Type[*model_starlark.Struct[TReference, TMetadata]]("struct")),
 			})),
 		})),
@@ -2167,7 +2167,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunShell(thread *starlar
 		return nil, fmt.Errorf("%s: got %d positional arguments, want 0", b.Name(), len(fnArgs))
 	}
 	var command string
-	var outputs []model_starlark.File[TReference, TMetadata]
+	var outputs []*model_starlark.File[TReference, TMetadata]
 	var arguments []any
 	var env map[string]string
 	execGroup := ""
@@ -2182,7 +2182,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunShell(thread *starlar
 	if err := starlark.UnpackArgs(
 		b.Name(), fnArgs, kwargs,
 		// Required arguments.
-		"outputs", unpack.Bind(thread, &outputs, unpack.List(unpack.Type[model_starlark.File[TReference, TMetadata]]("File"))),
+		"outputs", unpack.Bind(thread, &outputs, unpack.List(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File"))),
 		"command", unpack.Bind(thread, &command, unpack.String),
 		// Optional arguments.
 		"arguments?", unpack.Bind(thread, &arguments, unpack.List(unpack.Or([]unpack.UnpackerInto[any]{
@@ -2194,7 +2194,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunShell(thread *starlar
 		"execution_requirements?", unpack.Bind(thread, &executionRequirements, unpack.Dict(unpack.String, unpack.String)),
 		"inputs?", unpack.Bind(thread, &inputs, unpack.Or([]unpack.UnpackerInto[any]{
 			unpack.Decay(unpack.Type[*model_starlark.Depset[TReference, TMetadata]]("depset")),
-			unpack.Decay(unpack.List(unpack.Type[model_starlark.File[TReference, TMetadata]]("File"))),
+			unpack.Decay(unpack.List(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File"))),
 		})),
 		"mnemonic?", unpack.Bind(thread, &mnemonic, unpack.IfNotNone(unpack.String)),
 		"progress_message?", unpack.Bind(thread, &progressMessage, unpack.IfNotNone(unpack.String)),
@@ -2204,7 +2204,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunShell(thread *starlar
 			unpack.Singleton(unpack.Decay(unpack.Type[*model_starlark.Depset[TReference, TMetadata]]("depset"))),
 			unpack.List(unpack.Or([]unpack.UnpackerInto[any]{
 				unpack.Decay(unpack.Type[*model_starlark.Depset[TReference, TMetadata]]("depset")),
-				unpack.Decay(unpack.Type[model_starlark.File[TReference, TMetadata]]("File")),
+				unpack.Decay(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File")),
 				unpack.Decay(unpack.Type[*model_starlark.Struct[TReference, TMetadata]]("struct")),
 			})),
 		})),
@@ -2218,15 +2218,15 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunShell(thread *starlar
 }
 
 func (rca *ruleContextActions[TReference, TMetadata]) doSymlink(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	var output model_starlark.File[TReference, TMetadata]
+	var output *model_starlark.File[TReference, TMetadata]
 	var targetFile *model_starlark.File[TReference, TMetadata]
 	targetPath := ""
 	isExecutable := false
 	progressMessage := ""
 	if err := starlark.UnpackArgs(
 		b.Name(), args, kwargs,
-		"output", unpack.Bind(thread, &output, unpack.Type[model_starlark.File[TReference, TMetadata]]("File")),
-		"target_file?", unpack.Bind(thread, &targetFile, unpack.IfNotNone(unpack.Pointer(unpack.Type[model_starlark.File[TReference, TMetadata]]("File")))),
+		"output", unpack.Bind(thread, &output, unpack.Type[*model_starlark.File[TReference, TMetadata]]("File")),
+		"target_file?", unpack.Bind(thread, &targetFile, unpack.IfNotNone(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File"))),
 		"target_path?", unpack.Bind(thread, &targetPath, unpack.IfNotNone(unpack.String)),
 		"is_executable?", unpack.Bind(thread, &isExecutable, unpack.Bool),
 		"progress_message?", unpack.Bind(thread, &progressMessage, unpack.IfNotNone(unpack.String)),
@@ -2247,12 +2247,12 @@ func (rca *ruleContextActions[TReference, TMetadata]) doTransformVersionFile(thr
 }
 
 func (rca *ruleContextActions[TReference, TMetadata]) doWrite(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	var output model_starlark.File[TReference, TMetadata]
+	var output *model_starlark.File[TReference, TMetadata]
 	var content string
 	isExecutable := false
 	if err := starlark.UnpackArgs(
 		b.Name(), args, kwargs,
-		"output", unpack.Bind(thread, &output, unpack.Type[model_starlark.File[TReference, TMetadata]]("File")),
+		"output", unpack.Bind(thread, &output, unpack.Type[*model_starlark.File[TReference, TMetadata]]("File")),
 		// TODO: Accept Args.
 		"content", unpack.Bind(thread, &content, unpack.String),
 		"is_executable?", unpack.Bind(thread, &isExecutable, unpack.Bool),

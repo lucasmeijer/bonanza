@@ -23,13 +23,13 @@ type File[TReference object.BasicReference, TMetadata model_core.CloneableRefere
 }
 
 var (
-	_ EncodableValue[object.LocalReference, model_core.CloneableReferenceMetadata] = File[object.LocalReference, model_core.CloneableReferenceMetadata]{}
-	_ starlark.Comparable                                                          = File[object.LocalReference, model_core.CloneableReferenceMetadata]{}
-	_ starlark.HasAttrs                                                            = File[object.LocalReference, model_core.CloneableReferenceMetadata]{}
+	_ EncodableValue[object.LocalReference, model_core.CloneableReferenceMetadata] = (*File[object.LocalReference, model_core.CloneableReferenceMetadata])(nil)
+	_ starlark.Comparable                                                          = (*File[object.LocalReference, model_core.CloneableReferenceMetadata])(nil)
+	_ starlark.HasAttrs                                                            = (*File[object.LocalReference, model_core.CloneableReferenceMetadata])(nil)
 )
 
-func NewFile[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](definition model_core.Message[*model_starlark_pb.File, TReference]) File[TReference, TMetadata] {
-	return File[TReference, TMetadata]{
+func NewFile[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](definition model_core.Message[*model_starlark_pb.File, TReference]) *File[TReference, TMetadata] {
+	return &File[TReference, TMetadata]{
 		definition: definition,
 	}
 }
@@ -49,7 +49,7 @@ func (File[TReference, TMetadata]) Truth() starlark.Bool {
 	return starlark.True
 }
 
-func (f File[TReference, TMetadata]) Hash(thread *starlark.Thread) (uint32, error) {
+func (f *File[TReference, TMetadata]) Hash(thread *starlark.Thread) (uint32, error) {
 	d := f.definition.Message
 	h := fnv.New32a()
 	h.Write([]byte(d.Package))
@@ -58,18 +58,27 @@ func (f File[TReference, TMetadata]) Hash(thread *starlark.Thread) (uint32, erro
 	return h.Sum32(), nil
 }
 
-func (f File[TReference, TMetadata]) CompareSameType(thread *starlark.Thread, op syntax.Token, other starlark.Value, depth int) (bool, error) {
+func (f *File[TReference, TMetadata]) equals(other *File[TReference, TMetadata]) bool {
+	if f != other {
+		if !model_core.MessagesEqual(f.definition, other.definition) {
+			return false
+		}
+	}
+	return true
+}
+
+func (f *File[TReference, TMetadata]) CompareSameType(thread *starlark.Thread, op syntax.Token, other starlark.Value, depth int) (bool, error) {
 	switch op {
 	case syntax.EQL:
-		return model_core.MessagesEqual(f.definition, other.(File[TReference, TMetadata]).definition), nil
+		return f.equals(other.(*File[TReference, TMetadata])), nil
 	case syntax.NEQ:
-		return !model_core.MessagesEqual(f.definition, other.(File[TReference, TMetadata]).definition), nil
+		return !f.equals(other.(*File[TReference, TMetadata])), nil
 	default:
 		return false, errors.New("File can only be compared for equality")
 	}
 }
 
-func (f File[TReference, TMetadata]) appendOwner(parts []string) ([]string, error) {
+func (f *File[TReference, TMetadata]) appendOwner(parts []string) ([]string, error) {
 	if o := f.definition.Message.Owner; o != nil {
 		// Place output files in a directory that has the
 		// configuration reference in its name. In addition to
@@ -97,7 +106,7 @@ func (f File[TReference, TMetadata]) appendOwner(parts []string) ([]string, erro
 	return parts, nil
 }
 
-func (f File[TReference, TMetadata]) getPath() (string, error) {
+func (f *File[TReference, TMetadata]) getPath() (string, error) {
 	d := f.definition.Message
 	canonicalPackage, err := pg_label.NewCanonicalPackage(d.Package)
 	if err != nil {
@@ -118,7 +127,7 @@ func (f File[TReference, TMetadata]) getPath() (string, error) {
 	), nil
 }
 
-func (f File[TReference, TMetadata]) Attr(thread *starlark.Thread, name string) (starlark.Value, error) {
+func (f *File[TReference, TMetadata]) Attr(thread *starlark.Thread, name string) (starlark.Value, error) {
 	d := f.definition.Message
 	switch name {
 	case "basename":
@@ -223,7 +232,7 @@ func (File[TReference, TMetadata]) AttrNames() []string {
 	return fileAttrNames
 }
 
-func (f File[TReference, TMetadata]) EncodeValue(path map[starlark.Value]struct{}, currentIdentifier *pg_label.CanonicalStarlarkIdentifier, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.Value, TMetadata], bool, error) {
+func (f *File[TReference, TMetadata]) EncodeValue(path map[starlark.Value]struct{}, currentIdentifier *pg_label.CanonicalStarlarkIdentifier, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.Value, TMetadata], bool, error) {
 	d := model_core.Patch(options.ObjectCapturer, f.definition)
 	return model_core.NewPatchedMessage(
 		&model_starlark_pb.Value{
