@@ -226,6 +226,90 @@ message ConfiguredTarget {
     // The values of the provider instances that this target produced,
     // sorted alphabetically by provider identifier.
     repeated bonanza.model.starlark.Struct provider_instances = 1;
+
+    message Output {
+      message Parent {
+        // Reference to the B-tree node containing additional outputs.
+        bonanza.model.core.Reference reference = 1;
+
+        // The filename of the first output contained in the B-tree that
+        // is referenced.
+        string first_filename = 2;
+      }
+
+      message Leaf {
+        // The filename of the output, relative to the output directory
+        // that is used to store files belonging to this package and
+        // configuration.
+        string filename = 1;
+
+        message Directory {
+          oneof source {
+            // The directory is the output of a command that was
+            // declared using ctx.actions.run() or
+            // ctx.actions.run_shell().
+            string action_id = 1;
+          }
+        }
+
+        message File {
+          oneof source {
+            bonanza.model.filesystem.FileProperties static_properties = 1;
+
+            // The file is the output of a command that was declared
+            // using ctx.actions.run() or ctx.actions.run_shell().
+            string action_id = 2;
+          }
+        }
+
+        message Symlink {
+          oneof source {
+            // The symlink refers to another file, which was achieved by
+            // calling ctx.actions.symlink(target_file=...).
+            bonanza.model.starlark.File file = 1;
+
+            // The symlink refers to a static path, which was achieved
+            // by calling ctx.actions.symlink(target_path=...).
+            string static_target_path = 2;
+
+            // The symlink is the output of a command that was declared
+            // using ctx.actions.run() or ctx.actions.run_shell().
+            string action_id = 3;
+          }
+        }
+
+        oneof kind {
+          // The output is a directory, typically created using
+          // ctx.actions.declare_directory().
+          Directory directory = 2;
+
+          // The output is a file, typically created using
+          // ctx.actions.declare_file().
+          File file = 3;
+
+          // The output is a symlink, typically created using
+          // ctx.actions.declare_symlink().
+          Symlink symlink = 4;
+        }
+      }
+
+      oneof level {
+        // A single output, for which properties are provided.
+        Leaf leaf = 1;
+
+        // B-tree node containing additional outputs.
+        Parent parent = 2;
+      }
+    }
+
+    // The output directories, files and symbolic links that this target
+    // declared as part of its implementation function using
+    // ctx.actions.declare_{directory,file,symlink}(), or predeclared
+    // using attr.output{,_list}().
+    //
+    // Outputs are stored in a B-tree, where entries are sorted
+    // alphabetically by filename.
+    repeated Output outputs = 2;
   }
 }
 
