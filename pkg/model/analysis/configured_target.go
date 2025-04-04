@@ -728,6 +728,10 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 		outputsValues := map[string]any{}
 		ruleTargetPublicAttrValues = ruleTarget.PublicAttrValues
 		targetPackage := targetLabel.GetCanonicalPackage()
+		outputRegistrar := targetOutputRegistrar[TReference, TMetadata]{
+			outputsByPackageRelativePath: map[string]*targetOutput{},
+			outputsByFile:                map[*model_starlark.File[TReference, TMetadata]]*targetOutput{},
+		}
 	GetNonLabelAttrValues:
 		for _, namedAttr := range ruleDefinition.Message.Attrs {
 			var publicAttrValue *model_starlark_pb.RuleTarget_PublicAttrValue
@@ -777,7 +781,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 							if canonicalPackage != targetPackage {
 								return nil, fmt.Errorf("output attr %#v contains to label %#v, which refers to a different package", namedAttr.Name, canonicalLabel.String())
 							}
-							attrOutputs = append(attrOutputs, model_starlark.NewFile[TReference, TMetadata](
+							f, err := outputRegistrar.registerOutput(
 								model_core.Nested(configurationReference, &model_starlark_pb.File{
 									Owner: &model_starlark_pb.File_Owner{
 										ConfigurationReference: configurationReference.Message,
@@ -787,7 +791,11 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 									PackageRelativePath: canonicalLabel.GetTargetName().String(),
 									Type:                model_starlark_pb.File_FILE,
 								}),
-							))
+							)
+							if err != nil {
+								return nil, fmt.Errorf("output attr %#v: %w", err)
+							}
+							attrOutputs = append(attrOutputs, f)
 							return model_starlark.NewLabel[TReference, TMetadata](resolvedLabel), nil
 						default:
 							return nil, fmt.Errorf("value of attr %#v contains labels, which is not expected for this type", namedAttr.Name)
@@ -1206,6 +1214,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 			outputs:                model_starlark.NewStructFromDict[TReference, TMetadata](nil, outputsValues),
 			execGroups:             execGroups,
 			fragments:              map[string]*model_starlark.Struct[TReference, TMetadata]{},
+			outputRegistrar:        &outputRegistrar,
 		}
 		thread.SetLocal(model_starlark.CurrentCtxKey, rc)
 
@@ -1443,6 +1452,51 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 	}
 }
 
+type targetOutput struct{}
+
+type targetOutputRegistrar[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata] struct {
+	outputsByPackageRelativePath map[string]*targetOutput
+	outputsByFile                map[*model_starlark.File[TReference, TMetadata]]*targetOutput
+}
+
+func (or *targetOutputRegistrar[TReference, TMetadata]) registerOutput(definition model_core.Message[*model_starlark_pb.File, TReference]) (starlark.Value, error) {
+	o := &targetOutput{}
+	or.outputsByPackageRelativePath[definition.Message.PackageRelativePath] = o
+	f := model_starlark.NewFile[TReference, TMetadata](definition)
+	or.outputsByFile[f] = o
+	return f, nil
+}
+
+// targetOutputRegistrar is able to convert model_starlark.File objects
+// that were declared as part of the current target to targetOutputs.
+// This allows them to be associated to the action that yields them.
+var _ unpack.UnpackerInto[*targetOutput] = (*targetOutputRegistrar[object.BasicReference, model_core.CloneableReferenceMetadata])(nil)
+
+func (or *targetOutputRegistrar[TReference, TMetadata]) UnpackInto(thread *starlark.Thread, v starlark.Value, dst **targetOutput) error {
+	var f *model_starlark.File[TReference, TMetadata]
+	if err := unpack.Type[*model_starlark.File[TReference, TMetadata]]("File").UnpackInto(thread, v, &f); err != nil {
+		return err
+	}
+	o, ok := or.outputsByFile[f]
+	if !ok {
+		return fmt.Errorf("%s was not declared as part of this target", f.String())
+	}
+	*dst = o
+	return nil
+}
+
+func (or *targetOutputRegistrar[TReference, TMetadata]) Canonicalize(thread *starlark.Thread, v starlark.Value) (starlark.Value, error) {
+	var o *targetOutput
+	if err := or.UnpackInto(thread, v, &o); err != nil {
+		return nil, err
+	}
+	return v, nil
+}
+
+func (or *targetOutputRegistrar[TReference, TMetadata]) GetConcatenationOperator() syntax.Token {
+	return syntax.PLUS
+}
+
 type ruleContext[TReference object.BasicReference, TMetadata BaseComputerReferenceMetadata] struct {
 	computer               *baseComputer[TReference, TMetadata]
 	context                context.Context
@@ -1463,6 +1517,7 @@ type ruleContext[TReference object.BasicReference, TMetadata BaseComputerReferen
 	tags                   *starlark.List
 	varDict                *starlark.Dict
 	fragments              map[string]*model_starlark.Struct[TReference, TMetadata]
+	outputRegistrar        *targetOutputRegistrar[TReference, TMetadata]
 }
 
 var _ starlark.HasAttrs = (*ruleContext[object.GlobalReference, BaseComputerReferenceMetadata])(nil)
@@ -1992,17 +2047,17 @@ func (rca *ruleContextActions[TReference, TMetadata]) doDeclareDirectory(thread 
 		return nil, fmt.Errorf("%s: got %d positional arguments, want at most 1", b.Name(), len(args))
 	}
 	var filename label.TargetName
-	var sibling *model_starlark.File[TReference, TMetadata]
+	var sibling *targetOutput
+	rc := rca.ruleContext
 	if err := starlark.UnpackArgs(
 		b.Name(), args, kwargs,
 		"filename", unpack.Bind(thread, &filename, unpack.TargetName),
-		"sibling?", unpack.Bind(thread, &sibling, unpack.IfNotNone(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File"))),
+		"sibling?", unpack.Bind(thread, &sibling, unpack.IfNotNone(rc.outputRegistrar)),
 	); err != nil {
 		return nil, err
 	}
 
-	rc := rca.ruleContext
-	return model_starlark.NewFile[TReference, TMetadata](
+	return rc.outputRegistrar.registerOutput(
 		model_core.Nested(
 			rc.configurationReference,
 			&model_starlark_pb.File{
@@ -2015,7 +2070,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doDeclareDirectory(thread 
 				Type:                model_starlark_pb.File_DIRECTORY,
 			},
 		),
-	), nil
+	)
 }
 
 func (rca *ruleContextActions[TReference, TMetadata]) doDeclareFile(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -2023,17 +2078,17 @@ func (rca *ruleContextActions[TReference, TMetadata]) doDeclareFile(thread *star
 		return nil, fmt.Errorf("%s: got %d positional arguments, want at most 1", b.Name(), len(args))
 	}
 	var filename label.TargetName
-	var sibling *model_starlark.File[TReference, TMetadata]
+	var sibling *targetOutput
+	rc := rca.ruleContext
 	if err := starlark.UnpackArgs(
 		b.Name(), args, kwargs,
 		"filename", unpack.Bind(thread, &filename, unpack.TargetName),
-		"sibling?", unpack.Bind(thread, &sibling, unpack.IfNotNone(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File"))),
+		"sibling?", unpack.Bind(thread, &sibling, unpack.IfNotNone(rc.outputRegistrar)),
 	); err != nil {
 		return nil, err
 	}
 
-	rc := rca.ruleContext
-	return model_starlark.NewFile[TReference, TMetadata](
+	return rc.outputRegistrar.registerOutput(
 		model_core.Nested(
 			rc.configurationReference,
 			&model_starlark_pb.File{
@@ -2046,7 +2101,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doDeclareFile(thread *star
 				Type:                model_starlark_pb.File_FILE,
 			},
 		),
-	), nil
+	)
 }
 
 func (rca *ruleContextActions[TReference, TMetadata]) doDeclareSymlink(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -2054,17 +2109,17 @@ func (rca *ruleContextActions[TReference, TMetadata]) doDeclareSymlink(thread *s
 		return nil, fmt.Errorf("%s: got %d positional arguments, want at most 1", b.Name(), len(args))
 	}
 	var filename label.TargetName
-	var sibling *model_starlark.File[TReference, TMetadata]
+	var sibling *targetOutput
+	rc := rca.ruleContext
 	if err := starlark.UnpackArgs(
 		b.Name(), args, kwargs,
 		"filename", unpack.Bind(thread, &filename, unpack.TargetName),
-		"sibling?", unpack.Bind(thread, &sibling, unpack.IfNotNone(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File"))),
+		"sibling?", unpack.Bind(thread, &sibling, unpack.IfNotNone(rc.outputRegistrar)),
 	); err != nil {
 		return nil, err
 	}
 
-	rc := rca.ruleContext
-	return model_starlark.NewFile[TReference, TMetadata](
+	return rc.outputRegistrar.registerOutput(
 		model_core.Nested(
 			rc.configurationReference,
 			&model_starlark_pb.File{
@@ -2077,21 +2132,22 @@ func (rca *ruleContextActions[TReference, TMetadata]) doDeclareSymlink(thread *s
 				Type:                model_starlark_pb.File_SYMLINK,
 			},
 		),
-	), nil
+	)
 }
 
 func (rca *ruleContextActions[TReference, TMetadata]) doExpandTemplate(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	if len(args) != 0 {
 		return nil, fmt.Errorf("%s: got %d positional arguments, want 0", b.Name(), len(args))
 	}
-	var output *model_starlark.File[TReference, TMetadata]
+	var output *targetOutput
 	var template *model_starlark.File[TReference, TMetadata]
 	isExecutable := false
 	var substitutions map[string]string
+	rc := rca.ruleContext
 	if err := starlark.UnpackArgs(
 		b.Name(), args, kwargs,
 		// Required arguments.
-		"output", unpack.Bind(thread, &output, unpack.Type[*model_starlark.File[TReference, TMetadata]]("File")),
+		"output", unpack.Bind(thread, &output, rc.outputRegistrar),
 		"template", unpack.Bind(thread, &template, unpack.Type[*model_starlark.File[TReference, TMetadata]]("File")),
 		// Optional arguments.
 		// TODO: Add TemplateDict and computed_substitutions.
@@ -2109,7 +2165,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 		return nil, fmt.Errorf("%s: got %d positional arguments, want 0", b.Name(), len(fnArgs))
 	}
 	var executable any
-	var outputs []*model_starlark.File[TReference, TMetadata]
+	var outputs []*targetOutput
 	var arguments []any
 	var env map[string]string
 	execGroup := ""
@@ -2121,6 +2177,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 	var toolchain *label.ResolvedLabel
 	var tools []any
 	useDefaultShellEnv := false
+	rc := rca.ruleContext
 	if err := starlark.UnpackArgs(
 		b.Name(), fnArgs, kwargs,
 		// Required arguments.
@@ -2129,7 +2186,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 			unpack.Decay(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File")),
 			unpack.Decay(unpack.Type[*model_starlark.Struct[TReference, TMetadata]]("struct")),
 		})),
-		"outputs", unpack.Bind(thread, &outputs, unpack.List(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File"))),
+		"outputs", unpack.Bind(thread, &outputs, unpack.List(rc.outputRegistrar)),
 		// Optional arguments.
 		"arguments?", unpack.Bind(thread, &arguments, unpack.List(unpack.Or([]unpack.UnpackerInto[any]{
 			unpack.Decay(unpack.Type[*args]("Args")),
@@ -2167,7 +2224,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunShell(thread *starlar
 		return nil, fmt.Errorf("%s: got %d positional arguments, want 0", b.Name(), len(fnArgs))
 	}
 	var command string
-	var outputs []*model_starlark.File[TReference, TMetadata]
+	var outputs []*targetOutput
 	var arguments []any
 	var env map[string]string
 	execGroup := ""
@@ -2179,10 +2236,11 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunShell(thread *starlar
 	var toolchain *label.ResolvedLabel
 	var tools []any
 	useDefaultShellEnv := false
+	rc := rca.ruleContext
 	if err := starlark.UnpackArgs(
 		b.Name(), fnArgs, kwargs,
 		// Required arguments.
-		"outputs", unpack.Bind(thread, &outputs, unpack.List(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File"))),
+		"outputs", unpack.Bind(thread, &outputs, unpack.List(rc.outputRegistrar)),
 		"command", unpack.Bind(thread, &command, unpack.String),
 		// Optional arguments.
 		"arguments?", unpack.Bind(thread, &arguments, unpack.List(unpack.Or([]unpack.UnpackerInto[any]{
@@ -2218,14 +2276,15 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunShell(thread *starlar
 }
 
 func (rca *ruleContextActions[TReference, TMetadata]) doSymlink(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	var output *model_starlark.File[TReference, TMetadata]
+	var output *targetOutput
 	var targetFile *model_starlark.File[TReference, TMetadata]
 	targetPath := ""
 	isExecutable := false
 	progressMessage := ""
+	rc := rca.ruleContext
 	if err := starlark.UnpackArgs(
 		b.Name(), args, kwargs,
-		"output", unpack.Bind(thread, &output, unpack.Type[*model_starlark.File[TReference, TMetadata]]("File")),
+		"output", unpack.Bind(thread, &output, rc.outputRegistrar),
 		"target_file?", unpack.Bind(thread, &targetFile, unpack.IfNotNone(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File"))),
 		"target_path?", unpack.Bind(thread, &targetPath, unpack.IfNotNone(unpack.String)),
 		"is_executable?", unpack.Bind(thread, &isExecutable, unpack.Bool),
@@ -2247,12 +2306,13 @@ func (rca *ruleContextActions[TReference, TMetadata]) doTransformVersionFile(thr
 }
 
 func (rca *ruleContextActions[TReference, TMetadata]) doWrite(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	var output *model_starlark.File[TReference, TMetadata]
+	var output *targetOutput
 	var content string
 	isExecutable := false
+	rc := rca.ruleContext
 	if err := starlark.UnpackArgs(
 		b.Name(), args, kwargs,
-		"output", unpack.Bind(thread, &output, unpack.Type[*model_starlark.File[TReference, TMetadata]]("File")),
+		"output", unpack.Bind(thread, &output, rc.outputRegistrar),
 		// TODO: Accept Args.
 		"content", unpack.Bind(thread, &content, unpack.String),
 		"is_executable?", unpack.Bind(thread, &isExecutable, unpack.Bool),
