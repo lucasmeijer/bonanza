@@ -3,6 +3,7 @@ package label
 import (
 	"errors"
 	"regexp"
+	"strings"
 )
 
 // TargetName corresponds to the name of an addressable and/or buildable
@@ -37,4 +38,14 @@ func MustNewTargetName(value string) TargetName {
 
 func (tn TargetName) String() string {
 	return tn.value
+}
+
+// GetSibling appends a provided target name to the directory portion of
+// the current target name.
+func (tn TargetName) GetSibling(child TargetName) TargetName {
+	slash := strings.LastIndexByte(tn.value, '/')
+	if slash < 0 {
+		return child
+	}
+	return TargetName{value: tn.value[:slash+1] + child.value}
 }

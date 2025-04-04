@@ -35,6 +35,7 @@ go_test(
         "canonical_target_pattern_test.go",
         "module_version_test.go",
         "resolved_label_test.go",
+        "target_name_test.go",
     ],
     deps = [
         ":label",
