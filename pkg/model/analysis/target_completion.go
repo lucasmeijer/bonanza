@@ -3,10 +3,8 @@ package analysis
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/buildbarn/bonanza/pkg/evaluation"
-	"github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	model_starlark "github.com/buildbarn/bonanza/pkg/model/starlark"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
@@ -50,50 +48,12 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetCompletionValue(ctx c
 			return PatchedTargetCompletionValue{}, errors.New("\"files\" field of DefaultInfo provider contains an element that is not a File")
 		}
 
-		file := elementFile.File
-		canonicalPackage, err := label.NewCanonicalPackage(file.Package)
-		if err != nil {
-			return PatchedTargetCompletionValue{}, fmt.Errorf("invalid package %#v: %w", file.Package, err)
-		}
-
-		if owner := file.Owner; owner == nil {
-			// File is a source file. Ensure it exists.
-			packageRelativePath, err := label.NewTargetName(file.PackageRelativePath)
-			if err != nil {
-				return PatchedTargetCompletionValue{}, fmt.Errorf("invalid package relative path %#v: %w", file.PackageRelativePath, err)
-			}
-			fileProperties := e.GetFilePropertiesValue(
-				&model_analysis_pb.FileProperties_Key{
-					CanonicalRepo: canonicalPackage.GetCanonicalRepo().String(),
-					Path:          canonicalPackage.AppendTargetName(packageRelativePath).GetRepoRelativePath(),
-				},
-			)
-			if !fileProperties.IsSet() {
+		if _, err := getStarlarkFileProperties(e, model_core.Nested(element, elementFile.File)); err != nil {
+			if errors.Is(err, evaluation.ErrMissingDependency) {
 				missingDependencies = true
 				continue
 			}
-		} else {
-			// File is an output file. Ensure it gets built.
-			targetName, err := label.NewTargetName(owner.TargetName)
-			if err != nil {
-				return PatchedTargetCompletionValue{}, fmt.Errorf("invalid target name %#v: %w", owner.TargetName, err)
-			}
-
-			configurationReference := model_core.Patch(e, model_core.Nested(element, owner.ConfigurationReference))
-			targetOutput := e.GetTargetOutputValue(
-				model_core.NewPatchedMessage(
-					&model_analysis_pb.TargetOutput_Key{
-						TargetLabel:            canonicalPackage.AppendTargetName(targetName).String(),
-						PackageRelativePath:    file.PackageRelativePath,
-						ConfigurationReference: configurationReference.Message,
-					},
-					model_core.MapReferenceMetadataToWalkers(configurationReference.Patcher),
-				),
-			)
-			if !targetOutput.IsSet() {
-				missingDependencies = true
-				continue
-			}
+			return PatchedTargetCompletionValue{}, err
 		}
 	}
 	if missingDependencies {

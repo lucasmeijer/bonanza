@@ -9,10 +9,13 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/buildbarn/bb-storage/pkg/filesystem"
+	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
 	"github.com/buildbarn/bonanza/pkg/evaluation"
 	"github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/model/core/btree"
+	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
 	model_starlark "github.com/buildbarn/bonanza/pkg/model/starlark"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
 	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
@@ -21,6 +24,8 @@ import (
 	"github.com/buildbarn/bonanza/pkg/storage/dag"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"go.starlark.net/starlark"
@@ -573,10 +578,12 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 		}
 
 		allBuiltinsModulesNames := e.GetBuiltinsModuleNamesValue(&model_analysis_pb.BuiltinsModuleNames_Key{})
+		directoryCreationParameters, gotDirectoryCreationParameters := e.GetDirectoryCreationParametersObjectValue(&model_analysis_pb.DirectoryCreationParametersObject_Key{})
+		fileCreationParameters, gotFileCreationParameters := e.GetFileCreationParametersObjectValue(&model_analysis_pb.FileCreationParametersObject_Key{})
 		ruleValue := e.GetCompiledBzlFileGlobalValue(&model_analysis_pb.CompiledBzlFileGlobal_Key{
 			Identifier: ruleIdentifier.String(),
 		})
-		if !allBuiltinsModulesNames.IsSet() || !ruleValue.IsSet() {
+		if !allBuiltinsModulesNames.IsSet() || !gotDirectoryCreationParameters || !gotFileCreationParameters || !ruleValue.IsSet() {
 			return PatchedConfiguredTargetValue{}, evaluation.ErrMissingDependency
 		}
 		v, ok := ruleValue.Message.Global.GetKind().(*model_starlark_pb.Value_Rule)
@@ -1194,23 +1201,25 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 		}
 
 		rc := &ruleContext[TReference, TMetadata]{
-			computer:               c,
-			context:                ctx,
-			environment:            e,
-			ruleIdentifier:         ruleIdentifier,
-			targetLabel:            targetLabel,
-			configurationReference: configurationReference,
-			ruleDefinition:         ruleDefinition,
-			ruleTarget:             model_core.Nested(targetValue, ruleTarget),
-			attr:                   model_starlark.NewStructFromDict[TReference, TMetadata](nil, attrValues),
-			splitAttr:              model_starlark.NewStructFromDict[TReference, TMetadata](nil, splitAttrValues),
-			executable:             model_starlark.NewStructFromDict[TReference, TMetadata](nil, executableValues),
-			file:                   model_starlark.NewStructFromDict[TReference, TMetadata](nil, fileValues),
-			files:                  model_starlark.NewStructFromDict[TReference, TMetadata](nil, filesValues),
-			outputs:                model_starlark.NewStructFromDict[TReference, TMetadata](nil, outputsValues),
-			execGroups:             execGroups,
-			fragments:              map[string]*model_starlark.Struct[TReference, TMetadata]{},
-			outputRegistrar:        &outputRegistrar,
+			computer:                    c,
+			context:                     ctx,
+			environment:                 e,
+			ruleIdentifier:              ruleIdentifier,
+			targetLabel:                 targetLabel,
+			configurationReference:      configurationReference,
+			ruleDefinition:              ruleDefinition,
+			ruleTarget:                  model_core.Nested(targetValue, ruleTarget),
+			attr:                        model_starlark.NewStructFromDict[TReference, TMetadata](nil, attrValues),
+			splitAttr:                   model_starlark.NewStructFromDict[TReference, TMetadata](nil, splitAttrValues),
+			executable:                  model_starlark.NewStructFromDict[TReference, TMetadata](nil, executableValues),
+			file:                        model_starlark.NewStructFromDict[TReference, TMetadata](nil, fileValues),
+			files:                       model_starlark.NewStructFromDict[TReference, TMetadata](nil, filesValues),
+			outputs:                     model_starlark.NewStructFromDict[TReference, TMetadata](nil, outputsValues),
+			execGroups:                  execGroups,
+			fragments:                   map[string]*model_starlark.Struct[TReference, TMetadata]{},
+			outputRegistrar:             &outputRegistrar,
+			directoryCreationParameters: directoryCreationParameters,
+			fileCreationParameters:      fileCreationParameters,
 		}
 		thread.SetLocal(model_starlark.CurrentCtxKey, rc)
 
@@ -1585,26 +1594,28 @@ func (or *targetOutputRegistrar[TReference, TMetadata]) GetConcatenationOperator
 }
 
 type ruleContext[TReference object.BasicReference, TMetadata BaseComputerReferenceMetadata] struct {
-	computer               *baseComputer[TReference, TMetadata]
-	context                context.Context
-	environment            ConfiguredTargetEnvironment[TReference, TMetadata]
-	ruleIdentifier         label.CanonicalStarlarkIdentifier
-	targetLabel            label.CanonicalLabel
-	configurationReference model_core.Message[*model_core_pb.Reference, TReference]
-	ruleDefinition         model_core.Message[*model_starlark_pb.Rule_Definition, TReference]
-	ruleTarget             model_core.Message[*model_starlark_pb.RuleTarget, TReference]
-	attr                   starlark.Value
-	splitAttr              starlark.Value
-	buildSettingValue      starlark.Value
-	executable             starlark.Value
-	file                   starlark.Value
-	files                  starlark.Value
-	outputs                starlark.Value
-	execGroups             []ruleContextExecGroupState
-	tags                   *starlark.List
-	varDict                *starlark.Dict
-	fragments              map[string]*model_starlark.Struct[TReference, TMetadata]
-	outputRegistrar        *targetOutputRegistrar[TReference, TMetadata]
+	computer                    *baseComputer[TReference, TMetadata]
+	context                     context.Context
+	environment                 ConfiguredTargetEnvironment[TReference, TMetadata]
+	ruleIdentifier              label.CanonicalStarlarkIdentifier
+	targetLabel                 label.CanonicalLabel
+	configurationReference      model_core.Message[*model_core_pb.Reference, TReference]
+	ruleDefinition              model_core.Message[*model_starlark_pb.Rule_Definition, TReference]
+	ruleTarget                  model_core.Message[*model_starlark_pb.RuleTarget, TReference]
+	attr                        starlark.Value
+	splitAttr                   starlark.Value
+	buildSettingValue           starlark.Value
+	executable                  starlark.Value
+	file                        starlark.Value
+	files                       starlark.Value
+	outputs                     starlark.Value
+	execGroups                  []ruleContextExecGroupState
+	tags                        *starlark.List
+	varDict                     *starlark.Dict
+	fragments                   map[string]*model_starlark.Struct[TReference, TMetadata]
+	outputRegistrar             *targetOutputRegistrar[TReference, TMetadata]
+	directoryCreationParameters *model_filesystem.DirectoryCreationParameters
+	fileCreationParameters      *model_filesystem.FileCreationParameters
 }
 
 var _ starlark.HasAttrs = (*ruleContext[object.GlobalReference, BaseComputerReferenceMetadata])(nil)
@@ -2055,6 +2066,37 @@ func (rc *ruleContext[TReference, TMetadata]) doTargetPlatformHasConstraint(thre
 	return starlark.Bool(defaultConstraintValueLabel != nil && *defaultConstraintValueLabel == constraintValueLabel), nil
 }
 
+func (rc *ruleContext[TReference, TMetadata]) setOutputToStaticRootDirectory(output *targetOutput[TMetadata], capturableDirectory model_filesystem.CapturableDirectory[TMetadata, TMetadata]) error {
+	var createdDirectory model_filesystem.CreatedDirectory[TMetadata]
+	group, groupCtx := errgroup.WithContext(rc.context)
+	group.Go(func() error {
+		return model_filesystem.CreateDirectoryMerkleTree(
+			groupCtx,
+			semaphore.NewWeighted(1),
+			group,
+			rc.directoryCreationParameters,
+			capturableDirectory,
+			model_filesystem.NewSimpleDirectoryMerkleTreeCapturer(rc.environment),
+			&createdDirectory,
+		)
+	})
+	if err := group.Wait(); err != nil {
+		return err
+	}
+
+	return output.setDefinition(
+		model_core.NewPatchedMessage(
+			&model_analysis_pb.ConfiguredTarget_Value_Output_Leaf{
+				PackageRelativePath: output.packageRelativePath.String(),
+				Source: &model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_StaticRootDirectory{
+					StaticRootDirectory: createdDirectory.Message.Message,
+				},
+			},
+			createdDirectory.Message.Patcher,
+		),
+	)
+}
+
 type ruleContextActions[TReference object.BasicReference, TMetadata BaseComputerReferenceMetadata] struct {
 	ruleContext *ruleContext[TReference, TMetadata]
 }
@@ -2205,17 +2247,31 @@ func (rca *ruleContextActions[TReference, TMetadata]) doExpandTemplate(thread *s
 		return nil, err
 	}
 
+	substitutionsList := make([]*model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_ExpandTemplate_Substitution, 0, len(substitutions))
+	for _, needle := range slices.Sorted(maps.Keys(substitutions)) {
+		substitutionsList = append(substitutionsList, &model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_ExpandTemplate_Substitution{
+			Needle:      []byte(needle),
+			Replacement: []byte(substitutions[needle]),
+		})
+	}
+
 	if output.fileType != model_starlark_pb.File_FILE {
 		return nil, errors.New("output was not declared as a regular file")
 	}
+	patchedTemplate := model_core.Patch(rc.environment, template.GetDefinition())
 	return starlark.None, output.setDefinition(
-		model_core.NewSimplePatchedMessage[TMetadata](
+		model_core.NewPatchedMessage(
 			&model_analysis_pb.ConfiguredTarget_Value_Output_Leaf{
 				PackageRelativePath: output.packageRelativePath.String(),
-				Source: &model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_ExpandTemplate{
-					ExpandTemplate: &emptypb.Empty{},
+				Source: &model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_ExpandTemplate_{
+					ExpandTemplate: &model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_ExpandTemplate{
+						Template:      patchedTemplate.Message,
+						IsExecutable:  isExecutable,
+						Substitutions: substitutionsList,
+					},
 				},
 			},
+			patchedTemplate.Patcher,
 		),
 	)
 }
@@ -2364,10 +2420,40 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunShell(thread *starlar
 	return starlark.None, nil
 }
 
+type singleSymlinkDirectory[TFile, TDirectory model_core.ReferenceMetadata] struct {
+	name   path.Component
+	target path.Parser
+}
+
+func (singleSymlinkDirectory[TFile, TDirectory]) Close() error {
+	return nil
+}
+
+func (d *singleSymlinkDirectory[TFile, TDirectory]) ReadDir() ([]filesystem.FileInfo, error) {
+	return []filesystem.FileInfo{
+		filesystem.NewFileInfo(d.name, filesystem.FileTypeSymlink, false),
+	}, nil
+}
+
+func (d *singleSymlinkDirectory[TFile, TDirectory]) Readlink(name path.Component) (path.Parser, error) {
+	if name != d.name {
+		panic("unexpected name")
+	}
+	return d.target, nil
+}
+
+func (singleSymlinkDirectory[TFile, TDirectory]) EnterCapturableDirectory(name path.Component) (*model_filesystem.CreatedDirectory[TDirectory], model_filesystem.CapturableDirectory[TDirectory, TFile], error) {
+	panic("directory only contains a symlink")
+}
+
+func (singleSymlinkDirectory[TFile, TDirectory]) OpenForFileMerkleTreeCreation(name path.Component) (model_filesystem.CapturableFile[TFile], error) {
+	panic("directory only contains a symlink")
+}
+
 func (rca *ruleContextActions[TReference, TMetadata]) doSymlink(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var output *targetOutput[TMetadata]
 	var targetFile *model_starlark.File[TReference, TMetadata]
-	targetPath := ""
+	var targetPath path.Parser
 	isExecutable := false
 	progressMessage := ""
 	rc := rca.ruleContext
@@ -2375,7 +2461,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doSymlink(thread *starlark
 		b.Name(), args, kwargs,
 		"output", unpack.Bind(thread, &output, rc.outputRegistrar),
 		"target_file?", unpack.Bind(thread, &targetFile, unpack.IfNotNone(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File"))),
-		"target_path?", unpack.Bind(thread, &targetPath, unpack.IfNotNone(unpack.String)),
+		"target_path?", unpack.Bind(thread, &targetPath, unpack.PathParser(path.UNIXFormat)),
 		"is_executable?", unpack.Bind(thread, &isExecutable, unpack.Bool),
 		"progress_message?", unpack.Bind(thread, &progressMessage, unpack.IfNotNone(unpack.String)),
 	); err != nil {
@@ -2383,7 +2469,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doSymlink(thread *starlark
 	}
 
 	if targetFile != nil {
-		if targetPath != "" {
+		if targetPath != nil {
 			return nil, errors.New("target_file and target_path cannot be specified at the same time")
 		}
 		if output.fileType != model_starlark_pb.File_DIRECTORY && output.fileType != model_starlark_pb.File_FILE {
@@ -2408,24 +2494,20 @@ func (rca *ruleContextActions[TReference, TMetadata]) doSymlink(thread *starlark
 		)
 	}
 
-	if targetPath == "" {
+	if targetPath == nil {
 		return nil, errors.New("one of target_file or target_path needs to be specified")
 	}
 	if output.fileType != model_starlark_pb.File_SYMLINK {
 		return nil, errors.New("target_path can only be used in combination with outputs that are declared as symbolic links")
 	}
 
-	return starlark.None, output.setDefinition(
-		model_core.NewSimplePatchedMessage[TMetadata](
-			&model_analysis_pb.ConfiguredTarget_Value_Output_Leaf{
-				PackageRelativePath: output.packageRelativePath.String(),
-				Source: &model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_Static{
-					// TODO: Actually create
-					// a symlink node here.
-					Static: &emptypb.Empty{},
-				},
-			},
-		),
+	return starlark.None, rc.setOutputToStaticRootDirectory(
+		output,
+		&singleSymlinkDirectory[TMetadata, TMetadata]{
+			// TODO: Use the correct pathname!
+			name:   path.MustNewComponent("XXX"),
+			target: targetPath,
+		},
 	)
 }
 
@@ -2435,6 +2517,37 @@ func (rca *ruleContextActions[TReference, TMetadata]) doTransformInfoFile(thread
 
 func (rca *ruleContextActions[TReference, TMetadata]) doTransformVersionFile(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	return starlark.None, nil
+}
+
+type singleFileDirectory[TFile, TDirectory model_core.ReferenceMetadata] struct {
+	name         path.Component
+	isExecutable bool
+	file         model_filesystem.CapturableFile[TFile]
+}
+
+func (singleFileDirectory[TFile, TDirectory]) Close() error {
+	return nil
+}
+
+func (d *singleFileDirectory[TFile, TDirectory]) ReadDir() ([]filesystem.FileInfo, error) {
+	return []filesystem.FileInfo{
+		filesystem.NewFileInfo(d.name, filesystem.FileTypeRegularFile, d.isExecutable),
+	}, nil
+}
+
+func (d *singleFileDirectory[TFile, TDirectory]) Readlink(name path.Component) (path.Parser, error) {
+	panic("directory only contains a regular file")
+}
+
+func (singleFileDirectory[TFile, TDirectory]) EnterCapturableDirectory(name path.Component) (*model_filesystem.CreatedDirectory[TDirectory], model_filesystem.CapturableDirectory[TDirectory, TFile], error) {
+	panic("directory only contains a symlink")
+}
+
+func (d *singleFileDirectory[TFile, TDirectory]) OpenForFileMerkleTreeCreation(name path.Component) (model_filesystem.CapturableFile[TFile], error) {
+	if name != d.name {
+		panic("unexpected name")
+	}
+	return d.file, nil
 }
 
 func (rca *ruleContextActions[TReference, TMetadata]) doWrite(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -2455,17 +2568,25 @@ func (rca *ruleContextActions[TReference, TMetadata]) doWrite(thread *starlark.T
 	if output.fileType != model_starlark_pb.File_FILE {
 		return nil, errors.New("output was not declared as a regular file")
 	}
-	return starlark.None, output.setDefinition(
-		model_core.NewSimplePatchedMessage[TMetadata](
-			&model_analysis_pb.ConfiguredTarget_Value_Output_Leaf{
-				PackageRelativePath: output.packageRelativePath.String(),
-				Source: &model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_Static{
-					// TODO: Actually create
-					// a file node here.
-					Static: &emptypb.Empty{},
-				},
-			},
-		),
+
+	fileContents, err := model_filesystem.CreateFileMerkleTree(
+		rc.context,
+		rc.fileCreationParameters,
+		strings.NewReader(content),
+		model_filesystem.NewSimpleFileMerkleTreeCapturer(rc.environment),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return starlark.None, rc.setOutputToStaticRootDirectory(
+		output,
+		&singleFileDirectory[TMetadata, TMetadata]{
+			// TODO: Use the correct pathname!
+			name:         path.MustNewComponent("XXX"),
+			isExecutable: isExecutable,
+			file:         model_filesystem.NewSimpleCapturableFile(fileContents),
+		},
 	)
 }
 

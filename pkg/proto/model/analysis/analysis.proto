@@ -241,6 +241,24 @@ message ConfiguredTarget {
         // The package relative path of the output.
         string package_relative_path = 1;
 
+        message ExpandTemplate {
+          // File that contains the template for the output file's
+          // contents.
+          bonanza.model.starlark.File template = 1;
+
+          // Whether the output file is executable.
+          bool is_executable = 2;
+
+          message Substitution {
+            bytes needle = 1;
+            bytes replacement = 2;
+          }
+
+          // Needles to search for in the template, and replacements to
+          // emit at the locations where such needs are found.
+          repeated Substitution substitutions = 3;
+        }
+
         oneof source {
           // Output of a command that was declared using
           // ctx.actions.run() or ctx.actions.run_shell(). The
@@ -249,11 +267,12 @@ message ConfiguredTarget {
 
           // Output of template expansion performed by
           // ctx.actions.expand_template().
-          google.protobuf.Empty expand_template = 3;
+          ExpandTemplate expand_template = 3;
 
           // Output of ctx.actions.symlink(target_path=...) or
-          // ctx.actions.write().
-          google.protobuf.Empty static = 4;
+          // ctx.actions.write(), provided in the form of a directory
+          // hierarchy containing the file or directory in question.
+          bonanza.model.filesystem.Directory static_root_directory = 4;
 
           // Output of ctx.actions.symlink(target_file=...).
           bonanza.model.starlark.File symlink = 5;
@@ -1167,7 +1186,9 @@ message TargetOutput {
     bonanza.model.core.Reference configuration_reference = 3;
   }
 
-  message Value {}
+  message Value {
+    bonanza.model.filesystem.Directory root_directory = 1;
+  }
 }
 
 message TargetPatternExpansion {

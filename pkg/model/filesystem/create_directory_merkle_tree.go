@@ -52,6 +52,24 @@ type CapturableFile[TFile model_core.ReferenceMetadata] interface {
 	Discard()
 }
 
+type simpleCapturableFile[TFile model_core.ReferenceMetadata] struct {
+	fileContents model_core.PatchedMessage[*model_filesystem_pb.FileContents, TFile]
+}
+
+func NewSimpleCapturableFile[TFile model_core.ReferenceMetadata](fileContents model_core.PatchedMessage[*model_filesystem_pb.FileContents, TFile]) CapturableFile[TFile] {
+	return &simpleCapturableFile[TFile]{
+		fileContents: fileContents,
+	}
+}
+
+func (cf *simpleCapturableFile[TFile]) CreateFileMerkleTree(ctx context.Context) (model_core.PatchedMessage[*model_filesystem_pb.FileContents, TFile], error) {
+	return cf.fileContents, nil
+}
+
+func (cf *simpleCapturableFile[TFile]) Discard() {
+	cf.fileContents.Discard()
+}
+
 type unfinalizedDirectory[TDirectory, TFile model_core.ReferenceMetadata] struct {
 	leavesPatcherLock                    sync.Mutex
 	leaves                               model_core.PatchedMessage[*model_filesystem_pb.Leaves, TFile]

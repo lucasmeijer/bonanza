@@ -116,6 +116,8 @@
             "CompiledBzlFileFunctionFactory",
             "CompiledBzlFileGlobal",
             "ConfiguredTarget",
+            "DirectoryCreationParametersObject",
+            "FileCreationParametersObject",
             "ExecTransition",
             "MakeVariables",
             "ResolvedToolchains",
@@ -506,7 +508,9 @@
       },
       "TargetOutput": {
          "dependsOn": [
-            "ConfiguredTarget"
+            "ConfiguredTarget",
+            "FileProperties",
+            "TargetOutput"
          ],
          "keyContainsReferences": true
       },
