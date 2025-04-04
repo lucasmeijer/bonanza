@@ -246,3 +246,7 @@ func (f *File[TReference, TMetadata]) EncodeValue(path map[starlark.Value]struct
 		d.Patcher,
 	), false, nil
 }
+
+func (f *File[TReference, TMetadata]) GetDefinition() model_core.Message[*model_starlark_pb.File, TReference] {
+	return f.definition
+}

@@ -729,8 +729,14 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 		ruleTargetPublicAttrValues = ruleTarget.PublicAttrValues
 		targetPackage := targetLabel.GetCanonicalPackage()
 		outputRegistrar := targetOutputRegistrar[TReference, TMetadata]{
-			outputsByPackageRelativePath: map[string]*targetOutput{},
-			outputsByFile:                map[*model_starlark.File[TReference, TMetadata]]*targetOutput{},
+			owner: model_core.Nested(configurationReference, &model_starlark_pb.File_Owner{
+				ConfigurationReference: configurationReference.Message,
+				TargetName:             targetLabel.GetTargetName().String(),
+			}),
+			targetPackage: targetPackage.String(),
+
+			outputsByPackageRelativePath: map[string]*targetOutput[TMetadata]{},
+			outputsByFile:                map[*model_starlark.File[TReference, TMetadata]]*targetOutput[TMetadata]{},
 		}
 	GetNonLabelAttrValues:
 		for _, namedAttr := range ruleDefinition.Message.Attrs {
@@ -781,17 +787,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 							if canonicalPackage != targetPackage {
 								return nil, fmt.Errorf("output attr %#v contains to label %#v, which refers to a different package", namedAttr.Name, canonicalLabel.String())
 							}
-							f, err := outputRegistrar.registerOutput(
-								model_core.Nested(configurationReference, &model_starlark_pb.File{
-									Owner: &model_starlark_pb.File_Owner{
-										ConfigurationReference: configurationReference.Message,
-										TargetName:             targetLabel.GetTargetName().String(),
-									},
-									Package:             canonicalPackage.String(),
-									PackageRelativePath: canonicalLabel.GetTargetName().String(),
-									Type:                model_starlark_pb.File_FILE,
-								}),
-							)
+							f, err := outputRegistrar.registerOutput(targetLabel.GetTargetName(), nil, model_starlark_pb.File_FILE)
 							if err != nil {
 								return nil, fmt.Errorf("output attr %#v: %w", err)
 							}
@@ -1430,9 +1426,65 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 			patcher.Merge(v.Patcher)
 		}
 
+		outputsTreeBuilder := btree.NewSplitProllyBuilder(
+			/* minimumSizeBytes = */ 32*1024,
+			/* maximumSizeBytes = */ 128*1024,
+			btree.NewObjectCreatingNodeMerger(
+				c.getValueObjectEncoder(),
+				c.getReferenceFormat(),
+				/* parentNodeComputer = */ func(createdObject model_core.CreatedObject[TMetadata], childNodes []*model_analysis_pb.ConfiguredTarget_Value_Output) (model_core.PatchedMessage[*model_analysis_pb.ConfiguredTarget_Value_Output, TMetadata], error) {
+					var firstPackageRelativePath string
+					switch firstElement := childNodes[0].Level.(type) {
+					case *model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_:
+						firstPackageRelativePath = firstElement.Leaf.PackageRelativePath
+					case *model_analysis_pb.ConfiguredTarget_Value_Output_Parent_:
+						firstPackageRelativePath = firstElement.Parent.FirstPackageRelativePath
+					}
+					patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
+					return model_core.NewPatchedMessage(
+						&model_analysis_pb.ConfiguredTarget_Value_Output{
+							Level: &model_analysis_pb.ConfiguredTarget_Value_Output_Parent_{
+								Parent: &model_analysis_pb.ConfiguredTarget_Value_Output_Parent{
+									Reference: patcher.AddReference(
+										createdObject.Contents.GetReference(),
+										e.CaptureCreatedObject(createdObject),
+									),
+									FirstPackageRelativePath: firstPackageRelativePath,
+								},
+							},
+						},
+						patcher,
+					), nil
+				},
+			),
+		)
+		outputsByPackageRelativePath := outputRegistrar.outputsByPackageRelativePath
+		for _, packageRelativePath := range slices.Sorted(maps.Keys(outputsByPackageRelativePath)) {
+			output := outputsByPackageRelativePath[packageRelativePath]
+			if !output.definition.IsSet() {
+				return PatchedConfiguredTargetValue{}, fmt.Errorf("file %#v is not an output of any action", packageRelativePath)
+			}
+			if err := outputsTreeBuilder.PushChild(model_core.NewPatchedMessage(
+				&model_analysis_pb.ConfiguredTarget_Value_Output{
+					Level: &model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_{
+						Leaf: output.definition.Message,
+					},
+				},
+				output.definition.Patcher,
+			)); err != nil {
+				return PatchedConfiguredTargetValue{}, err
+			}
+		}
+		outputsList, err := outputsTreeBuilder.FinalizeList()
+		if err != nil {
+			return PatchedConfiguredTargetValue{}, err
+		}
+		patcher.Merge(outputsList.Patcher)
+
 		return model_core.NewPatchedMessage(
 			&model_analysis_pb.ConfiguredTarget_Value{
 				ProviderInstances: encodedProviderInstances,
+				Outputs:           outputsList.Message,
 			},
 			model_core.MapReferenceMetadataToWalkers(patcher),
 		), nil
@@ -1452,17 +1504,52 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 	}
 }
 
-type targetOutput struct{}
+type targetOutput[TMetadata model_core.ReferenceMetadata] struct {
+	// Constant fields.
+	packageRelativePath label.TargetName
+	fileType            model_starlark_pb.File_Type
 
-type targetOutputRegistrar[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata] struct {
-	outputsByPackageRelativePath map[string]*targetOutput
-	outputsByFile                map[*model_starlark.File[TReference, TMetadata]]*targetOutput
+	// Variable fields.
+	definition model_core.PatchedMessage[*model_analysis_pb.ConfiguredTarget_Value_Output_Leaf, TMetadata]
 }
 
-func (or *targetOutputRegistrar[TReference, TMetadata]) registerOutput(definition model_core.Message[*model_starlark_pb.File, TReference]) (starlark.Value, error) {
-	o := &targetOutput{}
-	or.outputsByPackageRelativePath[definition.Message.PackageRelativePath] = o
-	f := model_starlark.NewFile[TReference, TMetadata](definition)
+func (o *targetOutput[TMetadata]) setDefinition(definition model_core.PatchedMessage[*model_analysis_pb.ConfiguredTarget_Value_Output_Leaf, TMetadata]) error {
+	if o.definition.IsSet() {
+		return fmt.Errorf("file %#v is an output of multiple actions", o.packageRelativePath.String())
+	}
+	o.definition = definition
+	return nil
+}
+
+type targetOutputRegistrar[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata] struct {
+	owner         model_core.Message[*model_starlark_pb.File_Owner, TReference]
+	targetPackage string
+
+	outputsByPackageRelativePath map[string]*targetOutput[TMetadata]
+	outputsByFile                map[*model_starlark.File[TReference, TMetadata]]*targetOutput[TMetadata]
+}
+
+func (or *targetOutputRegistrar[TReference, TMetadata]) registerOutput(filename label.TargetName, sibling *targetOutput[TMetadata], fileType model_starlark_pb.File_Type) (starlark.Value, error) {
+	// If a sibling is provided, path resolution needs to start in
+	// the directory containing containing the sibling.
+	if sibling != nil {
+		filename = sibling.packageRelativePath.GetSibling(filename)
+	}
+
+	filenameStr := filename.String()
+	o := &targetOutput[TMetadata]{
+		packageRelativePath: filename,
+		fileType:            fileType,
+	}
+	or.outputsByPackageRelativePath[filenameStr] = o
+	f := model_starlark.NewFile[TReference, TMetadata](
+		model_core.Nested(or.owner, &model_starlark_pb.File{
+			Owner:               or.owner.Message,
+			Package:             or.targetPackage,
+			PackageRelativePath: filenameStr,
+			Type:                fileType,
+		}),
+	)
 	or.outputsByFile[f] = o
 	return f, nil
 }
@@ -1470,9 +1557,9 @@ func (or *targetOutputRegistrar[TReference, TMetadata]) registerOutput(definitio
 // targetOutputRegistrar is able to convert model_starlark.File objects
 // that were declared as part of the current target to targetOutputs.
 // This allows them to be associated to the action that yields them.
-var _ unpack.UnpackerInto[*targetOutput] = (*targetOutputRegistrar[object.BasicReference, model_core.CloneableReferenceMetadata])(nil)
+var _ unpack.UnpackerInto[*targetOutput[model_core.CloneableReferenceMetadata]] = (*targetOutputRegistrar[object.BasicReference, model_core.CloneableReferenceMetadata])(nil)
 
-func (or *targetOutputRegistrar[TReference, TMetadata]) UnpackInto(thread *starlark.Thread, v starlark.Value, dst **targetOutput) error {
+func (or *targetOutputRegistrar[TReference, TMetadata]) UnpackInto(thread *starlark.Thread, v starlark.Value, dst **targetOutput[TMetadata]) error {
 	var f *model_starlark.File[TReference, TMetadata]
 	if err := unpack.Type[*model_starlark.File[TReference, TMetadata]]("File").UnpackInto(thread, v, &f); err != nil {
 		return err
@@ -1486,7 +1573,7 @@ func (or *targetOutputRegistrar[TReference, TMetadata]) UnpackInto(thread *starl
 }
 
 func (or *targetOutputRegistrar[TReference, TMetadata]) Canonicalize(thread *starlark.Thread, v starlark.Value) (starlark.Value, error) {
-	var o *targetOutput
+	var o *targetOutput[TMetadata]
 	if err := or.UnpackInto(thread, v, &o); err != nil {
 		return nil, err
 	}
@@ -2047,7 +2134,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doDeclareDirectory(thread 
 		return nil, fmt.Errorf("%s: got %d positional arguments, want at most 1", b.Name(), len(args))
 	}
 	var filename label.TargetName
-	var sibling *targetOutput
+	var sibling *targetOutput[TMetadata]
 	rc := rca.ruleContext
 	if err := starlark.UnpackArgs(
 		b.Name(), args, kwargs,
@@ -2057,20 +2144,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doDeclareDirectory(thread 
 		return nil, err
 	}
 
-	return rc.outputRegistrar.registerOutput(
-		model_core.Nested(
-			rc.configurationReference,
-			&model_starlark_pb.File{
-				Owner: &model_starlark_pb.File_Owner{
-					ConfigurationReference: rc.configurationReference.Message,
-					TargetName:             rc.targetLabel.GetTargetName().String(),
-				},
-				Package:             rc.targetLabel.GetCanonicalPackage().String(),
-				PackageRelativePath: filename.String(),
-				Type:                model_starlark_pb.File_DIRECTORY,
-			},
-		),
-	)
+	return rc.outputRegistrar.registerOutput(filename, sibling, model_starlark_pb.File_DIRECTORY)
 }
 
 func (rca *ruleContextActions[TReference, TMetadata]) doDeclareFile(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -2078,7 +2152,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doDeclareFile(thread *star
 		return nil, fmt.Errorf("%s: got %d positional arguments, want at most 1", b.Name(), len(args))
 	}
 	var filename label.TargetName
-	var sibling *targetOutput
+	var sibling *targetOutput[TMetadata]
 	rc := rca.ruleContext
 	if err := starlark.UnpackArgs(
 		b.Name(), args, kwargs,
@@ -2088,20 +2162,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doDeclareFile(thread *star
 		return nil, err
 	}
 
-	return rc.outputRegistrar.registerOutput(
-		model_core.Nested(
-			rc.configurationReference,
-			&model_starlark_pb.File{
-				Owner: &model_starlark_pb.File_Owner{
-					ConfigurationReference: rc.configurationReference.Message,
-					TargetName:             rc.targetLabel.GetTargetName().String(),
-				},
-				Package:             rc.targetLabel.GetCanonicalPackage().String(),
-				PackageRelativePath: filename.String(),
-				Type:                model_starlark_pb.File_FILE,
-			},
-		),
-	)
+	return rc.outputRegistrar.registerOutput(filename, sibling, model_starlark_pb.File_FILE)
 }
 
 func (rca *ruleContextActions[TReference, TMetadata]) doDeclareSymlink(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -2109,7 +2170,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doDeclareSymlink(thread *s
 		return nil, fmt.Errorf("%s: got %d positional arguments, want at most 1", b.Name(), len(args))
 	}
 	var filename label.TargetName
-	var sibling *targetOutput
+	var sibling *targetOutput[TMetadata]
 	rc := rca.ruleContext
 	if err := starlark.UnpackArgs(
 		b.Name(), args, kwargs,
@@ -2119,27 +2180,14 @@ func (rca *ruleContextActions[TReference, TMetadata]) doDeclareSymlink(thread *s
 		return nil, err
 	}
 
-	return rc.outputRegistrar.registerOutput(
-		model_core.Nested(
-			rc.configurationReference,
-			&model_starlark_pb.File{
-				Owner: &model_starlark_pb.File_Owner{
-					ConfigurationReference: rc.configurationReference.Message,
-					TargetName:             rc.targetLabel.GetTargetName().String(),
-				},
-				Package:             rc.targetLabel.GetCanonicalPackage().String(),
-				PackageRelativePath: filename.String(),
-				Type:                model_starlark_pb.File_SYMLINK,
-			},
-		),
-	)
+	return rc.outputRegistrar.registerOutput(filename, sibling, model_starlark_pb.File_SYMLINK)
 }
 
 func (rca *ruleContextActions[TReference, TMetadata]) doExpandTemplate(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	if len(args) != 0 {
 		return nil, fmt.Errorf("%s: got %d positional arguments, want 0", b.Name(), len(args))
 	}
-	var output *targetOutput
+	var output *targetOutput[TMetadata]
 	var template *model_starlark.File[TReference, TMetadata]
 	isExecutable := false
 	var substitutions map[string]string
@@ -2157,7 +2205,19 @@ func (rca *ruleContextActions[TReference, TMetadata]) doExpandTemplate(thread *s
 		return nil, err
 	}
 
-	return starlark.None, nil
+	if output.fileType != model_starlark_pb.File_FILE {
+		return nil, errors.New("output was not declared as a regular file")
+	}
+	return starlark.None, output.setDefinition(
+		model_core.NewSimplePatchedMessage[TMetadata](
+			&model_analysis_pb.ConfiguredTarget_Value_Output_Leaf{
+				PackageRelativePath: output.packageRelativePath.String(),
+				Source: &model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_ExpandTemplate{
+					ExpandTemplate: &emptypb.Empty{},
+				},
+			},
+		),
+	)
 }
 
 func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thread, b *starlark.Builtin, fnArgs starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -2165,7 +2225,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 		return nil, fmt.Errorf("%s: got %d positional arguments, want 0", b.Name(), len(fnArgs))
 	}
 	var executable any
-	var outputs []*targetOutput
+	var outputs []*targetOutput[TMetadata]
 	var arguments []any
 	var env map[string]string
 	execGroup := ""
@@ -2216,6 +2276,21 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 		return nil, err
 	}
 
+	// TODO: Actually register the action.
+	for _, output := range outputs {
+		if err := output.setDefinition(
+			model_core.NewSimplePatchedMessage[TMetadata](
+				&model_analysis_pb.ConfiguredTarget_Value_Output_Leaf{
+					PackageRelativePath: output.packageRelativePath.String(),
+					Source: &model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_ActionId{
+						ActionId: []byte("TODO"),
+					},
+				},
+			),
+		); err != nil {
+			return nil, err
+		}
+	}
 	return starlark.None, nil
 }
 
@@ -2224,7 +2299,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunShell(thread *starlar
 		return nil, fmt.Errorf("%s: got %d positional arguments, want 0", b.Name(), len(fnArgs))
 	}
 	var command string
-	var outputs []*targetOutput
+	var outputs []*targetOutput[TMetadata]
 	var arguments []any
 	var env map[string]string
 	execGroup := ""
@@ -2272,11 +2347,25 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunShell(thread *starlar
 	}
 
 	// TODO: Actually register the action.
+	for _, output := range outputs {
+		if err := output.setDefinition(
+			model_core.NewSimplePatchedMessage[TMetadata](
+				&model_analysis_pb.ConfiguredTarget_Value_Output_Leaf{
+					PackageRelativePath: output.packageRelativePath.String(),
+					Source: &model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_ActionId{
+						ActionId: []byte("TODO"),
+					},
+				},
+			),
+		); err != nil {
+			return nil, err
+		}
+	}
 	return starlark.None, nil
 }
 
 func (rca *ruleContextActions[TReference, TMetadata]) doSymlink(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	var output *targetOutput
+	var output *targetOutput[TMetadata]
 	var targetFile *model_starlark.File[TReference, TMetadata]
 	targetPath := ""
 	isExecutable := false
@@ -2293,8 +2382,51 @@ func (rca *ruleContextActions[TReference, TMetadata]) doSymlink(thread *starlark
 		return nil, err
 	}
 
-	// TODO: Actually register the action.
-	return starlark.None, nil
+	if targetFile != nil {
+		if targetPath != "" {
+			return nil, errors.New("target_file and target_path cannot be specified at the same time")
+		}
+		if output.fileType != model_starlark_pb.File_DIRECTORY && output.fileType != model_starlark_pb.File_FILE {
+			return nil, errors.New("target_file can only be used in combination with outputs that are declared as directories or regular files")
+		}
+		targetFileDefinition := targetFile.GetDefinition()
+		if output.fileType != targetFileDefinition.Message.Type {
+			return nil, errors.New("output and target_file have different file types")
+		}
+
+		patchedTargetFileDefinition := model_core.Patch(rc.environment, targetFileDefinition)
+		return starlark.None, output.setDefinition(
+			model_core.NewPatchedMessage(
+				&model_analysis_pb.ConfiguredTarget_Value_Output_Leaf{
+					PackageRelativePath: output.packageRelativePath.String(),
+					Source: &model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_Symlink{
+						Symlink: targetFileDefinition.Message,
+					},
+				},
+				patchedTargetFileDefinition.Patcher,
+			),
+		)
+	}
+
+	if targetPath == "" {
+		return nil, errors.New("one of target_file or target_path needs to be specified")
+	}
+	if output.fileType != model_starlark_pb.File_SYMLINK {
+		return nil, errors.New("target_path can only be used in combination with outputs that are declared as symbolic links")
+	}
+
+	return starlark.None, output.setDefinition(
+		model_core.NewSimplePatchedMessage[TMetadata](
+			&model_analysis_pb.ConfiguredTarget_Value_Output_Leaf{
+				PackageRelativePath: output.packageRelativePath.String(),
+				Source: &model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_Static{
+					// TODO: Actually create
+					// a symlink node here.
+					Static: &emptypb.Empty{},
+				},
+			},
+		),
+	)
 }
 
 func (rca *ruleContextActions[TReference, TMetadata]) doTransformInfoFile(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -2306,7 +2438,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doTransformVersionFile(thr
 }
 
 func (rca *ruleContextActions[TReference, TMetadata]) doWrite(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	var output *targetOutput
+	var output *targetOutput[TMetadata]
 	var content string
 	isExecutable := false
 	rc := rca.ruleContext
@@ -2319,7 +2451,22 @@ func (rca *ruleContextActions[TReference, TMetadata]) doWrite(thread *starlark.T
 	); err != nil {
 		return nil, err
 	}
-	return starlark.None, nil
+
+	if output.fileType != model_starlark_pb.File_FILE {
+		return nil, errors.New("output was not declared as a regular file")
+	}
+	return starlark.None, output.setDefinition(
+		model_core.NewSimplePatchedMessage[TMetadata](
+			&model_analysis_pb.ConfiguredTarget_Value_Output_Leaf{
+				PackageRelativePath: output.packageRelativePath.String(),
+				Source: &model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_Static{
+					// TODO: Actually create
+					// a file node here.
+					Static: &emptypb.Empty{},
+				},
+			},
+		),
+	)
 }
 
 type ruleContextExecGroups[TReference object.BasicReference, TMetadata BaseComputerReferenceMetadata] struct {
