@@ -34,7 +34,10 @@ func NewFile[TReference object.BasicReference, TMetadata model_core.CloneableRef
 	}
 }
 
-func (File[TReference, TMetadata]) String() string {
+func (f *File[TReference, TMetadata]) String() string {
+	if p, err := f.getPath(); err == nil {
+		return fmt.Sprintf("<File %s>", p)
+	}
 	return "<File>"
 }
 
