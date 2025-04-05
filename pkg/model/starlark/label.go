@@ -81,7 +81,7 @@ func (l label[TReference, TMetadata]) Attr(thread *starlark.Thread, name string)
 			return nil, err
 		}
 		return starlark.String(go_path.Join(
-			externalDirectoryName,
+			ComponentStrExternal,
 			canonicalLabel.GetCanonicalPackage().GetCanonicalRepo().String(),
 		)), nil
 

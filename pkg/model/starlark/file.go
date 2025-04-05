@@ -7,6 +7,7 @@ import (
 	"hash/fnv"
 	go_path "path"
 
+	bb_path "github.com/buildbarn/bb-storage/pkg/filesystem/path"
 	pg_label "github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
@@ -16,7 +17,19 @@ import (
 	"go.starlark.net/syntax"
 )
 
-const externalDirectoryName = "external"
+// Names of commonly used pathname components of source and output files.
+const (
+	ComponentStrBazelOut = "bazel-out"
+	ComponentStrBin      = "bin"
+	ComponentStrExternal = "external"
+)
+
+// Typed instances of the names specified above.
+var (
+	ComponentBazelOut = bb_path.MustNewComponent(ComponentStrBazelOut)
+	ComponentBin      = bb_path.MustNewComponent(ComponentStrBin)
+	ComponentExternal = bb_path.MustNewComponent(ComponentStrExternal)
+)
 
 type File[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata] struct {
 	definition model_core.Message[*model_starlark_pb.File, TReference]
@@ -101,9 +114,9 @@ func (f *File[TReference, TMetadata]) appendOwner(parts []string) ([]string, err
 
 		parts = append(
 			parts,
-			"bazel-out",
+			ComponentStrBazelOut,
 			configurationSlug,
-			"bin",
+			ComponentStrBin,
 		)
 	}
 	return parts, nil
@@ -122,7 +135,7 @@ func (f *File[TReference, TMetadata]) getPath() (string, error) {
 	return go_path.Join(
 		append(
 			parts,
-			externalDirectoryName,
+			ComponentStrExternal,
 			canonicalPackage.GetCanonicalRepo().String(),
 			canonicalPackage.GetPackagePath(),
 			d.PackageRelativePath,
@@ -196,7 +209,7 @@ func (f *File[TReference, TMetadata]) Attr(thread *starlark.Thread, name string)
 				starlark.String(go_path.Join(
 					append(
 						parts,
-						externalDirectoryName,
+						ComponentStrExternal,
 						canonicalPackage.GetCanonicalRepo().String(),
 					)...,
 				)),

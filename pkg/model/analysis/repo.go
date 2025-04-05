@@ -48,8 +48,6 @@ import (
 	"go.starlark.net/syntax"
 )
 
-var externalDirectoryName = path.MustNewComponent("external")
-
 type jsonOrderedMapEntry[T any] struct {
 	key   string
 	value T
@@ -1221,7 +1219,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) maybeGetStableInput
 		}
 
 		mrc.defaultWorkingDirectoryPath = defaultWorkingDirectoryPath
-		externalPath := stableInputRootPath.Append(externalDirectoryName)
+		externalPath := stableInputRootPath.Append(model_starlark.ComponentExternal)
 		mrc.pathUnpackerInto = &externalRepoAddingPathUnpackerInto[TReference, TMetadata]{
 			context: mrc,
 			base: model_starlark.NewPathOrLabelOrStringUnpackerInto[TReference, TMetadata](
@@ -2349,13 +2347,13 @@ func (ui *externalRepoAddingPathUnpackerInto[TReference, TMetadata]) maybeAddExt
 	mrc := ui.context
 	if components := bp.GetRelativeTo(ui.externalPath); len(components) >= 1 {
 		repoName := components[0]
-		if !slices.Equal(mrc.subdirectoryComponents, []path.Component{externalDirectoryName, repoName}) {
+		if !slices.Equal(mrc.subdirectoryComponents, []path.Component{model_starlark.ComponentExternal, repoName}) {
 			// Path belongs to an external repo that is
 			// different from the repo that is currently
 			// being constructed.
-			externalDirectory, err := mrc.inputRootDirectory.getOrCreateDirectory(externalDirectoryName)
+			externalDirectory, err := mrc.inputRootDirectory.getOrCreateDirectory(model_starlark.ComponentExternal)
 			if err != nil {
-				return fmt.Errorf("Failed to create directory %#v: %w", externalDirectoryName.String(), err)
+				return fmt.Errorf("Failed to create directory %#v: %w", model_starlark.ComponentStrExternal, err)
 			}
 			if err := externalDirectory.maybeLoadContents(mrc.directoryLoadOptions); err != nil {
 				return fmt.Errorf("failed to load contents of %#v directory: %w", err)
@@ -2670,7 +2668,7 @@ func (c *baseComputer[TReference, TMetadata]) fetchRepo(ctx context.Context, can
 
 	// Invoke the implementation function.
 	subdirectoryComponents := []path.Component{
-		externalDirectoryName,
+		model_starlark.ComponentExternal,
 		path.MustNewComponent(canonicalRepo.String()),
 	}
 	repositoryContext, err := c.newModuleOrRepositoryContext(ctx, e, subdirectoryComponents)
