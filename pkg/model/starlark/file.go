@@ -10,6 +10,7 @@ import (
 	bb_path "github.com/buildbarn/bb-storage/pkg/filesystem/path"
 	pg_label "github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
+	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
 	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 
@@ -94,28 +95,38 @@ func (f *File[TReference, TMetadata]) CompareSameType(thread *starlark.Thread, o
 	}
 }
 
+// ConfigurationReferenceToComponent determines the pathname component
+// to use for a given configuration, so that it may be embedded into
+// bazel-out/.../bin pathnames.
+func ConfigurationReferenceToComponent[TReference object.BasicReference](configurationReference model_core.Message[*model_core_pb.Reference, TReference]) (string, error) {
+	if configurationReference.Message == nil {
+		// The configuration is empty, meaning all build
+		// settings are set to their default values. Use the
+		// string "none" to denote this, akin config.none().
+		return "none", nil
+	}
+
+	// The configuration is non-empty. Put the reference of the
+	// configuration in the pathname. In addition to guaranteeing
+	// there are no collisions, it makes it easy to inspect the
+	// configuration that was used to build these files.
+	r, err := model_core.FlattenReference(configurationReference)
+	if err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(r.GetRawReference()), nil
+}
+
 func (f *File[TReference, TMetadata]) appendOwner(parts []string) ([]string, error) {
 	if o := f.definition.Message.Owner; o != nil {
-		// Place output files in a directory that has the
-		// configuration reference in its name. In addition to
-		// ensuring that output files for different
-		// configurations don't collide, it makes it easy to
-		// inspect the configuration that was used to build.
-		configurationSlug := "_"
-		if o.ConfigurationReference != nil {
-			configurationReference, err := model_core.FlattenReference(
-				model_core.Nested(f.definition, o.ConfigurationReference),
-			)
-			if err != nil {
-				return nil, err
-			}
-			configurationSlug = base64.RawURLEncoding.EncodeToString(configurationReference.GetRawReference())
+		configurationComponent, err := ConfigurationReferenceToComponent(model_core.Nested(f.definition, o.ConfigurationReference))
+		if err != nil {
+			return nil, err
 		}
-
 		parts = append(
 			parts,
 			ComponentStrBazelOut,
-			configurationSlug,
+			configurationComponent,
 			ComponentStrBin,
 		)
 	}

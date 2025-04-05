@@ -509,6 +509,7 @@
       "TargetOutput": {
          "dependsOn": [
             "ConfiguredTarget",
+            "DirectoryCreationParametersObject",
             "FileProperties",
             "TargetOutput"
          ],
