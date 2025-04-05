@@ -31,4 +31,18 @@ func TestTargetName(t *testing.T) {
 				String(),
 		)
 	})
+
+	t.Run("GetLeadingComponent", func(t *testing.T) {
+		head, tail := label.MustNewTargetName("a").GetLeadingComponent()
+		assert.Equal(t, "a", head.String())
+		assert.Nil(t, tail)
+
+		head, tail = label.MustNewTargetName("a/b").GetLeadingComponent()
+		assert.Equal(t, "a", head.String())
+		assert.Equal(t, "b", tail.String())
+
+		head, tail = label.MustNewTargetName("a/b/c").GetLeadingComponent()
+		assert.Equal(t, "a", head.String())
+		assert.Equal(t, "b/c", tail.String())
+	})
 }

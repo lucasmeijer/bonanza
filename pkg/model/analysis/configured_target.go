@@ -2066,7 +2066,7 @@ func (rc *ruleContext[TReference, TMetadata]) doTargetPlatformHasConstraint(thre
 	return starlark.Bool(defaultConstraintValueLabel != nil && *defaultConstraintValueLabel == constraintValueLabel), nil
 }
 
-func (rc *ruleContext[TReference, TMetadata]) setOutputToStaticRootDirectory(output *targetOutput[TMetadata], capturableDirectory model_filesystem.CapturableDirectory[TMetadata, TMetadata]) error {
+func (rc *ruleContext[TReference, TMetadata]) setOutputToStaticDirectory(output *targetOutput[TMetadata], capturableDirectory model_filesystem.CapturableDirectory[TMetadata, TMetadata]) error {
 	var createdDirectory model_filesystem.CreatedDirectory[TMetadata]
 	group, groupCtx := errgroup.WithContext(rc.context)
 	group.Go(func() error {
@@ -2088,8 +2088,8 @@ func (rc *ruleContext[TReference, TMetadata]) setOutputToStaticRootDirectory(out
 		model_core.NewPatchedMessage(
 			&model_analysis_pb.ConfiguredTarget_Value_Output_Leaf{
 				PackageRelativePath: output.packageRelativePath.String(),
-				Source: &model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_StaticRootDirectory{
-					StaticRootDirectory: createdDirectory.Message.Message,
+				Source: &model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_StaticPackageDirectory{
+					StaticPackageDirectory: createdDirectory.Message.Message,
 				},
 			},
 			createdDirectory.Message.Patcher,
@@ -2421,8 +2421,8 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunShell(thread *starlar
 }
 
 type singleSymlinkDirectory[TFile, TDirectory model_core.ReferenceMetadata] struct {
-	name   path.Component
-	target path.Parser
+	remainingPath label.TargetName
+	target        path.Parser
 }
 
 func (singleSymlinkDirectory[TFile, TDirectory]) Close() error {
@@ -2430,20 +2430,26 @@ func (singleSymlinkDirectory[TFile, TDirectory]) Close() error {
 }
 
 func (d *singleSymlinkDirectory[TFile, TDirectory]) ReadDir() ([]filesystem.FileInfo, error) {
+	head, tail := d.remainingPath.GetLeadingComponent()
+	fileType := filesystem.FileTypeDirectory
+	if tail == nil {
+		fileType = filesystem.FileTypeSymlink
+	}
 	return []filesystem.FileInfo{
-		filesystem.NewFileInfo(d.name, filesystem.FileTypeSymlink, false),
+		filesystem.NewFileInfo(head, fileType, false),
 	}, nil
 }
 
 func (d *singleSymlinkDirectory[TFile, TDirectory]) Readlink(name path.Component) (path.Parser, error) {
-	if name != d.name {
-		panic("unexpected name")
-	}
 	return d.target, nil
 }
 
-func (singleSymlinkDirectory[TFile, TDirectory]) EnterCapturableDirectory(name path.Component) (*model_filesystem.CreatedDirectory[TDirectory], model_filesystem.CapturableDirectory[TDirectory, TFile], error) {
-	panic("directory only contains a symlink")
+func (d *singleSymlinkDirectory[TFile, TDirectory]) EnterCapturableDirectory(name path.Component) (*model_filesystem.CreatedDirectory[TDirectory], model_filesystem.CapturableDirectory[TDirectory, TFile], error) {
+	_, tail := d.remainingPath.GetLeadingComponent()
+	return nil, &singleSymlinkDirectory[TFile, TDirectory]{
+		remainingPath: *tail,
+		target:        d.target,
+	}, nil
 }
 
 func (singleSymlinkDirectory[TFile, TDirectory]) OpenForFileMerkleTreeCreation(name path.Component) (model_filesystem.CapturableFile[TFile], error) {
@@ -2501,12 +2507,11 @@ func (rca *ruleContextActions[TReference, TMetadata]) doSymlink(thread *starlark
 		return nil, errors.New("target_path can only be used in combination with outputs that are declared as symbolic links")
 	}
 
-	return starlark.None, rc.setOutputToStaticRootDirectory(
+	return starlark.None, rc.setOutputToStaticDirectory(
 		output,
 		&singleSymlinkDirectory[TMetadata, TMetadata]{
-			// TODO: Use the correct pathname!
-			name:   path.MustNewComponent("XXX"),
-			target: targetPath,
+			remainingPath: output.packageRelativePath,
+			target:        targetPath,
 		},
 	)
 }
@@ -2520,9 +2525,9 @@ func (rca *ruleContextActions[TReference, TMetadata]) doTransformVersionFile(thr
 }
 
 type singleFileDirectory[TFile, TDirectory model_core.ReferenceMetadata] struct {
-	name         path.Component
-	isExecutable bool
-	file         model_filesystem.CapturableFile[TFile]
+	remainingPath label.TargetName
+	isExecutable  bool
+	file          model_filesystem.CapturableFile[TFile]
 }
 
 func (singleFileDirectory[TFile, TDirectory]) Close() error {
@@ -2530,8 +2535,15 @@ func (singleFileDirectory[TFile, TDirectory]) Close() error {
 }
 
 func (d *singleFileDirectory[TFile, TDirectory]) ReadDir() ([]filesystem.FileInfo, error) {
+	head, tail := d.remainingPath.GetLeadingComponent()
+	fileType := filesystem.FileTypeDirectory
+	isExecutable := false
+	if tail == nil {
+		fileType = filesystem.FileTypeRegularFile
+		isExecutable = d.isExecutable
+	}
 	return []filesystem.FileInfo{
-		filesystem.NewFileInfo(d.name, filesystem.FileTypeRegularFile, d.isExecutable),
+		filesystem.NewFileInfo(head, fileType, isExecutable),
 	}, nil
 }
 
@@ -2539,14 +2551,16 @@ func (d *singleFileDirectory[TFile, TDirectory]) Readlink(name path.Component) (
 	panic("directory only contains a regular file")
 }
 
-func (singleFileDirectory[TFile, TDirectory]) EnterCapturableDirectory(name path.Component) (*model_filesystem.CreatedDirectory[TDirectory], model_filesystem.CapturableDirectory[TDirectory, TFile], error) {
-	panic("directory only contains a symlink")
+func (d *singleFileDirectory[TFile, TDirectory]) EnterCapturableDirectory(name path.Component) (*model_filesystem.CreatedDirectory[TDirectory], model_filesystem.CapturableDirectory[TDirectory, TFile], error) {
+	_, tail := d.remainingPath.GetLeadingComponent()
+	return nil, &singleFileDirectory[TFile, TDirectory]{
+		remainingPath: *tail,
+		isExecutable:  d.isExecutable,
+		file:          d.file,
+	}, nil
 }
 
 func (d *singleFileDirectory[TFile, TDirectory]) OpenForFileMerkleTreeCreation(name path.Component) (model_filesystem.CapturableFile[TFile], error) {
-	if name != d.name {
-		panic("unexpected name")
-	}
 	return d.file, nil
 }
 
@@ -2579,13 +2593,12 @@ func (rca *ruleContextActions[TReference, TMetadata]) doWrite(thread *starlark.T
 		return nil, err
 	}
 
-	return starlark.None, rc.setOutputToStaticRootDirectory(
+	return starlark.None, rc.setOutputToStaticDirectory(
 		output,
 		&singleFileDirectory[TMetadata, TMetadata]{
-			// TODO: Use the correct pathname!
-			name:         path.MustNewComponent("XXX"),
-			isExecutable: isExecutable,
-			file:         model_filesystem.NewSimpleCapturableFile(fileContents),
+			remainingPath: output.packageRelativePath,
+			isExecutable:  isExecutable,
+			file:          model_filesystem.NewSimpleCapturableFile(fileContents),
 		},
 	)
 }

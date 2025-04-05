@@ -132,8 +132,10 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetOutputValue(ctx conte
 			return PatchedTargetOutputValue{}, fmt.Errorf("failed to file properties of template: %w", err)
 		}
 		return PatchedTargetOutputValue{}, errors.New("TODO: expand template")
-	case *model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_StaticRootDirectory:
-		patchedRootDirectory := model_core.Patch(e, model_core.Nested(output, source.StaticRootDirectory))
+	case *model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_StaticPackageDirectory:
+		// TODO: We need to prefix bazel-out/... to the
+		// resulting directory hierarchy!
+		patchedRootDirectory := model_core.Patch(e, model_core.Nested(output, source.StaticPackageDirectory))
 		return model_core.NewPatchedMessage(
 			&model_analysis_pb.TargetOutput_Value{
 				RootDirectory: patchedRootDirectory.Message,

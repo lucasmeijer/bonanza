@@ -4,6 +4,8 @@ import (
 	"errors"
 	"regexp"
 	"strings"
+
+	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
 )
 
 // TargetName corresponds to the name of an addressable and/or buildable
@@ -48,4 +50,14 @@ func (tn TargetName) GetSibling(child TargetName) TargetName {
 		return child
 	}
 	return TargetName{value: tn.value[:slash+1] + child.value}
+}
+
+// GetLeadingComponent splits the target name, returning the first
+// pathname component and the trailing part.
+func (tn TargetName) GetLeadingComponent() (path.Component, *TargetName) {
+	slash := strings.IndexByte(tn.value, '/')
+	if slash < 0 {
+		return path.MustNewComponent(tn.value), nil
+	}
+	return path.MustNewComponent(tn.value[:slash]), &TargetName{value: tn.value[slash+1:]}
 }

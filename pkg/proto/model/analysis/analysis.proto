@@ -271,8 +271,10 @@ message ConfiguredTarget {
 
           // Output of ctx.actions.symlink(target_path=...) or
           // ctx.actions.write(), provided in the form of a directory
-          // hierarchy containing the file or directory in question.
-          bonanza.model.filesystem.Directory static_root_directory = 4;
+          // hierarchy containing the file or symlink in question,
+          // rooted at the output directory of the current package and
+          // configuration.
+          bonanza.model.filesystem.Directory static_package_directory = 4;
 
           // Output of ctx.actions.symlink(target_file=...).
           bonanza.model.starlark.File symlink = 5;
