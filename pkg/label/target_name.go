@@ -52,12 +52,17 @@ func (tn TargetName) GetSibling(child TargetName) TargetName {
 	return TargetName{value: tn.value[:slash+1] + child.value}
 }
 
-// GetLeadingComponent splits the target name, returning the first
-// pathname component and the trailing part.
-func (tn TargetName) GetLeadingComponent() (path.Component, *TargetName) {
-	slash := strings.IndexByte(tn.value, '/')
-	if slash < 0 {
-		return path.MustNewComponent(tn.value), nil
+// ToComponents returns the pathname components of the target name.
+func (tn TargetName) ToComponents() []path.Component {
+	v := tn.value
+	components := make([]path.Component, 0, strings.Count(v, "/")+1)
+	for {
+		slash := strings.IndexByte(v, '/')
+		if slash < 0 {
+			components = append(components, path.MustNewComponent(v))
+			return components
+		}
+		components = append(components, path.MustNewComponent(v[:slash]))
+		v = v[slash+1:]
 	}
-	return path.MustNewComponent(tn.value[:slash]), &TargetName{value: tn.value[slash+1:]}
 }

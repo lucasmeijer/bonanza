@@ -118,13 +118,42 @@ func getStarlarkFileProperties[TReference object.BasicReference, TMetadata model
 	return model_core.Nested(fileProperties, exists), nil
 }
 
+func getPackageOutputDirectoryComponents[TReference object.BasicReference](configurationReference model_core.Message[*model_core_pb.Reference, TReference], canonicalPackage label.CanonicalPackage) ([]path.Component, error) {
+	// TODO: Add more utility functions to pkg/label, so that we
+	// don't need to call path.MustNewComponent() from here.
+	configurationComponent, err := model_starlark.ConfigurationReferenceToComponent(configurationReference)
+	if err != nil {
+		return nil, err
+	}
+	components := []path.Component{
+		model_starlark.ComponentBazelOut,
+		path.MustNewComponent(configurationComponent),
+		model_starlark.ComponentBin,
+		model_starlark.ComponentExternal,
+		path.MustNewComponent(canonicalPackage.GetCanonicalRepo().String()),
+	}
+	for packageComponent := range strings.FieldsFuncSeq(canonicalPackage.GetPackagePath(), func(r rune) bool { return r == '/' }) {
+		components = append(components, path.MustNewComponent(packageComponent))
+	}
+	return components, nil
+}
+
 func (c *baseComputer[TReference, TMetadata]) ComputeTargetOutputValue(ctx context.Context, key model_core.Message[*model_analysis_pb.TargetOutput_Key, TReference], e TargetOutputEnvironment[TReference, TMetadata]) (PatchedTargetOutputValue, error) {
+	targetLabel, err := label.NewCanonicalLabel(key.Message.TargetLabel)
+	if err != nil {
+		return PatchedTargetOutputValue{}, fmt.Errorf("invalid target label: %w", err)
+	}
+	packageRelativePath, err := label.NewTargetName(key.Message.PackageRelativePath)
+	if err != nil {
+		return PatchedTargetOutputValue{}, fmt.Errorf("invalid package relative path: %w", err)
+	}
+
 	configurationReference := model_core.Nested(key, key.Message.ConfigurationReference)
 	patchedConfigurationReference := model_core.Patch(e, configurationReference)
 	configuredTarget := e.GetConfiguredTargetValue(
 		model_core.NewPatchedMessage(
 			&model_analysis_pb.ConfiguredTarget_Key{
-				Label:                  key.Message.TargetLabel,
+				Label:                  targetLabel.String(),
 				ConfigurationReference: patchedConfigurationReference.Message,
 			},
 			model_core.MapReferenceMetadataToWalkers(patchedConfigurationReference.Patcher),
@@ -134,7 +163,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetOutputValue(ctx conte
 		return PatchedTargetOutputValue{}, evaluation.ErrMissingDependency
 	}
 
-	packageRelativePath := key.Message.PackageRelativePath
+	packageRelativePathStr := packageRelativePath.String()
 	output, err := btree.Find(
 		ctx,
 		c.configuredTargetOutputReader,
@@ -142,9 +171,9 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetOutputValue(ctx conte
 		func(entry *model_analysis_pb.ConfiguredTarget_Value_Output) (int, *model_core_pb.Reference) {
 			switch level := entry.Level.(type) {
 			case *model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_:
-				return strings.Compare(packageRelativePath, level.Leaf.PackageRelativePath), nil
+				return strings.Compare(packageRelativePathStr, level.Leaf.PackageRelativePath), nil
 			case *model_analysis_pb.ConfiguredTarget_Value_Output_Parent_:
-				return strings.Compare(packageRelativePath, level.Parent.FirstPackageRelativePath), level.Parent.Reference
+				return strings.Compare(packageRelativePathStr, level.Parent.FirstPackageRelativePath), level.Parent.Reference
 			default:
 				return 0, nil
 			}
@@ -235,6 +264,11 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetOutputValue(ctx conte
 			return PatchedTargetOutputValue{}, err
 		}
 
+		components, err := getPackageOutputDirectoryComponents(configurationReference, targetLabel.GetCanonicalPackage())
+		if err != nil {
+			return PatchedTargetOutputValue{}, err
+		}
+
 		// Place the output file in a directory structure.
 		var createdDirectory model_filesystem.CreatedDirectory[model_core.FileBackedObjectLocation]
 		group, groupCtx = errgroup.WithContext(ctx)
@@ -245,10 +279,9 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetOutputValue(ctx conte
 				group,
 				directoryCreationParameters,
 				&singleFileDirectory[model_core.FileBackedObjectLocation, model_core.FileBackedObjectLocation]{
-					// TODO: Fill in the correct path!
-					remainingPath: label.MustNewTargetName("TODO"),
-					isExecutable:  source.ExpandTemplate.IsExecutable,
-					file:          model_filesystem.NewSimpleCapturableFile(outputFileContents),
+					components:   append(components, packageRelativePath.ToComponents()...),
+					isExecutable: source.ExpandTemplate.IsExecutable,
+					file:         model_filesystem.NewSimpleCapturableFile(outputFileContents),
 				},
 				model_filesystem.NewSimpleDirectoryMerkleTreeCapturer(fileWritingObjectCapturer),
 				&createdDirectory,
@@ -287,23 +320,9 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetOutputValue(ctx conte
 			return PatchedTargetOutputValue{}, evaluation.ErrMissingDependency
 		}
 
-		configurationComponent, err := model_starlark.ConfigurationReferenceToComponent(configurationReference)
+		components, err := getPackageOutputDirectoryComponents(configurationReference, targetLabel.GetCanonicalPackage())
 		if err != nil {
 			return PatchedTargetOutputValue{}, err
-		}
-		targetLabel, err := label.NewCanonicalLabel(key.Message.TargetLabel)
-		if err != nil {
-			return PatchedTargetOutputValue{}, fmt.Errorf("invalid target label: %w", err)
-		}
-		components := []path.Component{
-			model_starlark.ComponentBazelOut,
-			path.MustNewComponent(configurationComponent),
-			model_starlark.ComponentBin,
-			model_starlark.ComponentExternal,
-			path.MustNewComponent(targetLabel.GetCanonicalRepo().String()),
-		}
-		for packageComponent := range strings.FieldsFuncSeq(targetLabel.GetCanonicalPackage().GetPackagePath(), func(r rune) bool { return r == '/' }) {
-			components = append(components, path.MustNewComponent(packageComponent))
 		}
 
 		var createdDirectory model_filesystem.CreatedDirectory[TMetadata]

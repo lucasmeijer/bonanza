@@ -2421,8 +2421,8 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunShell(thread *starlar
 }
 
 type singleSymlinkDirectory[TFile, TDirectory model_core.ReferenceMetadata] struct {
-	remainingPath label.TargetName
-	target        path.Parser
+	components []path.Component
+	target     path.Parser
 }
 
 func (singleSymlinkDirectory[TFile, TDirectory]) Close() error {
@@ -2430,13 +2430,12 @@ func (singleSymlinkDirectory[TFile, TDirectory]) Close() error {
 }
 
 func (d *singleSymlinkDirectory[TFile, TDirectory]) ReadDir() ([]filesystem.FileInfo, error) {
-	head, tail := d.remainingPath.GetLeadingComponent()
 	fileType := filesystem.FileTypeDirectory
-	if tail == nil {
+	if len(d.components) == 1 {
 		fileType = filesystem.FileTypeSymlink
 	}
 	return []filesystem.FileInfo{
-		filesystem.NewFileInfo(head, fileType, false),
+		filesystem.NewFileInfo(d.components[0], fileType, false),
 	}, nil
 }
 
@@ -2445,10 +2444,9 @@ func (d *singleSymlinkDirectory[TFile, TDirectory]) Readlink(name path.Component
 }
 
 func (d *singleSymlinkDirectory[TFile, TDirectory]) EnterCapturableDirectory(name path.Component) (*model_filesystem.CreatedDirectory[TDirectory], model_filesystem.CapturableDirectory[TDirectory, TFile], error) {
-	_, tail := d.remainingPath.GetLeadingComponent()
 	return nil, &singleSymlinkDirectory[TFile, TDirectory]{
-		remainingPath: *tail,
-		target:        d.target,
+		components: d.components[1:],
+		target:     d.target,
 	}, nil
 }
 
@@ -2510,8 +2508,8 @@ func (rca *ruleContextActions[TReference, TMetadata]) doSymlink(thread *starlark
 	return starlark.None, rc.setOutputToStaticDirectory(
 		output,
 		&singleSymlinkDirectory[TMetadata, TMetadata]{
-			remainingPath: output.packageRelativePath,
-			target:        targetPath,
+			components: output.packageRelativePath.ToComponents(),
+			target:     targetPath,
 		},
 	)
 }
@@ -2525,9 +2523,9 @@ func (rca *ruleContextActions[TReference, TMetadata]) doTransformVersionFile(thr
 }
 
 type singleFileDirectory[TFile, TDirectory model_core.ReferenceMetadata] struct {
-	remainingPath label.TargetName
-	isExecutable  bool
-	file          model_filesystem.CapturableFile[TFile]
+	components   []path.Component
+	isExecutable bool
+	file         model_filesystem.CapturableFile[TFile]
 }
 
 func (singleFileDirectory[TFile, TDirectory]) Close() error {
@@ -2535,15 +2533,14 @@ func (singleFileDirectory[TFile, TDirectory]) Close() error {
 }
 
 func (d *singleFileDirectory[TFile, TDirectory]) ReadDir() ([]filesystem.FileInfo, error) {
-	head, tail := d.remainingPath.GetLeadingComponent()
 	fileType := filesystem.FileTypeDirectory
 	isExecutable := false
-	if tail == nil {
+	if len(d.components) == 1 {
 		fileType = filesystem.FileTypeRegularFile
 		isExecutable = d.isExecutable
 	}
 	return []filesystem.FileInfo{
-		filesystem.NewFileInfo(head, fileType, isExecutable),
+		filesystem.NewFileInfo(d.components[0], fileType, isExecutable),
 	}, nil
 }
 
@@ -2552,11 +2549,10 @@ func (d *singleFileDirectory[TFile, TDirectory]) Readlink(name path.Component) (
 }
 
 func (d *singleFileDirectory[TFile, TDirectory]) EnterCapturableDirectory(name path.Component) (*model_filesystem.CreatedDirectory[TDirectory], model_filesystem.CapturableDirectory[TDirectory, TFile], error) {
-	_, tail := d.remainingPath.GetLeadingComponent()
 	return nil, &singleFileDirectory[TFile, TDirectory]{
-		remainingPath: *tail,
-		isExecutable:  d.isExecutable,
-		file:          d.file,
+		components:   d.components[1:],
+		isExecutable: d.isExecutable,
+		file:         d.file,
 	}, nil
 }
 
@@ -2596,9 +2592,9 @@ func (rca *ruleContextActions[TReference, TMetadata]) doWrite(thread *starlark.T
 	return starlark.None, rc.setOutputToStaticDirectory(
 		output,
 		&singleFileDirectory[TMetadata, TMetadata]{
-			remainingPath: output.packageRelativePath,
-			isExecutable:  isExecutable,
-			file:          model_filesystem.NewSimpleCapturableFile(fileContents),
+			components:   output.packageRelativePath.ToComponents(),
+			isExecutable: isExecutable,
+			file:         model_filesystem.NewSimpleCapturableFile(fileContents),
 		},
 	)
 }

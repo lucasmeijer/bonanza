@@ -3,6 +3,7 @@ package label_test
 import (
 	"testing"
 
+	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
 	"github.com/buildbarn/bonanza/pkg/label"
 	"github.com/stretchr/testify/assert"
 )
@@ -32,17 +33,30 @@ func TestTargetName(t *testing.T) {
 		)
 	})
 
-	t.Run("GetLeadingComponent", func(t *testing.T) {
-		head, tail := label.MustNewTargetName("a").GetLeadingComponent()
-		assert.Equal(t, "a", head.String())
-		assert.Nil(t, tail)
-
-		head, tail = label.MustNewTargetName("a/b").GetLeadingComponent()
-		assert.Equal(t, "a", head.String())
-		assert.Equal(t, "b", tail.String())
-
-		head, tail = label.MustNewTargetName("a/b/c").GetLeadingComponent()
-		assert.Equal(t, "a", head.String())
-		assert.Equal(t, "b/c", tail.String())
+	t.Run("ToComponents", func(t *testing.T) {
+		assert.Equal(
+			t,
+			[]path.Component{
+				path.MustNewComponent("a"),
+			},
+			label.MustNewTargetName("a").ToComponents(),
+		)
+		assert.Equal(
+			t,
+			[]path.Component{
+				path.MustNewComponent("a"),
+				path.MustNewComponent("b"),
+			},
+			label.MustNewTargetName("a/b").ToComponents(),
+		)
+		assert.Equal(
+			t,
+			[]path.Component{
+				path.MustNewComponent("a"),
+				path.MustNewComponent("b"),
+				path.MustNewComponent("c"),
+			},
+			label.MustNewTargetName("a/b/c").ToComponents(),
+		)
 	})
 }
