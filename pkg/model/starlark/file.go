@@ -69,9 +69,7 @@ func (File[TReference, TMetadata]) Truth() starlark.Bool {
 func (f *File[TReference, TMetadata]) Hash(thread *starlark.Thread) (uint32, error) {
 	d := f.definition.Message
 	h := fnv.New32a()
-	h.Write([]byte(d.Package))
-	h.Write([]byte(":"))
-	h.Write([]byte(d.PackageRelativePath))
+	h.Write([]byte(d.Label))
 	return h.Sum32(), nil
 }
 
@@ -121,7 +119,11 @@ func (f *File[TReference, TMetadata]) Attr(thread *starlark.Thread, name string)
 	d := f.definition.Message
 	switch name {
 	case "basename":
-		return starlark.String(go_path.Base(d.PackageRelativePath)), nil
+		canonicalLabel, err := pg_label.NewCanonicalLabel(d.Label)
+		if err != nil {
+			return nil, fmt.Errorf("invalid canonical label %#v: %w", d.Label, err)
+		}
+		return starlark.String(go_path.Base(canonicalLabel.GetTargetName().String())), nil
 	case "dirname":
 		p, err := FileGetPath(f.definition)
 		if err != nil {
@@ -129,8 +131,12 @@ func (f *File[TReference, TMetadata]) Attr(thread *starlark.Thread, name string)
 		}
 		return starlark.String(go_path.Dir(p)), nil
 	case "extension":
-		p := d.PackageRelativePath
-		for i := len(p) - 1; i >= 0 && p[i] != '/'; i-- {
+		canonicalLabel, err := pg_label.NewCanonicalLabel(d.Label)
+		if err != nil {
+			return nil, fmt.Errorf("invalid canonical label %#v: %w", d.Label, err)
+		}
+		p := canonicalLabel.GetTargetName().String()
+		for i := len(p) - 1; i >= 0 && p[i] != '/' && p[i] != ':'; i-- {
 			if p[i] == '.' {
 				return starlark.String(p[i+1:]), nil
 			}
@@ -143,24 +149,23 @@ func (f *File[TReference, TMetadata]) Attr(thread *starlark.Thread, name string)
 	case "is_symlink":
 		return starlark.Bool(d.Type == model_starlark_pb.File_SYMLINK), nil
 	case "owner":
-		canonicalPackage, err := pg_label.NewCanonicalPackage(d.Package)
+		canonicalLabel, err := pg_label.NewCanonicalLabel(d.Label)
 		if err != nil {
-			return nil, fmt.Errorf("invalid canonical package %#v: %w", d.Package, err)
+			return nil, fmt.Errorf("invalid canonical label %#v: %w", d.Label, err)
 		}
 
 		// If the file is an output file, return the label of
 		// the target that generates it. If it is a source file,
 		// return a label of the file itself.
-		targetNameStr := d.PackageRelativePath
 		if o := d.Owner; o != nil {
-			targetNameStr = o.TargetName
-		}
-		targetName, err := pg_label.NewTargetName(targetNameStr)
-		if err != nil {
-			return nil, fmt.Errorf("invalid target name %#v: %w", targetNameStr, err)
+			targetName, err := pg_label.NewTargetName(o.TargetName)
+			if err != nil {
+				return nil, fmt.Errorf("invalid owner target name %#v: %w", o.TargetName, err)
+			}
+			canonicalLabel = canonicalLabel.GetCanonicalPackage().AppendTargetName(targetName)
 		}
 
-		return NewLabel[TReference, TMetadata](canonicalPackage.AppendTargetName(targetName).AsResolved()), nil
+		return NewLabel[TReference, TMetadata](canonicalLabel.AsResolved()), nil
 	case "path":
 		p, err := FileGetPath(f.definition)
 		if err != nil {
@@ -168,9 +173,9 @@ func (f *File[TReference, TMetadata]) Attr(thread *starlark.Thread, name string)
 		}
 		return starlark.String(p), nil
 	case "root":
-		canonicalPackage, err := pg_label.NewCanonicalPackage(d.Package)
+		canonicalLabel, err := pg_label.NewCanonicalLabel(d.Label)
 		if err != nil {
-			return nil, fmt.Errorf("invalid canonical package %#v: %w", d.Package, err)
+			return nil, fmt.Errorf("invalid canonical label %#v: %w", d.Label, err)
 		}
 		parts, err := appendFileOwnerToPath(f.definition, make([]string, 0, 6))
 		if err != nil {
@@ -184,21 +189,22 @@ func (f *File[TReference, TMetadata]) Attr(thread *starlark.Thread, name string)
 					append(
 						parts,
 						ComponentStrExternal,
-						canonicalPackage.GetCanonicalRepo().String(),
+						canonicalLabel.GetCanonicalRepo().String(),
 					)...,
 				)),
 			},
 		), nil
 	case "short_path":
-		canonicalPackage, err := pg_label.NewCanonicalPackage(d.Package)
+		canonicalLabel, err := pg_label.NewCanonicalLabel(d.Label)
 		if err != nil {
-			return nil, fmt.Errorf("invalid canonical package %#v: %w", d.Package, err)
+			return nil, fmt.Errorf("invalid canonical label %#v: %w", d.Label, err)
 		}
+		canonicalPackage := canonicalLabel.GetCanonicalPackage()
 		return starlark.String(go_path.Join(
 			"..",
 			canonicalPackage.GetCanonicalRepo().String(),
 			canonicalPackage.GetPackagePath(),
-			d.PackageRelativePath,
+			canonicalLabel.GetTargetName().String(),
 		)), nil
 	default:
 		return nil, nil
@@ -242,21 +248,22 @@ func (f *File[TReference, TMetadata]) GetDefinition() model_core.Message[*model_
 // object, similar to accessing the "path" attribute of a File from
 // within Starlark code.
 func FileGetPath[TReference object.BasicReference](f model_core.Message[*model_starlark_pb.File, TReference]) (string, error) {
-	canonicalPackage, err := pg_label.NewCanonicalPackage(f.Message.Package)
+	canonicalLabel, err := pg_label.NewCanonicalLabel(f.Message.Label)
 	if err != nil {
-		return "", fmt.Errorf("invalid canonical package %#v: %w", f.Message.Package, err)
+		return "", fmt.Errorf("invalid canonical label %#v: %w", f.Message.Label, err)
 	}
 	parts, err := appendFileOwnerToPath(f, make([]string, 0, 7))
 	if err != nil {
 		return "", err
 	}
+	canonicalPackage := canonicalLabel.GetCanonicalPackage()
 	return go_path.Join(
 		append(
 			parts,
 			ComponentStrExternal,
 			canonicalPackage.GetCanonicalRepo().String(),
 			canonicalPackage.GetPackagePath(),
-			f.Message.PackageRelativePath,
+			canonicalLabel.GetTargetName().String(),
 		)...,
 	), nil
 }

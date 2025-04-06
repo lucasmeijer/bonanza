@@ -40,9 +40,9 @@ func getStarlarkFileProperties[TReference object.BasicReference, TMetadata model
 	if f.Message == nil {
 		return model_core.Message[*model_filesystem_pb.FileProperties, TReference]{}, errors.New("file not set")
 	}
-	canonicalPackage, err := label.NewCanonicalPackage(f.Message.Package)
+	canonicalLabel, err := label.NewCanonicalLabel(f.Message.Label)
 	if err != nil {
-		return model_core.Message[*model_filesystem_pb.FileProperties, TReference]{}, fmt.Errorf("invalid package %#v: %w", f.Message.Package, err)
+		return model_core.Message[*model_filesystem_pb.FileProperties, TReference]{}, fmt.Errorf("invalid label %#v: %w", f.Message.Label, err)
 	}
 
 	if owner := f.Message.Owner; owner != nil {
@@ -57,8 +57,8 @@ func getStarlarkFileProperties[TReference object.BasicReference, TMetadata model
 		targetOutput := e.GetTargetOutputValue(
 			model_core.NewPatchedMessage(
 				&model_analysis_pb.TargetOutput_Key{
-					TargetLabel:            canonicalPackage.AppendTargetName(targetName).String(),
-					PackageRelativePath:    f.Message.PackageRelativePath,
+					TargetLabel:            canonicalLabel.GetCanonicalPackage().AppendTargetName(targetName).String(),
+					PackageRelativePath:    canonicalLabel.GetTargetName().String(),
 					ConfigurationReference: configurationReference.Message,
 				},
 				model_core.MapReferenceMetadataToWalkers(configurationReference.Patcher),
@@ -98,14 +98,10 @@ func getStarlarkFileProperties[TReference object.BasicReference, TMetadata model
 	}
 
 	// File is a source file. Fetch it from its repo.
-	packageRelativePath, err := label.NewTargetName(f.Message.PackageRelativePath)
-	if err != nil {
-		return model_core.Message[*model_filesystem_pb.FileProperties, TReference]{}, fmt.Errorf("invalid package relative path %#v: %w", f.Message.PackageRelativePath, err)
-	}
 	fileProperties := e.GetFilePropertiesValue(
 		&model_analysis_pb.FileProperties_Key{
-			CanonicalRepo: canonicalPackage.GetCanonicalRepo().String(),
-			Path:          canonicalPackage.AppendTargetName(packageRelativePath).GetRepoRelativePath(),
+			CanonicalRepo: canonicalLabel.GetCanonicalRepo().String(),
+			Path:          canonicalLabel.GetRepoRelativePath(),
 		},
 	)
 	if !fileProperties.IsSet() {

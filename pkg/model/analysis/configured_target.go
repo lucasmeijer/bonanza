@@ -563,9 +563,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 						ConfigurationReference: configurationReference.Message,
 						TargetName:             targetKind.PredeclaredOutputFileTarget.OwnerTargetName,
 					},
-					Package:             targetLabel.GetCanonicalPackage().String(),
-					PackageRelativePath: targetLabel.GetTargetName().String(),
-					Type:                model_starlark_pb.File_FILE,
+					Label: targetLabel.String(),
+					Type:  model_starlark_pb.File_FILE,
 				},
 				configurationReference.Patcher,
 			),
@@ -740,7 +739,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 				ConfigurationReference: configurationReference.Message,
 				TargetName:             targetLabel.GetTargetName().String(),
 			}),
-			targetPackage: targetPackage.String(),
+			targetPackage: targetPackage,
 
 			outputsByPackageRelativePath: map[string]*targetOutput[TMetadata]{},
 			outputsByFile:                map[*model_starlark.File[TReference, TMetadata]]*targetOutput[TMetadata]{},
@@ -1502,9 +1501,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 		return getSingleFileConfiguredTargetValue(
 			model_core.NewSimplePatchedMessage[TMetadata](
 				&model_starlark_pb.File{
-					Package:             targetLabel.GetCanonicalPackage().String(),
-					PackageRelativePath: targetLabel.GetTargetName().String(),
-					Type:                model_starlark_pb.File_FILE,
+					Label: targetLabel.String(),
+					Type:  model_starlark_pb.File_FILE,
 				},
 			),
 		), nil
@@ -1532,7 +1530,7 @@ func (o *targetOutput[TMetadata]) setDefinition(definition model_core.PatchedMes
 
 type targetOutputRegistrar[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata] struct {
 	owner         model_core.Message[*model_starlark_pb.File_Owner, TReference]
-	targetPackage string
+	targetPackage label.CanonicalPackage
 
 	outputsByPackageRelativePath map[string]*targetOutput[TMetadata]
 	outputsByFile                map[*model_starlark.File[TReference, TMetadata]]*targetOutput[TMetadata]
@@ -1545,18 +1543,16 @@ func (or *targetOutputRegistrar[TReference, TMetadata]) registerOutput(filename 
 		filename = sibling.packageRelativePath.GetSibling(filename)
 	}
 
-	filenameStr := filename.String()
 	o := &targetOutput[TMetadata]{
 		packageRelativePath: filename,
 		fileType:            fileType,
 	}
-	or.outputsByPackageRelativePath[filenameStr] = o
+	or.outputsByPackageRelativePath[filename.String()] = o
 	f := model_starlark.NewFile[TReference, TMetadata](
 		model_core.Nested(or.owner, &model_starlark_pb.File{
-			Owner:               or.owner.Message,
-			Package:             or.targetPackage,
-			PackageRelativePath: filenameStr,
-			Type:                fileType,
+			Owner: or.owner.Message,
+			Label: or.targetPackage.AppendTargetName(filename).String(),
+			Type:  fileType,
 		}),
 	)
 	or.outputsByFile[f] = o
@@ -1738,9 +1734,8 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 					Owner: &model_starlark_pb.File_Owner{
 						TargetName: "stamp",
 					},
-					Package:             "@@builtins_core+",
-					PackageRelativePath: "stable-status.txt",
-					Type:                model_starlark_pb.File_FILE,
+					Label: "@@builtins_core+//:stable-status.txt",
+					Type:  model_starlark_pb.File_FILE,
 				},
 			),
 		), nil
@@ -1805,9 +1800,8 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 					Owner: &model_starlark_pb.File_Owner{
 						TargetName: "stamp",
 					},
-					Package:             "@@builtins_core+",
-					PackageRelativePath: "volatile-status.txt",
-					Type:                model_starlark_pb.File_FILE,
+					Label: "@@builtins_core+//:volatile-status.txt",
+					Type:  model_starlark_pb.File_FILE,
 				},
 			),
 		), nil

@@ -317,12 +317,9 @@ message File {
   // it is a source file.
   Owner owner = 1;
 
-  // Canonical package that contains the file.
-  string package = 2;
-
-  // The name of the directory, file, or symlink relative to the
-  // canonical package.
-  string package_relative_path = 3;
+  // Canonical package that contains the directory, file or symlink, and
+  // its name relative to the package's directory.
+  string label = 2;
 
   enum Type {
     // Regular file declared through ctx.actions.declare_file().
@@ -336,7 +333,7 @@ message File {
   }
 
   // The type of the file.
-  Type type = 5;
+  Type type = 3;
 }
 
 message Function {
