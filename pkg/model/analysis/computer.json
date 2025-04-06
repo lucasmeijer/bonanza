@@ -512,7 +512,9 @@
             "ConfiguredTarget",
             "DirectoryCreationParametersObject",
             "DirectoryReaders",
+            "FileCreationParametersObject",
             "FileProperties",
+            "FileReader",
             "TargetOutput"
          ],
          "keyContainsReferences": true

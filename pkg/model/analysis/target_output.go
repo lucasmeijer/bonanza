@@ -1,9 +1,11 @@
 package analysis
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/buildbarn/bb-storage/pkg/filesystem"
@@ -163,21 +165,117 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetOutputValue(ctx conte
 	case *model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_ActionId:
 		return PatchedTargetOutputValue{}, errors.New("TODO: invoke action")
 	case *model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_ExpandTemplate_:
-		if _, err := getStarlarkFileProperties(ctx, e, model_core.Nested(output, source.ExpandTemplate.Template)); err != nil {
-			return PatchedTargetOutputValue{}, fmt.Errorf("failed to file properties of template: %w", err)
+		directoryCreationParameters, gotDirectoryCreationParameters := e.GetDirectoryCreationParametersObjectValue(&model_analysis_pb.DirectoryCreationParametersObject_Key{})
+		fileCreationParameters, gotFileCreationParameters := e.GetFileCreationParametersObjectValue(&model_analysis_pb.FileCreationParametersObject_Key{})
+		fileReader, gotFileReader := e.GetFileReaderValue(&model_analysis_pb.FileReader_Key{})
+		if !gotDirectoryCreationParameters || !gotFileCreationParameters || !gotFileReader {
+			return PatchedTargetOutputValue{}, evaluation.ErrMissingDependency
 		}
 
+		// Look up template file.
+		templateFileProperties, err := getStarlarkFileProperties(ctx, e, model_core.Nested(output, source.ExpandTemplate.Template))
+		if err != nil {
+			return PatchedTargetOutputValue{}, fmt.Errorf("failed to file properties of template: %w", err)
+		}
+		templateContentsEntry, err := model_filesystem.NewFileContentsEntryFromProto(model_core.Nested(templateFileProperties, templateFileProperties.Message.Contents))
+		if err != nil {
+			return PatchedTargetOutputValue{}, err
+		}
+
+		// Create search and replacer for performing substitutions.
 		substitutions := source.ExpandTemplate.Substitutions
 		needles := make([][]byte, 0, len(substitutions))
+		replacements := make([][]byte, 0, len(substitutions))
 		for _, substitution := range substitutions {
 			needles = append(needles, substitution.Needle)
+			replacements = append(replacements, substitution.Replacement)
 		}
-		_, err := search.NewMultiSearchAndReplacer(needles)
+		searchAndReplacer, err := search.NewMultiSearchAndReplacer(needles)
 		if err != nil {
 			return PatchedTargetOutputValue{}, fmt.Errorf("invalid substitution keys: %w", err)
 		}
 
-		return PatchedTargetOutputValue{}, errors.New("TODO: expand template")
+		merkleTreeNodes, err := c.filePool.NewFile()
+		if err != nil {
+			return PatchedTargetOutputValue{}, err
+		}
+		defer func() {
+			if merkleTreeNodes != nil {
+				merkleTreeNodes.Close()
+			}
+		}()
+		fileWritingObjectCapturer := model_core.NewFileWritingObjectCapturer(model_filesystem.NewSectionWriter(merkleTreeNodes))
+
+		// Perform substitutions and create a new Merkle tree
+		// for the resulting output file.
+		pipeReader, pipeWriter := io.Pipe()
+		var outputFileContents model_core.PatchedMessage[*model_filesystem_pb.FileContents, model_core.FileBackedObjectLocation]
+		group, groupCtx := errgroup.WithContext(ctx)
+		group.Go(func() error {
+			err := searchAndReplacer.SearchAndReplace(
+				pipeWriter,
+				bufio.NewReader(fileReader.FileOpenRead(groupCtx, templateContentsEntry, 0)),
+				replacements,
+			)
+			pipeWriter.CloseWithError(err)
+			return err
+		})
+		group.Go(func() error {
+			var err error
+			outputFileContents, err = model_filesystem.CreateFileMerkleTree(
+				groupCtx,
+				fileCreationParameters,
+				pipeReader,
+				model_filesystem.NewSimpleFileMerkleTreeCapturer(fileWritingObjectCapturer),
+			)
+			pipeReader.CloseWithError(err)
+			return err
+		})
+		if err := group.Wait(); err != nil {
+			return PatchedTargetOutputValue{}, err
+		}
+
+		// Place the output file in a directory structure.
+		var createdDirectory model_filesystem.CreatedDirectory[model_core.FileBackedObjectLocation]
+		group, groupCtx = errgroup.WithContext(ctx)
+		group.Go(func() error {
+			return model_filesystem.CreateDirectoryMerkleTree(
+				groupCtx,
+				semaphore.NewWeighted(1),
+				group,
+				directoryCreationParameters,
+				&singleFileDirectory[model_core.FileBackedObjectLocation, model_core.FileBackedObjectLocation]{
+					// TODO: Fill in the correct path!
+					remainingPath: label.MustNewTargetName("TODO"),
+					isExecutable:  source.ExpandTemplate.IsExecutable,
+					file:          model_filesystem.NewSimpleCapturableFile(outputFileContents),
+				},
+				model_filesystem.NewSimpleDirectoryMerkleTreeCapturer(fileWritingObjectCapturer),
+				&createdDirectory,
+			)
+		})
+		if err := group.Wait(); err != nil {
+			return PatchedTargetOutputValue{}, err
+		}
+
+		// Flush the created Merkle tree to disk, so that it can
+		// be read back during the uploading process.
+		if err := fileWritingObjectCapturer.Flush(); err != nil {
+			return PatchedTargetOutputValue{}, err
+		}
+		objectContentsWalkerFactory := model_core.NewFileReadingObjectContentsWalkerFactory(merkleTreeNodes)
+		defer objectContentsWalkerFactory.Release()
+		merkleTreeNodes = nil
+
+		return model_core.NewPatchedMessage(
+			&model_analysis_pb.TargetOutput_Value{
+				RootDirectory: createdDirectory.Message.Message,
+			},
+			model_core.MapReferenceMessagePatcherMetadata(
+				createdDirectory.Message.Patcher,
+				objectContentsWalkerFactory.CreateObjectContentsWalker,
+			),
+		), nil
 	case *model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_StaticPackageDirectory:
 		// Output file was already computed during configuration.
 		// For example by calling ctx.actions.write() or
