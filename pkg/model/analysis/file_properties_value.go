@@ -4,18 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
-	"strings"
 
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
 	"github.com/buildbarn/bonanza/pkg/evaluation"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
-	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
-	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
-	model_filesystem_pb "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
+	"github.com/buildbarn/bonanza/pkg/storage/dag"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // reposFilePropertiesResolver resolves the properties of a file
@@ -23,161 +22,55 @@ import (
 // directory, which allows symbolic links with targets of shape
 // "../${repo}/${file}" to resolve properly.
 type reposFilePropertiesResolver[TReference object.BasicReference, TMetadata any] struct {
-	context         context.Context
-	directoryReader model_parser.ParsedObjectReader[TReference, model_core.Message[*model_filesystem_pb.Directory, TReference]]
-	leavesReader    model_parser.ParsedObjectReader[TReference, model_core.Message[*model_filesystem_pb.Leaves, TReference]]
-	environment     FilePropertiesEnvironment[TReference, TMetadata]
+	context          context.Context
+	directoryReaders *DirectoryReaders[TReference]
+	environment      FilePropertiesEnvironment[TReference, TMetadata]
 
-	currentDirectoryReference model_core.Message[*model_core_pb.Reference, TReference]
-	stack                     []model_core.Message[*model_filesystem_pb.Directory, TReference]
-	fileProperties            model_core.Message[*model_filesystem_pb.FileProperties, TReference]
-	gotTerminal               bool
+	currentRepo *model_filesystem.DirectoryComponentWalker[TReference]
 }
 
 var _ path.ComponentWalker = (*reposFilePropertiesResolver[object.LocalReference, model_core.ReferenceMetadata])(nil)
 
-func (r *reposFilePropertiesResolver[TReference, TMetadata]) dereferenceCurrentDirectory() error {
-	if r.currentDirectoryReference.IsSet() {
-		d, err := model_parser.Dereference(r.context, r.directoryReader, r.currentDirectoryReference)
-		if err != nil {
-			return err
-		}
-		r.stack = append(r.stack, d)
-		r.currentDirectoryReference.Clear()
+func (r *reposFilePropertiesResolver[TReference, TMetadata]) handleRepoOnUp() (path.ComponentWalker, error) {
+	r.currentRepo = nil
+	return r, nil
+}
+
+func (r *reposFilePropertiesResolver[TReference, TMetadata]) setCurrentRepo(name string) error {
+	repoValue := r.environment.GetRepoValue(&model_analysis_pb.Repo_Key{
+		CanonicalRepo: name,
+	})
+	if !repoValue.IsSet() {
+		return evaluation.ErrMissingDependency
 	}
+
+	r.currentRepo = model_filesystem.NewDirectoryComponentWalker[TReference](
+		r.context,
+		r.directoryReaders.Directory,
+		r.directoryReaders.Leaves,
+		r.handleRepoOnUp,
+		model_core.Nested(repoValue, repoValue.Message.RootDirectoryReference.GetReference()),
+		nil,
+	)
 	return nil
 }
 
 func (r *reposFilePropertiesResolver[TReference, TMetadata]) OnDirectory(name path.Component) (path.GotDirectoryOrSymlink, error) {
-	if err := r.dereferenceCurrentDirectory(); err != nil {
+	if err := r.setCurrentRepo(name.String()); err != nil {
 		return nil, err
 	}
-	if len(r.stack) == 0 {
-		// Currently within the root directory. Enter the repo
-		// corresponding to the provided directory name.
-		repoValue := r.environment.GetRepoValue(&model_analysis_pb.Repo_Key{
-			CanonicalRepo: name.String(),
-		})
-		if !repoValue.IsSet() {
-			return nil, evaluation.ErrMissingDependency
-		}
-
-		r.currentDirectoryReference = model_core.Nested(repoValue, repoValue.Message.RootDirectoryReference.GetReference())
-		return path.GotDirectory{
-			Child:        r,
-			IsReversible: true,
-		}, nil
-	}
-
-	d := r.stack[len(r.stack)-1]
-	n := name.String()
-	directories := d.Message.Directories
-	if i, ok := sort.Find(
-		len(directories),
-		func(i int) int { return strings.Compare(n, directories[i].Name) },
-	); ok {
-		switch contents := directories[i].Contents.(type) {
-		case *model_filesystem_pb.DirectoryNode_ContentsExternal:
-			r.currentDirectoryReference = model_core.Nested(d, contents.ContentsExternal.Reference)
-		case *model_filesystem_pb.DirectoryNode_ContentsInline:
-			r.stack = append(r.stack, model_core.Nested(d, contents.ContentsInline))
-		default:
-			return nil, errors.New("unknown directory contents type")
-		}
-		return path.GotDirectory{
-			Child:        r,
-			IsReversible: true,
-		}, nil
-	}
-
-	leaves, err := model_filesystem.DirectoryGetLeaves(r.context, r.leavesReader, d)
-	if err != nil {
-		return nil, err
-	}
-
-	files := leaves.Message.Files
-	if _, ok := sort.Find(
-		len(files),
-		func(i int) int { return strings.Compare(n, files[i].Name) },
-	); ok {
-		return nil, errors.New("path resolves to a regular file, while a directory was expected")
-	}
-
-	symlinks := leaves.Message.Symlinks
-	if i, ok := sort.Find(
-		len(symlinks),
-		func(i int) int { return strings.Compare(n, symlinks[i].Name) },
-	); ok {
-		return path.GotSymlink{
-			Parent: path.NewRelativeScopeWalker(r),
-			Target: path.UNIXFormat.NewParser(symlinks[i].Target),
-		}, nil
-	}
-
-	return nil, errors.New("path does not exist")
+	return path.GotDirectory{
+		Child:        r.currentRepo,
+		IsReversible: true,
+	}, nil
 }
 
 func (r *reposFilePropertiesResolver[TReference, TMetadata]) OnTerminal(name path.Component) (*path.GotSymlink, error) {
-	if err := r.dereferenceCurrentDirectory(); err != nil {
-		return nil, err
-	}
-	if len(r.stack) == 0 {
-		return path.OnTerminalViaOnDirectory(r, name)
-	}
-
-	d := r.stack[len(r.stack)-1]
-	n := name.String()
-	directories := d.Message.Directories
-	if _, ok := sort.Find(
-		len(directories),
-		func(i int) int { return strings.Compare(n, directories[i].Name) },
-	); ok {
-		return nil, errors.New("path resolves to a directory, while a file was expected")
-	}
-
-	leaves, err := model_filesystem.DirectoryGetLeaves(r.context, r.leavesReader, d)
-	if err != nil {
-		return nil, err
-	}
-
-	files := leaves.Message.Files
-	if i, ok := sort.Find(
-		len(files),
-		func(i int) int { return strings.Compare(n, files[i].Name) },
-	); ok {
-		properties := files[i].Properties
-		if properties == nil {
-			return nil, errors.New("path resolves to file that does not have any properties")
-		}
-		r.fileProperties = model_core.Nested(leaves, properties)
-		r.gotTerminal = true
-		return nil, nil
-	}
-
-	symlinks := leaves.Message.Symlinks
-	if i, ok := sort.Find(
-		len(symlinks),
-		func(i int) int { return strings.Compare(n, symlinks[i].Name) },
-	); ok {
-		return &path.GotSymlink{
-			Parent: path.NewRelativeScopeWalker(r),
-			Target: path.UNIXFormat.NewParser(symlinks[i].Target),
-		}, nil
-	}
-
-	r.gotTerminal = true
-	return nil, nil
+	return path.OnTerminalViaOnDirectory(r, name)
 }
 
 func (r *reposFilePropertiesResolver[TReference, TMetadata]) OnUp() (path.ComponentWalker, error) {
-	if r.currentDirectoryReference.IsSet() {
-		r.currentDirectoryReference.Clear()
-	} else if len(r.stack) == 0 {
-		return nil, errors.New("path escapes repositories directory")
-	} else {
-		r.stack = r.stack[:len(r.stack)-1]
-	}
-	return r, nil
+	return nil, errors.New("path escapes repositories directory")
 }
 
 func (c *baseComputer[TReference, TMetadata]) ComputeFilePropertiesValue(ctx context.Context, key *model_analysis_pb.FileProperties_Key, e FilePropertiesEnvironment[TReference, TMetadata]) (PatchedFilePropertiesValue, error) {
@@ -187,34 +80,35 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFilePropertiesValue(ctx con
 	}
 
 	resolver := reposFilePropertiesResolver[TReference, TMetadata]{
-		context:         ctx,
-		directoryReader: directoryReaders.Directory,
-		leavesReader:    directoryReaders.Leaves,
-		environment:     e,
+		context:          ctx,
+		directoryReaders: directoryReaders,
+		environment:      e,
 	}
-
-	canonicalRepo, ok := path.NewComponent(key.CanonicalRepo)
-	if !ok {
-		return PatchedFilePropertiesValue{}, fmt.Errorf("canonical repo is not a valid pathname component")
-	}
-	repoDirectory, err := resolver.OnDirectory(canonicalRepo)
-	if err != nil {
+	if err := resolver.setCurrentRepo(key.CanonicalRepo); err != nil {
 		return PatchedFilePropertiesValue{}, fmt.Errorf("failed to resolve canonical repo directory: %w", err)
 	}
 
 	if err := path.Resolve(
 		path.UNIXFormat.NewParser(key.Path),
-		path.NewLoopDetectingScopeWalker(
-			path.NewRelativeScopeWalker(repoDirectory.(path.GotDirectory).Child),
-		),
+		path.NewLoopDetectingScopeWalker(path.NewRelativeScopeWalker(resolver.currentRepo)),
 	); err != nil {
+		if status.Code(err) == codes.NotFound {
+			return model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](
+				&model_analysis_pb.FileProperties_Value{},
+			), nil
+		}
 		return PatchedFilePropertiesValue{}, fmt.Errorf("failed to resolve path: %w", err)
 	}
-	if !resolver.gotTerminal {
+
+	if resolver.currentRepo == nil {
+		return PatchedFilePropertiesValue{}, errors.New("path resolves to a location outside any repo")
+	}
+	fileProperties := resolver.currentRepo.GetCurrentFileProperties()
+	if !fileProperties.IsSet() {
 		return PatchedFilePropertiesValue{}, errors.New("path resolves to a directory")
 	}
 
-	patchedFileProperties := model_core.Patch(e, resolver.fileProperties)
+	patchedFileProperties := model_core.Patch(e, fileProperties)
 	return model_core.NewPatchedMessage(
 		&model_analysis_pb.FileProperties_Value{
 			Exists: patchedFileProperties.Message,

@@ -49,7 +49,7 @@ func NewFile[TReference object.BasicReference, TMetadata model_core.CloneableRef
 }
 
 func (f *File[TReference, TMetadata]) String() string {
-	if p, err := f.getPath(); err == nil {
+	if p, err := FileGetPath(f.definition); err == nil {
 		return fmt.Sprintf("<File %s>", p)
 	}
 	return "<File>"
@@ -117,50 +117,13 @@ func ConfigurationReferenceToComponent[TReference object.BasicReference](configu
 	return base64.RawURLEncoding.EncodeToString(r.GetRawReference()), nil
 }
 
-func (f *File[TReference, TMetadata]) appendOwner(parts []string) ([]string, error) {
-	if o := f.definition.Message.Owner; o != nil {
-		configurationComponent, err := ConfigurationReferenceToComponent(model_core.Nested(f.definition, o.ConfigurationReference))
-		if err != nil {
-			return nil, err
-		}
-		parts = append(
-			parts,
-			ComponentStrBazelOut,
-			configurationComponent,
-			ComponentStrBin,
-		)
-	}
-	return parts, nil
-}
-
-func (f *File[TReference, TMetadata]) getPath() (string, error) {
-	d := f.definition.Message
-	canonicalPackage, err := pg_label.NewCanonicalPackage(d.Package)
-	if err != nil {
-		return "", fmt.Errorf("invalid canonical package %#v: %w", d.Package, err)
-	}
-	parts, err := f.appendOwner(make([]string, 0, 7))
-	if err != nil {
-		return "", err
-	}
-	return go_path.Join(
-		append(
-			parts,
-			ComponentStrExternal,
-			canonicalPackage.GetCanonicalRepo().String(),
-			canonicalPackage.GetPackagePath(),
-			d.PackageRelativePath,
-		)...,
-	), nil
-}
-
 func (f *File[TReference, TMetadata]) Attr(thread *starlark.Thread, name string) (starlark.Value, error) {
 	d := f.definition.Message
 	switch name {
 	case "basename":
 		return starlark.String(go_path.Base(d.PackageRelativePath)), nil
 	case "dirname":
-		p, err := f.getPath()
+		p, err := FileGetPath(f.definition)
 		if err != nil {
 			return nil, err
 		}
@@ -199,7 +162,7 @@ func (f *File[TReference, TMetadata]) Attr(thread *starlark.Thread, name string)
 
 		return NewLabel[TReference, TMetadata](canonicalPackage.AppendTargetName(targetName).AsResolved()), nil
 	case "path":
-		p, err := f.getPath()
+		p, err := FileGetPath(f.definition)
 		if err != nil {
 			return nil, err
 		}
@@ -209,7 +172,7 @@ func (f *File[TReference, TMetadata]) Attr(thread *starlark.Thread, name string)
 		if err != nil {
 			return nil, fmt.Errorf("invalid canonical package %#v: %w", d.Package, err)
 		}
-		parts, err := f.appendOwner(make([]string, 0, 6))
+		parts, err := appendFileOwnerToPath(f.definition, make([]string, 0, 6))
 		if err != nil {
 			return nil, err
 		}
@@ -273,4 +236,43 @@ func (f *File[TReference, TMetadata]) EncodeValue(path map[starlark.Value]struct
 
 func (f *File[TReference, TMetadata]) GetDefinition() model_core.Message[*model_starlark_pb.File, TReference] {
 	return f.definition
+}
+
+// FileGetPath returns the full input root path corresponding to a File
+// object, similar to accessing the "path" attribute of a File from
+// within Starlark code.
+func FileGetPath[TReference object.BasicReference](f model_core.Message[*model_starlark_pb.File, TReference]) (string, error) {
+	canonicalPackage, err := pg_label.NewCanonicalPackage(f.Message.Package)
+	if err != nil {
+		return "", fmt.Errorf("invalid canonical package %#v: %w", f.Message.Package, err)
+	}
+	parts, err := appendFileOwnerToPath(f, make([]string, 0, 7))
+	if err != nil {
+		return "", err
+	}
+	return go_path.Join(
+		append(
+			parts,
+			ComponentStrExternal,
+			canonicalPackage.GetCanonicalRepo().String(),
+			canonicalPackage.GetPackagePath(),
+			f.Message.PackageRelativePath,
+		)...,
+	), nil
+}
+
+func appendFileOwnerToPath[TReference object.BasicReference](f model_core.Message[*model_starlark_pb.File, TReference], parts []string) ([]string, error) {
+	if o := f.Message.Owner; o != nil {
+		configurationComponent, err := ConfigurationReferenceToComponent(model_core.Nested(f, o.ConfigurationReference))
+		if err != nil {
+			return nil, err
+		}
+		parts = append(
+			parts,
+			ComponentStrBazelOut,
+			configurationComponent,
+			ComponentStrBin,
+		)
+	}
+	return parts, nil
 }

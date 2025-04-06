@@ -1,8 +1,6 @@
 package filesystem
 
 import (
-	"context"
-
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
 	"github.com/buildbarn/bb-storage/pkg/util"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
@@ -105,38 +103,4 @@ func addDirectoriesToCluster[TReference any](c *DirectoryCluster, d model_core.M
 		}
 	}
 	return directoryIndex, nil
-}
-
-// DirectoryGetLeaves is a helper function for obtaining the leaves
-// contained in a directory.
-func DirectoryGetLeaves[TReference any](
-	ctx context.Context,
-	reader model_parser.ParsedObjectReader[TReference, model_core.Message[*model_filesystem_pb.Leaves, TReference]],
-	directory model_core.Message[*model_filesystem_pb.Directory, TReference],
-) (model_core.Message[*model_filesystem_pb.Leaves, TReference], error) {
-	switch leaves := directory.Message.Leaves.(type) {
-	case *model_filesystem_pb.Directory_LeavesExternal:
-		return model_parser.Dereference(ctx, reader, model_core.Nested(directory, leaves.LeavesExternal.Reference))
-	case *model_filesystem_pb.Directory_LeavesInline:
-		return model_core.Nested(directory, leaves.LeavesInline), nil
-	default:
-		return model_core.Message[*model_filesystem_pb.Leaves, TReference]{}, status.Error(codes.InvalidArgument, "Directory has no leaves")
-	}
-}
-
-// DirectoryNodeGetContents is a helper function for obtaining the
-// contents of a directory node.
-func DirectoryNodeGetContents[TReference any](
-	ctx context.Context,
-	reader model_parser.ParsedObjectReader[TReference, model_core.Message[*model_filesystem_pb.Directory, TReference]],
-	directoryNode model_core.Message[*model_filesystem_pb.DirectoryNode, TReference],
-) (model_core.Message[*model_filesystem_pb.Directory, TReference], error) {
-	switch contents := directoryNode.Message.Contents.(type) {
-	case *model_filesystem_pb.DirectoryNode_ContentsExternal:
-		return model_parser.Dereference(ctx, reader, model_core.Nested(directoryNode, contents.ContentsExternal.Reference))
-	case *model_filesystem_pb.DirectoryNode_ContentsInline:
-		return model_core.Nested(directoryNode, contents.ContentsInline), nil
-	default:
-		return model_core.Message[*model_filesystem_pb.Directory, TReference]{}, status.Error(codes.InvalidArgument, "Directory node has no contents")
-	}
 }

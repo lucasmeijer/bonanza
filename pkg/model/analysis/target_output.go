@@ -18,22 +18,23 @@ import (
 	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
 	model_filesystem_pb "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
 	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
+	"github.com/buildbarn/bonanza/pkg/search"
 	"github.com/buildbarn/bonanza/pkg/storage/dag"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
-	"google.golang.org/protobuf/encoding/protojson"
 )
 
 type getStarlarkFilePropertiesEnvironment[TReference any, TMetadata any] interface {
 	model_core.ExistingObjectCapturer[TReference, TMetadata]
 
+	GetDirectoryReadersValue(key *model_analysis_pb.DirectoryReaders_Key) (*DirectoryReaders[TReference], bool)
 	GetFilePropertiesValue(key *model_analysis_pb.FileProperties_Key) model_core.Message[*model_analysis_pb.FileProperties_Value, TReference]
 	GetTargetOutputValue(key model_core.PatchedMessage[*model_analysis_pb.TargetOutput_Key, dag.ObjectContentsWalker]) model_core.Message[*model_analysis_pb.TargetOutput_Value, TReference]
 }
 
-func getStarlarkFileProperties[TReference object.BasicReference, TMetadata model_core.WalkableReferenceMetadata](e getStarlarkFilePropertiesEnvironment[TReference, TMetadata], f model_core.Message[*model_starlark_pb.File, TReference]) (model_core.Message[*model_filesystem_pb.FileProperties, TReference], error) {
+func getStarlarkFileProperties[TReference object.BasicReference, TMetadata model_core.WalkableReferenceMetadata](ctx context.Context, e getStarlarkFilePropertiesEnvironment[TReference, TMetadata], f model_core.Message[*model_starlark_pb.File, TReference]) (model_core.Message[*model_filesystem_pb.FileProperties, TReference], error) {
 	if f.Message == nil {
 		return model_core.Message[*model_filesystem_pb.FileProperties, TReference]{}, errors.New("file not set")
 	}
@@ -49,6 +50,7 @@ func getStarlarkFileProperties[TReference object.BasicReference, TMetadata model
 			return model_core.Message[*model_filesystem_pb.FileProperties, TReference]{}, fmt.Errorf("invalid target name %#v: %w", owner.TargetName, err)
 		}
 
+		directoryReaders, gotDirectoryReaders := e.GetDirectoryReadersValue(&model_analysis_pb.DirectoryReaders_Key{})
 		configurationReference := model_core.Patch(e, model_core.Nested(f, owner.ConfigurationReference))
 		targetOutput := e.GetTargetOutputValue(
 			model_core.NewPatchedMessage(
@@ -60,11 +62,37 @@ func getStarlarkFileProperties[TReference object.BasicReference, TMetadata model
 				model_core.MapReferenceMetadataToWalkers(configurationReference.Patcher),
 			),
 		)
-		if !targetOutput.IsSet() {
+		if !gotDirectoryReaders || !targetOutput.IsSet() {
 			return model_core.Message[*model_filesystem_pb.FileProperties, TReference]{}, evaluation.ErrMissingDependency
 		}
 
-		return model_core.Message[*model_filesystem_pb.FileProperties, TReference]{}, fmt.Errorf("TODO: PROCESS TARGET OUTPUT: %s", protojson.Format(targetOutput.Message))
+		filePath, err := model_starlark.FileGetPath(f)
+		if err != nil {
+			return model_core.Message[*model_filesystem_pb.FileProperties, TReference]{}, err
+		}
+		componentWalker := model_filesystem.NewDirectoryComponentWalker[TReference](
+			ctx,
+			directoryReaders.Directory,
+			directoryReaders.Leaves,
+			func() (path.ComponentWalker, error) {
+				return nil, errors.New("path resolution escapes input root")
+			},
+			model_core.Message[*model_core_pb.Reference, TReference]{},
+			[]model_core.Message[*model_filesystem_pb.Directory, TReference]{
+				model_core.Nested(targetOutput, targetOutput.Message.RootDirectory),
+			},
+		)
+		if err := path.Resolve(
+			path.UNIXFormat.NewParser(filePath),
+			path.NewLoopDetectingScopeWalker(path.NewRelativeScopeWalker(componentWalker)),
+		); err != nil {
+			return model_core.Message[*model_filesystem_pb.FileProperties, TReference]{}, fmt.Errorf("failed to resolve path: %w", err)
+		}
+		fileProperties := componentWalker.GetCurrentFileProperties()
+		if !fileProperties.IsSet() {
+			return model_core.Message[*model_filesystem_pb.FileProperties, TReference]{}, errors.New("target output is a directory")
+		}
+		return fileProperties, nil
 	}
 
 	// File is a source file. Fetch it from its repo.
@@ -135,9 +163,20 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetOutputValue(ctx conte
 	case *model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_ActionId:
 		return PatchedTargetOutputValue{}, errors.New("TODO: invoke action")
 	case *model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_ExpandTemplate_:
-		if _, err := getStarlarkFileProperties(e, model_core.Nested(output, source.ExpandTemplate.Template)); err != nil {
+		if _, err := getStarlarkFileProperties(ctx, e, model_core.Nested(output, source.ExpandTemplate.Template)); err != nil {
 			return PatchedTargetOutputValue{}, fmt.Errorf("failed to file properties of template: %w", err)
 		}
+
+		substitutions := source.ExpandTemplate.Substitutions
+		needles := make([][]byte, 0, len(substitutions))
+		for _, substitution := range substitutions {
+			needles = append(needles, substitution.Needle)
+		}
+		_, err := search.NewMultiSearchAndReplacer(needles)
+		if err != nil {
+			return PatchedTargetOutputValue{}, fmt.Errorf("invalid substitution keys: %w", err)
+		}
+
 		return PatchedTargetOutputValue{}, errors.New("TODO: expand template")
 	case *model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_StaticPackageDirectory:
 		// Output file was already computed during configuration.

@@ -9,6 +9,7 @@ go_library(
         "create_file_merkle_tree.go",
         "directory_access_parameters.go",
         "directory_cluster_object_parser.go",
+        "directory_component_walker.go",
         "directory_creation_parameters.go",
         "directory_merkle_tree_capturer.go",
         "escapement_counting_scope_walker.go",

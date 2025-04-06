@@ -48,7 +48,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetCompletionValue(ctx c
 			return PatchedTargetCompletionValue{}, errors.New("\"files\" field of DefaultInfo provider contains an element that is not a File")
 		}
 
-		if _, err := getStarlarkFileProperties(e, model_core.Nested(element, elementFile.File)); err != nil {
+		if _, err := getStarlarkFileProperties(ctx, e, model_core.Nested(element, elementFile.File)); err != nil {
 			if errors.Is(err, evaluation.ErrMissingDependency) {
 				missingDependencies = true
 				continue

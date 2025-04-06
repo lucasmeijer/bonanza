@@ -501,6 +501,7 @@
       "TargetCompletion": {
          "dependsOn": [
             "ConfiguredTarget",
+            "DirectoryReaders",
             "FileProperties",
             "TargetOutput"
          ],
@@ -510,6 +511,7 @@
          "dependsOn": [
             "ConfiguredTarget",
             "DirectoryCreationParametersObject",
+            "DirectoryReaders",
             "FileProperties",
             "TargetOutput"
          ],
