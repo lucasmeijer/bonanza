@@ -388,6 +388,23 @@ message FileReader {
   message Key {}
 }
 
+message FileRoot {
+  message Key {
+    // The source file or output file's contents that are being requested.
+    bonanza.model.starlark.File file = 1;
+  }
+
+  message Value {
+    // A directory hierarchy that contains the requested file, placed at
+    // the location it would appear inside the input root of an action
+    // that depends on it.
+    //
+    // If the requested file is a symlink, its target(s) will also be
+    // part of the directory structure.
+    bonanza.model.filesystem.Directory root_directory = 1;
+  }
+}
+
 message FilesInPackage {
   message Key {
     // The package for which the list of files it contains is requested.
@@ -1170,27 +1187,6 @@ message TargetCompletion {
   }
 
   message Value {}
-}
-
-message TargetOutput {
-  message Key {
-    // The label of the target that produces the output file, directory,
-    // or symbolic link.
-    string target_label = 1;
-
-    // The path of the output file, directory, or symbolic link,
-    // relative to the output directory of the specified package and
-    // configuration.
-    string package_relative_path = 2;
-
-    // The configuration that needs to be applied when building the
-    // output.
-    bonanza.model.core.Reference configuration_reference = 3;
-  }
-
-  message Value {
-    bonanza.model.filesystem.Directory root_directory = 1;
-  }
 }
 
 message TargetPatternExpansion {

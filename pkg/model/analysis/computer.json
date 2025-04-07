@@ -211,6 +211,18 @@
             "type": "*model_filesystem.FileReader[TReference]"
          }
       },
+      "FileRoot": {
+         "dependsOn": [
+            "ConfiguredTarget",
+            "DirectoryCreationParametersObject",
+            "DirectoryReaders",
+            "FileCreationParametersObject",
+            "FileProperties",
+            "FileReader",
+            "FileRoot"
+         ],
+         "keyContainsReferences": true
+      },
       "FilesInPackage": {
          "dependsOn": [
             "DirectoryCreationParametersObject",
@@ -503,19 +515,7 @@
             "ConfiguredTarget",
             "DirectoryReaders",
             "FileProperties",
-            "TargetOutput"
-         ],
-         "keyContainsReferences": true
-      },
-      "TargetOutput": {
-         "dependsOn": [
-            "ConfiguredTarget",
-            "DirectoryCreationParametersObject",
-            "DirectoryReaders",
-            "FileCreationParametersObject",
-            "FileProperties",
-            "FileReader",
-            "TargetOutput"
+            "FileRoot"
          ],
          "keyContainsReferences": true
       },
