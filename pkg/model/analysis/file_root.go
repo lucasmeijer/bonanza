@@ -121,11 +121,12 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 		}
 
 		configurationReference := model_core.Nested(f, o.ConfigurationReference)
+		targetLabel := fileLabel.GetCanonicalPackage().AppendTargetName(targetName)
 		patchedConfigurationReference := model_core.Patch(e, configurationReference)
 		configuredTarget := e.GetConfiguredTargetValue(
 			model_core.NewPatchedMessage(
 				&model_analysis_pb.ConfiguredTarget_Key{
-					Label:                  fileLabel.GetCanonicalPackage().AppendTargetName(targetName).String(),
+					Label:                  targetLabel.String(),
 					ConfigurationReference: patchedConfigurationReference.Message,
 				},
 				model_core.MapReferenceMetadataToWalkers(patchedConfigurationReference.Patcher),
@@ -164,7 +165,20 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 
 		switch source := outputLeaf.Leaf.Source.(type) {
 		case *model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_ActionId:
-			return PatchedFileRootValue{}, errors.New("TODO: invoke action")
+			patchedConfigurationReference := model_core.Patch(e, configurationReference)
+			targetActionResult := e.GetTargetActionResultValue(
+				model_core.NewPatchedMessage(
+					&model_analysis_pb.TargetActionResult_Key{
+						Label:                  targetLabel.String(),
+						ConfigurationReference: patchedConfigurationReference.Message,
+						ActionId:               source.ActionId,
+					},
+					model_core.MapReferenceMetadataToWalkers(patchedConfigurationReference.Patcher),
+				),
+			)
+			if !targetActionResult.IsSet() {
+				return PatchedFileRootValue{}, evaluation.ErrMissingDependency
+			}
 		case *model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_ExpandTemplate_:
 			directoryCreationParameters, gotDirectoryCreationParameters := e.GetDirectoryCreationParametersObjectValue(&model_analysis_pb.DirectoryCreationParametersObject_Key{})
 			fileCreationParameters, gotFileCreationParameters := e.GetFileCreationParametersObjectValue(&model_analysis_pb.FileCreationParametersObject_Key{})

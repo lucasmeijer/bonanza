@@ -219,7 +219,8 @@
             "FileCreationParametersObject",
             "FileProperties",
             "FileReader",
-            "FileRoot"
+            "FileRoot",
+            "TargetActionResult"
          ],
          "keyContainsReferences": true
       },
@@ -509,6 +510,12 @@
          "dependsOn": [
             "Package"
          ]
+      },
+      "TargetActionResult": {
+         "dependsOn": [
+            "ConfiguredTarget"
+         ],
+         "keyContainsReferences": true
       },
       "TargetCompletion": {
          "dependsOn": [

@@ -1,6 +1,7 @@
 package analysis
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -1434,6 +1435,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 			patcher.Merge(v.Patcher)
 		}
 
+		// Construct list of outputs of the target.
 		outputsTreeBuilder := btree.NewSplitProllyBuilder(
 			/* minimumSizeBytes = */ 32*1024,
 			/* maximumSizeBytes = */ 128*1024,
@@ -1489,10 +1491,65 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 		}
 		patcher.Merge(outputsList.Patcher)
 
+		// Construct list of actions of the target.
+		actionsTreeBuilder := btree.NewSplitProllyBuilder(
+			/* minimumSizeBytes = */ 32*1024,
+			/* maximumSizeBytes = */ 128*1024,
+			btree.NewObjectCreatingNodeMerger(
+				c.getValueObjectEncoder(),
+				c.getReferenceFormat(),
+				/* parentNodeComputer = */ func(createdObject model_core.CreatedObject[TMetadata], childNodes []*model_analysis_pb.ConfiguredTarget_Value_Action) (model_core.PatchedMessage[*model_analysis_pb.ConfiguredTarget_Value_Action, TMetadata], error) {
+					var firstID []byte
+					switch firstElement := childNodes[0].Level.(type) {
+					case *model_analysis_pb.ConfiguredTarget_Value_Action_Leaf_:
+						firstID = firstElement.Leaf.Id
+					case *model_analysis_pb.ConfiguredTarget_Value_Action_Parent_:
+						firstID = firstElement.Parent.FirstId
+					}
+					patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
+					return model_core.NewPatchedMessage(
+						&model_analysis_pb.ConfiguredTarget_Value_Action{
+							Level: &model_analysis_pb.ConfiguredTarget_Value_Action_Parent_{
+								Parent: &model_analysis_pb.ConfiguredTarget_Value_Action_Parent{
+									Reference: patcher.AddReference(
+										createdObject.Contents.GetReference(),
+										e.CaptureCreatedObject(createdObject),
+									),
+									FirstId: firstID,
+								},
+							},
+						},
+						patcher,
+					), nil
+				},
+			),
+		)
+		slices.SortFunc(rc.actions, func(a, b model_core.PatchedMessage[*model_analysis_pb.ConfiguredTarget_Value_Action_Leaf, TMetadata]) int {
+			return bytes.Compare(a.Message.Id, b.Message.Id)
+		})
+		for _, action := range rc.actions {
+			if err := actionsTreeBuilder.PushChild(model_core.NewPatchedMessage(
+				&model_analysis_pb.ConfiguredTarget_Value_Action{
+					Level: &model_analysis_pb.ConfiguredTarget_Value_Action_Leaf_{
+						Leaf: action.Message,
+					},
+				},
+				action.Patcher,
+			)); err != nil {
+				return PatchedConfiguredTargetValue{}, err
+			}
+		}
+		actionsList, err := actionsTreeBuilder.FinalizeList()
+		if err != nil {
+			return PatchedConfiguredTargetValue{}, err
+		}
+		patcher.Merge(actionsList.Patcher)
+
 		return model_core.NewPatchedMessage(
 			&model_analysis_pb.ConfiguredTarget_Value{
 				ProviderInstances: encodedProviderInstances,
 				Outputs:           outputsList.Message,
+				Actions:           actionsList.Message,
 			},
 			model_core.MapReferenceMetadataToWalkers(patcher),
 		), nil
@@ -1620,6 +1677,7 @@ type ruleContext[TReference object.BasicReference, TMetadata BaseComputerReferen
 	outputRegistrar             *targetOutputRegistrar[TReference, TMetadata]
 	directoryCreationParameters *model_filesystem.DirectoryCreationParameters
 	fileCreationParameters      *model_filesystem.FileCreationParameters
+	actions                     []model_core.PatchedMessage[*model_analysis_pb.ConfiguredTarget_Value_Action_Leaf, TMetadata]
 }
 
 var _ starlark.HasAttrs = (*ruleContext[object.GlobalReference, BaseComputerReferenceMetadata])(nil)
@@ -2334,14 +2392,19 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 		return nil, err
 	}
 
-	// TODO: Actually register the action.
+	// Use the name of the first output file as a somewhat stable
+	// identifier of the action. Associate the outputs with this action.
+	if len(outputs) == 0 {
+		return nil, errors.New("action has no outputs")
+	}
+	actionID := []byte(outputs[0].packageRelativePath.String())
 	for _, output := range outputs {
 		if err := output.setDefinition(
 			model_core.NewSimplePatchedMessage[TMetadata](
 				&model_analysis_pb.ConfiguredTarget_Value_Output_Leaf{
 					PackageRelativePath: output.packageRelativePath.String(),
 					Source: &model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_ActionId{
-						ActionId: []byte("TODO"),
+						ActionId: actionID,
 					},
 				},
 			),
@@ -2349,6 +2412,12 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 			return nil, err
 		}
 	}
+
+	rc.actions = append(rc.actions, model_core.NewSimplePatchedMessage[TMetadata](
+		&model_analysis_pb.ConfiguredTarget_Value_Action_Leaf{
+			Id: actionID,
+		},
+	))
 	return starlark.None, nil
 }
 

@@ -53,6 +53,7 @@ type baseComputer[TReference object.BasicReference, TMetadata BaseComputerRefere
 	buildSettingOverrideReader                   model_parser.ParsedObjectReader[TReference, model_core.Message[[]*model_analysis_pb.BuildSettingOverride, TReference]]
 	buildSpecificationReader                     model_parser.ParsedObjectReader[TReference, model_core.Message[*model_build_pb.BuildSpecification, TReference]]
 	commandOutputsReader                         model_parser.ParsedObjectReader[TReference, model_core.Message[*model_command_pb.Outputs, TReference]]
+	configuredTargetActionReader                 model_parser.ParsedObjectReader[TReference, model_core.Message[[]*model_analysis_pb.ConfiguredTarget_Value_Action, TReference]]
 	configuredTargetOutputReader                 model_parser.ParsedObjectReader[TReference, model_core.Message[[]*model_analysis_pb.ConfiguredTarget_Value_Output, TReference]]
 	moduleExtensionReposValueRepoReader          model_parser.ParsedObjectReader[TReference, model_core.Message[[]*model_analysis_pb.ModuleExtensionRepos_Value_Repo, TReference]]
 	packageValueTargetReader                     model_parser.ParsedObjectReader[TReference, model_core.Message[[]*model_analysis_pb.Package_Value_Target, TReference]]

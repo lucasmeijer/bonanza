@@ -298,6 +298,33 @@ message ConfiguredTarget {
     // Outputs are stored in a B-tree, where entries are sorted
     // alphabetically by package relative path.
     repeated Output outputs = 2;
+
+    message Action {
+      message Parent {
+        // Reference to the B-tree node containing additional actions.
+        bonanza.model.core.Reference reference = 1;
+
+        // The identifier of the first output contained in the B-tree
+        // that is referenced.
+        bytes first_id = 2;
+      }
+
+      message Leaf {
+        // The identifier of the action. This identifier can be used by
+        // outputs to reference the action that generates them.
+        bytes id = 1;
+      }
+
+      oneof level {
+        // A single action, for which properties are provided.
+        Leaf leaf = 1;
+
+        // B-tree node containing additional actions.
+        Parent parent = 2;
+      }
+    }
+
+    repeated Action actions = 3;
   }
 }
 
@@ -1169,6 +1196,25 @@ message Target {
 
   message Value {
     bonanza.model.starlark.Target.Definition definition = 1;
+  }
+}
+
+message TargetActionResult {
+  message Key {
+    // The label of the target that declared the action.
+    string label = 1;
+
+    // The configuration that was used to compute the configured target
+    // declaring the action.
+    bonanza.model.core.Reference configuration_reference = 2;
+
+    // The identifier of the action within the configured target.
+    bytes action_id = 3;
+  }
+
+  message Value {
+    // The contents of output files and directories of this action.
+    bonanza.model.filesystem.Directory output_root = 1;
   }
 }
 
