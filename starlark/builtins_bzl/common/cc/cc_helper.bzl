@@ -86,7 +86,7 @@ def _check_file_extensions(attr_values, allowed_extensions, attr_name, label, ru
                         at_least_one_good = True
                         break
                 if not at_least_one_good:
-                    fail("'{}' does not produce any {} {} files".format(str(attr_value.label), rule_name, attr_name), attr = attr_name)
+                    fail("'{}' does not produce any {} {} files".format(str(attr_value.label), rule_name, attr_name))
 
 def _check_srcs_extensions(ctx, allowed_extensions, rule_name, allow_versioned_shared_libraries):
     _check_file_extensions(ctx.attr.srcs, allowed_extensions, "srcs", ctx.label, rule_name, allow_versioned_shared_libraries)

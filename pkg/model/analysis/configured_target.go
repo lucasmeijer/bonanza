@@ -793,7 +793,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 							if canonicalPackage != targetPackage {
 								return nil, fmt.Errorf("output attr %#v contains to label %#v, which refers to a different package", namedAttr.Name, canonicalLabel.String())
 							}
-							f, err := outputRegistrar.registerOutput(targetLabel.GetTargetName(), nil, model_starlark_pb.File_FILE)
+							f, err := outputRegistrar.registerOutput(canonicalLabel.GetTargetName(), nil, model_starlark_pb.File_FILE)
 							if err != nil {
 								return nil, fmt.Errorf("output attr %#v: %w", err)
 							}
@@ -1536,11 +1536,19 @@ type targetOutputRegistrar[TReference object.BasicReference, TMetadata model_cor
 	outputsByFile                map[*model_starlark.File[TReference, TMetadata]]*targetOutput[TMetadata]
 }
 
-func (or *targetOutputRegistrar[TReference, TMetadata]) registerOutput(filename label.TargetName, sibling *targetOutput[TMetadata], fileType model_starlark_pb.File_Type) (starlark.Value, error) {
+func (or *targetOutputRegistrar[TReference, TMetadata]) registerOutput(filename label.TargetName, sibling *model_starlark.File[TReference, TMetadata], fileType model_starlark_pb.File_Type) (starlark.Value, error) {
 	// If a sibling is provided, path resolution needs to start in
 	// the directory containing containing the sibling.
 	if sibling != nil {
-		filename = sibling.packageRelativePath.GetSibling(filename)
+		siblingLabelStr := sibling.GetDefinition().Message.Label
+		siblingLabel, err := label.NewCanonicalLabel(siblingLabelStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid label for sibling %#v: %w", siblingLabelStr)
+		}
+		if siblingPackage := siblingLabel.GetCanonicalPackage(); siblingPackage != or.targetPackage {
+			return nil, fmt.Errorf("sibling %#v is not declared in the same package", siblingLabel.String())
+		}
+		filename = siblingLabel.GetTargetName().GetSibling(filename)
 	}
 
 	o := &targetOutput[TMetadata]{
@@ -2170,12 +2178,12 @@ func (rca *ruleContextActions[TReference, TMetadata]) doDeclareDirectory(thread 
 		return nil, fmt.Errorf("%s: got %d positional arguments, want at most 1", b.Name(), len(args))
 	}
 	var filename label.TargetName
-	var sibling *targetOutput[TMetadata]
+	var sibling *model_starlark.File[TReference, TMetadata]
 	rc := rca.ruleContext
 	if err := starlark.UnpackArgs(
 		b.Name(), args, kwargs,
 		"filename", unpack.Bind(thread, &filename, unpack.TargetName),
-		"sibling?", unpack.Bind(thread, &sibling, unpack.IfNotNone(rc.outputRegistrar)),
+		"sibling?", unpack.Bind(thread, &sibling, unpack.IfNotNone(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File"))),
 	); err != nil {
 		return nil, err
 	}
@@ -2188,12 +2196,12 @@ func (rca *ruleContextActions[TReference, TMetadata]) doDeclareFile(thread *star
 		return nil, fmt.Errorf("%s: got %d positional arguments, want at most 1", b.Name(), len(args))
 	}
 	var filename label.TargetName
-	var sibling *targetOutput[TMetadata]
+	var sibling *model_starlark.File[TReference, TMetadata]
 	rc := rca.ruleContext
 	if err := starlark.UnpackArgs(
 		b.Name(), args, kwargs,
 		"filename", unpack.Bind(thread, &filename, unpack.TargetName),
-		"sibling?", unpack.Bind(thread, &sibling, unpack.IfNotNone(rc.outputRegistrar)),
+		"sibling?", unpack.Bind(thread, &sibling, unpack.IfNotNone(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File"))),
 	); err != nil {
 		return nil, err
 	}
@@ -2206,12 +2214,12 @@ func (rca *ruleContextActions[TReference, TMetadata]) doDeclareSymlink(thread *s
 		return nil, fmt.Errorf("%s: got %d positional arguments, want at most 1", b.Name(), len(args))
 	}
 	var filename label.TargetName
-	var sibling *targetOutput[TMetadata]
+	var sibling *model_starlark.File[TReference, TMetadata]
 	rc := rca.ruleContext
 	if err := starlark.UnpackArgs(
 		b.Name(), args, kwargs,
 		"filename", unpack.Bind(thread, &filename, unpack.TargetName),
-		"sibling?", unpack.Bind(thread, &sibling, unpack.IfNotNone(rc.outputRegistrar)),
+		"sibling?", unpack.Bind(thread, &sibling, unpack.IfNotNone(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File"))),
 	); err != nil {
 		return nil, err
 	}
