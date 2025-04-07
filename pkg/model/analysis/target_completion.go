@@ -48,12 +48,18 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetCompletionValue(ctx c
 			return PatchedTargetCompletionValue{}, errors.New("\"files\" field of DefaultInfo provider contains an element that is not a File")
 		}
 
-		if _, err := getStarlarkFileProperties(ctx, e, model_core.Nested(element, elementFile.File)); err != nil {
-			if errors.Is(err, evaluation.ErrMissingDependency) {
-				missingDependencies = true
-				continue
-			}
-			return PatchedTargetCompletionValue{}, err
+		patchedFile := model_core.Patch(e, model_core.Nested(element, elementFile.File))
+		targetOutput := e.GetFileRootValue(
+			model_core.NewPatchedMessage(
+				&model_analysis_pb.FileRoot_Key{
+					File: patchedFile.Message,
+				},
+				model_core.MapReferenceMetadataToWalkers(patchedFile.Patcher),
+			),
+		)
+		if !targetOutput.IsSet() {
+			missingDependencies = true
+			continue
 		}
 	}
 	if missingDependencies {

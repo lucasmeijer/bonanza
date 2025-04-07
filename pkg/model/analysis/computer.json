@@ -513,8 +513,6 @@
       "TargetCompletion": {
          "dependsOn": [
             "ConfiguredTarget",
-            "DirectoryReaders",
-            "FileProperties",
             "FileRoot"
          ],
          "keyContainsReferences": true
