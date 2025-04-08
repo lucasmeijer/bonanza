@@ -202,7 +202,6 @@
       },
       "FileProperties": {
          "dependsOn": [
-            "BuildSpecification",
             "DirectoryReaders",
             "Repo"
          ]
@@ -227,6 +226,7 @@
             "FileProperties",
             "FileReader",
             "FileRoot",
+            "Repo",
             "TargetActionResult"
          ],
          "keyContainsReferences": true

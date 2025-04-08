@@ -10,6 +10,7 @@ import (
 
 	"github.com/buildbarn/bb-storage/pkg/filesystem"
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bonanza/pkg/evaluation"
 	"github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
@@ -109,12 +110,12 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 	if f.Message == nil {
 		return PatchedFileRootValue{}, fmt.Errorf("no file provided")
 	}
+	fileLabel, err := label.NewCanonicalLabel(f.Message.Label)
+	if err != nil {
+		return PatchedFileRootValue{}, fmt.Errorf("invalid label: %w", err)
+	}
 
 	if o := f.Message.Owner; o != nil {
-		fileLabel, err := label.NewCanonicalLabel(f.Message.Label)
-		if err != nil {
-			return PatchedFileRootValue{}, fmt.Errorf("invalid label: %w", err)
-		}
 		targetName, err := label.NewTargetName(o.TargetName)
 		if err != nil {
 			return PatchedFileRootValue{}, fmt.Errorf("invalid target name: %w", err)
@@ -344,7 +345,88 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 		}
 	}
 
-	return PatchedFileRootValue{}, errors.New("TODO: source file")
+	// File refers to a source file. Extract the source file from
+	// the correct repo. If the source file is a symbolic link, keep
+	// on following them until we reach a file. Create a directory
+	// hierarchy that contains the resulting file and all of the
+	// symbolic links that we encountered along the way.
+	directoryCreationParameters, gotDirectoryCreationParameters := e.GetDirectoryCreationParametersObjectValue(&model_analysis_pb.DirectoryCreationParametersObject_Key{})
+	directoryReaders, gotDirectoryReaders := e.GetDirectoryReadersValue(&model_analysis_pb.DirectoryReaders_Key{})
+	if !gotDirectoryCreationParameters || !gotDirectoryReaders {
+		return PatchedFileRootValue{}, evaluation.ErrMissingDependency
+	}
+	resolver := reposFilePropertiesResolver[TReference, TMetadata]{
+		context:          ctx,
+		directoryReaders: directoryReaders,
+		environment:      e,
+	}
+
+	var externalDirectory changeTrackingDirectory[TReference, TMetadata]
+	symlinkRecordingComponentWalker := symlinkRecordingComponentWalker[TReference, TMetadata]{
+		base:  &resolver,
+		stack: util.NewNonEmptyStack(&externalDirectory),
+	}
+
+	if err := path.Resolve(
+		path.UNIXFormat.NewParser(fileLabel.GetExternalRelativePath()),
+		path.NewLoopDetectingScopeWalker(
+			path.NewRelativeScopeWalker(&symlinkRecordingComponentWalker),
+		),
+	); err != nil {
+		return PatchedFileRootValue{}, fmt.Errorf("failed to resolve path: %w", err)
+	}
+
+	resolvedFileProperties, err := resolver.getCurrentFileProperties()
+	if err != nil {
+		return PatchedFileRootValue{}, err
+	}
+	resolvedFile, err := newChangeTrackingFileFromFileProperties[TReference, TMetadata](resolvedFileProperties)
+	if err != nil {
+		return PatchedFileRootValue{}, err
+	}
+
+	// Resolving the file created all intermediate symbolic links.
+	// Copy over the file they point to as well.
+	if err := symlinkRecordingComponentWalker.stack.Peek().setFile(
+		nil,
+		*symlinkRecordingComponentWalker.terminalName,
+		resolvedFile,
+	); err != nil {
+		return PatchedFileRootValue{}, err
+	}
+
+	group, groupCtx := errgroup.WithContext(ctx)
+	var createdRootDirectory model_filesystem.CreatedDirectory[TMetadata]
+	group.Go(func() error {
+		return model_filesystem.CreateDirectoryMerkleTree[TMetadata, TMetadata](
+			groupCtx,
+			semaphore.NewWeighted(1),
+			group,
+			directoryCreationParameters,
+			&capturableChangeTrackingDirectory[TReference, TMetadata]{
+				options: &capturableChangeTrackingDirectoryOptions[TReference, TMetadata]{
+					objectCapturer: e,
+				},
+				directory: &changeTrackingDirectory[TReference, TMetadata]{
+					directories: map[path.Component]*changeTrackingDirectory[TReference, TMetadata]{
+						model_starlark.ComponentExternal: &externalDirectory,
+					},
+				},
+			},
+			model_filesystem.NewSimpleDirectoryMerkleTreeCapturer[TMetadata](e),
+			&createdRootDirectory,
+		)
+	})
+	if err := group.Wait(); err != nil {
+		return PatchedFileRootValue{}, err
+	}
+
+	return model_core.NewPatchedMessage(
+		&model_analysis_pb.FileRoot_Value{
+			RootDirectory: createdRootDirectory.Message.Message,
+		},
+		model_core.MapReferenceMetadataToWalkers(createdRootDirectory.Message.Patcher),
+	), nil
 }
 
 type pathPrependingDirectory[TDirectory, TFile model_core.ReferenceMetadata] struct {
@@ -379,4 +461,91 @@ func (d *pathPrependingDirectory[TDirectory, TFile]) EnterCapturableDirectory(na
 
 func (pathPrependingDirectory[TDirectory, TFile]) OpenForFileMerkleTreeCreation(name path.Component) (model_filesystem.CapturableFile[TFile], error) {
 	panic("path prepending directory never contains regular files")
+}
+
+// symlinkRecordingComponentWalker is a decorator for
+// path.ComponentWalker that monitors the paths that are being
+// traversed, and copies over any symbolic links that are encountered
+// into another directory hierarcy.
+//
+// This implementation is used when FileRoot is called against a source
+// file. Any symbolic links that are encountered should be followed, but
+// also be captured so that they appear in input roots of actions.
+type symlinkRecordingComponentWalker[TReference object.BasicReference, TMetadata model_core.ReferenceMetadata] struct {
+	base         path.ComponentWalker
+	stack        util.NonEmptyStack[*changeTrackingDirectory[TReference, TMetadata]]
+	terminalName *path.Component
+}
+
+func (cw *symlinkRecordingComponentWalker[TReference, TMetadata]) gotSymlink(name path.Component, r path.GotSymlink) (path.GotSymlink, error) {
+	newBase, err := r.Parent.OnRelative()
+	if err != nil {
+		return path.GotSymlink{}, err
+	}
+
+	d := cw.stack.Peek()
+	if err := d.setSymlink(nil, name, r.Target); err != nil {
+		return path.GotSymlink{}, err
+	}
+
+	cw.base = newBase
+	return path.GotSymlink{
+		Parent: path.NewRelativeScopeWalker(cw),
+		Target: r.Target,
+	}, nil
+}
+
+func (cw *symlinkRecordingComponentWalker[TReference, TMetadata]) OnDirectory(name path.Component) (path.GotDirectoryOrSymlink, error) {
+	result, err := cw.base.OnDirectory(name)
+	if err != nil {
+		return nil, err
+	}
+	switch r := result.(type) {
+	case path.GotDirectory:
+		if !r.IsReversible {
+			return nil, errors.New("directory is not reversible, which this implementation assumes")
+		}
+
+		d := cw.stack.Peek()
+		child, err := d.getOrCreateDirectory(name)
+		if err != nil {
+			return nil, err
+		}
+		cw.stack.Push(child)
+		cw.base = r.Child
+
+		return path.GotDirectory{
+			Child:        cw,
+			IsReversible: true,
+		}, nil
+	case path.GotSymlink:
+		return cw.gotSymlink(name, r)
+	default:
+		panic("unexpected result type")
+	}
+}
+
+func (cw *symlinkRecordingComponentWalker[TReference, TMetadata]) OnTerminal(name path.Component) (*path.GotSymlink, error) {
+	result, err := cw.base.OnTerminal(name)
+	if err != nil || result == nil {
+		cw.terminalName = &name
+		return result, err
+	}
+	newResult, err := cw.gotSymlink(name, *result)
+	if err != nil {
+		return nil, err
+	}
+	return &newResult, nil
+}
+
+func (cw *symlinkRecordingComponentWalker[TReference, TMetadata]) OnUp() (path.ComponentWalker, error) {
+	parent, err := cw.base.OnUp()
+	if err != nil {
+		return nil, err
+	}
+	if _, ok := cw.stack.PopSingle(); !ok {
+		return nil, errors.New("traversal escapes root directory")
+	}
+	cw.base = parent
+	return cw, nil
 }

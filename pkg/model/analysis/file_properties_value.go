@@ -10,6 +10,7 @@ import (
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
+	model_filesystem_pb "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
 	"github.com/buildbarn/bonanza/pkg/storage/dag"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 
@@ -73,6 +74,17 @@ func (r *reposFilePropertiesResolver[TReference, TMetadata]) OnUp() (path.Compon
 	return nil, errors.New("path escapes repositories directory")
 }
 
+func (r *reposFilePropertiesResolver[TReference, TMetadata]) getCurrentFileProperties() (model_core.Message[*model_filesystem_pb.FileProperties, TReference], error) {
+	if r.currentRepo == nil {
+		return model_core.Message[*model_filesystem_pb.FileProperties, TReference]{}, errors.New("path resolves to a location outside any repo")
+	}
+	fileProperties := r.currentRepo.GetCurrentFileProperties()
+	if !fileProperties.IsSet() {
+		return model_core.Message[*model_filesystem_pb.FileProperties, TReference]{}, errors.New("path resolves to a directory")
+	}
+	return fileProperties, nil
+}
+
 func (c *baseComputer[TReference, TMetadata]) ComputeFilePropertiesValue(ctx context.Context, key *model_analysis_pb.FileProperties_Key, e FilePropertiesEnvironment[TReference, TMetadata]) (PatchedFilePropertiesValue, error) {
 	directoryReaders, gotDirectoryReaders := e.GetDirectoryReadersValue(&model_analysis_pb.DirectoryReaders_Key{})
 	if !gotDirectoryReaders {
@@ -100,14 +112,10 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFilePropertiesValue(ctx con
 		return PatchedFilePropertiesValue{}, fmt.Errorf("failed to resolve path: %w", err)
 	}
 
-	if resolver.currentRepo == nil {
-		return PatchedFilePropertiesValue{}, errors.New("path resolves to a location outside any repo")
+	fileProperties, err := resolver.getCurrentFileProperties()
+	if err != nil {
+		return PatchedFilePropertiesValue{}, err
 	}
-	fileProperties := resolver.currentRepo.GetCurrentFileProperties()
-	if !fileProperties.IsSet() {
-		return PatchedFilePropertiesValue{}, errors.New("path resolves to a directory")
-	}
-
 	patchedFileProperties := model_core.Patch(e, fileProperties)
 	return model_core.NewPatchedMessage(
 		&model_analysis_pb.FileProperties_Value{
