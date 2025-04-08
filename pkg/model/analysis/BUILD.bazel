@@ -25,6 +25,7 @@ go_library(
         "exec_transition.go",
         "file_access_parameters.go",
         "file_creation_parameters.go",
+        "file_list_root.go",
         "file_properties_value.go",
         "file_reader.go",
         "file_root.go",

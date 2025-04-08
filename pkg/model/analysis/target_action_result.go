@@ -28,7 +28,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 	}
 
 	actionID := key.Message.ActionId
-	output, err := btree.Find(
+	action, err := btree.Find(
 		ctx,
 		c.configuredTargetActionReader,
 		model_core.Nested(configuredTarget, configuredTarget.Message.Actions),
@@ -46,9 +46,18 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 	if err != nil {
 		return PatchedTargetActionResultValue{}, err
 	}
-	if !output.IsSet() {
+	if !action.IsSet() {
 		return PatchedTargetActionResultValue{}, errors.New("target does not yield an action with the provided identifier")
 	}
+	actionLevel, ok := action.Message.Level.(*model_analysis_pb.ConfiguredTarget_Value_Action_Leaf_)
+	if !ok {
+		return PatchedTargetActionResultValue{}, errors.New("action is not a leaf")
+	}
 
-	return PatchedTargetActionResultValue{}, errors.New("TODO: Implement!")
+	_, err = getRootForFiles(e, model_core.Nested(action, actionLevel.Leaf.Inputs))
+	if err != nil {
+		return PatchedTargetActionResultValue{}, err
+	}
+
+	return PatchedTargetActionResultValue{}, errors.New("TODO: Invoke action!")
 }

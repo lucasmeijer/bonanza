@@ -313,6 +313,9 @@ message ConfiguredTarget {
         // The identifier of the action. This identifier can be used by
         // outputs to reference the action that generates them.
         bytes id = 1;
+
+        // Depset of the input files of the action.
+        repeated bonanza.model.starlark.List.Element inputs = 2;
       }
 
       oneof level {
@@ -413,6 +416,20 @@ message FileProperties {
 
 message FileReader {
   message Key {}
+}
+
+message FileListRoot {
+  message Key {
+    // Reference to a Starlark list containing files.
+    bonanza.model.core.Reference list_reference = 1;
+  }
+
+  message Value {
+    // A directory hierarchy that contains all of the files contained in
+    // the list, placed at the location they would appear inside the
+    // input root of an action that depends on them.
+    bonanza.model.filesystem.Directory root_directory = 1;
+  }
 }
 
 message FileRoot {

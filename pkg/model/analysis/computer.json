@@ -193,6 +193,13 @@
             "type": "*model_filesystem.FileCreationParameters"
          }
       },
+      "FileListRoot": {
+         "dependsOn": [
+            "FileListRoot",
+            "FileRoot"
+         ],
+         "keyContainsReferences": true
+      },
       "FileProperties": {
          "dependsOn": [
             "BuildSpecification",
@@ -513,7 +520,9 @@
       },
       "TargetActionResult": {
          "dependsOn": [
-            "ConfiguredTarget"
+            "ConfiguredTarget",
+            "FileListRoot",
+            "FileRoot"
          ],
          "keyContainsReferences": true
       },

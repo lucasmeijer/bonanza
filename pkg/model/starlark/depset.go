@@ -11,6 +11,7 @@ import (
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/model/core/btree"
 	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
+	"github.com/buildbarn/bonanza/pkg/starlark/unpack"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 
 	"go.starlark.net/starlark"
@@ -240,31 +241,42 @@ func (e *depsetChildrenEncoder[TReference, TMetadata]) encode(children any) erro
 	return nil
 }
 
-// Encode a depset value to a Protobuf message. This method is identical
-// to EncodeValue(), except that can be used in cases where the value
-// may only be a depset.
-func (d *Depset[TReference, TMetadata]) Encode(path map[starlark.Value]struct{}, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.Depset, TMetadata], bool, error) {
+// EncodeList encodes a depset value to a Protobuf message in the form
+// of a (non-deduplicated) list. This method is identical to Encode(),
+// except that can be used in cases where only the elements need to be
+// retained, and the "order" field of the depset is of no importance.
+func (d *Depset[TReference, TMetadata]) EncodeList(path map[starlark.Value]struct{}, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[[]*model_starlark_pb.List_Element, TMetadata], bool, error) {
 	e := depsetChildrenEncoder[TReference, TMetadata]{
 		path:        path,
 		options:     options,
 		treeBuilder: newListBuilder(options),
 	}
 	if err := e.encode(d.children); err != nil {
-		return model_core.PatchedMessage[*model_starlark_pb.Depset, TMetadata]{}, false, err
+		return model_core.PatchedMessage[[]*model_starlark_pb.List_Element, TMetadata]{}, false, err
 	}
 
 	elements, err := e.treeBuilder.FinalizeList()
 	if err != nil {
+		return model_core.PatchedMessage[[]*model_starlark_pb.List_Element, TMetadata]{}, false, err
+	}
+	return elements, e.needsCode, nil
+}
+
+// Encode a depset value to a Protobuf message. This method is identical
+// to EncodeValue(), except that can be used in cases where the value
+// may only be a depset.
+func (d *Depset[TReference, TMetadata]) Encode(path map[starlark.Value]struct{}, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.Depset, TMetadata], bool, error) {
+	elements, needsCode, err := d.EncodeList(path, options)
+	if err != nil {
 		return model_core.PatchedMessage[*model_starlark_pb.Depset, TMetadata]{}, false, err
 	}
-
 	return model_core.NewPatchedMessage(
 		&model_starlark_pb.Depset{
 			Elements: elements.Message,
 			Order:    d.order,
 		},
 		elements.Patcher,
-	), e.needsCode, nil
+	), needsCode, nil
 }
 
 // EncodeValue encodes a depset value to a Starlark value Protobuf
@@ -483,4 +495,38 @@ func (vs *valueSet) maybeGrow() {
 		vs.hashes = newHashes
 		vs.values = newValues
 	}
+}
+
+type listToDepsetUnpackerInto[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata] struct {
+	base unpack.UnpackerInto[[]starlark.Value]
+}
+
+func NewListToDepsetUnpackerInto[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](base unpack.Canonicalizer) unpack.UnpackerInto[*Depset[TReference, TMetadata]] {
+	return &listToDepsetUnpackerInto[TReference, TMetadata]{
+		base: unpack.List(unpack.Canonicalize(base)),
+	}
+}
+
+func (ui *listToDepsetUnpackerInto[TReference, TMetadata]) UnpackInto(thread *starlark.Thread, v starlark.Value, dst **Depset[TReference, TMetadata]) error {
+	var list []starlark.Value
+	if err := ui.base.UnpackInto(thread, v, &list); err != nil {
+		return err
+	}
+
+	d, err := NewDepset[TReference, TMetadata](thread, list, nil, model_starlark_pb.Depset_DEFAULT)
+	if err != nil {
+		return err
+	}
+	*dst = d
+	return nil
+}
+
+func (ui *listToDepsetUnpackerInto[TReference, TMetadata]) Canonicalize(thread *starlark.Thread, v starlark.Value) (starlark.Value, error) {
+	var d *Depset[TReference, TMetadata]
+	err := ui.UnpackInto(thread, v, &d)
+	return d, err
+}
+
+func (listToDepsetUnpackerInto[TReference, TMetadata]) GetConcatenationOperator() syntax.Token {
+	return syntax.PLUS
 }

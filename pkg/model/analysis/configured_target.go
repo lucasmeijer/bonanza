@@ -2346,7 +2346,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 	var env map[string]string
 	execGroup := ""
 	var executionRequirements map[string]string
-	var inputs any
+	var inputs *model_starlark.Depset[TReference, TMetadata]
 	mnemonic := ""
 	var progressMessage string
 	var resourceSet *model_starlark.NamedFunction[TReference, TMetadata]
@@ -2371,9 +2371,11 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 		"env?", unpack.Bind(thread, &env, unpack.Dict(unpack.String, unpack.String)),
 		"exec_group?", unpack.Bind(thread, &execGroup, unpack.IfNotNone(unpack.String)),
 		"execution_requirements?", unpack.Bind(thread, &executionRequirements, unpack.Dict(unpack.String, unpack.String)),
-		"inputs?", unpack.Bind(thread, &inputs, unpack.Or([]unpack.UnpackerInto[any]{
-			unpack.Decay(unpack.Type[*model_starlark.Depset[TReference, TMetadata]]("depset")),
-			unpack.Decay(unpack.List(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File"))),
+		"inputs?", unpack.Bind(thread, &inputs, unpack.Or([]unpack.UnpackerInto[*model_starlark.Depset[TReference, TMetadata]]{
+			unpack.Type[*model_starlark.Depset[TReference, TMetadata]]("depset"),
+			model_starlark.NewListToDepsetUnpackerInto[TReference, TMetadata](
+				unpack.Canonicalize(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File")),
+			),
 		})),
 		"mnemonic?", unpack.Bind(thread, &mnemonic, unpack.IfNotNone(unpack.String)),
 		"progress_message?", unpack.Bind(thread, &progressMessage, unpack.IfNotNone(unpack.String)),
@@ -2413,10 +2415,23 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 		}
 	}
 
-	rc.actions = append(rc.actions, model_core.NewSimplePatchedMessage[TMetadata](
+	patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
+	var inputsList []*model_starlark_pb.List_Element
+	if inputs != nil {
+		d, _, err := inputs.EncodeList(map[starlark.Value]struct{}{}, rc.computer.getValueEncodingOptions(rc.environment, nil))
+		if err != nil {
+			return nil, err
+		}
+		inputsList = d.Message
+		patcher.Merge(d.Patcher)
+	}
+
+	rc.actions = append(rc.actions, model_core.NewPatchedMessage(
 		&model_analysis_pb.ConfiguredTarget_Value_Action_Leaf{
-			Id: actionID,
+			Id:     actionID,
+			Inputs: inputsList,
 		},
+		patcher,
 	))
 	return starlark.None, nil
 }
@@ -2431,7 +2446,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunShell(thread *starlar
 	var env map[string]string
 	execGroup := ""
 	var executionRequirements map[string]string
-	var inputs any
+	var inputs *model_starlark.Depset[TReference, TMetadata]
 	mnemonic := ""
 	progressMessage := ""
 	var resourceSet *model_starlark.NamedFunction[TReference, TMetadata]
@@ -2452,9 +2467,11 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunShell(thread *starlar
 		"env?", unpack.Bind(thread, &env, unpack.Dict(unpack.String, unpack.String)),
 		"exec_group?", unpack.Bind(thread, &execGroup, unpack.IfNotNone(unpack.String)),
 		"execution_requirements?", unpack.Bind(thread, &executionRequirements, unpack.Dict(unpack.String, unpack.String)),
-		"inputs?", unpack.Bind(thread, &inputs, unpack.Or([]unpack.UnpackerInto[any]{
-			unpack.Decay(unpack.Type[*model_starlark.Depset[TReference, TMetadata]]("depset")),
-			unpack.Decay(unpack.List(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File"))),
+		"inputs?", unpack.Bind(thread, &inputs, unpack.Or([]unpack.UnpackerInto[*model_starlark.Depset[TReference, TMetadata]]{
+			unpack.Type[*model_starlark.Depset[TReference, TMetadata]]("depset"),
+			model_starlark.NewListToDepsetUnpackerInto[TReference, TMetadata](
+				unpack.Canonicalize(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File")),
+			),
 		})),
 		"mnemonic?", unpack.Bind(thread, &mnemonic, unpack.IfNotNone(unpack.String)),
 		"progress_message?", unpack.Bind(thread, &progressMessage, unpack.IfNotNone(unpack.String)),
