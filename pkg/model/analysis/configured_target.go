@@ -869,8 +869,9 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 			}
 
 			execGroups = append(execGroups, ruleContextExecGroupState{
-				toolchainIdentifiers: toolchainIdentifiers,
-				toolchainInfos:       make([]starlark.Value, len(toolchainIdentifiers)),
+				platformPkixPublicKey: resolvedToolchains.Message.PlatformPkixPublicKey,
+				toolchainIdentifiers:  toolchainIdentifiers,
+				toolchainInfos:        make([]starlark.Value, len(toolchainIdentifiers)),
 			})
 			execGroupPlatformLabels[namedExecGroup.Name] = resolvedToolchains.Message.PlatformLabel
 		}
@@ -2400,6 +2401,16 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 		return nil, errors.New("action has no outputs")
 	}
 	actionID := []byte(outputs[0].packageRelativePath.String())
+
+	execGroups := rc.ruleDefinition.Message.ExecGroups
+	execGroupIndex, ok := sort.Find(
+		len(execGroups),
+		func(i int) int { return strings.Compare(execGroup, execGroups[i].Name) },
+	)
+	if !ok {
+		return nil, fmt.Errorf("rule does not have an exec group with name %#v", execGroup)
+	}
+
 	for _, output := range outputs {
 		if err := output.setDefinition(
 			model_core.NewSimplePatchedMessage[TMetadata](
@@ -2428,8 +2439,9 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 
 	rc.actions = append(rc.actions, model_core.NewPatchedMessage(
 		&model_analysis_pb.ConfiguredTarget_Value_Action_Leaf{
-			Id:     actionID,
-			Inputs: inputsList,
+			Id:                    actionID,
+			Inputs:                inputsList,
+			PlatformPkixPublicKey: rc.execGroups[execGroupIndex].platformPkixPublicKey,
 		},
 		patcher,
 	))
@@ -2857,8 +2869,9 @@ func (tc *toolchainContext[TReference, TMetadata]) Get(thread *starlark.Thread, 
 }
 
 type ruleContextExecGroupState struct {
-	toolchainIdentifiers []string
-	toolchainInfos       []starlark.Value
+	platformPkixPublicKey []byte
+	toolchainIdentifiers  []string
+	toolchainInfos        []starlark.Value
 }
 
 type getProviderFromConfiguredTargetEnvironment[TReference any] interface {

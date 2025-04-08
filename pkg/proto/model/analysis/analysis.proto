@@ -316,6 +316,10 @@ message ConfiguredTarget {
 
         // Depset of the input files of the action.
         repeated bonanza.model.starlark.List.Element inputs = 2;
+
+        // The X25519 public key that identifies the platform that
+        // should be used to execute the action in PKIX, ASN.1 DER form.
+        bytes platform_pkix_public_key = 3;
       }
 
       oneof level {
@@ -1141,6 +1145,11 @@ message ResolvedToolchains {
     // Label of an execution platform that is capable of running actions
     // using executables that are part of the resolved toolchains.
     string platform_label = 2;
+
+    // The X25519 public key that identifies the execution platform that
+    // is capable of running executables that are part of the resolved
+    // toolchains, in PKIX, ASN.1 DER form.
+    bytes platform_pkix_public_key = 3;
   }
 }
 

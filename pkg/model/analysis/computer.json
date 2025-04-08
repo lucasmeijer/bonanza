@@ -520,6 +520,7 @@
       },
       "TargetActionResult": {
          "dependsOn": [
+            "ActionResult",
             "ConfiguredTarget",
             "FileListRoot",
             "FileRoot"

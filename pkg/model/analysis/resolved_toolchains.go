@@ -169,8 +169,9 @@ CheckExecutionPlatform:
 			return PatchedResolvedToolchainsValue{}, evaluation.ErrMissingDependency
 		}
 		return model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](&model_analysis_pb.ResolvedToolchains_Value{
-			ToolchainIdentifiers: toolchainIdentifiers,
-			PlatformLabel:        executionPlatform.Label,
+			ToolchainIdentifiers:  toolchainIdentifiers,
+			PlatformLabel:         executionPlatform.Label,
+			PlatformPkixPublicKey: executionPlatform.ExecPkixPublicKey,
 		}), nil
 	}
 

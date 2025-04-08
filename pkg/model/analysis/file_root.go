@@ -339,6 +339,18 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 				model_core.MapReferenceMetadataToWalkers(createdDirectory.Message.Patcher),
 			), nil
 		case *model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_Symlink:
+			patchedSymlinkTargetFile := model_core.Patch(e, model_core.Nested(output, source.Symlink))
+			symlinkTarget := e.GetFileRootValue(
+				model_core.NewPatchedMessage(
+					&model_analysis_pb.FileRoot_Key{
+						File: patchedSymlinkTargetFile.Message,
+					},
+					model_core.MapReferenceMetadataToWalkers(patchedSymlinkTargetFile.Patcher),
+				),
+			)
+			if !symlinkTarget.IsSet() {
+				return PatchedFileRootValue{}, evaluation.ErrMissingDependency
+			}
 			return PatchedFileRootValue{}, errors.New("TODO: symlink")
 		default:
 			return PatchedFileRootValue{}, errors.New("unknown output source type")

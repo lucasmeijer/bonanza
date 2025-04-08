@@ -25,6 +25,7 @@ type getRootForFilesEnvironment[TReference, TMetadata any] interface {
 func getRootForFiles[TReference object.BasicReference, TMetadata model_core.WalkableReferenceMetadata](e getRootForFilesEnvironment[TReference, TMetadata], fileList model_core.Message[[]*model_starlark_pb.List_Element, TReference]) (model_core.PatchedMessage[*model_filesystem_pb.Directory, TMetadata], error) {
 	missingDependencies := false
 	for i, element := range fileList.Message {
+		var root model_core.Message[*model_filesystem_pb.Directory, TReference]
 		switch level := element.Level.(type) {
 		case *model_starlark_pb.List_Element_Parent_:
 			patchedReference := model_core.Patch(e, model_core.Nested(fileList, level.Parent.Reference))
@@ -40,6 +41,7 @@ func getRootForFiles[TReference object.BasicReference, TMetadata model_core.Walk
 				missingDependencies = true
 				continue
 			}
+			root = model_core.Nested(v, v.Message.RootDirectory)
 		case *model_starlark_pb.List_Element_Leaf:
 			file, ok := level.Leaf.Kind.(*model_starlark_pb.Value_File)
 			if !ok {
@@ -58,8 +60,16 @@ func getRootForFiles[TReference object.BasicReference, TMetadata model_core.Walk
 				missingDependencies = true
 				continue
 			}
+			root = model_core.Nested(v, v.Message.RootDirectory)
 		default:
 			return model_core.PatchedMessage[*model_filesystem_pb.Directory, TMetadata]{}, errors.New("invalid list level type")
+		}
+
+		// Optimize the case when this function is called
+		// against a single element list. Return the resulting
+		// root without any merging.
+		if len(fileList.Message) == 1 {
+			return model_core.Patch(e, root), nil
 		}
 	}
 	if missingDependencies {
