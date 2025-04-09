@@ -521,7 +521,11 @@
       "TargetActionResult": {
          "dependsOn": [
             "ActionResult",
+            "CommandEncoderObject",
             "ConfiguredTarget",
+            "DirectoryCreationParameters",
+            "DirectoryCreationParametersObject",
+            "FileCreationParameters",
             "FileListRoot",
             "FileRoot"
          ],

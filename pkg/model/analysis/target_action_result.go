@@ -5,17 +5,19 @@ import (
 	"context"
 	"errors"
 
+	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
 	"github.com/buildbarn/bonanza/pkg/evaluation"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/model/core/btree"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
+	model_command_pb "github.com/buildbarn/bonanza/pkg/proto/model/command"
 	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
-	"github.com/buildbarn/bonanza/pkg/storage/dag"
 
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx context.Context, key model_core.Message[*model_analysis_pb.TargetActionResult_Key, TReference], e TargetActionResultEnvironment[TReference, TMetadata]) (PatchedTargetActionResultValue, error) {
+	commandEncoder, gotCommandEncoder := e.GetCommandEncoderObjectValue(&model_analysis_pb.CommandEncoderObject_Key{})
 	patchedConfigurationReference := model_core.Patch(e, model_core.Nested(key, key.Message.ConfigurationReference))
 	configuredTarget := e.GetConfiguredTargetValue(
 		model_core.NewPatchedMessage(
@@ -26,10 +28,21 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 			model_core.MapReferenceMetadataToWalkers(patchedConfigurationReference.Patcher),
 		),
 	)
-	if !configuredTarget.IsSet() {
+	directoryCreationParameters, gotDirectoryCreationParameters := e.GetDirectoryCreationParametersObjectValue(&model_analysis_pb.DirectoryCreationParametersObject_Key{})
+	directoryCreationParametersMessage := e.GetDirectoryCreationParametersValue(&model_analysis_pb.DirectoryCreationParameters_Key{})
+	fileCreationParametersMessage := e.GetFileCreationParametersValue(&model_analysis_pb.FileCreationParameters_Key{})
+	if !gotCommandEncoder ||
+		!configuredTarget.IsSet() ||
+		!gotDirectoryCreationParameters ||
+		!directoryCreationParametersMessage.IsSet() ||
+		!fileCreationParametersMessage.IsSet() {
 		return PatchedTargetActionResultValue{}, evaluation.ErrMissingDependency
 	}
 
+	// Look up the action within the configured target.
+	// TODO: Should this be moved into a separate function, so that
+	// changes to a single action does not require others to be
+	// recomputed?
 	actionID := key.Message.ActionId
 	action, err := btree.Find(
 		ctx,
@@ -58,17 +71,45 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 	}
 	actionLeaf := actionLevel.Leaf
 
-	_, err = getRootForFiles(e, model_core.Nested(action, actionLeaf.Inputs))
+	// Construct the command of the action.
+	referenceFormat := c.getReferenceFormat()
+	createdCommand, err := model_core.MarshalAndEncodePatchedMessage(
+		model_core.NewSimplePatchedMessage[TMetadata](
+			&model_command_pb.Command{
+				// Arguments: arguments,
+				// EnvironmentVariables: enironmentVariables,
+				DirectoryCreationParameters: directoryCreationParametersMessage.Message.DirectoryCreationParameters,
+				FileCreationParameters:      fileCreationParametersMessage.Message.FileCreationParameters,
+				// OutputPathPattern: outputPathPattern,
+				WorkingDirectory: (*path.Trace)(nil).GetUNIXString(),
+			},
+		),
+		referenceFormat,
+		commandEncoder,
+	)
+
+	// Construct the input root of the action.
+	rootDirectory, err := getRootForFiles(e, model_core.Nested(action, actionLeaf.Inputs))
+	if err != nil {
+		return PatchedTargetActionResultValue{}, err
+	}
+	createdRootDirectory, err := model_core.MarshalAndEncodePatchedMessage(
+		rootDirectory,
+		referenceFormat,
+		directoryCreationParameters.GetEncoder(),
+	)
 	if err != nil {
 		return PatchedTargetActionResultValue{}, err
 	}
 
-	patcher := model_core.NewReferenceMessagePatcher[dag.ObjectContentsWalker]()
+	patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
 	actionResult := e.GetActionResultValue(
 		model_core.NewPatchedMessage(
 			&model_analysis_pb.ActionResult_Key{
-				// TODO: Provide command and input root!
-				// CommandReference:      xyz,
+				CommandReference: patcher.AddReference(
+					createdCommand.Contents.GetReference(),
+					e.CaptureCreatedObject(createdCommand),
+				),
 				// TODO: Should we make the execution
 				// timeout on build actions configurable?
 				// Bazel with REv2 does not set this field
@@ -76,10 +117,13 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 				// to pick a default.
 				ExecutionTimeout:   &durationpb.Duration{Seconds: 3600},
 				ExitCodeMustBeZero: true,
-				// InputRootReference:    xyz,
+				InputRootReference: patcher.AddReference(
+					createdRootDirectory.Contents.GetReference(),
+					e.CaptureCreatedObject(createdRootDirectory),
+				),
 				PlatformPkixPublicKey: actionLeaf.PlatformPkixPublicKey,
 			},
-			patcher,
+			model_core.MapReferenceMetadataToWalkers(patcher),
 		),
 	)
 	if !actionResult.IsSet() {
