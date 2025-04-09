@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"maps"
 	"math"
 	"math/big"
@@ -289,42 +290,17 @@ func EncodeValue[TReference any, TMetadata model_core.CloneableReferenceMetadata
 		path[value] = struct{}{}
 		defer delete(path, value)
 
-		listBuilder := NewListBuilder[TReference, TMetadata](options)
-		needsCode := false
-		for value := range starlark.Elements(typedValue) {
-			encodedValue, valueNeedsCode, err := EncodeValue[TReference, TMetadata](value, path, nil, options)
-			if err != nil {
-				return model_core.PatchedMessage[*model_starlark_pb.Value, TMetadata]{}, false, err
-			}
-			needsCode = needsCode || valueNeedsCode
-			if err := listBuilder.PushChild(model_core.NewPatchedMessage(
-				&model_starlark_pb.List_Element{
-					Level: &model_starlark_pb.List_Element_Leaf{
-						Leaf: encodedValue.Message,
-					},
-				},
-				encodedValue.Patcher,
-			)); err != nil {
-				return model_core.PatchedMessage[*model_starlark_pb.Value, TMetadata]{}, false, err
-			}
-		}
-
-		elements, err := listBuilder.FinalizeList()
+		list, needsCode, err := EncodeList(typedValue.Elements(), path, options)
 		if err != nil {
 			return model_core.PatchedMessage[*model_starlark_pb.Value, TMetadata]{}, false, err
 		}
-
-		// TODO: This should use inlinedtree to ensure the
-		// resulting Value object is not too large.
 		return model_core.NewPatchedMessage(
 			&model_starlark_pb.Value{
 				Kind: &model_starlark_pb.Value_List{
-					List: &model_starlark_pb.List{
-						Elements: elements.Message,
-					},
+					List: list.Message,
 				},
 			},
-			elements.Patcher,
+			list.Patcher,
 		), needsCode, nil
 	case starlark.String:
 		return model_core.NewSimplePatchedMessage[TMetadata](&model_starlark_pb.Value{
@@ -362,6 +338,41 @@ func EncodeValue[TReference any, TMetadata model_core.CloneableReferenceMetadata
 	default:
 		return model_core.PatchedMessage[*model_starlark_pb.Value, TMetadata]{}, false, fmt.Errorf("value of type %s cannot be encoded", value.Type())
 	}
+}
+
+// EncodeList encodes a sequence of Starlark values to a B-tree of
+// Protobuf messages.
+func EncodeList[TReference any, TMetadata model_core.CloneableReferenceMetadata](values iter.Seq[starlark.Value], path map[starlark.Value]struct{}, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.List, TMetadata], bool, error) {
+	listBuilder := NewListBuilder[TReference, TMetadata](options)
+	needsCode := false
+	for value := range values {
+		encodedValue, valueNeedsCode, err := EncodeValue[TReference, TMetadata](value, path, nil, options)
+		if err != nil {
+			return model_core.PatchedMessage[*model_starlark_pb.List, TMetadata]{}, false, err
+		}
+		needsCode = needsCode || valueNeedsCode
+		if err := listBuilder.PushChild(model_core.NewPatchedMessage(
+			&model_starlark_pb.List_Element{
+				Level: &model_starlark_pb.List_Element_Leaf{
+					Leaf: encodedValue.Message,
+				},
+			},
+			encodedValue.Patcher,
+		)); err != nil {
+			return model_core.PatchedMessage[*model_starlark_pb.List, TMetadata]{}, false, err
+		}
+	}
+	elements, err := listBuilder.FinalizeList()
+	if err != nil {
+		return model_core.PatchedMessage[*model_starlark_pb.List, TMetadata]{}, false, err
+	}
+
+	return model_core.NewPatchedMessage(
+		&model_starlark_pb.List{
+			Elements: elements.Message,
+		},
+		elements.Patcher,
+	), needsCode, nil
 }
 
 func DecodeGlobals[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](encodedGlobals model_core.Message[*model_starlark_pb.Struct_Fields, TReference], currentFilename pg_label.CanonicalLabel, options *ValueDecodingOptions[TReference]) (starlark.StringDict, error) {

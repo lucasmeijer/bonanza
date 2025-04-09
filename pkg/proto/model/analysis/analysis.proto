@@ -224,50 +224,51 @@ message Args {
       }
 
       message Leaf {
-        // If set, do not emit the start_with and
-        // separate.terminate_with arguments if no values are provided.
-        bool omit_if_empty = 1;
+        message StartTerminateWith {
+          // Fixed string argument to add.
+          string value = 1;
+
+          // If set, do not emit the argument if no values are provided.
+          bool omit_if_empty = 2;
+        }
 
         // If set, emit a string argument before the values.
-        google.protobuf.StringValue start_with = 2;
+        StartTerminateWith start_with = 1;
 
         oneof values {
           // Values are sourced from a list. Elements should not be
           // deduplicated prior to being processed.
-          bonanza.model.starlark.List list = 3;
+          bonanza.model.starlark.List list = 2;
 
           // Values are sourced from a depset. Only the first occurrence
           // of each value is processed.
-          bonanza.model.starlark.Depset depset = 4;
+          bonanza.model.starlark.Depset depset = 3;
         }
 
         // If set, values of type File that reference a directory are
         // expanded to all files recursively contained in that
         // directory.
-        bool expand_directories = 5;
+        bool expand_directories = 4;
 
         // An optional function that converts each item to zero or more
         // strings, which may be further processed before appending. If
         // not set, standard conversion is performed.
-        bonanza.model.starlark.Function map_each = 6;
+        bonanza.model.starlark.Function map_each = 5;
 
         // Format string pattern, applied to each string returned by the
         // map_each function. The format string must have exactly one
         // "%s" placeholder.
-        string format_each = 7;
+        string format_each = 6;
 
         // If set, duplicate arguments that appear after formatting are
         // removed. The first occurrence is the one that remains.
-        bool uniquify = 8;
+        bool uniquify = 7;
 
         message Separate {
           // If set, insert a string argument before each existing
           // argument, effectively doubling the number of arguments to
           // be appended at that point.
           google.protobuf.StringValue before_each = 1;
-
-          // If set, emit a string argument after the values.
-          google.protobuf.StringValue terminate_with = 2;
         }
 
         message Joined {
@@ -283,11 +284,14 @@ message Args {
 
         oneof style {
           // If set, the arguments were declared using Args.add_all().
-          Separate separate = 9;
+          Separate separate = 8;
 
           // If set, the arguments were declared using Args.add_joined().
-          Joined joined = 10;
+          Joined joined = 9;
         }
+
+        // If set, emit a string argument after the values.
+        StartTerminateWith terminate_with = 10;
       }
 
       oneof level {

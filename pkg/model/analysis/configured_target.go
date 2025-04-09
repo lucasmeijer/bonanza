@@ -28,6 +28,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"go.starlark.net/starlark"
 	"go.starlark.net/syntax"
@@ -3081,12 +3082,30 @@ func getProviderFromVisibleConfiguredTarget[TReference any, TConfigurationRefere
 	return p, visibleTarget.Message.Label, err
 }
 
+// argsAdd records all arguments provided to Args.add(), Args.add_all()
+// and Args.add_joined().
+type argsAdd[TReference any, TMetadata model_core.CloneableReferenceMetadata] struct {
+	startWith         *model_analysis_pb.Args_Leaf_Add_Leaf_StartTerminateWith
+	values            any
+	expandDirectories bool
+	mapEach           *model_starlark.NamedFunction[TReference, TMetadata]
+	formatEach        string
+	uniquify          bool
+	setStyle          func(leaf *model_analysis_pb.Args_Leaf_Add_Leaf)
+	terminateWith     *model_analysis_pb.Args_Leaf_Add_Leaf_StartTerminateWith
+}
+
+// argsUseParamFile records all arguments provided to
+// Args.use_param_file().
 type argsUseParamFile struct {
 	paramFileArg string
 	useAlways    bool
 }
 
+// args records the state of an Args object created through
+// ctx.actions.args().
 type args[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata] struct {
+	adds            []argsAdd[TReference, TMetadata]
 	paramFileFormat model_analysis_pb.Args_Leaf_UseParamFile_Format
 	useParamFile    *argsUseParamFile
 }
@@ -3149,21 +3168,298 @@ func (a *args[TReference, TMetadata]) Encode(path map[starlark.Value]struct{}, o
 			UseAlways:    u.useAlways,
 		}
 	}
-	return model_core.NewSimplePatchedMessage[TMetadata](&model_analysis_pb.Args_Leaf{
-		// TODO: Fill in "adds"!
-		UseParamFile: useParamFile,
-	}), nil
+
+	addsListBuilder := btree.NewSplitProllyBuilder(
+		options.ObjectMinimumSizeBytes,
+		options.ObjectMaximumSizeBytes,
+		btree.NewObjectCreatingNodeMerger(
+			options.ObjectEncoder,
+			options.ObjectReferenceFormat,
+			func(createdObject model_core.CreatedObject[TMetadata], childNodes []*model_analysis_pb.Args_Leaf_Add) (model_core.PatchedMessage[*model_analysis_pb.Args_Leaf_Add, TMetadata], error) {
+				patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
+				return model_core.NewPatchedMessage(
+					&model_analysis_pb.Args_Leaf_Add{
+						Level: &model_analysis_pb.Args_Leaf_Add_Parent_{
+							Parent: &model_analysis_pb.Args_Leaf_Add_Parent{
+								Reference: patcher.AddReference(
+									createdObject.Contents.GetReference(),
+									options.ObjectCapturer.CaptureCreatedObject(createdObject),
+								),
+							},
+						},
+					},
+					patcher,
+				), nil
+			},
+		),
+	)
+	for _, add := range a.adds {
+		patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
+		leaf := &model_analysis_pb.Args_Leaf_Add_Leaf{
+			StartWith:         add.startWith,
+			ExpandDirectories: add.expandDirectories,
+			FormatEach:        add.formatEach,
+			Uniquify:          add.uniquify,
+			TerminateWith:     add.terminateWith,
+		}
+		switch typedValues := add.values.(type) {
+		case []starlark.Value:
+			list, _, err := model_starlark.EncodeList(slices.Values(typedValues), map[starlark.Value]struct{}{}, options)
+			if err != nil {
+				return model_core.PatchedMessage[*model_analysis_pb.Args_Leaf, TMetadata]{}, err
+			}
+			leaf.Values = &model_analysis_pb.Args_Leaf_Add_Leaf_List{
+				List: list.Message,
+			}
+			patcher.Merge(list.Patcher)
+		case *model_starlark.Depset[TReference, TMetadata]:
+			depset, _, err := typedValues.Encode(path, options)
+			if err != nil {
+				return model_core.PatchedMessage[*model_analysis_pb.Args_Leaf, TMetadata]{}, err
+			}
+			leaf.Values = &model_analysis_pb.Args_Leaf_Add_Leaf_Depset{
+				Depset: depset.Message,
+			}
+			patcher.Merge(depset.Patcher)
+		default:
+			panic("unknown sequence type")
+		}
+		if add.mapEach != nil {
+			mapEach, _, err := add.mapEach.Encode(path, options)
+			if err != nil {
+				return model_core.PatchedMessage[*model_analysis_pb.Args_Leaf, TMetadata]{}, err
+			}
+			leaf.MapEach = mapEach.Message
+			patcher.Merge(mapEach.Patcher)
+		}
+		add.setStyle(leaf)
+		if err := addsListBuilder.PushChild(
+			model_core.NewPatchedMessage(
+				&model_analysis_pb.Args_Leaf_Add{
+					Level: &model_analysis_pb.Args_Leaf_Add_Leaf_{
+						Leaf: leaf,
+					},
+				},
+				patcher,
+			),
+		); err != nil {
+			return model_core.PatchedMessage[*model_analysis_pb.Args_Leaf, TMetadata]{}, err
+		}
+	}
+	addsList, err := addsListBuilder.FinalizeList()
+	if err != nil {
+		return model_core.PatchedMessage[*model_analysis_pb.Args_Leaf, TMetadata]{}, err
+	}
+
+	return model_core.NewPatchedMessage(
+		&model_analysis_pb.Args_Leaf{
+			Adds:         addsList.Message,
+			UseParamFile: useParamFile,
+		},
+		addsList.Patcher,
+	), nil
 }
 
 func (a *args[TReference, TMetadata]) doAdd(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var startWith *model_analysis_pb.Args_Leaf_Add_Leaf_StartTerminateWith
+	var value starlark.Value
+	valueUnpackerInto := unpack.Or([]unpack.UnpackerInto[starlark.Value]{
+		unpack.Canonicalize(unpack.String),
+		unpack.Canonicalize(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File")),
+	})
+	switch len(args) {
+	case 1:
+		if err := starlark.UnpackArgs(
+			b.Name(), args, nil,
+			"value", unpack.Bind(thread, &value, valueUnpackerInto),
+		); err != nil {
+			return nil, err
+		}
+	case 2:
+		var argName string
+		if err := starlark.UnpackArgs(
+			b.Name(), args, nil,
+			"arg_name", unpack.Bind(thread, &argName, unpack.String),
+			"value", unpack.Bind(thread, &value, valueUnpackerInto),
+		); err != nil {
+			return nil, err
+		}
+		startWith = &model_analysis_pb.Args_Leaf_Add_Leaf_StartTerminateWith{
+			Value: argName,
+		}
+	default:
+		return nil, fmt.Errorf("%s: got %d positional arguments, want 1 or 2", b.Name(), len(args))
+	}
+
+	format := "%s"
+	if err := starlark.UnpackArgs(
+		b.Name(), nil, kwargs,
+		"format?", unpack.Bind(thread, &format, unpack.String),
+	); err != nil {
+		return nil, err
+	}
+
+	a.adds = append(a.adds, argsAdd[TReference, TMetadata]{
+		startWith:  startWith,
+		values:     []starlark.Value{value},
+		formatEach: format,
+		setStyle: func(leaf *model_analysis_pb.Args_Leaf_Add_Leaf) {
+			leaf.Style = &model_analysis_pb.Args_Leaf_Add_Leaf_Separate_{
+				Separate: &model_analysis_pb.Args_Leaf_Add_Leaf_Separate{},
+			}
+		},
+	})
 	return a, nil
 }
 
+func (a *args[TReference, TMetadata]) doAddAllJoinedParseArgs(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple) (startWith *string, values any, err error) {
+	valuesUnpackerInto := unpack.Or([]unpack.UnpackerInto[any]{
+		unpack.Decay(unpack.List(unpack.Any)),
+		unpack.Decay(unpack.Type[*model_starlark.Depset[TReference, TMetadata]]("depset")),
+	})
+	switch len(args) {
+	case 1:
+		if err := starlark.UnpackArgs(
+			b.Name(), args, nil,
+			"values", unpack.Bind(thread, &values, valuesUnpackerInto),
+		); err != nil {
+			return nil, nil, err
+		}
+	case 2:
+		if err := starlark.UnpackArgs(
+			b.Name(), args, nil,
+			"arg_name", unpack.Bind(thread, &startWith, unpack.Pointer(unpack.String)),
+			"values", unpack.Bind(thread, &values, valuesUnpackerInto),
+		); err != nil {
+			return nil, nil, err
+		}
+	default:
+		return nil, nil, fmt.Errorf("%s: got %d positional arguments, want 1 or 2", b.Name(), len(args))
+	}
+	return startWith, values, nil
+}
+
 func (a *args[TReference, TMetadata]) doAddAll(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	startWith, values, err := a.doAddAllJoinedParseArgs(thread, b, args)
+	if err != nil {
+		return nil, err
+	}
+
+	var mapEach *model_starlark.NamedFunction[TReference, TMetadata]
+	formatEach := "%s"
+	var beforeEachStr *string
+	omitIfEmpty := true
+	uniquify := true
+	expandDirectories := true
+	var terminateWith *string
+	allowClosure := false
+	if err := starlark.UnpackArgs(
+		b.Name(), nil, kwargs,
+		"map_each?", unpack.Bind(thread, &mapEach, unpack.Pointer(model_starlark.NewNamedFunctionUnpackerInto[TReference, TMetadata]())),
+		"format_each?", unpack.Bind(thread, &formatEach, unpack.IfNotNone(unpack.String)),
+		"before_each?", unpack.Bind(thread, &beforeEachStr, unpack.IfNotNone(unpack.Pointer(unpack.String))),
+		"omit_if_empty?", unpack.Bind(thread, &omitIfEmpty, unpack.Bool),
+		"uniquify?", unpack.Bind(thread, &uniquify, unpack.Bool),
+		"expand_directories?", unpack.Bind(thread, &expandDirectories, unpack.Bool),
+		"terminate_with?", unpack.Bind(thread, &terminateWith, unpack.IfNotNone(unpack.Pointer(unpack.String))),
+		"allow_closure?", unpack.Bind(thread, &allowClosure, unpack.Bool),
+	); err != nil {
+		return nil, err
+	}
+
+	var beforeEach *wrapperspb.StringValue
+	if beforeEachStr != nil {
+		beforeEach = &wrapperspb.StringValue{
+			Value: *beforeEachStr,
+		}
+	}
+	add := argsAdd[TReference, TMetadata]{
+		values:            values,
+		expandDirectories: expandDirectories,
+		mapEach:           mapEach,
+		formatEach:        formatEach,
+		uniquify:          uniquify,
+		setStyle: func(leaf *model_analysis_pb.Args_Leaf_Add_Leaf) {
+			leaf.Style = &model_analysis_pb.Args_Leaf_Add_Leaf_Separate_{
+				Separate: &model_analysis_pb.Args_Leaf_Add_Leaf_Separate{
+					BeforeEach: beforeEach,
+				},
+			}
+		},
+	}
+	if startWith != nil {
+		add.startWith = &model_analysis_pb.Args_Leaf_Add_Leaf_StartTerminateWith{
+			Value:       *startWith,
+			OmitIfEmpty: omitIfEmpty,
+		}
+	}
+	if terminateWith != nil {
+		add.terminateWith = &model_analysis_pb.Args_Leaf_Add_Leaf_StartTerminateWith{
+			Value:       *terminateWith,
+			OmitIfEmpty: omitIfEmpty,
+		}
+	}
+	a.adds = append(a.adds, add)
 	return a, nil
 }
 
 func (a *args[TReference, TMetadata]) doAddJoined(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	startWith, values, err := a.doAddAllJoinedParseArgs(thread, b, args)
+	if err != nil {
+		return nil, err
+	}
+
+	var joinWith string
+	var mapEach *model_starlark.NamedFunction[TReference, TMetadata]
+	formatEach := "%s"
+	formatJoined := "%"
+	omitIfEmpty := true
+	uniquify := true
+	expandDirectories := true
+	var terminateWith *string
+	allowClosure := false
+	if err := starlark.UnpackArgs(
+		b.Name(), nil, kwargs,
+		"join_with?", unpack.Bind(thread, &joinWith, unpack.String),
+		"map_each?", unpack.Bind(thread, &mapEach, unpack.Pointer(model_starlark.NewNamedFunctionUnpackerInto[TReference, TMetadata]())),
+		"format_each?", unpack.Bind(thread, &formatEach, unpack.IfNotNone(unpack.String)),
+		"format_joined?", unpack.Bind(thread, &formatJoined, unpack.IfNotNone(unpack.String)),
+		"omit_if_empty?", unpack.Bind(thread, &omitIfEmpty, unpack.Bool),
+		"uniquify?", unpack.Bind(thread, &uniquify, unpack.Bool),
+		"expand_directories?", unpack.Bind(thread, &expandDirectories, unpack.Bool),
+		"allow_closure?", unpack.Bind(thread, &allowClosure, unpack.Bool),
+	); err != nil {
+		return nil, err
+	}
+
+	add := argsAdd[TReference, TMetadata]{
+		values:            values,
+		expandDirectories: expandDirectories,
+		mapEach:           mapEach,
+		formatEach:        formatEach,
+		uniquify:          uniquify,
+		setStyle: func(leaf *model_analysis_pb.Args_Leaf_Add_Leaf) {
+			leaf.Style = &model_analysis_pb.Args_Leaf_Add_Leaf_Joined_{
+				Joined: &model_analysis_pb.Args_Leaf_Add_Leaf_Joined{
+					JoinWith:     joinWith,
+					FormatJoined: formatJoined,
+				},
+			}
+		},
+	}
+	if startWith != nil {
+		add.startWith = &model_analysis_pb.Args_Leaf_Add_Leaf_StartTerminateWith{
+			Value:       *startWith,
+			OmitIfEmpty: omitIfEmpty,
+		}
+	}
+	if terminateWith != nil {
+		add.terminateWith = &model_analysis_pb.Args_Leaf_Add_Leaf_StartTerminateWith{
+			Value:       *terminateWith,
+			OmitIfEmpty: omitIfEmpty,
+		}
+	}
+	a.adds = append(a.adds, add)
 	return a, nil
 }
 
