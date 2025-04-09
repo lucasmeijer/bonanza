@@ -2229,7 +2229,9 @@ func (rca *ruleContextActions[TReference, TMetadata]) AttrNames() []string {
 }
 
 func (rca *ruleContextActions[TReference, TMetadata]) doArgs(thread *starlark.Thread, b *starlark.Builtin, arguments starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	return &args{}, nil
+	return &args[TReference, TMetadata]{
+		paramFileFormat: model_analysis_pb.Args_Leaf_UseParamFile_SHELL,
+	}, nil
 }
 
 func (rca *ruleContextActions[TReference, TMetadata]) doDeclareDirectory(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -2337,6 +2339,43 @@ func (rca *ruleContextActions[TReference, TMetadata]) doExpandTemplate(thread *s
 	)
 }
 
+// promoteStringArgumentsToArgs promotes a non-empty list of strings to
+// an Args object that when evaluated expands to the same values.
+func promoteStringArgumentsToArgs[TMetadata model_core.ReferenceMetadata](
+	stringArgumentsListBuilder btree.Builder[*model_starlark_pb.List_Element, TMetadata],
+	argsList btree.Builder[*model_analysis_pb.Args, TMetadata],
+) error {
+	stringArgumentsList, err := stringArgumentsListBuilder.FinalizeList()
+	if err != nil {
+		return err
+	}
+	return argsList.PushChild(
+		model_core.NewPatchedMessage(
+			&model_analysis_pb.Args{
+				Level: &model_analysis_pb.Args_Leaf_{
+					Leaf: &model_analysis_pb.Args_Leaf{
+						Adds: []*model_analysis_pb.Args_Leaf_Add{{
+							Level: &model_analysis_pb.Args_Leaf_Add_Leaf_{
+								Leaf: &model_analysis_pb.Args_Leaf_Add_Leaf{
+									Values: &model_analysis_pb.Args_Leaf_Add_Leaf_List{
+										List: &model_starlark_pb.List{
+											Elements: stringArgumentsList.Message,
+										},
+									},
+									Style: &model_analysis_pb.Args_Leaf_Add_Leaf_Separate_{
+										Separate: &model_analysis_pb.Args_Leaf_Add_Leaf_Separate{},
+									},
+								},
+							},
+						}},
+					},
+				},
+			},
+			stringArgumentsList.Patcher,
+		),
+	)
+}
+
 func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thread, b *starlark.Builtin, fnArgs starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	if len(fnArgs) != 0 {
 		return nil, fmt.Errorf("%s: got %d positional arguments, want 0", b.Name(), len(fnArgs))
@@ -2366,7 +2405,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 		"outputs", unpack.Bind(thread, &outputs, unpack.List(rc.outputRegistrar)),
 		// Optional arguments.
 		"arguments?", unpack.Bind(thread, &arguments, unpack.List(unpack.Or([]unpack.UnpackerInto[any]{
-			unpack.Decay(unpack.Type[*args]("Args")),
+			unpack.Decay(unpack.Type[*args[TReference, TMetadata]]("Args")),
 			unpack.Decay(unpack.String),
 		}))),
 		"env?", unpack.Bind(thread, &env, unpack.Dict(unpack.String, unpack.String)),
@@ -2402,6 +2441,99 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 	}
 	actionID := []byte(outputs[0].packageRelativePath.String())
 
+	// Encode all arguments. Arguments may be a mixture of strings
+	// and Args objects.
+	//
+	// Promote any runs of string arguments to equivalent Args
+	// objects taking a list. That way, computation of target
+	// actions only needs to process Args objects.
+	valueEncodingOptions := rc.computer.getValueEncodingOptions(rc.environment, nil)
+	argsListBuilder := btree.NewSplitProllyBuilder(
+		valueEncodingOptions.ObjectMinimumSizeBytes,
+		valueEncodingOptions.ObjectMaximumSizeBytes,
+		btree.NewObjectCreatingNodeMerger(
+			valueEncodingOptions.ObjectEncoder,
+			valueEncodingOptions.ObjectReferenceFormat,
+			func(createdObject model_core.CreatedObject[TMetadata], childNodes []*model_analysis_pb.Args) (model_core.PatchedMessage[*model_analysis_pb.Args, TMetadata], error) {
+				patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
+				return model_core.NewPatchedMessage(
+					&model_analysis_pb.Args{
+						Level: &model_analysis_pb.Args_Parent_{
+							Parent: &model_analysis_pb.Args_Parent{
+								Reference: patcher.AddReference(
+									createdObject.Contents.GetReference(),
+									valueEncodingOptions.ObjectCapturer.CaptureCreatedObject(createdObject),
+								),
+							},
+						},
+					},
+					patcher,
+				), nil
+			},
+		),
+	)
+	var stringArgumentsListBuilder btree.Builder[*model_starlark_pb.List_Element, TMetadata]
+	gotStringArguments := false
+	for _, argument := range arguments {
+		switch typedArgument := argument.(type) {
+		case *args[TReference, TMetadata]:
+			if gotStringArguments {
+				if err := promoteStringArgumentsToArgs(stringArgumentsListBuilder, argsListBuilder); err != nil {
+					return nil, err
+				}
+				gotStringArguments = false
+			}
+			encodedArgs, err := typedArgument.Encode(map[starlark.Value]struct{}{}, valueEncodingOptions)
+			if err != nil {
+				return nil, err
+			}
+			if err := argsListBuilder.PushChild(
+				model_core.NewPatchedMessage(
+					&model_analysis_pb.Args{
+						Level: &model_analysis_pb.Args_Leaf_{
+							Leaf: encodedArgs.Message,
+						},
+					},
+					encodedArgs.Patcher,
+				),
+			); err != nil {
+				return nil, err
+			}
+		case string:
+			if !gotStringArguments {
+				stringArgumentsListBuilder = model_starlark.NewListBuilder(valueEncodingOptions)
+				gotStringArguments = true
+			}
+			if err := stringArgumentsListBuilder.PushChild(
+				model_core.NewSimplePatchedMessage[TMetadata](
+					&model_starlark_pb.List_Element{
+						Level: &model_starlark_pb.List_Element_Leaf{
+							Leaf: &model_starlark_pb.Value{
+								Kind: &model_starlark_pb.Value_Str{
+									Str: typedArgument,
+								},
+							},
+						},
+					},
+				),
+			); err != nil {
+				return nil, err
+			}
+		default:
+			panic("unexpected argument type")
+		}
+	}
+	if gotStringArguments {
+		if err := promoteStringArgumentsToArgs(stringArgumentsListBuilder, argsListBuilder); err != nil {
+			return nil, err
+		}
+	}
+	argsList, err := argsListBuilder.FinalizeList()
+	if err != nil {
+		return nil, err
+	}
+	patcher := argsList.Patcher
+
 	execGroups := rc.ruleDefinition.Message.ExecGroups
 	execGroupIndex, ok := sort.Find(
 		len(execGroups),
@@ -2426,10 +2558,9 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 		}
 	}
 
-	patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
 	var inputsList []*model_starlark_pb.List_Element
 	if inputs != nil {
-		d, _, err := inputs.EncodeList(map[starlark.Value]struct{}{}, rc.computer.getValueEncodingOptions(rc.environment, nil))
+		d, _, err := inputs.EncodeList(map[starlark.Value]struct{}{}, valueEncodingOptions)
 		if err != nil {
 			return nil, err
 		}
@@ -2439,6 +2570,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 
 	rc.actions = append(rc.actions, model_core.NewPatchedMessage(
 		&model_analysis_pb.ConfiguredTarget_Value_Action_Leaf{
+			Arguments:             argsList.Message,
 			Id:                    actionID,
 			Inputs:                inputsList,
 			PlatformPkixPublicKey: rc.execGroups[execGroupIndex].platformPkixPublicKey,
@@ -2473,7 +2605,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunShell(thread *starlar
 		"command", unpack.Bind(thread, &command, unpack.String),
 		// Optional arguments.
 		"arguments?", unpack.Bind(thread, &arguments, unpack.List(unpack.Or([]unpack.UnpackerInto[any]{
-			unpack.Decay(unpack.Type[*args]("Args")),
+			unpack.Decay(unpack.Type[*args[TReference, TMetadata]]("Args")),
 			unpack.Decay(unpack.String),
 		}))),
 		"env?", unpack.Bind(thread, &env, unpack.Dict(unpack.String, unpack.String)),
@@ -2949,29 +3081,37 @@ func getProviderFromVisibleConfiguredTarget[TReference any, TConfigurationRefere
 	return p, visibleTarget.Message.Label, err
 }
 
-type args struct{}
+type argsUseParamFile struct {
+	paramFileArg string
+	useAlways    bool
+}
 
-var _ starlark.HasAttrs = (*args)(nil)
+type args[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata] struct {
+	paramFileFormat model_analysis_pb.Args_Leaf_UseParamFile_Format
+	useParamFile    *argsUseParamFile
+}
 
-func (args) String() string {
+var _ starlark.HasAttrs = (*args[object.LocalReference, model_core.CloneableReferenceMetadata])(nil)
+
+func (args[TReference, TMetadata]) String() string {
 	return "<Args>"
 }
 
-func (args) Type() string {
+func (args[TReference, TMetadata]) Type() string {
 	return "Args"
 }
 
-func (args) Freeze() {}
+func (args[TReference, TMetadata]) Freeze() {}
 
-func (args) Truth() starlark.Bool {
+func (args[TReference, TMetadata]) Truth() starlark.Bool {
 	return starlark.True
 }
 
-func (args) Hash(thread *starlark.Thread) (uint32, error) {
+func (args[TReference, TMetadata]) Hash(thread *starlark.Thread) (uint32, error) {
 	return 0, errors.New("Args cannot be hashed")
 }
 
-func (a *args) Attr(thread *starlark.Thread, name string) (starlark.Value, error) {
+func (a *args[TReference, TMetadata]) Attr(thread *starlark.Thread, name string) (starlark.Value, error) {
 	switch name {
 	case "add":
 		return starlark.NewBuiltin("Args.add", a.doAdd), nil
@@ -2996,27 +3136,75 @@ var argsAttrNames = []string{
 	"use_param_file",
 }
 
-func (args) AttrNames() []string {
+func (args[TReference, TMetadata]) AttrNames() []string {
 	return argsAttrNames
 }
 
-func (a *args) doAdd(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+func (a *args[TReference, TMetadata]) Encode(path map[starlark.Value]struct{}, options *model_starlark.ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[*model_analysis_pb.Args_Leaf, TMetadata], error) {
+	var useParamFile *model_analysis_pb.Args_Leaf_UseParamFile
+	if u := a.useParamFile; u != nil {
+		useParamFile = &model_analysis_pb.Args_Leaf_UseParamFile{
+			Format:       a.paramFileFormat,
+			ParamFileArg: u.paramFileArg,
+			UseAlways:    u.useAlways,
+		}
+	}
+	return model_core.NewSimplePatchedMessage[TMetadata](&model_analysis_pb.Args_Leaf{
+		// TODO: Fill in "adds"!
+		UseParamFile: useParamFile,
+	}), nil
+}
+
+func (a *args[TReference, TMetadata]) doAdd(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	return a, nil
 }
 
-func (a *args) doAddAll(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+func (a *args[TReference, TMetadata]) doAddAll(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	return a, nil
 }
 
-func (a *args) doAddJoined(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+func (a *args[TReference, TMetadata]) doAddJoined(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	return a, nil
 }
 
-func (a *args) doSetParamFileFormat(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+func (a *args[TReference, TMetadata]) doSetParamFileFormat(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var format string
+	if err := starlark.UnpackArgs(
+		b.Name(), args, kwargs,
+		"format", unpack.Bind(thread, &format, unpack.String),
+	); err != nil {
+		return nil, err
+	}
+	switch format {
+	case "multiline":
+		a.paramFileFormat = model_analysis_pb.Args_Leaf_UseParamFile_MULTILINE
+	case "shell":
+		a.paramFileFormat = model_analysis_pb.Args_Leaf_UseParamFile_SHELL
+	case "flag_per_line":
+		a.paramFileFormat = model_analysis_pb.Args_Leaf_UseParamFile_FLAG_PER_LINE
+	default:
+		return nil, fmt.Errorf("unknown param file format %#v", format)
+	}
 	return a, nil
 }
 
-func (a *args) doUseParamFile(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+func (a *args[TReference, TMetadata]) doUseParamFile(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	if len(args) > 1 {
+		return nil, fmt.Errorf("%s: got %d positional arguments, want at most 1", b.Name(), len(args))
+	}
+	var paramFileArg string
+	useAlways := false
+	if err := starlark.UnpackArgs(
+		b.Name(), args, kwargs,
+		"param_file_arg", unpack.Bind(thread, &paramFileArg, unpack.String),
+		"use_always?", unpack.Bind(thread, &useAlways, unpack.Bool),
+	); err != nil {
+		return nil, err
+	}
+	a.useParamFile = &argsUseParamFile{
+		paramFileArg: paramFileArg,
+		useAlways:    useAlways,
+	}
 	return a, nil
 }
 

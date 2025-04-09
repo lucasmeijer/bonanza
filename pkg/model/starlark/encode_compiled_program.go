@@ -56,7 +56,7 @@ func newSplitBTreeBuilder[TReference any, TMessage proto.Message, TMetadata mode
 	)
 }
 
-func newListBuilder[TReference any, TMetadata model_core.CloneableReferenceMetadata](options *ValueEncodingOptions[TReference, TMetadata]) btree.Builder[*model_starlark_pb.List_Element, TMetadata] {
+func NewListBuilder[TReference any, TMetadata model_core.CloneableReferenceMetadata](options *ValueEncodingOptions[TReference, TMetadata]) btree.Builder[*model_starlark_pb.List_Element, TMetadata] {
 	return newSplitBTreeBuilder(
 		options,
 		/* parentNodeComputer = */ func(createdObject model_core.CreatedObject[TMetadata], childNodes []*model_starlark_pb.List_Element) (model_core.PatchedMessage[*model_starlark_pb.List_Element, TMetadata], error) {
@@ -115,7 +115,7 @@ type EncodableValue[TReference any, TMetadata model_core.CloneableReferenceMetad
 func EncodeCompiledProgram[TReference any, TMetadata model_core.CloneableReferenceMetadata](program *starlark.Program, globals starlark.StringDict, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.CompiledProgram, TMetadata], error) {
 	needsCode := false
 	var globalsKeys []string
-	globalsValuesBuilder := newListBuilder[TReference, TMetadata](options)
+	globalsValuesBuilder := NewListBuilder[TReference, TMetadata](options)
 	for _, name := range slices.Sorted(maps.Keys(globals)) {
 		identifier, err := pg_label.NewStarlarkIdentifier(name)
 		if err != nil {
@@ -289,7 +289,7 @@ func EncodeValue[TReference any, TMetadata model_core.CloneableReferenceMetadata
 		path[value] = struct{}{}
 		defer delete(path, value)
 
-		listBuilder := newListBuilder[TReference, TMetadata](options)
+		listBuilder := NewListBuilder[TReference, TMetadata](options)
 		needsCode := false
 		for value := range starlark.Elements(typedValue) {
 			encodedValue, valueNeedsCode, err := EncodeValue[TReference, TMetadata](value, path, nil, options)

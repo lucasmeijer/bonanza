@@ -249,7 +249,7 @@ func (d *Depset[TReference, TMetadata]) EncodeList(path map[starlark.Value]struc
 	e := depsetChildrenEncoder[TReference, TMetadata]{
 		path:        path,
 		options:     options,
-		treeBuilder: newListBuilder(options),
+		treeBuilder: NewListBuilder(options),
 	}
 	if err := e.encode(d.children); err != nil {
 		return model_core.PatchedMessage[[]*model_starlark_pb.List_Element, TMetadata]{}, false, err

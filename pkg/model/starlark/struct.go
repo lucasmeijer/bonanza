@@ -315,7 +315,7 @@ func (s *Struct[TReference, TMetadata]) ToDict() map[string]any {
 // value is expected to only be a struct, and any provider identifier
 // may be discarded.
 func (s *Struct[TReference, TMetadata]) EncodeStructFields(path map[starlark.Value]struct{}, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.Struct_Fields, TMetadata], bool, error) {
-	listBuilder := newListBuilder[TReference, TMetadata](options)
+	listBuilder := NewListBuilder[TReference, TMetadata](options)
 	needsCode := false
 	for i, value := range s.values {
 		var encodedValue model_core.PatchedMessage[*model_starlark_pb.Value, TMetadata]

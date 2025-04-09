@@ -127,7 +127,7 @@ func (rr *repositoryRule[TReference, TMetadata]) CallInternal(thread *starlark.T
 
 	valueEncodingOptions := thread.Local(ValueEncodingOptionsKey).(*ValueEncodingOptions[TReference, TMetadata])
 	var attrKeys []string
-	attrValuesBuilder := newListBuilder[TReference, TMetadata](valueEncodingOptions)
+	attrValuesBuilder := NewListBuilder[TReference, TMetadata](valueEncodingOptions)
 	for i, attrName := range attrNames {
 		if value := values[i]; value != nil {
 			encodedValue, _, err := EncodeValue[TReference, TMetadata](
