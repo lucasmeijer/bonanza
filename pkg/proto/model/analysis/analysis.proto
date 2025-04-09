@@ -352,10 +352,10 @@ message Args {
   }
 
   oneof level {
-    // A single Args.add_*() invocation.
+    // A single Args object.
     Leaf leaf = 1;
 
-    // B-tree node containing additional arguments.
+    // B-tree node containing additional Args objects.
     Parent parent = 2;
   }
 }
