@@ -395,7 +395,7 @@ func (dlc *depsetToListConverter[TReference, TMetadata]) appendChildren(children
 // ToList extracts all elements contained in the depset and returns them
 // as a list. If the depset contains duplicate elements, only the first
 // occurrence is retained.
-func (d *Depset[TReference, TMetadata]) ToList(thread *starlark.Thread) (*starlark.List, error) {
+func (d *Depset[TReference, TMetadata]) ToList(thread *starlark.Thread) ([]starlark.Value, error) {
 	dlc := depsetToListConverter[TReference, TMetadata]{
 		thread:           thread,
 		encodedListsSeen: map[object.LocalReference]struct{}{},
@@ -411,16 +411,20 @@ func (d *Depset[TReference, TMetadata]) ToList(thread *starlark.Thread) (*starla
 			slices.Reverse(dlc.list)
 		}
 	}
-	l := starlark.NewList(dlc.list)
-	l.Freeze()
-	return l, nil
+	return dlc.list, nil
 }
 
 func (d *Depset[TReference, TMetadata]) doToList(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	if err := starlark.UnpackArgs(b.Name(), args, kwargs); err != nil {
 		return nil, err
 	}
-	return d.ToList(thread)
+	elements, err := d.ToList(thread)
+	if err != nil {
+		return nil, err
+	}
+	l := starlark.NewList(elements)
+	l.Freeze()
+	return l, nil
 }
 
 // valueSet is a simple set type for starlark.Value. It's not possible

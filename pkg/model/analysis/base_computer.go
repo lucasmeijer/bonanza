@@ -50,6 +50,8 @@ type baseComputer[TReference object.BasicReference, TMetadata BaseComputerRefere
 	// TODO: These should likely be removed and instantiated later
 	// on, so that we can encrypt all data in storage.
 	valueReaders                                 model_starlark.ValueReaders[TReference]
+	argsReader                                   model_parser.ParsedObjectReader[TReference, model_core.Message[[]*model_analysis_pb.Args, TReference]]
+	argsAddReader                                model_parser.ParsedObjectReader[TReference, model_core.Message[[]*model_analysis_pb.Args_Leaf_Add, TReference]]
 	buildSettingOverrideReader                   model_parser.ParsedObjectReader[TReference, model_core.Message[[]*model_analysis_pb.BuildSettingOverride, TReference]]
 	buildSpecificationReader                     model_parser.ParsedObjectReader[TReference, model_core.Message[*model_build_pb.BuildSpecification, TReference]]
 	commandOutputsReader                         model_parser.ParsedObjectReader[TReference, model_core.Message[*model_command_pb.Outputs, TReference]]
@@ -97,6 +99,14 @@ func NewBaseComputer[TReference object.BasicReference, TMetadata BaseComputerRef
 				model_parser.NewMessageListObjectParser[TReference, model_starlark_pb.List_Element](),
 			),
 		},
+		argsReader: model_parser.LookupParsedObjectReader(
+			parsedObjectPoolIngester,
+			model_parser.NewMessageListObjectParser[TReference, model_analysis_pb.Args](),
+		),
+		argsAddReader: model_parser.LookupParsedObjectReader(
+			parsedObjectPoolIngester,
+			model_parser.NewMessageListObjectParser[TReference, model_analysis_pb.Args_Leaf_Add](),
+		),
 		buildSpecificationReader: model_parser.LookupParsedObjectReader(
 			parsedObjectPoolIngester,
 			model_parser.NewChainedObjectParser(

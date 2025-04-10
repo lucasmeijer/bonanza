@@ -140,7 +140,7 @@ func NewToolchainTypeUnpackerInto[TReference any, TMetadata model_core.Cloneable
 
 func (toolchainTypeUnpackerInto[TReference, TMetadata]) UnpackInto(thread *starlark.Thread, v starlark.Value, dst **ToolchainType[TReference, TMetadata]) error {
 	switch typedV := v.(type) {
-	case starlark.String, label[TReference, TMetadata]:
+	case starlark.String, Label[TReference, TMetadata]:
 		var l pg_label.ResolvedLabel
 		if err := NewLabelOrStringUnpackerInto[TReference, TMetadata](CurrentFilePackage(thread, 1)).UnpackInto(thread, v, &l); err != nil {
 			return err

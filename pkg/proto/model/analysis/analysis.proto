@@ -224,16 +224,8 @@ message Args {
       }
 
       message Leaf {
-        message StartTerminateWith {
-          // Fixed string argument to add.
-          string value = 1;
-
-          // If set, do not emit the argument if no values are provided.
-          bool omit_if_empty = 2;
-        }
-
         // If set, emit a string argument before the values.
-        StartTerminateWith start_with = 1;
+        google.protobuf.StringValue start_with = 1;
 
         // Argument values. This field may only be set to a list or a
         // depset.
@@ -254,15 +246,34 @@ message Args {
         // "%s" placeholder.
         string format_each = 5;
 
+        // If true, if there are no arguments derived from values to be
+        // appended, then all further processing is suppressed and the
+        // command line will be unchanged.
+        //
+        // If false, the effect depends on the style:
+        //
+        // - If separate, start_with and separate.terminate_with, if
+        //   provided, will still be appended regardless of whether or
+        //   not there are other arguments.
+        //
+        // - If joined, then even if there are no strings to join
+        //   together, two arguments will be appended: start_with
+        //   followed by an empty string (which is the logical join of
+        //   zero strings).
+        bool omit_if_empty = 6;
+
         // If set, duplicate arguments that appear after formatting are
         // removed. The first occurrence is the one that remains.
-        bool uniquify = 6;
+        bool uniquify = 7;
 
         message Separate {
           // If set, insert a string argument before each existing
           // argument, effectively doubling the number of arguments to
           // be appended at that point.
           google.protobuf.StringValue before_each = 1;
+
+          // If set, emit a string argument after the values.
+          google.protobuf.StringValue terminate_with = 2;
         }
 
         message Joined {
@@ -278,14 +289,11 @@ message Args {
 
         oneof style {
           // If set, the arguments were declared using Args.add_all().
-          Separate separate = 7;
+          Separate separate = 8;
 
           // If set, the arguments were declared using Args.add_joined().
-          Joined joined = 8;
+          Joined joined = 9;
         }
-
-        // If set, emit a string argument after the values.
-        StartTerminateWith terminate_with = 10;
       }
 
       oneof level {

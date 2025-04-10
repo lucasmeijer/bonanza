@@ -1509,6 +1509,31 @@ func bytesToValidString(p []byte) string {
 	}
 }
 
+func newArgumentsBuilder[TMetadata model_core.ReferenceMetadata](commandEncoder model_encoding.BinaryEncoder, referenceFormat object.ReferenceFormat, objectCapturer model_core.CreatedObjectCapturer[TMetadata]) btree.Builder[*model_command_pb.ArgumentList_Element, TMetadata] {
+	return btree.NewSplitProllyBuilder(
+		1<<16,
+		1<<18,
+		btree.NewObjectCreatingNodeMerger(
+			commandEncoder,
+			referenceFormat,
+			/* parentNodeComputer = */ func(createdObject model_core.CreatedObject[TMetadata], childNodes []*model_command_pb.ArgumentList_Element) (model_core.PatchedMessage[*model_command_pb.ArgumentList_Element, TMetadata], error) {
+				patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
+				return model_core.NewPatchedMessage(
+					&model_command_pb.ArgumentList_Element{
+						Level: &model_command_pb.ArgumentList_Element_Parent{
+							Parent: patcher.AddReference(
+								createdObject.Contents.GetReference(),
+								objectCapturer.CaptureCreatedObject(createdObject),
+							),
+						},
+					},
+					patcher,
+				), nil
+			},
+		),
+	)
+}
+
 func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	mrc.maybeGetCommandEncoder()
 	mrc.maybeGetDirectoryCreationParameters()
@@ -1566,28 +1591,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 	// variables to B-trees, so that they can
 	// be attached to the Command message.
 	referenceFormat := mrc.computer.getReferenceFormat()
-	argumentsBuilder := btree.NewSplitProllyBuilder(
-		1<<16,
-		1<<18,
-		btree.NewObjectCreatingNodeMerger(
-			mrc.commandEncoder,
-			referenceFormat,
-			/* parentNodeComputer = */ func(createdObject model_core.CreatedObject[dag.ObjectContentsWalker], childNodes []*model_command_pb.ArgumentList_Element) (model_core.PatchedMessage[*model_command_pb.ArgumentList_Element, dag.ObjectContentsWalker], error) {
-				patcher := model_core.NewReferenceMessagePatcher[dag.ObjectContentsWalker]()
-				return model_core.NewPatchedMessage(
-					&model_command_pb.ArgumentList_Element{
-						Level: &model_command_pb.ArgumentList_Element_Parent{
-							Parent: patcher.AddReference(
-								createdObject.Contents.GetReference(),
-								dag.NewSimpleObjectContentsWalker(createdObject.Contents, createdObject.Metadata),
-							),
-						},
-					},
-					patcher,
-				), nil
-			},
-		),
-	)
+	argumentsBuilder := newArgumentsBuilder(mrc.commandEncoder, referenceFormat, model_core.WalkableCreatedObjectCapturer)
 	for _, argument := range arguments {
 		var argumentStr string
 		switch typedArgument := argument.(type) {

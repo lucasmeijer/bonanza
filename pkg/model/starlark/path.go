@@ -335,7 +335,7 @@ func (ui *pathOrLabelOrStringUnpackerInto[TReference, TMetadata]) UnpackInto(thr
 		}
 		*dst = r.CurrentPath
 		return nil
-	case label[TReference, TMetadata]:
+	case Label[TReference, TMetadata]:
 		canonicalLabel, err := typedV.value.AsCanonical()
 		if err != nil {
 			return err

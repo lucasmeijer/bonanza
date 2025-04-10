@@ -1179,10 +1179,11 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 				}
 
 				filesDepset := model_starlark.NewDepsetFromList[TReference, TMetadata](filesDepsetElements, model_starlark_pb.Depset_DEFAULT)
-				files, err := filesDepset.ToList(thread)
+				filesElements, err := filesDepset.ToList(thread)
 				if err != nil {
 					return PatchedConfiguredTargetValue{}, fmt.Errorf("converting files depset to list: %w", err)
 				}
+				files := starlark.NewList(filesElements)
 				files.Freeze()
 				if allowSingleFile {
 					switch l := files.Len(); l {
@@ -3087,14 +3088,14 @@ func getProviderFromVisibleConfiguredTarget[TReference any, TConfigurationRefere
 // argsAdd records all arguments provided to Args.add(), Args.add_all()
 // and Args.add_joined().
 type argsAdd[TReference any, TMetadata model_core.CloneableReferenceMetadata] struct {
-	startWith         *model_analysis_pb.Args_Leaf_Add_Leaf_StartTerminateWith
+	startWith         *wrapperspb.StringValue
 	values            starlark.Value
 	expandDirectories bool
 	mapEach           *model_starlark.NamedFunction[TReference, TMetadata]
 	formatEach        string
+	omitIfEmpty       bool
 	uniquify          bool
 	setStyle          func(leaf *model_analysis_pb.Args_Leaf_Add_Leaf)
-	terminateWith     *model_analysis_pb.Args_Leaf_Add_Leaf_StartTerminateWith
 }
 
 // argsUseParamFile records all arguments provided to
@@ -3200,8 +3201,8 @@ func (a *args[TReference, TMetadata]) Encode(path map[starlark.Value]struct{}, o
 			StartWith:         add.startWith,
 			ExpandDirectories: add.expandDirectories,
 			FormatEach:        add.formatEach,
+			OmitIfEmpty:       add.omitIfEmpty,
 			Uniquify:          add.uniquify,
-			TerminateWith:     add.terminateWith,
 		}
 
 		values, _, err := model_starlark.EncodeValue(add.values, map[starlark.Value]struct{}{}, nil, options)
@@ -3250,7 +3251,7 @@ func (a *args[TReference, TMetadata]) Encode(path map[starlark.Value]struct{}, o
 }
 
 func (a *args[TReference, TMetadata]) doAdd(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	var startWith *model_analysis_pb.Args_Leaf_Add_Leaf_StartTerminateWith
+	var startWith *wrapperspb.StringValue
 	var value starlark.Value
 	valueUnpackerInto := unpack.Or([]unpack.UnpackerInto[starlark.Value]{
 		unpack.Canonicalize(unpack.String),
@@ -3273,7 +3274,7 @@ func (a *args[TReference, TMetadata]) doAdd(thread *starlark.Thread, b *starlark
 		); err != nil {
 			return nil, err
 		}
-		startWith = &model_analysis_pb.Args_Leaf_Add_Leaf_StartTerminateWith{
+		startWith = &wrapperspb.StringValue{
 			Value: argName,
 		}
 	default:
@@ -3340,7 +3341,7 @@ func (a *args[TReference, TMetadata]) doAddAll(thread *starlark.Thread, b *starl
 	omitIfEmpty := true
 	uniquify := true
 	expandDirectories := true
-	var terminateWith *string
+	var terminateWithStr *string
 	allowClosure := false
 	if err := starlark.UnpackArgs(
 		b.Name(), nil, kwargs,
@@ -3350,7 +3351,7 @@ func (a *args[TReference, TMetadata]) doAddAll(thread *starlark.Thread, b *starl
 		"omit_if_empty?", unpack.Bind(thread, &omitIfEmpty, unpack.Bool),
 		"uniquify?", unpack.Bind(thread, &uniquify, unpack.Bool),
 		"expand_directories?", unpack.Bind(thread, &expandDirectories, unpack.Bool),
-		"terminate_with?", unpack.Bind(thread, &terminateWith, unpack.IfNotNone(unpack.Pointer(unpack.String))),
+		"terminate_with?", unpack.Bind(thread, &terminateWithStr, unpack.IfNotNone(unpack.Pointer(unpack.String))),
 		"allow_closure?", unpack.Bind(thread, &allowClosure, unpack.Bool),
 	); err != nil {
 		return nil, err
@@ -3362,30 +3363,31 @@ func (a *args[TReference, TMetadata]) doAddAll(thread *starlark.Thread, b *starl
 			Value: *beforeEachStr,
 		}
 	}
+	var terminateWith *wrapperspb.StringValue
+	if terminateWithStr != nil {
+		terminateWith = &wrapperspb.StringValue{
+			Value: *terminateWithStr,
+		}
+	}
 	add := argsAdd[TReference, TMetadata]{
 		values:            values,
 		expandDirectories: expandDirectories,
 		mapEach:           mapEach,
 		formatEach:        formatEach,
+		omitIfEmpty:       omitIfEmpty,
 		uniquify:          uniquify,
 		setStyle: func(leaf *model_analysis_pb.Args_Leaf_Add_Leaf) {
 			leaf.Style = &model_analysis_pb.Args_Leaf_Add_Leaf_Separate_{
 				Separate: &model_analysis_pb.Args_Leaf_Add_Leaf_Separate{
-					BeforeEach: beforeEach,
+					BeforeEach:    beforeEach,
+					TerminateWith: terminateWith,
 				},
 			}
 		},
 	}
 	if startWith != nil {
-		add.startWith = &model_analysis_pb.Args_Leaf_Add_Leaf_StartTerminateWith{
-			Value:       *startWith,
-			OmitIfEmpty: omitIfEmpty,
-		}
-	}
-	if terminateWith != nil {
-		add.terminateWith = &model_analysis_pb.Args_Leaf_Add_Leaf_StartTerminateWith{
-			Value:       *terminateWith,
-			OmitIfEmpty: omitIfEmpty,
+		add.startWith = &wrapperspb.StringValue{
+			Value: *startWith,
 		}
 	}
 	a.adds = append(a.adds, add)
@@ -3405,7 +3407,6 @@ func (a *args[TReference, TMetadata]) doAddJoined(thread *starlark.Thread, b *st
 	omitIfEmpty := true
 	uniquify := true
 	expandDirectories := true
-	var terminateWith *string
 	allowClosure := false
 	if err := starlark.UnpackArgs(
 		b.Name(), nil, kwargs,
@@ -3426,6 +3427,7 @@ func (a *args[TReference, TMetadata]) doAddJoined(thread *starlark.Thread, b *st
 		expandDirectories: expandDirectories,
 		mapEach:           mapEach,
 		formatEach:        formatEach,
+		omitIfEmpty:       omitIfEmpty,
 		uniquify:          uniquify,
 		setStyle: func(leaf *model_analysis_pb.Args_Leaf_Add_Leaf) {
 			leaf.Style = &model_analysis_pb.Args_Leaf_Add_Leaf_Joined_{
@@ -3437,15 +3439,8 @@ func (a *args[TReference, TMetadata]) doAddJoined(thread *starlark.Thread, b *st
 		},
 	}
 	if startWith != nil {
-		add.startWith = &model_analysis_pb.Args_Leaf_Add_Leaf_StartTerminateWith{
-			Value:       *startWith,
-			OmitIfEmpty: omitIfEmpty,
-		}
-	}
-	if terminateWith != nil {
-		add.terminateWith = &model_analysis_pb.Args_Leaf_Add_Leaf_StartTerminateWith{
-			Value:       *terminateWith,
-			OmitIfEmpty: omitIfEmpty,
+		add.startWith = &wrapperspb.StringValue{
+			Value: *startWith,
 		}
 	}
 	a.adds = append(a.adds, add)

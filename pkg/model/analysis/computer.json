@@ -521,13 +521,18 @@
       "TargetActionResult": {
          "dependsOn": [
             "ActionResult",
+            "BuiltinsModuleNames",
+            "CanonicalRepoName",
             "CommandEncoderObject",
+            "CompiledBzlFileDecodedGlobals",
+            "CompiledBzlFileFunctionFactory",
             "ConfiguredTarget",
             "DirectoryCreationParameters",
             "DirectoryCreationParametersObject",
             "FileCreationParameters",
             "FileListRoot",
-            "FileRoot"
+            "FileRoot",
+            "RootModule"
          ],
          "keyContainsReferences": true
       },
