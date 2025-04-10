@@ -2366,6 +2366,7 @@ func promoteStringArgumentsToArgs[TMetadata model_core.ReferenceMetadata](
 											},
 										},
 									},
+									FormatEach: "%s",
 									Style: &model_analysis_pb.Args_Leaf_Add_Leaf_Separate_{
 										Separate: &model_analysis_pb.Args_Leaf_Add_Leaf_Separate{},
 									},
@@ -2445,13 +2446,44 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 	}
 	actionID := []byte(outputs[0].packageRelativePath.String())
 
+	// Derive argv0 from the executable.
+	var argv0 string
+	switch typedExecutable := executable.(type) {
+	case string:
+		argv0 = typedExecutable
+	case *model_starlark.File[TReference, TMetadata]:
+		var err error
+		argv0, err = model_starlark.FileGetPath(typedExecutable.GetDefinition())
+		if err != nil {
+			return nil, err
+		}
+	case *model_starlark.Struct[TReference, TMetadata]:
+		return nil, errors.New("TODO: get argv0 from FilesToRunProvider")
+	}
+	valueEncodingOptions := rc.computer.getValueEncodingOptions(rc.environment, nil)
+	stringArgumentsListBuilder := model_starlark.NewListBuilder(valueEncodingOptions)
+	if err := stringArgumentsListBuilder.PushChild(
+		model_core.NewSimplePatchedMessage[TMetadata](
+			&model_starlark_pb.List_Element{
+				Level: &model_starlark_pb.List_Element_Leaf{
+					Leaf: &model_starlark_pb.Value{
+						Kind: &model_starlark_pb.Value_Str{
+							Str: argv0,
+						},
+					},
+				},
+			},
+		),
+	); err != nil {
+		return nil, err
+	}
+
 	// Encode all arguments. Arguments may be a mixture of strings
 	// and Args objects.
 	//
 	// Promote any runs of string arguments to equivalent Args
 	// objects taking a list. That way, computation of target
 	// actions only needs to process Args objects.
-	valueEncodingOptions := rc.computer.getValueEncodingOptions(rc.environment, nil)
 	argsListBuilder := btree.NewSplitProllyBuilder(
 		valueEncodingOptions.ObjectMinimumSizeBytes,
 		valueEncodingOptions.ObjectMaximumSizeBytes,
@@ -2476,8 +2508,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 			},
 		),
 	)
-	var stringArgumentsListBuilder btree.Builder[*model_starlark_pb.List_Element, TMetadata]
-	gotStringArguments := false
+	gotStringArguments := true
 	for _, argument := range arguments {
 		switch typedArgument := argument.(type) {
 		case *args[TReference, TMetadata]:

@@ -475,7 +475,9 @@ message ConfiguredTarget {
         // should be used to execute the action in PKIX, ASN.1 DER form.
         bytes platform_pkix_public_key = 3;
 
-        // Command line arguments of the action.
+        // Command line arguments of the action. Whereas
+        // ctx.actions.run() takes argv[0] and argv[1:] separately, this
+        // field contains all of the arguments.
         repeated Args arguments = 4;
       }
 
