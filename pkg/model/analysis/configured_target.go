@@ -2358,9 +2358,11 @@ func promoteStringArgumentsToArgs[TMetadata model_core.ReferenceMetadata](
 						Adds: []*model_analysis_pb.Args_Leaf_Add{{
 							Level: &model_analysis_pb.Args_Leaf_Add_Leaf_{
 								Leaf: &model_analysis_pb.Args_Leaf_Add_Leaf{
-									Values: &model_analysis_pb.Args_Leaf_Add_Leaf_List{
-										List: &model_starlark_pb.List{
-											Elements: stringArgumentsList.Message,
+									Values: &model_starlark_pb.Value{
+										Kind: &model_starlark_pb.Value_List{
+											List: &model_starlark_pb.List{
+												Elements: stringArgumentsList.Message,
+											},
 										},
 									},
 									Style: &model_analysis_pb.Args_Leaf_Add_Leaf_Separate_{
@@ -3086,7 +3088,7 @@ func getProviderFromVisibleConfiguredTarget[TReference any, TConfigurationRefere
 // and Args.add_joined().
 type argsAdd[TReference any, TMetadata model_core.CloneableReferenceMetadata] struct {
 	startWith         *model_analysis_pb.Args_Leaf_Add_Leaf_StartTerminateWith
-	values            any
+	values            starlark.Value
 	expandDirectories bool
 	mapEach           *model_starlark.NamedFunction[TReference, TMetadata]
 	formatEach        string
@@ -3194,7 +3196,6 @@ func (a *args[TReference, TMetadata]) Encode(path map[starlark.Value]struct{}, o
 		),
 	)
 	for _, add := range a.adds {
-		patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
 		leaf := &model_analysis_pb.Args_Leaf_Add_Leaf{
 			StartWith:         add.startWith,
 			ExpandDirectories: add.expandDirectories,
@@ -3202,28 +3203,14 @@ func (a *args[TReference, TMetadata]) Encode(path map[starlark.Value]struct{}, o
 			Uniquify:          add.uniquify,
 			TerminateWith:     add.terminateWith,
 		}
-		switch typedValues := add.values.(type) {
-		case []starlark.Value:
-			list, _, err := model_starlark.EncodeList(slices.Values(typedValues), map[starlark.Value]struct{}{}, options)
-			if err != nil {
-				return model_core.PatchedMessage[*model_analysis_pb.Args_Leaf, TMetadata]{}, err
-			}
-			leaf.Values = &model_analysis_pb.Args_Leaf_Add_Leaf_List{
-				List: list.Message,
-			}
-			patcher.Merge(list.Patcher)
-		case *model_starlark.Depset[TReference, TMetadata]:
-			depset, _, err := typedValues.Encode(path, options)
-			if err != nil {
-				return model_core.PatchedMessage[*model_analysis_pb.Args_Leaf, TMetadata]{}, err
-			}
-			leaf.Values = &model_analysis_pb.Args_Leaf_Add_Leaf_Depset{
-				Depset: depset.Message,
-			}
-			patcher.Merge(depset.Patcher)
-		default:
-			panic("unknown sequence type")
+
+		values, _, err := model_starlark.EncodeValue(add.values, map[starlark.Value]struct{}{}, nil, options)
+		if err != nil {
+			return model_core.PatchedMessage[*model_analysis_pb.Args_Leaf, TMetadata]{}, err
 		}
+		leaf.Values = values.Message
+		patcher := values.Patcher
+
 		if add.mapEach != nil {
 			mapEach, _, err := add.mapEach.Encode(path, options)
 			if err != nil {
@@ -3232,7 +3219,9 @@ func (a *args[TReference, TMetadata]) Encode(path map[starlark.Value]struct{}, o
 			leaf.MapEach = mapEach.Message
 			patcher.Merge(mapEach.Patcher)
 		}
+
 		add.setStyle(leaf)
+
 		if err := addsListBuilder.PushChild(
 			model_core.NewPatchedMessage(
 				&model_analysis_pb.Args_Leaf_Add{
@@ -3301,7 +3290,7 @@ func (a *args[TReference, TMetadata]) doAdd(thread *starlark.Thread, b *starlark
 
 	a.adds = append(a.adds, argsAdd[TReference, TMetadata]{
 		startWith:  startWith,
-		values:     []starlark.Value{value},
+		values:     starlark.NewList([]starlark.Value{value}),
 		formatEach: format,
 		setStyle: func(leaf *model_analysis_pb.Args_Leaf_Add_Leaf) {
 			leaf.Style = &model_analysis_pb.Args_Leaf_Add_Leaf_Separate_{
@@ -3312,10 +3301,10 @@ func (a *args[TReference, TMetadata]) doAdd(thread *starlark.Thread, b *starlark
 	return a, nil
 }
 
-func (a *args[TReference, TMetadata]) doAddAllJoinedParseArgs(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple) (startWith *string, values any, err error) {
-	valuesUnpackerInto := unpack.Or([]unpack.UnpackerInto[any]{
-		unpack.Decay(unpack.List(unpack.Any)),
-		unpack.Decay(unpack.Type[*model_starlark.Depset[TReference, TMetadata]]("depset")),
+func (a *args[TReference, TMetadata]) doAddAllJoinedParseArgs(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple) (startWith *string, values starlark.Value, err error) {
+	valuesUnpackerInto := unpack.Or([]unpack.UnpackerInto[starlark.Value]{
+		unpack.Canonicalize(unpack.List(unpack.Any)),
+		unpack.Canonicalize(unpack.Type[*model_starlark.Depset[TReference, TMetadata]]("depset")),
 	})
 	switch len(args) {
 	case 1:

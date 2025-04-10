@@ -235,34 +235,28 @@ message Args {
         // If set, emit a string argument before the values.
         StartTerminateWith start_with = 1;
 
-        oneof values {
-          // Values are sourced from a list. Elements should not be
-          // deduplicated prior to being processed.
-          bonanza.model.starlark.List list = 2;
-
-          // Values are sourced from a depset. Only the first occurrence
-          // of each value is processed.
-          bonanza.model.starlark.Depset depset = 3;
-        }
+        // Argument values. This field may only be set to a list or a
+        // depset.
+        bonanza.model.starlark.Value values = 2;
 
         // If set, values of type File that reference a directory are
         // expanded to all files recursively contained in that
         // directory.
-        bool expand_directories = 4;
+        bool expand_directories = 3;
 
         // An optional function that converts each item to zero or more
         // strings, which may be further processed before appending. If
         // not set, standard conversion is performed.
-        bonanza.model.starlark.Function map_each = 5;
+        bonanza.model.starlark.Function map_each = 4;
 
         // Format string pattern, applied to each string returned by the
         // map_each function. The format string must have exactly one
         // "%s" placeholder.
-        string format_each = 6;
+        string format_each = 5;
 
         // If set, duplicate arguments that appear after formatting are
         // removed. The first occurrence is the one that remains.
-        bool uniquify = 7;
+        bool uniquify = 6;
 
         message Separate {
           // If set, insert a string argument before each existing
@@ -284,10 +278,10 @@ message Args {
 
         oneof style {
           // If set, the arguments were declared using Args.add_all().
-          Separate separate = 8;
+          Separate separate = 7;
 
           // If set, the arguments were declared using Args.add_joined().
-          Joined joined = 9;
+          Joined joined = 8;
         }
 
         // If set, emit a string argument after the values.
