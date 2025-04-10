@@ -468,17 +468,22 @@ message ConfiguredTarget {
         // outputs to reference the action that generates them.
         bytes id = 1;
 
-        // Depset of the input files of the action.
+        // Depset of File objects of the input files of the action.
         repeated bonanza.model.starlark.List.Element inputs = 2;
+
+        // Depset of File objects of the tools used by the action. This
+        // field is identical to "inputs", except that it also causes
+        // the runfiles directories of these files to be created.
+        repeated bonanza.model.starlark.List.Element tools = 3;
 
         // The X25519 public key that identifies the platform that
         // should be used to execute the action in PKIX, ASN.1 DER form.
-        bytes platform_pkix_public_key = 3;
+        bytes platform_pkix_public_key = 4;
 
         // Command line arguments of the action. Whereas
         // ctx.actions.run() takes argv[0] and argv[1:] separately, this
         // field contains all of the arguments.
-        repeated Args arguments = 4;
+        repeated Args arguments = 5;
       }
 
       oneof level {

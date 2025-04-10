@@ -883,6 +883,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 
 		// Last but not least, get the values of label attr.
 		executableValues := map[string]any{}
+		fileIsInCtxExecutable := map[*model_starlark.File[TReference, TMetadata]]struct{}{}
 		fileValues := map[string]any{}
 		filesValues := map[string]any{}
 		splitAttrValues := map[string]any{}
@@ -1128,7 +1129,12 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 								if err != nil {
 									return nil, fmt.Errorf("decode field \"files_to_run.executable\" of DefaultInfo provider of target with label %#v: %w", resolvedLabelStr, err)
 								}
-								executableValues[namedAttr.Name] = decodedExecutable
+								typedExecutable, ok := decodedExecutable.(*model_starlark.File[TReference, TMetadata])
+								if !ok {
+									return nil, fmt.Errorf("field \"files_to_run.executable\" of DefaultInfo provider of target with label %#v is not a File", resolvedLabelStr)
+								}
+								executableValues[namedAttr.Name] = typedExecutable
+								fileIsInCtxExecutable[typedExecutable] = struct{}{}
 							}
 
 							return model_starlark.NewTargetReference[TReference, TMetadata](canonicalLabel.AsResolved(), providerInstances), nil
@@ -1215,6 +1221,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 			attr:                        model_starlark.NewStructFromDict[TReference, TMetadata](nil, attrValues),
 			splitAttr:                   model_starlark.NewStructFromDict[TReference, TMetadata](nil, splitAttrValues),
 			executable:                  model_starlark.NewStructFromDict[TReference, TMetadata](nil, executableValues),
+			fileIsInCtxExecutable:       fileIsInCtxExecutable,
 			file:                        model_starlark.NewStructFromDict[TReference, TMetadata](nil, fileValues),
 			files:                       model_starlark.NewStructFromDict[TReference, TMetadata](nil, filesValues),
 			outputs:                     model_starlark.NewStructFromDict[TReference, TMetadata](nil, outputsValues),
@@ -1670,6 +1677,7 @@ type ruleContext[TReference object.BasicReference, TMetadata BaseComputerReferen
 	splitAttr                   starlark.Value
 	buildSettingValue           starlark.Value
 	executable                  starlark.Value
+	fileIsInCtxExecutable       map[*model_starlark.File[TReference, TMetadata]]struct{}
 	file                        starlark.Value
 	files                       starlark.Value
 	outputs                     starlark.Value
@@ -2160,6 +2168,36 @@ func (rc *ruleContext[TReference, TMetadata]) setOutputToStaticDirectory(output 
 	)
 }
 
+// getFileFromFileOrFilesToRunProvider takes a File or a
+// FilesToRunProvider and returns the File that corresponds to the
+// executable. In addition to that, it returns whether the resulting
+// File should be treated as a tool dependency. Namely, whether its
+// runfiles directory should be included in any input roots that have
+// this File listed as part of ctx.actions.run(tools=[...]).
+func (rc *ruleContext[TReference, TMetadata]) getFileFromFileOrFilesToRunProvider(thread *starlark.Thread, file any) (*model_starlark.File[TReference, TMetadata], bool, error) {
+	switch typedFile := file.(type) {
+	case *model_starlark.File[TReference, TMetadata]:
+		// Plain File objects only have their runfiles directory
+		// added if they are obtained through a label attribute
+		// marked executable=True.
+		_, isTool := rc.fileIsInCtxExecutable[typedFile]
+		return typedFile, isTool, nil
+	case *model_starlark.Struct[TReference, TMetadata]:
+		// Executables extracted from FilesToRunProvider
+		executable, err := typedFile.Attr(thread, "executable")
+		if err != nil {
+			return nil, false, fmt.Errorf("failed to get field \"executable\" of FilesToRunProvider: %w", err)
+		}
+		executableFile, ok := executable.(*model_starlark.File[TReference, TMetadata])
+		if !ok {
+			return nil, false, errors.New("field \"executable\" of FilesToRunProvider is not a File")
+		}
+		return executableFile, true, nil
+	default:
+		panic("not a file or FilesToRunProvider")
+	}
+}
+
 type ruleContextActions[TReference object.BasicReference, TMetadata BaseComputerReferenceMetadata] struct {
 	ruleContext *ruleContext[TReference, TMetadata]
 }
@@ -2446,19 +2484,26 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 	}
 	actionID := []byte(outputs[0].packageRelativePath.String())
 
-	// Derive argv0 from the executable.
-	var argv0 string
-	switch typedExecutable := executable.(type) {
-	case string:
-		argv0 = typedExecutable
-	case *model_starlark.File[TReference, TMetadata]:
-		var err error
-		argv0, err = model_starlark.FileGetPath(typedExecutable.GetDefinition())
+	// Derive argv0 from the executable. Even though it's not
+	// explicitly documented, the executable is also treated as a
+	// tool dependency.
+	var inputsDirect []starlark.Value
+	var toolsDirect []starlark.Value
+	argv0, ok := executable.(string)
+	if !ok {
+		executableFile, isTool, err := rc.getFileFromFileOrFilesToRunProvider(thread, executable)
+		if err != nil {
+			return nil, fmt.Errorf("executable: %w", err)
+		}
+		argv0, err = model_starlark.FileGetPath(executableFile.GetDefinition())
 		if err != nil {
 			return nil, err
 		}
-	case *model_starlark.Struct[TReference, TMetadata]:
-		return nil, errors.New("TODO: get argv0 from FilesToRunProvider")
+		if isTool {
+			toolsDirect = append(toolsDirect, executableFile)
+		} else {
+			inputsDirect = append(inputsDirect, executableFile)
+		}
 	}
 	valueEncodingOptions := rc.computer.getValueEncodingOptions(rc.environment, nil)
 	stringArgumentsListBuilder := model_starlark.NewListBuilder(valueEncodingOptions)
@@ -2593,21 +2638,56 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 		}
 	}
 
-	var inputsList []*model_starlark_pb.List_Element
+	// Gather inputs and tools.
+	//
+	// If tools are provided in the form of depsets, or Files that
+	// are not provided by a label attribute marked executable=True,
+	// they will not have their runfiles directories added to the
+	// input root. Demote such tools to regular inputs.
+	var inputsTransitive []*model_starlark.Depset[TReference, TMetadata]
 	if inputs != nil {
-		d, _, err := inputs.EncodeList(map[starlark.Value]struct{}{}, valueEncodingOptions)
-		if err != nil {
-			return nil, err
-		}
-		inputsList = d.Message
-		patcher.Merge(d.Patcher)
+		inputsTransitive = append(inputsTransitive, inputs)
 	}
+	for i, tool := range tools {
+		if d, ok := tool.(*model_starlark.Depset[TReference, TMetadata]); ok {
+			inputsTransitive = append(inputsTransitive, d)
+		} else {
+			if toolFile, isTool, err := rc.getFileFromFileOrFilesToRunProvider(thread, executable); err != nil {
+				return nil, fmt.Errorf("tool at index %d: %w", i, err)
+			} else if isTool {
+				toolsDirect = append(toolsDirect, toolFile)
+			} else {
+				inputsDirect = append(inputsDirect, toolFile)
+			}
+		}
+	}
+
+	mergedInputs, err := model_starlark.NewDepset(thread, inputsDirect, inputsTransitive, model_starlark_pb.Depset_DEFAULT)
+	if err != nil {
+		return nil, err
+	}
+	encodedInputs, _, err := mergedInputs.EncodeList(map[starlark.Value]struct{}{}, valueEncodingOptions)
+	if err != nil {
+		return nil, err
+	}
+	patcher.Merge(encodedInputs.Patcher)
+
+	mergedTools, err := model_starlark.NewDepset[TReference, TMetadata](thread, toolsDirect, nil, model_starlark_pb.Depset_DEFAULT)
+	if err != nil {
+		return nil, err
+	}
+	encodedTools, _, err := mergedTools.EncodeList(map[starlark.Value]struct{}{}, valueEncodingOptions)
+	if err != nil {
+		return nil, err
+	}
+	patcher.Merge(encodedTools.Patcher)
 
 	rc.actions = append(rc.actions, model_core.NewPatchedMessage(
 		&model_analysis_pb.ConfiguredTarget_Value_Action_Leaf{
 			Arguments:             argsList.Message,
 			Id:                    actionID,
-			Inputs:                inputsList,
+			Inputs:                encodedInputs.Message,
+			Tools:                 encodedTools.Message,
 			PlatformPkixPublicKey: rc.execGroups[execGroupIndex].platformPkixPublicKey,
 		},
 		patcher,
