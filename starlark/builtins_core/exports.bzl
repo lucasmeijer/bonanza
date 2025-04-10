@@ -281,6 +281,11 @@ def _filegroup_impl(ctx):
     if ctx.attr.output_group:
         for src in ctx.attr.srcs:
             files.append(getattr(src[OutputGroupInfo], ctx.attr.output_group))
+    elif len(ctx.attr.srcs) == 1:
+        # If exactly one target is provided, return the original
+        # DefaultInfo. This ensures that fields like files_to_run are
+        # preserved.
+        return ctx.attr.srcs[0][DefaultInfo]
     else:
         for src in ctx.attr.srcs:
             default_info = src[DefaultInfo]
