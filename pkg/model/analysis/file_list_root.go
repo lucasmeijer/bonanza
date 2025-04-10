@@ -7,22 +7,31 @@ import (
 
 	"github.com/buildbarn/bonanza/pkg/evaluation"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
+	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
 	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
 	model_filesystem_pb "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
 	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
 	"github.com/buildbarn/bonanza/pkg/storage/dag"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
+
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 )
 
-type getRootForFilesEnvironment[TReference, TMetadata any] interface {
+type addFilesToChangeTrackingDirectoryEnvironment[TReference, TMetadata any] interface {
 	model_core.ExistingObjectCapturer[TReference, TMetadata]
 
 	GetFileListRootValue(key model_core.PatchedMessage[*model_analysis_pb.FileListRoot_Key, dag.ObjectContentsWalker]) model_core.Message[*model_analysis_pb.FileListRoot_Value, TReference]
 	GetFileRootValue(key model_core.PatchedMessage[*model_analysis_pb.FileRoot_Key, dag.ObjectContentsWalker]) model_core.Message[*model_analysis_pb.FileRoot_Value, TReference]
 }
 
-func getRootForFiles[TReference object.BasicReference, TMetadata model_core.WalkableReferenceMetadata](e getRootForFilesEnvironment[TReference, TMetadata], fileList model_core.Message[[]*model_starlark_pb.List_Element, TReference]) (model_core.PatchedMessage[*model_filesystem_pb.Directory, TMetadata], error) {
+func addFilesToChangeTrackingDirectory[TReference object.BasicReference, TMetadata model_core.WalkableReferenceMetadata](
+	e addFilesToChangeTrackingDirectoryEnvironment[TReference, TMetadata],
+	fileList model_core.Message[[]*model_starlark_pb.List_Element, TReference],
+	out *changeTrackingDirectory[TReference, TMetadata],
+	loadOptions *changeTrackingDirectoryLoadOptions[TReference],
+) error {
 	missingDependencies := false
 	for i, element := range fileList.Message {
 		var root model_core.Message[*model_filesystem_pb.Directory, TReference]
@@ -45,7 +54,7 @@ func getRootForFiles[TReference object.BasicReference, TMetadata model_core.Walk
 		case *model_starlark_pb.List_Element_Leaf:
 			file, ok := level.Leaf.Kind.(*model_starlark_pb.Value_File)
 			if !ok {
-				return model_core.PatchedMessage[*model_filesystem_pb.Directory, TMetadata]{}, fmt.Errorf("element at index %d is not a file", i)
+				return fmt.Errorf("element at index %d is not a file", i)
 			}
 			patchedFile := model_core.Patch(e, model_core.Nested(fileList, file.File))
 			v := e.GetFileRootValue(
@@ -62,37 +71,72 @@ func getRootForFiles[TReference object.BasicReference, TMetadata model_core.Walk
 			}
 			root = model_core.Nested(v, v.Message.RootDirectory)
 		default:
-			return model_core.PatchedMessage[*model_filesystem_pb.Directory, TMetadata]{}, errors.New("invalid list level type")
+			return errors.New("invalid list level type")
 		}
-
-		// Optimize the case when this function is called
-		// against a single element list. Return the resulting
-		// root without any merging.
-		if len(fileList.Message) == 1 {
-			return model_core.Patch(e, root), nil
+		if err := out.mergeContents(root, loadOptions); err != nil {
+			return fmt.Errorf("failed to merge child %d", i)
 		}
 	}
 	if missingDependencies {
-		return model_core.PatchedMessage[*model_filesystem_pb.Directory, TMetadata]{}, evaluation.ErrMissingDependency
+		return evaluation.ErrMissingDependency
 	}
-	return model_core.PatchedMessage[*model_filesystem_pb.Directory, TMetadata]{}, errors.New("TODO: Implement!")
+	return nil
 }
 
 func (c *baseComputer[TReference, TMetadata]) ComputeFileListRootValue(ctx context.Context, key model_core.Message[*model_analysis_pb.FileListRoot_Key, TReference], e FileListRootEnvironment[TReference, TMetadata]) (PatchedFileListRootValue, error) {
+	directoryCreationParameters, gotDirectoryCreationParameters := e.GetDirectoryCreationParametersObjectValue(&model_analysis_pb.DirectoryCreationParametersObject_Key{})
+	directoryReaders, gotDirectoryReaders := e.GetDirectoryReadersValue(&model_analysis_pb.DirectoryReaders_Key{})
+	if !gotDirectoryCreationParameters || !gotDirectoryReaders {
+		return PatchedFileListRootValue{}, evaluation.ErrMissingDependency
+	}
+
 	filesList, err := model_parser.Dereference(ctx, c.valueReaders.List, model_core.Nested(key, key.Message.ListReference))
 	if err != nil {
 		return PatchedFileListRootValue{}, err
 	}
 
-	root, err := getRootForFiles(e, filesList)
-	if err != nil {
+	var rootDirectory changeTrackingDirectory[TReference, TMetadata]
+	if err := addFilesToChangeTrackingDirectory(
+		e,
+		filesList,
+		&rootDirectory,
+		&changeTrackingDirectoryLoadOptions[TReference]{
+			context:         ctx,
+			directoryReader: directoryReaders.Directory,
+			leavesReader:    directoryReaders.Leaves,
+		},
+	); err != nil {
+		return PatchedFileListRootValue{}, err
+	}
+
+	group, groupCtx := errgroup.WithContext(ctx)
+	var createdRootDirectory model_filesystem.CreatedDirectory[TMetadata]
+	group.Go(func() error {
+		return model_filesystem.CreateDirectoryMerkleTree[TMetadata, TMetadata](
+			groupCtx,
+			semaphore.NewWeighted(1),
+			group,
+			directoryCreationParameters,
+			&capturableChangeTrackingDirectory[TReference, TMetadata]{
+				options: &capturableChangeTrackingDirectoryOptions[TReference, TMetadata]{
+					context:         ctx,
+					directoryReader: directoryReaders.Directory,
+					objectCapturer:  e,
+				},
+				directory: &rootDirectory,
+			},
+			model_filesystem.NewSimpleDirectoryMerkleTreeCapturer[TMetadata](e),
+			&createdRootDirectory,
+		)
+	})
+	if err := group.Wait(); err != nil {
 		return PatchedFileListRootValue{}, err
 	}
 
 	return model_core.NewPatchedMessage(
 		&model_analysis_pb.FileListRoot_Value{
-			RootDirectory: root.Message,
+			RootDirectory: createdRootDirectory.Message.Message,
 		},
-		model_core.MapReferenceMetadataToWalkers(root.Patcher),
+		model_core.MapReferenceMetadataToWalkers(createdRootDirectory.Message.Patcher),
 	), nil
 }

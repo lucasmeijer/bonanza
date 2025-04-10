@@ -151,25 +151,95 @@ func (d *changeTrackingDirectory[TReference, TMetadata]) setContents(contents mo
 		if !ok {
 			return fmt.Errorf("directory %#v has an invalid name", directory.Name)
 		}
-		switch childContents := directory.Contents.(type) {
-		case *model_filesystem_pb.DirectoryNode_ContentsExternal:
-			d.directories[name] = &changeTrackingDirectory[TReference, TMetadata]{
-				currentReference: model_core.Nested(contents, childContents.ContentsExternal),
-			}
-		case *model_filesystem_pb.DirectoryNode_ContentsInline:
-			dChild := &changeTrackingDirectory[TReference, TMetadata]{}
-			if err := dChild.setContents(
-				model_core.Nested(contents, childContents.ContentsInline),
-				options,
-			); err != nil {
-				return err
-			}
-			d.directories[name] = dChild
-		default:
-			return errors.New("unknown directory contents type")
+		if err := d.createUnchangedDirectory(name, model_core.Nested(contents, directory), options); err != nil {
+			return err
 		}
 	}
 	return nil
+}
+
+// mergeContents recursively merges the contents of a given directory
+// message into an already existing changeTrackingDirectory. Any
+// conflicts will cause merging to fail.
+func (d *changeTrackingDirectory[TReference, TMetadata]) mergeContents(contents model_core.Message[*model_filesystem_pb.Directory, TReference], options *changeTrackingDirectoryLoadOptions[TReference]) error {
+	if err := d.maybeLoadContents(options); err != nil {
+		return err
+	}
+
+	leaves, err := model_filesystem.DirectoryGetLeaves(options.context, options.leavesReader, contents)
+	if err != nil {
+		return err
+	}
+
+	for _, file := range leaves.Message.Files {
+		name, ok := path.NewComponent(file.Name)
+		if !ok {
+			return fmt.Errorf("file %#v has an invalid name", file.Name)
+		}
+
+		if _, ok := d.files[name]; ok {
+			// TODO: Check equality!
+		} else if _, ok := d.symlinks[name]; ok {
+			return fmt.Errorf("file %#v conflicts with an existing symbolic link", name.String())
+		} else if _, ok := d.directories[name]; ok {
+			return fmt.Errorf("file %#v conflicts with an existing directory", name.String())
+		} else {
+			f, err := newChangeTrackingFileFromFileProperties[TReference, TMetadata](model_core.Nested(leaves, file.Properties))
+			if err != nil {
+				return fmt.Errorf("file %#v: %w", file.Name)
+			}
+			d.setFileSimple(name, f)
+		}
+	}
+	for _, symlink := range leaves.Message.Symlinks {
+		name, ok := path.NewComponent(symlink.Name)
+		if !ok {
+			return fmt.Errorf("symbolic link %#v has an invalid name", symlink.Name)
+		}
+
+		if _, ok := d.files[name]; ok {
+			return fmt.Errorf("symbolic link %#v conflicts with an existing file", name.String())
+		} else if _, ok := d.symlinks[name]; ok {
+			// TODO: Check equality!
+		} else if _, ok := d.directories[name]; ok {
+			return fmt.Errorf("symbolic link %#v conflicts with an existing directory", name.String())
+		} else {
+			d.setSymlinkSimple(name, path.UNIXFormat.NewParser(symlink.Target))
+		}
+	}
+
+	for _, directory := range contents.Message.Directories {
+		name, ok := path.NewComponent(directory.Name)
+		if !ok {
+			return fmt.Errorf("directory %#v has an invalid name", directory.Name)
+		}
+
+		if _, ok := d.files[name]; ok {
+			return fmt.Errorf("directory %#v conflicts with an existing file", name.String())
+		} else if _, ok := d.symlinks[name]; ok {
+			return fmt.Errorf("directory %#v conflicts with an existing symbolic link", name.String())
+		} else if child, ok := d.directories[name]; ok {
+			childMessage, err := model_filesystem.DirectoryNodeGetContents(options.context, options.directoryReader, model_core.Nested(contents, directory))
+			if err != nil {
+				return err
+			}
+			if err := child.mergeContents(childMessage, options); err != nil {
+				return err
+			}
+		} else {
+			if err := d.createUnchangedDirectory(name, model_core.Nested(contents, directory), options); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (d *changeTrackingDirectory[TReference, TMetadata]) setDirectorySimple(name path.Component, child *changeTrackingDirectory[TReference, TMetadata]) {
+	if d.directories == nil {
+		d.directories = map[path.Component]*changeTrackingDirectory[TReference, TMetadata]{}
+	}
+	d.directories[name] = child
 }
 
 func (d *changeTrackingDirectory[TReference, TMetadata]) getOrCreateDirectory(name path.Component) (*changeTrackingDirectory[TReference, TMetadata], error) {
@@ -181,13 +251,42 @@ func (d *changeTrackingDirectory[TReference, TMetadata]) getOrCreateDirectory(na
 		if _, ok := d.symlinks[name]; ok {
 			return nil, errors.New("a symbolic link with this name already exists")
 		}
-		if d.directories == nil {
-			d.directories = map[path.Component]*changeTrackingDirectory[TReference, TMetadata]{}
-		}
 		dChild = &changeTrackingDirectory[TReference, TMetadata]{}
-		d.directories[name] = dChild
+		d.setDirectorySimple(name, dChild)
 	}
 	return dChild, nil
+}
+
+func (d *changeTrackingDirectory[TReference, TMetadata]) createUnchangedDirectory(
+	name path.Component,
+	directoryNode model_core.Message[*model_filesystem_pb.DirectoryNode, TReference],
+	options *changeTrackingDirectoryLoadOptions[TReference],
+) error {
+	switch childContents := directoryNode.Message.Contents.(type) {
+	case *model_filesystem_pb.DirectoryNode_ContentsExternal:
+		d.setDirectorySimple(name, &changeTrackingDirectory[TReference, TMetadata]{
+			currentReference: model_core.Nested(directoryNode, childContents.ContentsExternal),
+		})
+	case *model_filesystem_pb.DirectoryNode_ContentsInline:
+		dChild := &changeTrackingDirectory[TReference, TMetadata]{}
+		if err := dChild.setContents(
+			model_core.Nested(directoryNode, childContents.ContentsInline),
+			options,
+		); err != nil {
+			return err
+		}
+		d.setDirectorySimple(name, dChild)
+	default:
+		return errors.New("unknown directory contents type")
+	}
+	return nil
+}
+
+func (d *changeTrackingDirectory[TReference, TMetadata]) setFileSimple(name path.Component, f *changeTrackingFile[TReference, TMetadata]) {
+	if d.files == nil {
+		d.files = map[path.Component]*changeTrackingFile[TReference, TMetadata]{}
+	}
+	d.files[name] = f
 }
 
 func (d *changeTrackingDirectory[TReference, TMetadata]) setFile(loadOptions *changeTrackingDirectoryLoadOptions[TReference], name path.Component, f *changeTrackingFile[TReference, TMetadata]) error {
@@ -195,14 +294,17 @@ func (d *changeTrackingDirectory[TReference, TMetadata]) setFile(loadOptions *ch
 		return err
 	}
 
-	if d.files == nil {
-		d.files = map[path.Component]*changeTrackingFile[TReference, TMetadata]{}
-	}
-	d.files[name] = f
+	d.setFileSimple(name, f)
 	delete(d.directories, name)
 	delete(d.symlinks, name)
-
 	return nil
+}
+
+func (d *changeTrackingDirectory[TReference, TMetadata]) setSymlinkSimple(name path.Component, target path.Parser) {
+	if d.symlinks == nil {
+		d.symlinks = map[path.Component]path.Parser{}
+	}
+	d.symlinks[name] = target
 }
 
 func (d *changeTrackingDirectory[TReference, TMetadata]) setSymlink(loadOptions *changeTrackingDirectoryLoadOptions[TReference], name path.Component, target path.Parser) error {
@@ -210,13 +312,9 @@ func (d *changeTrackingDirectory[TReference, TMetadata]) setSymlink(loadOptions 
 		return err
 	}
 
-	if d.symlinks == nil {
-		d.symlinks = map[path.Component]path.Parser{}
-	}
-	d.symlinks[name] = target
+	d.setSymlinkSimple(name, target)
 	delete(d.directories, name)
 	delete(d.files, name)
-
 	return nil
 }
 

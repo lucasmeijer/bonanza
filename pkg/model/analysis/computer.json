@@ -195,6 +195,8 @@
       },
       "FileListRoot": {
          "dependsOn": [
+            "DirectoryCreationParametersObject",
+            "DirectoryReaders",
             "FileListRoot",
             "FileRoot"
          ],
@@ -529,6 +531,7 @@
             "ConfiguredTarget",
             "DirectoryCreationParameters",
             "DirectoryCreationParametersObject",
+            "DirectoryReaders",
             "FileCreationParameters",
             "FileListRoot",
             "FileRoot",

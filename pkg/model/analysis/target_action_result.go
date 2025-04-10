@@ -14,6 +14,7 @@ import (
 	"github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/model/core/btree"
+	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
 	model_starlark "github.com/buildbarn/bonanza/pkg/model/starlark"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
 	model_command_pb "github.com/buildbarn/bonanza/pkg/proto/model/command"
@@ -21,6 +22,8 @@ import (
 	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
 	"github.com/buildbarn/bonanza/pkg/starlark/unpack"
 
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"go.starlark.net/starlark"
@@ -91,11 +94,13 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 	)
 	directoryCreationParameters, gotDirectoryCreationParameters := e.GetDirectoryCreationParametersObjectValue(&model_analysis_pb.DirectoryCreationParametersObject_Key{})
 	directoryCreationParametersMessage := e.GetDirectoryCreationParametersValue(&model_analysis_pb.DirectoryCreationParameters_Key{})
+	directoryReaders, gotDirectoryReaders := e.GetDirectoryReadersValue(&model_analysis_pb.DirectoryReaders_Key{})
 	fileCreationParametersMessage := e.GetFileCreationParametersValue(&model_analysis_pb.FileCreationParameters_Key{})
 	if !allBuiltinsModulesNames.IsSet() ||
 		!gotCommandEncoder ||
 		!configuredTarget.IsSet() ||
 		!gotDirectoryCreationParameters ||
+		!gotDirectoryReaders ||
 		!directoryCreationParametersMessage.IsSet() ||
 		!fileCreationParametersMessage.IsSet() {
 		return PatchedTargetActionResultValue{}, evaluation.ErrMissingDependency
@@ -445,12 +450,56 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 	)
 
 	// Construct the input root of the action.
-	rootDirectory, err := getRootForFiles(e, model_core.Nested(action, actionLeaf.Inputs))
-	if err != nil {
+	var rootDirectory changeTrackingDirectory[TReference, TMetadata]
+	loadOptions := &changeTrackingDirectoryLoadOptions[TReference]{
+		context:         ctx,
+		directoryReader: directoryReaders.Directory,
+		leavesReader:    directoryReaders.Leaves,
+	}
+	if err := addFilesToChangeTrackingDirectory(
+		e,
+		model_core.Nested(action, actionLeaf.Inputs),
+		&rootDirectory,
+		loadOptions,
+	); err != nil {
 		return PatchedTargetActionResultValue{}, err
 	}
-	createdRootDirectory, err := model_core.MarshalAndEncodePatchedMessage(
-		rootDirectory,
+	// TODO: We need to add runfiles for the tools!
+	if err := addFilesToChangeTrackingDirectory(
+		e,
+		model_core.Nested(action, actionLeaf.Tools),
+		&rootDirectory,
+		loadOptions,
+	); err != nil {
+		return PatchedTargetActionResultValue{}, err
+	}
+
+	group, groupCtx := errgroup.WithContext(ctx)
+	var createdRootDirectory model_filesystem.CreatedDirectory[TMetadata]
+	group.Go(func() error {
+		return model_filesystem.CreateDirectoryMerkleTree[TMetadata, TMetadata](
+			groupCtx,
+			semaphore.NewWeighted(1),
+			group,
+			directoryCreationParameters,
+			&capturableChangeTrackingDirectory[TReference, TMetadata]{
+				options: &capturableChangeTrackingDirectoryOptions[TReference, TMetadata]{
+					context:         ctx,
+					directoryReader: directoryReaders.Directory,
+					objectCapturer:  e,
+				},
+				directory: &rootDirectory,
+			},
+			model_filesystem.NewSimpleDirectoryMerkleTreeCapturer[TMetadata](e),
+			&createdRootDirectory,
+		)
+	})
+	if err := group.Wait(); err != nil {
+		return PatchedTargetActionResultValue{}, err
+	}
+
+	rootDirectoryObject, err := model_core.MarshalAndEncodePatchedMessage(
+		createdRootDirectory.Message,
 		referenceFormat,
 		directoryCreationParameters.GetEncoder(),
 	)
@@ -474,8 +523,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 				ExecutionTimeout:   &durationpb.Duration{Seconds: 3600},
 				ExitCodeMustBeZero: true,
 				InputRootReference: patcher.AddReference(
-					createdRootDirectory.Contents.GetReference(),
-					e.CaptureCreatedObject(createdRootDirectory),
+					rootDirectoryObject.Contents.GetReference(),
+					e.CaptureCreatedObject(rootDirectoryObject),
 				),
 				PlatformPkixPublicKey: actionLeaf.PlatformPkixPublicKey,
 			},
