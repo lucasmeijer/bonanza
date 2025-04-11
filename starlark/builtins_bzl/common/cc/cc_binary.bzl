@@ -121,7 +121,7 @@ def _collect_runfiles(ctx, feature_configuration, cc_toolchain, libraries, cc_li
     builder_artifacts = []
     builder_transitive_artifacts = []
 
-    builder = ctx.runfiles(transitive_files = _add(ctx, linking_mode != linker_mode.LINKING_DYNAMIC))
+    builder = ctx.runfiles(transitive_files = _add(ctx, linking_mode != linker_mode.LINKING_DYNAMIC), collect_default = True)
     coverage_runtime_objects_builder = ctx.runfiles(transitive_files = _add(ctx, linking_mode != linker_mode.LINKING_DYNAMIC))
 
     runtime_objects_for_coverage.extend(coverage_runtime_objects_builder.files.to_list())
@@ -829,7 +829,7 @@ be <code>main</code>.
     fragments = ["cpp"] + semantics.additional_fragments(),
     exec_groups = {
         "cpp_link": exec_group(toolchains = cc_helper.use_cpp_toolchain()),
-    },
+    } | semantics.extra_exec_groups,
     toolchains = cc_helper.use_cpp_toolchain() +
                  semantics.get_runtimes_toolchain(),
     provides = [CcInfo],

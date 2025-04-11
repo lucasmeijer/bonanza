@@ -83,6 +83,8 @@ def _cpp_fragment_impl(ctx):
     compilation_mode = ctx.attr._compilation_mode[BuildSettingInfo].value
     dynamic_mode = ctx.attr._dynamic_mode[BuildSettingInfo].value.upper()
     experimental_cc_implementation_deps = ctx.attr._cc_implementation_deps[BuildSettingInfo].value
+    experimental_starlark_compiling = ctx.attr._starlark_compiling[BuildSettingInfo].value
+    experimental_starlark_linking = ctx.attr._starlark_linking[BuildSettingInfo].value
     fission = ctx.attr._fission[BuildSettingInfo].value
     fission_active_for_current_compilation_mode = (
         True if fission == "yes" else False if fission == "no" else compilation_mode in fission.split(",")
@@ -110,7 +112,8 @@ def _cpp_fragment_impl(ctx):
         do_not_use_macos_set_install_name = ctx.attr._macos_set_install_name[BuildSettingInfo].value,
         dynamic_mode = lambda: dynamic_mode,
         experimental_cc_implementation_deps = lambda: experimental_cc_implementation_deps,
-        experimental_starlark_linking = lambda: True,
+        experimental_starlark_compiling = lambda: experimental_starlark_compiling,
+        experimental_starlark_linking = lambda: experimental_starlark_linking,
         fdo_path = lambda: None,  # We assume --fdo_optimize is always a label.
         fission_active_for_current_compilation_mode = lambda: fission_active_for_current_compilation_mode,
         force_pic = lambda: force_pic,
@@ -150,6 +153,8 @@ cpp_fragment = rule(
         "_propeller_optimize_absolute_ld_profile": attr.label(default = "//command_line_option:propeller_optimize_absolute_ld_profile"),
         "_proto_profile": attr.label(default = "//command_line_option:proto_profile"),
         "_save_feature_state": attr.label(default = "//command_line_option:experimental_save_feature_state"),
+        "_starlark_compiling": attr.label(default = "//command_line_option:experimental_starlark_compiling"),
+        "_starlark_linking": attr.label(default = "//command_line_option:experimental_starlark_linking"),
         "_strip": attr.label(default = "//command_line_option:strip"),
         "_stripopt": attr.label(default = "//command_line_option:stripopt"),
         "_use_specific_tool_files": attr.label(default = "//command_line_option:incompatible_use_specific_tool_files"),

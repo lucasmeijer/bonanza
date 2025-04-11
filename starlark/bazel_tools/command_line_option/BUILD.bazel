@@ -732,13 +732,19 @@ bool_flag(
 
 bool_flag(
     name = "experimental_starlark_cc_import",
-    build_setting_default = False,
+    build_setting_default = True,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "experimental_starlark_compiling",
+    build_setting_default = True,
     visibility = ["//visibility:public"],
 )
 
 bool_flag(
     name = "experimental_starlark_linking",
-    build_setting_default = False,
+    build_setting_default = True,
     visibility = ["//visibility:public"],
 )
 
@@ -900,12 +906,6 @@ string_list_flag(
 string_flag(
     name = "host_cpu",
     build_setting_default = "",
-    visibility = ["//visibility:public"],
-)
-
-label_flag(
-    name = "host_crosstool_top",
-    build_setting_default = "//tools/cpp:toolchain",
     visibility = ["//visibility:public"],
 )
 

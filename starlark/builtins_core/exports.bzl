@@ -608,7 +608,7 @@ def _create_compilation_outputs(objects, pic_objects, lto_compilation_context):
         temps = lambda: depset(),
     )
 
-def builtins_internal_cc_common_compile(
+def builtins_internal_cc_common_compile_fork(
         *,
         actions,
         cc_toolchain,
@@ -972,6 +972,14 @@ def builtins_internal_cc_common_merge_linking_contexts(linking_contexts = []):
         ),
     )
 
+def builtins_internal_cc_common_validate_starlark_compile_api_call(
+        *,
+        actions,
+        include_prefix,
+        strip_include_prefix,
+        additional_include_scanning_roots):
+    pass
+
 def builtins_internal_cc_internal_actions2ctx_cheat(actions):
     return native.current_ctx()
 
@@ -1229,7 +1237,7 @@ exported_toplevels["_builtins"] = struct(
             CcToolchainInfo = CcToolchainInfo,
             action_is_enabled = builtins_internal_cc_common_action_is_enabled,
             check_private_api = builtins_internal_cc_common_check_private_api,
-            compile = builtins_internal_cc_common_compile,
+            compile_fork = builtins_internal_cc_common_compile_fork,
             configure_features = builtins_internal_cc_common_configure_features,
             create_cc_toolchain_config_info = builtins_internal_cc_common_create_cc_toolchain_config_info,
             create_compilation_context = builtins_internal_cc_common_create_compilation_context,
@@ -1249,6 +1257,7 @@ exported_toplevels["_builtins"] = struct(
             merge_compilation_outputs = builtins_internal_cc_common_merge_compilation_outputs,
             merge_debug_context = builtins_internal_cc_common_merge_debug_context,
             merge_linking_contexts = builtins_internal_cc_common_merge_linking_contexts,
+            validate_starlark_compile_api_call = builtins_internal_cc_common_validate_starlark_compile_api_call,
         ),
         cc_internal = struct(
             actions2ctx_cheat = builtins_internal_cc_internal_actions2ctx_cheat,
