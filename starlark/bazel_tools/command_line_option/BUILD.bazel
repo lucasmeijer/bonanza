@@ -86,6 +86,12 @@ label_flag(
     visibility = ["//visibility:public"],
 )
 
+bool_flag(
+    name = "apple_generate_dsym",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
 string_flag(
     name = "apple_platform_type",
     # TODO: This should be inferred from the platform somehow.
@@ -203,6 +209,12 @@ string_flag(
 label_flag(
     name = "crosstool_top",
     build_setting_default = "//tools/cpp:toolchain",
+    visibility = ["//visibility:public"],
+)
+
+string_flag(
+    name = "cs_fdo_instrument",
+    build_setting_default = "",
     visibility = ["//visibility:public"],
 )
 
@@ -828,6 +840,12 @@ label_list_flag(
 string_list_flag(
     name = "features",
     build_setting_default = [],
+    visibility = ["//visibility:public"],
+)
+
+string_flag(
+    name = "fdo_instrument",
+    build_setting_default = "",
     visibility = ["//visibility:public"],
 )
 

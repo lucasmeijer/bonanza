@@ -103,18 +103,24 @@ def _cpp_fragment_impl(ctx):
     should_strip_binaries = strip == "always" or (strip == "sometimes" and compilation_mode == "fastbuild")
     use_specific_tool_files = ctx.attr._use_specific_tool_files[BuildSettingInfo].value
     return [FragmentInfo(
+        apple_generate_dsym = ctx.attr._apple_generate_dsym[BuildSettingInfo].value,
+        collect_code_coverage = ctx.attr._collect_code_coverage[BuildSettingInfo].value,
         compilation_mode = lambda: compilation_mode,
         conlyopts = ctx.attr._conlyopt[BuildSettingInfo].value,
         copts = ctx.attr._copt[BuildSettingInfo].value,
+        cs_fdo_instrument = ctx.attr._cs_fdo_instrument[BuildSettingInfo].value,
         cs_fdo_path = lambda: None,  # We assume --cs_fdo_optimize is always a label.
         custom_malloc = ctx.attr._custom_malloc[BuildSettingInfo].value if ctx.attr._custom_malloc else None,
         cxxopts = ctx.attr._cxxopt[BuildSettingInfo].value,
         do_not_use_macos_set_install_name = ctx.attr._macos_set_install_name[BuildSettingInfo].value,
+        dont_enable_host_nonhost = ctx.attr._dont_enable_host_nonhost_crosstool_features[BuildSettingInfo].value,
         dynamic_mode = lambda: dynamic_mode,
         experimental_cc_implementation_deps = lambda: experimental_cc_implementation_deps,
         experimental_starlark_compiling = lambda: experimental_starlark_compiling,
         experimental_starlark_linking = lambda: experimental_starlark_linking,
+        fdo_instrument = ctx.attr._fdo_instrument[BuildSettingInfo].value,
         fdo_path = lambda: None,  # We assume --fdo_optimize is always a label.
+        fdo_prefetch_hints = ctx.attr._fdo_prefetch_hints.label if ctx.attr._fdo_prefetch_hints else None,
         fission_active_for_current_compilation_mode = lambda: fission_active_for_current_compilation_mode,
         force_pic = lambda: force_pic,
         generate_llvm_lcov = lambda: generate_llvm_lcov,
@@ -134,13 +140,19 @@ def _cpp_fragment_impl(ctx):
 cpp_fragment = rule(
     _cpp_fragment_impl,
     attrs = {
+        "_apple_generate_dsym": attr.label(default = "//command_line_option:apple_generate_dsym"),
         "_cc_implementation_deps": attr.label(default = "//command_line_option:experimental_cc_implementation_deps"),
+        "_collect_code_coverage": attr.label(default = "//command_line_option:collect_code_coverage"),
         "_compilation_mode": attr.label(default = "//command_line_option:compilation_mode"),
         "_conlyopt": attr.label(default = "//command_line_option:conlyopt"),
         "_copt": attr.label(default = "//command_line_option:copt"),
+        "_cs_fdo_instrument": attr.label(default = "//command_line_option:cs_fdo_instrument"),
         "_custom_malloc": attr.label(default = "//command_line_option:custom_malloc"),
         "_cxxopt": attr.label(default = "//command_line_option:cxxopt"),
+        "_dont_enable_host_nonhost_crosstool_features": attr.label(default = "//command_line_option:incompatible_dont_enable_host_nonhost_crosstool_features"),
         "_dynamic_mode": attr.label(default = "//command_line_option:dynamic_mode"),
+        "_fdo_instrument": attr.label(default = "//command_line_option:fdo_instrument"),
+        "_fdo_prefetch_hints": attr.label(default = "//command_line_option:fdo_prefetch_hints"),
         "_fission": attr.label(default = "//command_line_option:fission"),
         "_force_pic": attr.label(default = "//command_line_option:force_pic"),
         "_generate_llvm_lcov": attr.label(default = "//command_line_option:experimental_generate_llvm_lcov"),

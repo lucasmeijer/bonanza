@@ -575,7 +575,7 @@ def builtins_internal_apple_common_dotted_version(v):
     return v
 
 def builtins_internal_cc_common_action_is_enabled(*, feature_configuration, action_name):
-    return action_name in ["c++-link-executable", "strip"]
+    return feature_configuration.is_enabled(action_name)
 
 def builtins_internal_cc_common_check_private_api(allowlist = []):
     pass
@@ -668,8 +668,221 @@ def builtins_internal_cc_common_configure_features(
         language = None,
         requested_features = [],
         unsupported_features = []):
+    cpp_configuration = cc_toolchain._cpp_configuration
+
+    all_requested_features_builder = set()
+    unsupported_features_builder = set(unsupported_features)
+    if not cc_toolchain._supports_header_parsing:
+        unsupported_features_builder.add("parse_headers")
+
+    if (
+        language not in ["objc", "objc++"] and
+        not cc_toolchain._cc_info.compilation_context.module_map
+    ):
+        unsupported_features_builder.add("module_maps")
+
+    if cpp_configuration.force_pic:
+        if "supports_pic" in unsupported_features_builder:
+            fail("PIC compilation is requested but the toolchain does not support it (feature named 'supports_pic' is not enabled)")
+
+        all_requested_features_builder.add("supports_pic")
+
+    if cpp_configuration.apple_generate_dsym:
+        all_requested_features_builder.add("generate_dsym_file")
+    else:
+        all_requested_features_builder.add("no_generate_debug_symbols")
+
+    if language in ["objc", "objc++"]:
+        all_requested_features_builder.add("lang_objc")
+        if cpp_configuration.objc_generate_linkmap:
+            all_requested_features_builder.add("generate_linkmap")
+        if cpp_configuration.objc_should_strip_binary:
+            all_requested_features_builder.add("dead_strip")
+
+    all_unsupported_features = unsupported_features_builder
+
+    all_features = (
+        [
+            cpp_configuration.compilation_mode(),
+            # ALL_COMPILE_ACTIONS:
+            "c-compile",
+            "c++-compile",
+            "c++-header-parsing",
+            "c++-module-compile",
+            "c++-module-codegen",
+            "c++-module-deps-scanning",
+            "c++20-module-compile",
+            "c++20-module-codegen",
+            "assemble",
+            "preprocess-assemble",
+            "clif-match",
+            "linkstamp-compile",
+            "cc-flags-make-variable",
+            "lto-backend",
+            "c++-header-analysis",
+            # ALL_LINK_ACTIONS:
+            "lto-index-for-executable",
+            "lto-index-for-dynamic-library",
+            "lto-index-for-nodeps-dynamic-library",
+            "c++-link-executable",
+            "c++-link-dynamic-library",
+            "c++-link-nodeps-dynamic-library",
+            # ALL_ARCHIVE_ACTIONS:
+            "c++-link-static-library",
+            # ALL_OTHER_ACTIONS:
+            "strip",
+        ] +
+        requested_features +
+        cc_toolchain._toolchain_features._default_selectables
+    )
+
+    if language in ["objc", "objc++"]:
+        all_features += [
+            "objc-compile",
+            "objc++-compile",
+            "objc-fully-link",
+            "objc-executable",
+        ]
+
+    if not cpp_configuration.dont_enable_host_nonhost:
+        if cc_toolchain._configuration.is_tool_configuration:
+            all_features.append("host")
+        else:
+            all_features.append("host")
+
+    if cpp_configuration.collect_code_coverage:
+        all_features.append("coverage")
+        if cpp_configuration.use_llvm_coverage_map_format:
+            all_features.append("llvm_coverage_map_format")
+        else:
+            all_features.append("gcc_coverage_map_format")
+
+    if "fdo_instrument" not in all_unsupported_features:
+        if cpp_configuration.fdo_instrument:
+            all_features += ["fdo_instrument"]
+        elif cpp_configuration.cs_fdo_instrument:
+            all_features += ["cs_fdo_instrument"]
+
+    branch_fdo_provider = cc_toolchain._fdo_context.branch_fdo_profile
+
+    enable_propeller_optimize = (
+        cc_toolchain._fdo_context.propeller_optimize_info and
+        (
+            cc_toolchain._fdo_context.propeller_optimize_info.cc_artifact or
+            cc_toolchain._fdo_context.propeller_optimize_info.ld_artifact
+        )
+    )
+
+    if branch_fdo_provider and cpp_configuration.compilation_mode == "opt":
+        fail("TODO: add FDO related features")
+    if cpp_configuration.fdo_prefetch_hints:
+        all_requested_features_builder.add("fdo_prefetch_hints")
+
+    if enable_propeller_optimize:
+        all_requested_features_builder.add("propeller_optimize")
+
+    for feature in all_features:
+        if feature not in all_unsupported_features:
+            all_requested_features_builder.add(feature)
+
+    # TODO: Implement the algorithm of FeatureSelection.java to
+    # grow/prune these based on "requires"/"implies".
     return struct(
-        is_enabled = lambda feature: False,
+        _tool_for_action = {
+            name: action_config.tools[0].path
+            for name, action_config in cc_toolchain._toolchain_features._action_configs_by_action_name.items()
+        },
+        is_requested = lambda feature: feature in all_requested_features_builder,
+        is_enabled = lambda feature: feature in all_requested_features_builder,
+    )
+
+def _feature(
+        name,
+        enabled = False,
+        flag_sets = [],
+        env_sets = [],
+        requires = [],
+        implies = [],
+        provides = []):
+    return struct(
+        name = name,
+        enabled = enabled,
+        flag_sets = flag_sets,
+        env_sets = env_sets,
+        requires = requires,
+        implies = implies,
+        provides = provides,
+        type_name = "feature",
+    )
+
+def _flag_group(
+        flags = [],
+        flag_groups = [],
+        iterate_over = None,
+        expand_if_available = None,
+        expand_if_not_available = None,
+        expand_if_true = None,
+        expand_if_false = None,
+        expand_if_equal = None):
+    return struct(
+        flags = flags,
+        flag_groups = flag_groups,
+        iterate_over = iterate_over,
+        expand_if_available = expand_if_available,
+        expand_if_not_available = expand_if_not_available,
+        expand_if_true = expand_if_true,
+        expand_if_false = expand_if_false,
+        expand_if_equal = expand_if_equal,
+        type_name = "flag_group",
+    )
+
+def _flag_set(
+        actions = [],
+        with_features = [],
+        flag_groups = []):
+    return struct(
+        actions = actions,
+        with_features = with_features,
+        flag_groups = flag_groups,
+        type_name = "flag_set",
+    )
+
+def _variable_with_value(name, value):
+    return struct(
+        name = name,
+        value = value,
+        type_name = "variable_with_value",
+    )
+
+def _with_feature_set(features = [], not_features = []):
+    return struct(
+        features = features,
+        not_features = not_features,
+        type_name = "with_feature_set",
+    )
+
+def _action_config(
+        action_name,
+        enabled = False,
+        tools = [],
+        flag_sets = [],
+        implies = []):
+    return struct(
+        action_name = action_name,
+        enabled = enabled,
+        tools = tools,
+        flag_sets = flag_sets,
+        implies = implies,
+        type_name = "action_config",
+    )
+
+def _tool(path = None, with_features = [], execution_requirements = [], tool = None):
+    return struct(
+        path = path,
+        tool = tool,
+        with_features = with_features,
+        execution_requirements = execution_requirements,
+        type_name = "tool",
     )
 
 def builtins_internal_cc_common_create_cc_toolchain_config_info(
@@ -689,6 +902,817 @@ def builtins_internal_cc_common_create_cc_toolchain_config_info(
         tool_paths = [],
         make_variables = [],
         builtin_sysroot = None):
+    feature_names = set([feature.name for feature in features])
+    if "no_legacy_features" not in feature_names:
+        gcc_tool_path = "DUMMY_GCC_TOOL"
+        linker_tool_path = "DUMMY_LINKER_TOOL"
+        ar_tool_path = "DUMMY_AR_TOOL"
+        strip_tool_path = "DUMMY_STRIP_TOOL"
+        for tool in tool_paths:
+            if tool.name == "gcc":
+                # TODO: Linker path needs to be relative to exec path.
+                gcc_tool_path = tool.path
+                linker_tool_path = tool.path
+            elif tool.name == "ar":
+                ar_tool_path = tool.path
+            elif tool.name == "strip":
+                strip_tool_path = tool.path
+
+        legacy_features_builder = [
+            feature
+            for feature in features
+            if feature.name == "legacy_compile_flags"
+        ][:1] + [
+            feature
+            for feature in features
+            if feature.name == "default_compile_flags"
+        ][:1]
+
+        if "legacy_compile_flags" not in feature_names:
+            legacy_features_builder.append(_feature(
+                name = "legacy_compile_flags",
+                enabled = True,
+                flag_sets = [_flag_set(
+                    actions = [
+                        "assemble",
+                        "c-compile",
+                        "c++-compile",
+                        "c++-header-parsing",
+                        "c++-module-codegen",
+                        "c++-module-compile",
+                        "clif-match",
+                        "linkstamp-compile",
+                        "lto-backend",
+                        "preprocess-assemble",
+                    ],
+                    flag_groups = [_flag_group(
+                        expand_if_available = "legacy_compile_flags",
+                        iterate_over = "legacy_compile_flags",
+                        flags = ["%{legacy_compile_flags}"],
+                    )],
+                )],
+            ))
+        if "dependency_file" not in feature_names:
+            fail("TODO: dependency_file")
+        if "random_seed" not in feature_names:
+            legacy_features_builder.append(_feature(
+                name = "random_seed",
+                enabled = True,
+                flag_sets = [_flag_set(
+                    actions = [
+                        "c-compile",
+                        "c++-compile",
+                        "c++-module-codegen",
+                        "c++-module-compile",
+                    ],
+                    flag_groups = [_flag_group(
+                        expand_if_available = "output_file",
+                        flags = ["-frandom-seed=%{output_file}"],
+                    )],
+                )],
+            ))
+        if "pic" not in feature_names:
+            legacy_features_builder.append(_feature(
+                name = "pic",
+                enabled = True,
+                flag_sets = [_flag_set(
+                    actions = [
+                        "assemble",
+                        "c-compile",
+                        "c++-compile",
+                        "c++-module-codegen",
+                        "c++-module-compile",
+                        "linkstamp-compile",
+                        "preprocess-assemble",
+                    ],
+                    flag_groups = [_flag_group(
+                        expand_if_available = "pic",
+                        flags = ["-fPIC"],
+                    )],
+                )],
+            ))
+        if "per_object_debug_info" not in feature_names:
+            legacy_features_builder.append(_feature(
+                name = "per_object_debug_info",
+                enabled = True,
+                flag_sets = [_flag_set(
+                    actions = [
+                        "assemble",
+                        "c-compile",
+                        "c++-compile",
+                        "c++-module-codegen",
+                        "preprocess-assemble",
+                    ],
+                    flag_groups = [_flag_group(
+                        expand_if_available = "per_object_debug_info_file",
+                        flags = ["-gsplit-dwarf", "-g"],
+                    )],
+                )],
+            ))
+        if "preprocessor_defines" not in feature_names:
+            legacy_features_builder.append(_feature(
+                name = "preprocessor_defines",
+                enabled = True,
+                flag_sets = [_flag_set(
+                    actions = [
+                        "c-compile",
+                        "c++-compile",
+                        "c++-header-parsing",
+                        "c++-module-compile",
+                        "clif-match",
+                        "linkstamp-compile",
+                        "preprocess-assemble",
+                    ],
+                    flag_groups = [_flag_group(
+                        iterate_over = "preprocessor_defines",
+                        flags = ["-D%{preprocessor_defines}"],
+                    )],
+                )],
+            ))
+        if "includes" not in feature_names:
+            fail("TODO: includes")
+        if "include_paths" not in feature_names:
+            fail("TODO: include_paths")
+        if "fdo_instrument" not in feature_names:
+            legacy_features_builder.append(_feature(
+                name = "fdo_instrument",
+                provides = ["profile"],
+                flag_sets = [_flag_set(
+                    actions = [
+                        "c-compile",
+                        "c++-compile",
+                        "c++-link-dynamic-library",
+                        "c++-link-executable",
+                        "c++-link-nodeps-dynamic-library",
+                        "lto-index-for-dynamic-library",
+                        "lto-index-for-executable",
+                        "lto-index-for-nodeps-dynamic-library",
+                    ],
+                    flag_groups = [_flag_group(
+                        expand_if_available = "fdo_instrument_path",
+                        flags = [
+                            "-fprofile-generate=%{fdo_instrument_path}",
+                            "-fno-data-sections",
+                        ],
+                    )],
+                )],
+            ))
+        if "fdo_optimize" not in feature_names:
+            fail("TODO: fdo_optimize")
+        if "cs_fdo_instrument" not in feature_names:
+            legacy_features_builder.append(_feature(
+                name = "cs_fdo_instrument",
+                provides = ["csprofile"],
+                flag_sets = [_flag_set(
+                    actions = [
+                        "c-compile",
+                        "c++-compile",
+                        "c++-link-dynamic-library",
+                        "c++-link-executable",
+                        "c++-link-nodeps-dynamic-library",
+                        "lto-backend",
+                        "lto-index-for-dynamic-library",
+                        "lto-index-for-executable",
+                        "lto-index-for-nodeps-dynamic-library",
+                    ],
+                    flag_groups = [_flag_group(
+                        expand_if_available = "cs_fdo_instrument_path",
+                        flags = ["-fcs-profile-generate=%{cs_fdo_instrument_path}"],
+                    )],
+                )],
+            ))
+        if "cs_fdo_optimize" not in feature_names:
+            legacy_features_builder.append(_feature(
+                name = "cs_fdo_optimize",
+                provides = ["csprofile"],
+                flag_sets = [_flag_set(
+                    actions = ["lto-backend"],
+                    flag_groups = [_flag_group(
+                        expand_if_available = "fdo_profile_path",
+                        flags = [
+                            "-fprofile-use=%{fdo_profile_path}",
+                            "-Wno-profile-instr-unprofiled",
+                            "-Wno-profile-instr-out-of-date",
+                            "-fprofile-correction",
+                        ],
+                    )],
+                )],
+            ))
+        if "fdo_prefetch_hints" not in feature_names:
+            legacy_features_builder.append(_feature(
+                name = "fdo_prefetch_hints",
+                flag_sets = [_flag_set(
+                    actions = [
+                        "c-compile",
+                        "c++-compile",
+                        "lto-backend",
+                    ],
+                    flag_groups = [_flag_group(
+                        expand_if_available = "fdo_prefetch_hints_path",
+                        flags = [
+                            "-mllvm",
+                            "-prefetch-hints-file=%{fdo_prefetch_hints_path}",
+                        ],
+                    )],
+                )],
+            ))
+        if "autofdo" not in feature_names:
+            legacy_features_builder.append(_feature(
+                name = "autofdo",
+                provides = "profile",
+                flag_sets = [_flag_set(
+                    actions = [
+                        "c-compile",
+                        "c++-compile",
+                    ],
+                    flag_groups = [_flag_group(
+                        expand_if_available = "fdo_profile_path",
+                        flags = [
+                            "-fauto-profile=%{fdo_profile_path}",
+                            "-fprofile-correction",
+                        ],
+                    )],
+                )],
+            ))
+        if "propeller_optimize_thinlto_compile_actions" not in feature_names:
+            legacy_features_builder.append(_feature(
+                name = "propeller_optimize_thinlto_compile_actions",
+            ))
+        if "propeller_optimize" not in feature_names:
+            legacy_features_builder.append(_feature(
+                name = "propeller_optimize",
+                flag_sets = [
+                    _flag_set(
+                        actions = [
+                            "c-compile",
+                            "c++-compile",
+                            "lto-compile",
+                        ],
+                        flag_groups = [_flag_group(
+                            expand_if_available = "propeller_optimize_cc_path",
+                            flags = [
+                                "-fbasic-block-sections=list=%{propeller_optimize_cc_path}",
+                                "-DBUILD_PROPELLER_ENABLED=1",
+                            ],
+                        )],
+                    ),
+                    _flag_set(
+                        actions = ["c++-link-executable"],
+                        flag_groups = [_flag_group(
+                            flags = ["-Wl,--symbol-ordering-file=%{propeller_optimize_ld_path}"],
+                        )],
+                    ),
+                ],
+            ))
+        if "memprof_optimize" not in feature_names:
+            legacy_features_builder.append(_feature(
+                name = "memprof_optimize",
+                flag_sets = [_flag_set(
+                    actions = [
+                        "c-compile",
+                        "c++-compile",
+                    ],
+                    flag_groups = [_flag_group(
+                        expand_if_available = "memprof_profile_path",
+                        flags = ["-memprof-profile-file=%{memprof_profile_path}"],
+                    )],
+                )],
+            ))
+        if "build_interface_libraries" not in feature_names:
+            legacy_features_builder.append(_feature(
+                name = "build_interface_libraries",
+                flag_sets = [_flag_set(
+                    with_features = [_with_feature_set(
+                        features = ["supports_interface_shared_libraries"],
+                    )],
+                    actions = [
+                        "c++-link-dynamic-library",
+                        "c++-link-nodeps-dynamic-library",
+                        "lto-index-for-dynamic-library",
+                        "lto-index-for-nodeps-dynamic-library",
+                    ],
+                    flag_groups = [_flag_group(
+                        expand_if_available = "generate_interface_library",
+                        flags = [
+                            "%{generate_interface_library}",
+                            "%{interface_library_builder_path}",
+                            "%{interface_library_input_path}",
+                            "%{interface_library_output_path}",
+                        ],
+                    )],
+                )],
+            ))
+        if "dynamic_library_linker_tool" not in feature_names:
+            legacy_features_builder.append(_feature(
+                name = "dynamic_library_linker_tool",
+                flag_sets = [_flag_set(
+                    with_features = [_with_feature_set(
+                        features = ["supports_interface_shared_libraries"],
+                    )],
+                    actions = [
+                        "c++-link-dynamic-library",
+                        "c++-link-nodeps-dynamic-library",
+                        "lto-index-for-dynamic-library",
+                        "lto-index-for-nodeps-dynamic-library",
+                    ],
+                    flag_groups = [_flag_group(
+                        expand_if_available = "generate_interface_library",
+                        flags = [linker_tool_path],
+                    )],
+                )],
+            ))
+        if "shared_flag" not in feature_names:
+            legacy_features_builder.append(_feature(
+                name = "shared_flag",
+                flag_sets = [_flag_set(
+                    actions = [
+                        "c++-link-dynamic-library",
+                        "c++-link-nodeps-dynamic-library",
+                        "lto-index-for-dynamic-library",
+                        "lto-index-for-nodeps-dynamic-library",
+                    ],
+                    flag_groups = [_flag_group(
+                        flags = ["-shared"],
+                    )],
+                )],
+            ))
+        if "linkstamps" not in feature_names:
+            legacy_features_builder.append(_feature(
+                name = "linkstamps",
+                flag_sets = [_flag_set(
+                    actions = [
+                        "c++-link-dynamic-library",
+                        "c++-link-executable",
+                        "c++-link-nodeps-dynamic-library",
+                        "lto-index-for-dynamic-library",
+                        "lto-index-for-executable",
+                        "lto-index-for-nodeps-dynamic-library",
+                    ],
+                    flag_groups = [_flag_group(
+                        expand_if_available = "linkstamp_paths",
+                        iterate_over = "linkstamp_paths",
+                        flags = ["%{linkstamp_paths}"],
+                    )],
+                )],
+            ))
+        if "output_execpath_flags" not in feature_names:
+            legacy_features_builder.append(_feature(
+                name = "output_execpath_flags",
+                flag_sets = [_flag_set(
+                    actions = [
+                        "c++-link-dynamic-library",
+                        "c++-link-executable",
+                        "c++-link-nodeps-dynamic-library",
+                        "lto-index-for-dynamic-library",
+                        "lto-index-for-executable",
+                        "lto-index-for-nodeps-dynamic-library",
+                    ],
+                    flag_groups = [_flag_group(
+                        expand_if_available = "output_execpath",
+                        flags = ["-o", "%{output_execpath}"],
+                    )],
+                )],
+            ))
+        if "runtime_library_search_directories" not in feature_names:
+            fail("TODO: runtime_library_search_directories")
+        if "library_search_directories" not in feature_names:
+            legacy_features_builder.append(_feature(
+                name = "library_search_directories",
+                flag_sets = [_flag_set(
+                    actions = [
+                        "c++-link-dynamic-library",
+                        "c++-link-executable",
+                        "c++-link-nodeps-dynamic-library",
+                        "lto-index-for-dynamic-library",
+                        "lto-index-for-executable",
+                        "lto-index-for-nodeps-dynamic-library",
+                    ],
+                    flag_groups = [_flag_group(
+                        expand_if_available = "library_search_directories",
+                        iterate_over = "library_search_directories",
+                        flags = ["-L%{library_search_directories}"],
+                    )],
+                )],
+            ))
+        if "archiver_flags" not in feature_names:
+            fail("TODO: archiver_flags")
+        if "libraries_to_link" not in feature_names:
+            legacy_features_builder.append(_feature(
+                name = "libraries_to_link",
+                flag_sets = [_flag_set(
+                    actions = [
+                        "c++-link-dynamic-library",
+                        "c++-link-executable",
+                        "c++-link-nodeps-dynamic-library",
+                        "lto-index-for-dynamic-library",
+                        "lto-index-for-executable",
+                        "lto-index-for-nodeps-dynamic-library",
+                    ],
+                    flag_groups = [
+                        _flag_group(
+                            expand_if_true = "thinlto_param_file",
+                            flags = ["-Wl,@%{thinlto_param_file}"],
+                        ),
+                        _flag_group(
+                            expand_if_available = "libraries_to_link",
+                            iterate_over = "libraries_to_link",
+                            flag_groups = [
+                                _flag_group(
+                                    expand_if_equal = _variable_with_value(
+                                        name = "libraries_to_link.type",
+                                        value = "object_file_group",
+                                    ),
+                                    expand_if_false = "libraries_to_link.is_whole_archive",
+                                    flags = ["-Wl,--start-lib"],
+                                ),
+                            ] + (
+                                ([
+                                    _flag_group(
+                                        expand_if_true = "libraries_to_link.is_whole_archive",
+                                        expand_if_equal = _variable_with_value(
+                                            name = "libraries_to_link.type",
+                                            value = "static_library",
+                                        ),
+                                        flags = ["-Wl,-whole-archive"],
+                                    ),
+                                    _flag_group(
+                                        expand_if_equal = _variable_with_value(
+                                            name = "libraries_to_link.type",
+                                            value = "object_file_group",
+                                        ),
+                                        iterate_over = "libraries_to_link.object_files",
+                                        flags = ["%{libraries_to_link.object_files}"],
+                                    ),
+                                ] + [
+                                    _flag_group(
+                                        expand_if_equal = _variable_with_value(
+                                            name = "libraries_to_link.type",
+                                            value = libraries_to_link_type,
+                                        ),
+                                        flags = ["%{libraries_to_link.name}"],
+                                    )
+                                    for libraries_to_link_type in [
+                                        "object_file",
+                                        "interface_library",
+                                        "static_library",
+                                    ]
+                                ] + [
+                                    _flag_group(
+                                        expand_if_equal = _variable_with_value(
+                                            name = "libraries_to_link.type",
+                                            value = "dynamic_library",
+                                        ),
+                                        flags = ["-l%{libraries_to_link.name}"],
+                                    ),
+                                    _flag_group(
+                                        expand_if_equal = _variable_with_value(
+                                            name = "libraries_to_link.type",
+                                            value = "versioned_dynamic_library",
+                                        ),
+                                        flags = ["-l:%{libraries_to_link.name}"],
+                                    ),
+                                    _flag_group(
+                                        expand_if_true = "libraries_to_link.is_whole_archive",
+                                        expand_if_equal = _variable_with_value(
+                                            name = "libraries_to_link.type",
+                                            value = "static_library",
+                                        ),
+                                        flags = ["-Wl,-no-whole-archive"],
+                                    ),
+                                ]) if target_cpu != "macosx" else ([
+                                    _flag_group(
+                                        expand_if_equal = _variable_with_value(
+                                            name = "libraries_to_link.type",
+                                            value = "object_file_group",
+                                        ),
+                                        iterate_over = "libraries_to_link.object_files",
+                                        flag_groups = [
+                                            _flag_group(
+                                                expand_if_false = "libraries_to_link.is_whole_archive",
+                                                flags = ["%{libraries_to_link.object_files}"],
+                                            ),
+                                            _flag_group(
+                                                expand_if_true = "libraries_to_link.is_whole_archive",
+                                                flags = ["-Wl,-force_load,%{libraries_to_link.object_files}"],
+                                            ),
+                                        ],
+                                    ),
+                                ] + [
+                                    _flag_group(
+                                        expand_if_equal = _variable_with_value(
+                                            name = "libraries_to_link.type",
+                                            value = libraries_to_link_type,
+                                        ),
+                                        iterate_over = "libraries_to_link.object_files",
+                                        flag_groups = [
+                                            _flag_group(
+                                                expand_if_false = "libraries_to_link.is_whole_archive",
+                                                flags = ["%{libraries_to_link.name}"],
+                                            ),
+                                            _flag_group(
+                                                expand_if_true = "libraries_to_link.is_whole_archive",
+                                                flags = ["-Wl,-force_load,%{libraries_to_link.name}"],
+                                            ),
+                                        ],
+                                    )
+                                    for libraries_to_link_type in [
+                                        "object_file",
+                                        "interface_library",
+                                        "static_library",
+                                    ]
+                                ] + [
+                                    _flag_group(
+                                        expand_if_equal = _variable_with_value(
+                                            name = "libraries_to_link.type",
+                                            value = "dynamic_library",
+                                        ),
+                                        flags = ["-l%{libraries_to_link.name}"],
+                                    ),
+                                    _flag_group(
+                                        expand_if_equal = _variable_with_value(
+                                            name = "libraries_to_link.type",
+                                            value = "versioned_dynamic_library",
+                                        ),
+                                        flags = ["%{libraries_to_link.path}"],
+                                    ),
+                                ])
+                            ) + [
+                                _flag_group(
+                                    expand_if_equal = _variable_with_value(
+                                        name = "libraries_to_link.type",
+                                        value = "object_file_group",
+                                    ),
+                                    expand_if_false = "libraries_to_link.is_whole_archive",
+                                    flags = ["-Wl,--end-lib"],
+                                ),
+                            ],
+                        ),
+                    ],
+                )],
+            ))
+        if "force_pic_flags" not in feature_names:
+            legacy_features_builder.append(_feature(
+                name = "force_pic_flags",
+                flag_sets = [_flag_set(
+                    actions = [
+                        "c++-link-executable",
+                        "lto-index-for-executable",
+                    ],
+                    flag_groups = [_flag_group(
+                        expand_if_available = "force_pic",
+                        flags = ["-pie" if target_cpu != "macosx" else "-Wl,-pie"],
+                    )],
+                )],
+            ))
+        if "user_link_flags" not in feature_names:
+            fail("TODO: user_link_flags")
+        if "legacy_link_flags" not in feature_names:
+            legacy_features_builder.append(_feature(
+                name = "legacy_link_flags",
+                flag_sets = [_flag_set(
+                    actions = [
+                        "c++-link-dynamic-library",
+                        "c++-link-executable",
+                        "c++-link-nodeps-dynamic-library",
+                        "lto-index-for-dynamic-library",
+                        "lto-index-for-executable",
+                        "lto-index-for-nodeps-dynamic-library",
+                    ],
+                    flag_groups = [_flag_group(
+                        expand_if_available = "legacy_link_flags",
+                        iterate_over = "legacy_link_flags",
+                        flags = ["%{legacy_link_flags}"],
+                    )],
+                )],
+            ))
+        if "static_libgcc" not in feature_names:
+            legacy_features_builder.append(_feature(
+                name = "static_libgcc",
+                flag_sets = [_flag_set(
+                    actions = [
+                        "c++-link-dynamic-library",
+                        "c++-link-executable",
+                        "lto-index-for-dynamic-library",
+                        "lto-index-for-executable",
+                    ],
+                    with_features = [_with_feature_set(
+                        features = ["static_link_cpp_runtimes"],
+                    )],
+                    flag_groups = [_flag_group(
+                        flags = ["-static-libgcc"],
+                    )],
+                )],
+            ))
+        if "fission_support" not in feature_names:
+            legacy_features_builder.append(_feature(
+                name = "fission_support",
+                flag_sets = [_flag_set(
+                    actions = [
+                        "c++-link-dynamic-library",
+                        "c++-link-executable",
+                        "c++-link-nodeps-dynamic-library",
+                        "lto-index-for-dynamic-library",
+                        "lto-index-for-executable",
+                        "lto-index-for-nodeps-dynamic-library",
+                    ],
+                    flag_groups = [_flag_group(
+                        expand_if_available = "is_using_fission",
+                        flags = ["-Wl,--gdb-index"],
+                    )],
+                )],
+            ))
+        if "strip_debug_symbols" not in feature_names:
+            legacy_features_builder.append(_feature(
+                name = "strip_debug_symbols",
+                flag_sets = [_flag_set(
+                    actions = [
+                        "c++-link-dynamic-library",
+                        "c++-link-executable",
+                        "c++-link-nodeps-dynamic-library",
+                        "lto-index-for-dynamic-library",
+                        "lto-index-for-executable",
+                        "lto-index-for-nodeps-dynamic-library",
+                    ],
+                    flag_groups = [_flag_group(
+                        expand_if_available = "strip_debug_symbols",
+                        flags = ["-Wl,-S"],
+                    )],
+                )],
+            ))
+        if "coverage" not in feature_names:
+            fail("TODO: coverage")
+
+        legacy_features_builder += [
+            feature
+            for feature in features
+            if feature.name not in ["legacy_compile_flags", "default_compile_flags"]
+        ]
+
+        if "fully_static_link" not in feature_names:
+            legacy_features_builder.append(_feature(
+                name = "fully_static_link",
+                flag_sets = [_flag_set(
+                    actions = [
+                        "c++-link-dynamic-library",
+                        "c++-link-executable",
+                        "lto-index-for-dynamic-library",
+                        "lto-index-for-executable",
+                    ],
+                    flag_groups = [_flag_group(
+                        flags = ["-static"],
+                    )],
+                )],
+            ))
+        if "user_compile_flags" not in feature_names:
+            fail("TODO: user_compile_flags")
+        if "sysroot" not in feature_names:
+            fail("TODO: sysroot")
+        if "sysroot" not in feature_names:
+            fail("TODO: sysroot")
+        if "unfiltered_compile_flags" not in feature_names:
+            fail("TODO: unfiltered_compile_flags")
+        if "linker_param_file" not in feature_names:
+            legacy_features_builder.append(_feature(
+                name = "linker_param_file",
+                flag_sets = [
+                    _flag_set(
+                        actions = [
+                            "c++-link-dynamic-library",
+                            "c++-link-executable",
+                            "c++-link-nodeps-dynamic-library",
+                            "lto-index-for-dynamic-library",
+                            "lto-index-for-executable",
+                            "lto-index-for-nodeps-dynamic-library",
+                        ],
+                        flag_groups = [_flag_group(
+                            expand_if_available = "linker_param_file",
+                            flags = ["@%{linker_param_file}"],
+                        )],
+                    ),
+                    _flag_set(
+                        actions = ["c++-link-static-library"],
+                        flag_groups = [_flag_group(
+                            expand_if_available = "linker_param_file",
+                            flags = ["@%{linker_param_file}"],
+                        )],
+                    ),
+                ],
+            ))
+        if "compiler_input_flags" not in feature_names:
+            fail("TODO: compiler_input_flags")
+        if "compiler_output_flags" not in feature_names:
+            fail("TODO: compiler_output_flags")
+
+        features = legacy_features_builder
+
+        legacy_action_config_builder = []
+
+        existing_action_config_names = set([action_config.action_name for action_config in action_configs])
+        for action_name in [
+            "assemble",
+            "preprocess-assemble",
+            "linkstamp-compile",
+            "lto-backend",
+            "c-compile",
+            "c++-compile",
+            "c++-header-parsing",
+            "c++-module-compile",
+            "c++-module-codegen",
+        ]:
+            if action_name not in existing_action_config_names:
+                legacy_action_config_builder.append(_action_config(
+                    action_name = action_name,
+                    tools = [_tool(path = gcc_tool_path)],
+                    implies = [
+                        "legacy_compile_flags",
+                        "user_compile_flags",
+                        "sysroot",
+                        "unfiltered_compile_flags",
+                        "compiler_input_flags",
+                        "compiler_output_flags",
+                    ],
+                ))
+        for action_name in [
+            "c++-link-executable",
+            "lto-index-for-executable",
+        ]:
+            if action_name not in existing_action_config_names:
+                legacy_action_config_builder.append(_action_config(
+                    action_name = action_name,
+                    tools = [_tool(path = gcc_tool_path)],
+                    implies = [
+                        "strip_debug_symbols",
+                        "linkstamps",
+                        "output_execpath_flags",
+                        "runtime_library_search_directories",
+                        "library_search_directories",
+                        "libraries_to_link",
+                        "force_pic_flags",
+                        "user_link_flags",
+                        "legacy_link_flags",
+                        "linker_param_file",
+                        "fission_support",
+                        "sysroot",
+                    ],
+                ))
+        for action_name in [
+            "c++-link-nodeps-dynamic-library",
+            "lto-index-for-nodeps-dynamic-library",
+            "c++-link-dynamic-library",
+            "lto-index-for-dynamic-library",
+        ]:
+            if action_name not in existing_action_config_names:
+                legacy_action_config_builder.append(_action_config(
+                    action_name = action_name,
+                    tools = [_tool(path = gcc_tool_path)],
+                    implies = [
+                        "build_interface_libraries",
+                        "dynamic_library_linker_tool",
+                        "strip_debug_symbols",
+                        "shared_flag",
+                        "linkstamps",
+                        "output_execpath_flags",
+                        "runtime_library_search_directories",
+                        "library_search_directories",
+                        "libraries_to_link",
+                        "user_link_flags",
+                        "legacy_link_flags",
+                        "linker_param_file",
+                        "fission_support",
+                        "sysroot",
+                    ],
+                ))
+        if "c++-link-static-library" not in existing_action_config_names:
+            legacy_action_config_builder.append(_action_config(
+                action_name = "c++-link-static-library",
+                tools = [_tool(path = ar_tool_path)],
+                implies = ["archiver_flags", "linker_param_file"],
+            ))
+        if "strip" not in existing_action_config_names:
+            legacy_action_config_builder.append(_action_config(
+                action_name = "strip",
+                tools = [_tool(path = strip_tool_path)],
+                flag_sets = [_flag_set(
+                    flag_groups = [
+                        _flag_group(
+                            flags = ["-S"] +
+                                    (["-p"] if target_cpu != "macosx" else []) +
+                                    ["-o", "%{output_file}"],
+                        ),
+                        _flag_group(
+                            iterate_over = "stripopts",
+                            flags = ["%{stripopts}"],
+                        ),
+                        _flag_group(
+                            flags = ["%{input_file}"],
+                        ),
+                    ],
+                )],
+            ))
+
+        legacy_action_config_builder += action_configs
+        action_configs = legacy_action_config_builder
+
     tool_paths_tuples = [
         [tool.name, tool.path]
         for tool in tool_paths
@@ -899,7 +1923,7 @@ def builtins_internal_cc_common_get_memory_inefficient_command_line(
     return ["TODO"]
 
 def builtins_internal_cc_common_get_tool_for_action(feature_configuration, action_name):
-    return "/TODO/get/tool/for/action"
+    return feature_configuration._tool_for_action[action_name]
 
 def builtins_internal_cc_common_get_tool_requirement_for_action(*, action_name, feature_configuration):
     return []
@@ -984,8 +2008,36 @@ def builtins_internal_cc_internal_actions2ctx_cheat(actions):
     return native.current_ctx()
 
 def builtins_internal_cc_internal_cc_toolchain_features(*, toolchain_config_info, tools_directory):
+    selectables = []
+    selectables_by_name = {}
+    action_configs_by_action_name = {}
+    default_selectables = []
+    for feature in toolchain_config_info._features:
+        selectables.append(feature)
+        selectables_by_name[feature.name] = feature
+        if feature.enabled:
+            default_selectables.append(feature.name)
+
+    for action_config in toolchain_config_info._action_configs:
+        selectables.append(action_config)
+        selectables_by_name[action_config.action_name] = action_config
+        action_configs_by_action_name[action_config.action_name] = action_config
+        if action_config.enabled:
+            default_selectables.append(action_config.action_name)
+
     return struct(
         _artifact_name_patterns = toolchain_config_info._artifact_name_patterns,
+        _selectables = selectables,
+        _selectables_by_name = selectables_by_name,
+        _action_configs_by_action_name = action_configs_by_action_name,
+        # TODO: Set these fields properly.
+        # _implies = ...,
+        # _implied_by = ...,
+        # _requires = ...,
+        # _provides = ...,
+        # _required_by = ...,
+        _default_selectables = default_selectables,
+        _cc_toolchain_path = tools_directory,
     )
 
 def builtins_internal_cc_internal_cc_toolchain_variables(vars):
@@ -1014,8 +2066,10 @@ def builtins_internal_cc_internal_collect_libraries_to_link(
     )
 
 def builtins_internal_cc_internal_convert_library_to_link_list_to_linker_input_list(libraries_to_link, static_mode, for_dynamic_library, support_dynamic_linker):
-    # TODO!
-    return []
+    library_inputs = []
+    for library_to_link in libraries_to_link.to_list():
+        fail("TODO: implement!")
+    return library_inputs
 
 def builtins_internal_cc_internal_create_cc_launcher_info(*, cc_info, compilation_outputs):
     return CcLauncherInfo(
@@ -1024,7 +2078,9 @@ def builtins_internal_cc_internal_create_cc_launcher_info(*, cc_info, compilatio
     )
 
 def builtins_internal_cc_internal_dynamic_library_soname(actions, path, preserve_name):
-    return "TODO"
+    if preserve_name:
+        return path.rsplit("/", 1)[-1]
+    fail("TODO: implement!")
 
 def builtins_internal_cc_internal_empty_compilation_outputs():
     return _create_compilation_outputs(
