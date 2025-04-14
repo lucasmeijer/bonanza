@@ -47,11 +47,13 @@ func CreateFileMerkleTree[T model_core.ReferenceMetadata](ctx context.Context, p
 				patcher := model_core.NewReferenceMessagePatcher[T]()
 				return model_core.NewPatchedMessage(
 					&model_filesystem_pb.FileContents{
+						Level: &model_filesystem_pb.FileContents_FileContentsListReference{
+							FileContentsListReference: patcher.AddReference(
+								createdObject.Contents.GetReference(),
+								capturer.CaptureFileContentsList(createdObject),
+							),
+						},
 						TotalSizeBytes: totalSizeBytes,
-						Reference: patcher.AddReference(
-							createdObject.Contents.GetReference(),
-							capturer.CaptureFileContentsList(createdObject),
-						),
 					},
 					patcher,
 				), nil
@@ -86,7 +88,9 @@ func CreateFileMerkleTree[T model_core.ReferenceMetadata](ctx context.Context, p
 		patcher := model_core.NewReferenceMessagePatcher[T]()
 		if err := treeBuilder.PushChild(model_core.NewPatchedMessage(
 			&model_filesystem_pb.FileContents{
-				Reference:      patcher.AddReference(chunkContents.GetReference(), capturer.CaptureChunk(chunkContents)),
+				Level: &model_filesystem_pb.FileContents_ChunkReference{
+					ChunkReference: patcher.AddReference(chunkContents.GetReference(), capturer.CaptureChunk(chunkContents)),
+				},
 				TotalSizeBytes: uint64(len(chunk)),
 			},
 			patcher,

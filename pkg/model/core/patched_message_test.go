@@ -27,8 +27,10 @@ func TestNewPatchedMessageFromExisting(t *testing.T) {
 					Name: "a",
 					Properties: &model_filesystem_pb.FileProperties{
 						Contents: &model_filesystem_pb.FileContents{
-							Reference: &model_core_pb.Reference{
-								Index: 2,
+							Level: &model_filesystem_pb.FileContents_ChunkReference{
+								ChunkReference: &model_core_pb.Reference{
+									Index: 2,
+								},
 							},
 							TotalSizeBytes: 23,
 						},
@@ -53,8 +55,10 @@ func TestNewPatchedMessageFromExisting(t *testing.T) {
 			Name: "a",
 			Properties: &model_filesystem_pb.FileProperties{
 				Contents: &model_filesystem_pb.FileContents{
-					Reference: &model_core_pb.Reference{
-						Index: 1,
+					Level: &model_filesystem_pb.FileContents_ChunkReference{
+						ChunkReference: &model_core_pb.Reference{
+							Index: 1,
+						},
 					},
 					TotalSizeBytes: 23,
 				},
@@ -74,8 +78,10 @@ func TestNewPatchedMessageFromExisting(t *testing.T) {
 					Name: "hello",
 					Properties: &model_filesystem_pb.FileProperties{
 						Contents: &model_filesystem_pb.FileContents{
-							Reference: &model_core_pb.Reference{
-								Index: 42,
+							Level: &model_filesystem_pb.FileContents_ChunkReference{
+								ChunkReference: &model_core_pb.Reference{
+									Index: 42,
+								},
 							},
 							TotalSizeBytes: 583,
 						},
@@ -96,8 +102,10 @@ func TestNewPatchedMessageFromExisting(t *testing.T) {
 			Name: "hello",
 			Properties: &model_filesystem_pb.FileProperties{
 				Contents: &model_filesystem_pb.FileContents{
-					Reference: &model_core_pb.Reference{
-						Index: math.MaxUint32,
+					Level: &model_filesystem_pb.FileContents_ChunkReference{
+						ChunkReference: &model_core_pb.Reference{
+							Index: math.MaxUint32,
+						},
 					},
 					TotalSizeBytes: 583,
 				},

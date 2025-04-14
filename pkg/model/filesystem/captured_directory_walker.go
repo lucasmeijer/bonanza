@@ -71,24 +71,30 @@ func (o *capturedDirectoryWalkerOptions) gatherWalkersForLeaves(leaves model_cor
 			return status.Errorf(codes.InvalidArgument, "File %#v does not have any properties", childPathTrace.GetUNIXString())
 		}
 		if contents := properties.Contents; contents != nil {
-			index, err := model_core.GetIndexFromReferenceMessage(contents.Reference, len(walkers))
-			if err != nil {
-				return util.StatusWrapf(err, "Invalid reference index for file %#v", childPathTrace.GetUNIXString())
-			}
-			childReference := leaves.OutgoingReferences.GetOutgoingReference(index)
-			if childReference.GetHeight() == 0 {
+			switch level := contents.Level.(type) {
+			case *model_filesystem_pb.FileContents_ChunkReference:
+				index, err := model_core.GetIndexFromReferenceMessage(level.ChunkReference, len(walkers))
+				if err != nil {
+					return util.StatusWrapf(err, "Invalid chunk reference index for file %#v", childPathTrace.GetUNIXString())
+				}
 				walkers[index] = &smallFileWalker{
 					options:   o,
-					reference: childReference,
+					reference: leaves.OutgoingReferences.GetOutgoingReference(index),
 					pathTrace: childPathTrace,
 					sizeBytes: uint32(contents.TotalSizeBytes),
 				}
-			} else {
+			case *model_filesystem_pb.FileContents_FileContentsListReference:
+				index, err := model_core.GetIndexFromReferenceMessage(level.FileContentsListReference, len(walkers))
+				if err != nil {
+					return util.StatusWrapf(err, "Invalid file contents list reference index for file %#v", childPathTrace.GetUNIXString())
+				}
 				walkers[index] = &recomputingConcatenatedFileWalker{
 					options:   o,
-					reference: childReference,
+					reference: leaves.OutgoingReferences.GetOutgoingReference(index),
 					pathTrace: childPathTrace,
 				}
+			default:
+				return status.Errorf(codes.InvalidArgument, "File %#v has an unknown file contents type", childPathTrace.GetUNIXString())
 			}
 		}
 	}
@@ -334,24 +340,30 @@ func (w *computedConcatenatedFileWalker) GetContents(ctx context.Context) (*obje
 	walkers := make([]dag.ObjectContentsWalker, reference.GetDegree())
 	offsetBytes := w.offsetBytes
 	for _, part := range fileContentsList {
-		index, err := model_core.GetIndexFromReferenceMessage(part.Reference, len(walkers))
-		if err != nil {
-			return nil, nil, util.StatusWrapf(err, "Invalid reference index for part of file %#v at offset %d", w.options.pathTrace.GetUNIXString(), offsetBytes)
-		}
-		partReference := w.object.Contents.GetOutgoingReference(index)
-		if partReference.GetHeight() == 0 {
+		switch level := part.Level.(type) {
+		case *model_filesystem_pb.FileContents_ChunkReference:
+			index, err := model_core.GetIndexFromReferenceMessage(level.ChunkReference, len(walkers))
+			if err != nil {
+				return nil, nil, util.StatusWrapf(err, "Invalid chunk reference index for part of file %#v at offset %d", w.options.pathTrace.GetUNIXString(), offsetBytes)
+			}
 			walkers[index] = &concatenatedFileChunkWalker{
 				options:     w.options,
-				reference:   partReference,
+				reference:   w.object.Contents.GetOutgoingReference(index),
 				offsetBytes: offsetBytes,
 				sizeBytes:   uint32(part.TotalSizeBytes),
 			}
-		} else {
+		case *model_filesystem_pb.FileContents_FileContentsListReference:
+			index, err := model_core.GetIndexFromReferenceMessage(level.FileContentsListReference, len(walkers))
+			if err != nil {
+				return nil, nil, util.StatusWrapf(err, "Invalid file contents list reference index for part of file %#v at offset %d", w.options.pathTrace.GetUNIXString(), offsetBytes)
+			}
 			walkers[index] = &computedConcatenatedFileWalker{
 				options:     w.options,
 				object:      &w.object.Metadata[index],
 				offsetBytes: offsetBytes,
 			}
+		default:
+			return nil, nil, status.Errorf(codes.InvalidArgument, "Part of %#v at offset %d has an unknown file contents type", w.options.pathTrace.GetUNIXString(), offsetBytes)
 		}
 		offsetBytes += part.TotalSizeBytes
 	}

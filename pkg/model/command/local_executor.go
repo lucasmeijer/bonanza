@@ -761,18 +761,7 @@ func (f *prepopulatedCapturableFile) CreateFileMerkleTree(ctx context.Context) (
 	// Read-only object store backed files.
 	var getFileContents model_filesystem_virtual.ApplyGetFileContents
 	if f.node.VirtualApply(&getFileContents) {
-		if getFileContents.FileContents.EndBytes == 0 {
-			// Empty file.
-			return model_core.PatchedMessage[*model_filesystem_pb.FileContents, dag.ObjectContentsWalker]{}, nil
-		}
-		patcher := model_core.NewReferenceMessagePatcher[dag.ObjectContentsWalker]()
-		return model_core.NewPatchedMessage(
-			&model_filesystem_pb.FileContents{
-				TotalSizeBytes: getFileContents.FileContents.EndBytes,
-				Reference:      patcher.AddReference(getFileContents.FileContents.Reference, dag.ExistingObjectContentsWalker),
-			},
-			patcher,
-		), nil
+		return model_filesystem.FileContentsEntryToProto(&getFileContents.FileContents), nil
 	}
 
 	// Mutable files created during execution.

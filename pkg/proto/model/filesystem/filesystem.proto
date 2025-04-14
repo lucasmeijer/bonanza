@@ -126,18 +126,26 @@ message DirectoryReference {
 
 message FileContents {
   // Reference to the data contained in the file.
-  //
-  // If the reference points to an object of height zero, the payload
-  // contains the literal contents of the file.
-  //
-  // If the reference points to an object with a height greater than
-  // zero, the payload contains a list of FileContents messages. The
-  // file's contents can be reobtained by concatenating the parts
-  // referenced by this message.
-  bonanza.model.core.Reference reference = 1;
+  oneof level {
+    // The reference points to an object with a height greater than
+    // zero, containing a list of FileContents messages. The file's
+    // contents can be reobtained by concatenating the parts referenced
+    // by this message.
+    bonanza.model.core.Reference file_contents_list_reference = 1
+        [(bonanza.model.core.object_format) = {
+          message_list_type_name:
+            "bonanza.model.filesystem.FileContents";
+        }];
 
-  // The total size of all chunks of data in this part of the file.
-  uint64 total_size_bytes = 2;
+    // The reference points to an object of height zero, containing the
+    // literal contents of the file.
+    bonanza.model.core.Reference chunk_reference = 2
+        [(bonanza.model.core.object_format) = { raw: {} }];
+  }
+
+  // The total size of all chunks of data in this part of the file. The
+  // size has to be greater than zero.
+  uint64 total_size_bytes = 3;
 }
 
 message DirectoryAccessParameters {

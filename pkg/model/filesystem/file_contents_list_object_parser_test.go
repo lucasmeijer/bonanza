@@ -48,8 +48,10 @@ func TestFileContentsListObjectParser(t *testing.T) {
 		// could have been collapsed.
 		data := marshalFileContentsList([]*model_filesystem_pb.FileContents{{
 			TotalSizeBytes: 42,
-			Reference: &model_core_pb.Reference{
-				Index: 1,
+			Level: &model_filesystem_pb.FileContents_ChunkReference{
+				ChunkReference: &model_core_pb.Reference{
+					Index: 1,
+				},
 			},
 		}})
 		_, _, err := objectParser.ParseObject(
@@ -70,20 +72,26 @@ func TestFileContentsListObjectParser(t *testing.T) {
 		data := marshalFileContentsList([]*model_filesystem_pb.FileContents{
 			{
 				TotalSizeBytes: 12,
-				Reference: &model_core_pb.Reference{
-					Index: 1,
+				Level: &model_filesystem_pb.FileContents_ChunkReference{
+					ChunkReference: &model_core_pb.Reference{
+						Index: 1,
+					},
 				},
 			},
 			{
 				TotalSizeBytes: 0,
-				Reference: &model_core_pb.Reference{
-					Index: 2,
+				Level: &model_filesystem_pb.FileContents_ChunkReference{
+					ChunkReference: &model_core_pb.Reference{
+						Index: 2,
+					},
 				},
 			},
 			{
 				TotalSizeBytes: 70,
-				Reference: &model_core_pb.Reference{
-					Index: 3,
+				Level: &model_filesystem_pb.FileContents_ChunkReference{
+					ChunkReference: &model_core_pb.Reference{
+						Index: 3,
+					},
 				},
 			},
 		})
@@ -108,14 +116,18 @@ func TestFileContentsListObjectParser(t *testing.T) {
 		data := marshalFileContentsList([]*model_filesystem_pb.FileContents{
 			{
 				TotalSizeBytes: 0x8000000000000000,
-				Reference: &model_core_pb.Reference{
-					Index: 1,
+				Level: &model_filesystem_pb.FileContents_FileContentsListReference{
+					FileContentsListReference: &model_core_pb.Reference{
+						Index: 1,
+					},
 				},
 			},
 			{
 				TotalSizeBytes: 0x8000000000000000,
-				Reference: &model_core_pb.Reference{
-					Index: 2,
+				Level: &model_filesystem_pb.FileContents_FileContentsListReference{
+					FileContentsListReference: &model_core_pb.Reference{
+						Index: 2,
+					},
 				},
 			},
 		})
@@ -135,14 +147,18 @@ func TestFileContentsListObjectParser(t *testing.T) {
 		data := marshalFileContentsList([]*model_filesystem_pb.FileContents{
 			{
 				TotalSizeBytes: 200,
-				Reference: &model_core_pb.Reference{
-					Index: 7,
+				Level: &model_filesystem_pb.FileContents_ChunkReference{
+					ChunkReference: &model_core_pb.Reference{
+						Index: 7,
+					},
 				},
 			},
 			{
 				TotalSizeBytes: 300,
-				Reference: &model_core_pb.Reference{
-					Index: 2,
+				Level: &model_filesystem_pb.FileContents_ChunkReference{
+					ChunkReference: &model_core_pb.Reference{
+						Index: 2,
+					},
 				},
 			},
 		})
@@ -162,14 +178,18 @@ func TestFileContentsListObjectParser(t *testing.T) {
 		data := marshalFileContentsList([]*model_filesystem_pb.FileContents{
 			{
 				TotalSizeBytes: 200,
-				Reference: &model_core_pb.Reference{
-					Index: 1,
+				Level: &model_filesystem_pb.FileContents_ChunkReference{
+					ChunkReference: &model_core_pb.Reference{
+						Index: 1,
+					},
 				},
 			},
 			{
 				TotalSizeBytes: 300,
-				Reference: &model_core_pb.Reference{
-					Index: 2,
+				Level: &model_filesystem_pb.FileContents_ChunkReference{
+					ChunkReference: &model_core_pb.Reference{
+						Index: 2,
+					},
 				},
 			},
 		})

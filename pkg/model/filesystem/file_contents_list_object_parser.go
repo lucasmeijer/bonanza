@@ -8,6 +8,7 @@ import (
 	"github.com/buildbarn/bonanza/pkg/model/parser"
 	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
 	model_filesystem_pb "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
+	"github.com/buildbarn/bonanza/pkg/storage/dag"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 
 	"google.golang.org/grpc/codes"
@@ -22,17 +23,43 @@ type FileContentsEntry[TReference any] struct {
 	Reference TReference
 }
 
-// NewFileContentsEntryFromProto constructs a FileContentsListEntry
-// based on the contents of a single FileContents Protobuf message,
-// refering to the file as a whole.
-func NewFileContentsEntryFromProto[TReference any](fileContents model_core.Message[*model_filesystem_pb.FileContents, TReference]) (FileContentsEntry[TReference], error) {
+func flattenFileContentsReference[TReference object.BasicReference](fileContents model_core.Message[*model_filesystem_pb.FileContents, TReference]) (TReference, error) {
+	var bad TReference
+	switch level := fileContents.Message.Level.(type) {
+	case *model_filesystem_pb.FileContents_ChunkReference:
+		reference, err := model_core.FlattenReference(model_core.Nested(fileContents, level.ChunkReference))
+		if err != nil {
+			return bad, err
+		}
+		if reference.GetHeight() != 0 {
+			return bad, status.Error(codes.InvalidArgument, "Chunk reference must have height 0")
+		}
+		return reference, nil
+	case *model_filesystem_pb.FileContents_FileContentsListReference:
+		reference, err := model_core.FlattenReference(model_core.Nested(fileContents, level.FileContentsListReference))
+		if err != nil {
+			return bad, err
+		}
+		if reference.GetHeight() == 0 {
+			return bad, status.Error(codes.InvalidArgument, "File contents list reference cannot have height 0")
+		}
+		return reference, nil
+	default:
+		return bad, status.Error(codes.InvalidArgument, "Unknown reference type")
+	}
+}
+
+// NewFileContentsEntryFromProto constructs a FileContentsEntry based on
+// the contents of a single FileContents Protobuf message, refering to
+// the file as a whole.
+func NewFileContentsEntryFromProto[TReference object.BasicReference](fileContents model_core.Message[*model_filesystem_pb.FileContents, TReference]) (FileContentsEntry[TReference], error) {
 	if fileContents.Message == nil {
 		// File is empty, meaning that it is not backed by any
 		// object. Leave the reference unset.
 		return FileContentsEntry[TReference]{EndBytes: 0}, nil
 	}
 
-	reference, err := model_core.FlattenReference(model_core.Nested(fileContents, fileContents.Message.Reference))
+	reference, err := flattenFileContentsReference(fileContents)
 	if err != nil {
 		return FileContentsEntry[TReference]{}, err
 	}
@@ -40,6 +67,51 @@ func NewFileContentsEntryFromProto[TReference any](fileContents model_core.Messa
 		EndBytes:  fileContents.Message.TotalSizeBytes,
 		Reference: reference,
 	}, nil
+}
+
+// FileContentsEntryToProto converts a FileContentsEntry back to a
+// Protobuf message.
+//
+// TODO: Should this function take a model_core.ExistingObjectCapturer?
+func FileContentsEntryToProto[TReference object.BasicReference](
+	entry *FileContentsEntry[TReference],
+) model_core.PatchedMessage[*model_filesystem_pb.FileContents, dag.ObjectContentsWalker] {
+	if entry.EndBytes == 0 {
+		// Empty file is encoded as a nil message.
+		return model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker]((*model_filesystem_pb.FileContents)(nil))
+	}
+
+	if entry.Reference.GetHeight() > 0 {
+		// Large file.
+		patcher := model_core.NewReferenceMessagePatcher[dag.ObjectContentsWalker]()
+		return model_core.NewPatchedMessage(
+			&model_filesystem_pb.FileContents{
+				Level: &model_filesystem_pb.FileContents_FileContentsListReference{
+					FileContentsListReference: patcher.AddReference(
+						entry.Reference.GetLocalReference(),
+						dag.ExistingObjectContentsWalker,
+					),
+				},
+				TotalSizeBytes: entry.EndBytes,
+			},
+			patcher,
+		)
+	}
+
+	// Small file.
+	patcher := model_core.NewReferenceMessagePatcher[dag.ObjectContentsWalker]()
+	return model_core.NewPatchedMessage(
+		&model_filesystem_pb.FileContents{
+			Level: &model_filesystem_pb.FileContents_ChunkReference{
+				ChunkReference: patcher.AddReference(
+					entry.Reference.GetLocalReference(),
+					dag.ExistingObjectContentsWalker,
+				),
+			},
+			TotalSizeBytes: entry.EndBytes,
+		},
+		patcher,
+	)
 }
 
 // FileContentsList contains the properties of parts of a concatenated
@@ -78,7 +150,7 @@ func (p *fileContentsListObjectParser[TReference]) ParseObject(in model_core.Mes
 		}
 		endBytes += part.TotalSizeBytes
 
-		partReference, err := model_core.FlattenReference(model_core.Nested(l, part.Reference))
+		partReference, err := flattenFileContentsReference(model_core.Nested(l, part))
 		if err != nil {
 			return nil, 0, util.StatusWrapf(err, "Invalid reference for part at index %d", i)
 		}
