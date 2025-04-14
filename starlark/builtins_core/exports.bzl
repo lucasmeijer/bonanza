@@ -885,6 +885,22 @@ def _tool(path = None, with_features = [], execution_requirements = [], tool = N
         type_name = "tool",
     )
 
+def _path_relative_to_package(ctx, path):
+    if path.startswith("/"):
+        return path
+
+    return "/".join(
+        [
+            component
+            for component in (
+                ctx.label.workspace_root.split("/") +
+                ctx.label.package.split("/") +
+                path.split("/")
+            )
+            if component
+        ],
+    )
+
 def builtins_internal_cc_common_create_cc_toolchain_config_info(
         ctx,
         toolchain_identifier,
@@ -910,9 +926,8 @@ def builtins_internal_cc_common_create_cc_toolchain_config_info(
         strip_tool_path = "DUMMY_STRIP_TOOL"
         for tool in tool_paths:
             if tool.name == "gcc":
-                # TODO: Linker path needs to be relative to exec path.
                 gcc_tool_path = tool.path
-                linker_tool_path = tool.path
+                linker_tool_path = _path_relative_to_package(ctx, tool.path)
             elif tool.name == "ar":
                 ar_tool_path = tool.path
             elif tool.name == "strip":
@@ -994,7 +1009,6 @@ def builtins_internal_cc_common_create_cc_toolchain_config_info(
         if "per_object_debug_info" not in feature_names:
             legacy_features_builder.append(_feature(
                 name = "per_object_debug_info",
-                enabled = True,
                 flag_sets = [_flag_set(
                     actions = [
                         "assemble",
@@ -1488,6 +1502,7 @@ def builtins_internal_cc_common_create_cc_toolchain_config_info(
         if "static_libgcc" not in feature_names:
             legacy_features_builder.append(_feature(
                 name = "static_libgcc",
+                enabled = True,
                 flag_sets = [_flag_set(
                     actions = [
                         "c++-link-dynamic-library",
@@ -1718,7 +1733,28 @@ def builtins_internal_cc_common_create_cc_toolchain_config_info(
         for tool in tool_paths
     ]
     return CcToolchainConfigInfo(
-        _action_configs = action_configs,
+        # Tools provided by the caller contain paths that are relative
+        # to the current package, but CcToolchainConfigInfo needs to
+        # report paths relative to the input root. Rewrite all action
+        # configs and tools to fix up the paths.
+        _action_configs = [
+            _action_config(
+                action_name = action_config.action_name,
+                enabled = action_config.enabled,
+                tools = [
+                    _tool(
+                        path = _path_relative_to_package(ctx, tool.path),
+                        tool = tool.tool,
+                        with_features = tool.with_features,
+                        execution_requirements = tool.execution_requirements,
+                    )
+                    for tool in action_config.tools
+                ],
+                flag_sets = action_config.flag_sets,
+                implies = action_config.implies,
+            )
+            for action_config in action_configs
+        ],
         _artifact_name_patterns = {
             pattern.category_name: struct(prefix = pattern.prefix, extension = pattern.extension)
             for pattern in artifact_name_patterns
