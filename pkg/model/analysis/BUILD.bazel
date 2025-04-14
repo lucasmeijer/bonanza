@@ -57,6 +57,7 @@ go_library(
         "root_module.go",
         "select.go",
         "stable_input_root_path.go",
+        "successful_action_result.go",
         "target.go",
         "target_action_result.go",
         "target_completion.go",

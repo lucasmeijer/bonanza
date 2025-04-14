@@ -89,20 +89,21 @@ func (c *baseComputer[TReference, TMetadata]) ComputeStableInputRootPathValue(ct
 
 	// Invoke "pwd".
 	keyPatcher := model_core.NewReferenceMessagePatcher[dag.ObjectContentsWalker]()
-	actionResult := e.GetActionResultValue(
+	actionResult := e.GetSuccessfulActionResultValue(
 		model_core.NewPatchedMessage(
-			&model_analysis_pb.ActionResult_Key{
-				PlatformPkixPublicKey: repoPlatform.Message.ExecPkixPublicKey,
-				CommandReference: keyPatcher.AddReference(
-					createdCommand.Contents.GetReference(),
-					dag.NewSimpleObjectContentsWalker(createdCommand.Contents, createdCommand.Metadata),
-				),
-				InputRootReference: keyPatcher.AddReference(
-					createdInputRoot.Contents.GetReference(),
-					dag.NewSimpleObjectContentsWalker(createdInputRoot.Contents, createdInputRoot.Metadata),
-				),
-				ExecutionTimeout:   &durationpb.Duration{Seconds: 60},
-				ExitCodeMustBeZero: true,
+			&model_analysis_pb.SuccessfulActionResult_Key{
+				Action: &model_analysis_pb.Action{
+					PlatformPkixPublicKey: repoPlatform.Message.ExecPkixPublicKey,
+					CommandReference: keyPatcher.AddReference(
+						createdCommand.Contents.GetReference(),
+						dag.NewSimpleObjectContentsWalker(createdCommand.Contents, createdCommand.Metadata),
+					),
+					InputRootReference: keyPatcher.AddReference(
+						createdInputRoot.Contents.GetReference(),
+						dag.NewSimpleObjectContentsWalker(createdInputRoot.Contents, createdInputRoot.Metadata),
+					),
+					ExecutionTimeout: &durationpb.Duration{Seconds: 60},
+				},
 			},
 			keyPatcher,
 		),

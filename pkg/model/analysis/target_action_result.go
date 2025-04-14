@@ -508,25 +508,26 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 	}
 
 	patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
-	actionResult := e.GetActionResultValue(
+	actionResult := e.GetSuccessfulActionResultValue(
 		model_core.NewPatchedMessage(
-			&model_analysis_pb.ActionResult_Key{
-				CommandReference: patcher.AddReference(
-					createdCommand.Contents.GetReference(),
-					e.CaptureCreatedObject(createdCommand),
-				),
-				// TODO: Should we make the execution
-				// timeout on build actions configurable?
-				// Bazel with REv2 does not set this field
-				// for build actions, relying on the cluster
-				// to pick a default.
-				ExecutionTimeout:   &durationpb.Duration{Seconds: 3600},
-				ExitCodeMustBeZero: true,
-				InputRootReference: patcher.AddReference(
-					rootDirectoryObject.Contents.GetReference(),
-					e.CaptureCreatedObject(rootDirectoryObject),
-				),
-				PlatformPkixPublicKey: actionLeaf.PlatformPkixPublicKey,
+			&model_analysis_pb.SuccessfulActionResult_Key{
+				Action: &model_analysis_pb.Action{
+					CommandReference: patcher.AddReference(
+						createdCommand.Contents.GetReference(),
+						e.CaptureCreatedObject(createdCommand),
+					),
+					// TODO: Should we make the execution
+					// timeout on build actions configurable?
+					// Bazel with REv2 does not set this field
+					// for build actions, relying on the cluster
+					// to pick a default.
+					ExecutionTimeout: &durationpb.Duration{Seconds: 3600},
+					InputRootReference: patcher.AddReference(
+						rootDirectoryObject.Contents.GetReference(),
+						e.CaptureCreatedObject(rootDirectoryObject),
+					),
+					PlatformPkixPublicKey: actionLeaf.PlatformPkixPublicKey,
+				},
 			},
 			model_core.MapReferenceMetadataToWalkers(patcher),
 		),

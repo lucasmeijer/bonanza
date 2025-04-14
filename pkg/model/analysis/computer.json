@@ -306,6 +306,7 @@
             "Repo",
             "RootModule",
             "StableInputRootPathObject",
+            "SuccessfulActionResult",
             "UsedModuleExtension"
          ]
       },
@@ -450,7 +451,8 @@
             "Repo",
             "RepositoryRuleObject",
             "RootModule",
-            "StableInputRootPathObject"
+            "StableInputRootPathObject",
+            "SuccessfulActionResult"
          ]
       },
       "RepoDefaultAttrs": {
@@ -494,14 +496,14 @@
       },
       "StableInputRootPath": {
          "dependsOn": [
-            "ActionResult",
             "CommandEncoderObject",
             "DirectoryCreationParameters",
             "DirectoryCreationParametersObject",
             "DirectoryReaders",
             "FileCreationParameters",
             "FileReader",
-            "RegisteredRepoPlatform"
+            "RegisteredRepoPlatform",
+            "SuccessfulActionResult"
          ]
       },
       "StableInputRootPathObject": {
@@ -515,6 +517,12 @@
             "type": "*model_starlark.BarePath"
          }
       },
+      "SuccessfulActionResult": {
+         "dependsOn": [
+            "ActionResult"
+         ],
+         "keyContainsReferences": true
+      },
       "Target": {
          "dependsOn": [
             "Package"
@@ -522,7 +530,6 @@
       },
       "TargetActionResult": {
          "dependsOn": [
-            "ActionResult",
             "BuiltinsModuleNames",
             "CanonicalRepoName",
             "CommandEncoderObject",
@@ -535,7 +542,8 @@
             "FileCreationParameters",
             "FileListRoot",
             "FileRoot",
-            "RootModule"
+            "RootModule",
+            "SuccessfulActionResult"
          ],
          "keyContainsReferences": true
       },

@@ -1171,6 +1171,7 @@ type moduleOrRepositoryContextEnvironment[TReference object.BasicReference, TMet
 	GetRepoValue(*model_analysis_pb.Repo_Key) model_core.Message[*model_analysis_pb.Repo_Value, TReference]
 	GetRootModuleValue(*model_analysis_pb.RootModule_Key) model_core.Message[*model_analysis_pb.RootModule_Value, TReference]
 	GetStableInputRootPathObjectValue(*model_analysis_pb.StableInputRootPathObject_Key) (*model_starlark.BarePath, bool)
+	GetSuccessfulActionResultValue(model_core.PatchedMessage[*model_analysis_pb.SuccessfulActionResult_Key, dag.ObjectContentsWalker]) model_core.Message[*model_analysis_pb.SuccessfulActionResult_Value, TReference]
 }
 
 type moduleOrRepositoryContext[TReference object.BasicReference, TMetadata BaseComputerReferenceMetadata] struct {
@@ -1787,13 +1788,15 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 	actionResult := mrc.environment.GetActionResultValue(
 		model_core.NewPatchedMessage(
 			&model_analysis_pb.ActionResult_Key{
-				PlatformPkixPublicKey: mrc.repoPlatform.Message.ExecPkixPublicKey,
-				CommandReference: keyPatcher.AddReference(
-					createdCommand.Contents.GetReference(),
-					dag.NewSimpleObjectContentsWalker(createdCommand.Contents, createdCommand.Metadata),
-				),
-				InputRootReference: inputRootReference.Message.Reference,
-				ExecutionTimeout:   &durationpb.Duration{Seconds: timeout},
+				Action: &model_analysis_pb.Action{
+					PlatformPkixPublicKey: mrc.repoPlatform.Message.ExecPkixPublicKey,
+					CommandReference: keyPatcher.AddReference(
+						createdCommand.Contents.GetReference(),
+						dag.NewSimpleObjectContentsWalker(createdCommand.Contents, createdCommand.Metadata),
+					),
+					InputRootReference: inputRootReference.Message.Reference,
+					ExecutionTimeout:   &durationpb.Duration{Seconds: timeout},
+				},
 			},
 			keyPatcher,
 		),
@@ -2091,17 +2094,18 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doRead(thread *star
 
 	// Execute the command.
 	keyPatcher := inputRootReference.Patcher
-	actionResult := mrc.environment.GetActionResultValue(
+	actionResult := mrc.environment.GetSuccessfulActionResultValue(
 		model_core.NewPatchedMessage(
-			&model_analysis_pb.ActionResult_Key{
-				PlatformPkixPublicKey: mrc.repoPlatform.Message.ExecPkixPublicKey,
-				CommandReference: keyPatcher.AddReference(
-					createdCommand.Contents.GetReference(),
-					dag.NewSimpleObjectContentsWalker(createdCommand.Contents, createdCommand.Metadata),
-				),
-				InputRootReference: inputRootReference.Message.Reference,
-				ExecutionTimeout:   &durationpb.Duration{Seconds: 300},
-				ExitCodeMustBeZero: true,
+			&model_analysis_pb.SuccessfulActionResult_Key{
+				Action: &model_analysis_pb.Action{
+					PlatformPkixPublicKey: mrc.repoPlatform.Message.ExecPkixPublicKey,
+					CommandReference: keyPatcher.AddReference(
+						createdCommand.Contents.GetReference(),
+						dag.NewSimpleObjectContentsWalker(createdCommand.Contents, createdCommand.Metadata),
+					),
+					InputRootReference: inputRootReference.Message.Reference,
+					ExecutionTimeout:   &durationpb.Duration{Seconds: 300},
+				},
 			},
 			keyPatcher,
 		),
@@ -2245,16 +2249,18 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doWhich(thread *sta
 	actionResult := mrc.environment.GetActionResultValue(
 		model_core.NewPatchedMessage(
 			&model_analysis_pb.ActionResult_Key{
-				PlatformPkixPublicKey: mrc.repoPlatform.Message.ExecPkixPublicKey,
-				CommandReference: keyPatcher.AddReference(
-					createdCommand.Contents.GetReference(),
-					dag.NewSimpleObjectContentsWalker(createdCommand.Contents, createdCommand.Metadata),
-				),
-				InputRootReference: keyPatcher.AddReference(
-					createdInputRoot.Contents.GetReference(),
-					dag.NewSimpleObjectContentsWalker(createdInputRoot.Contents, createdInputRoot.Metadata),
-				),
-				ExecutionTimeout: &durationpb.Duration{Seconds: 60},
+				Action: &model_analysis_pb.Action{
+					PlatformPkixPublicKey: mrc.repoPlatform.Message.ExecPkixPublicKey,
+					CommandReference: keyPatcher.AddReference(
+						createdCommand.Contents.GetReference(),
+						dag.NewSimpleObjectContentsWalker(createdCommand.Contents, createdCommand.Metadata),
+					),
+					InputRootReference: keyPatcher.AddReference(
+						createdInputRoot.Contents.GetReference(),
+						dag.NewSimpleObjectContentsWalker(createdInputRoot.Contents, createdInputRoot.Metadata),
+					),
+					ExecutionTimeout: &durationpb.Duration{Seconds: 60},
+				},
 			},
 			keyPatcher,
 		),
@@ -2412,13 +2418,15 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) Exists(p *model_sta
 	actionResult := mrc.environment.GetActionResultValue(
 		model_core.NewPatchedMessage(
 			&model_analysis_pb.ActionResult_Key{
-				PlatformPkixPublicKey: mrc.repoPlatform.Message.ExecPkixPublicKey,
-				CommandReference: keyPatcher.AddReference(
-					createdCommand.Contents.GetReference(),
-					dag.NewSimpleObjectContentsWalker(createdCommand.Contents, createdCommand.Metadata),
-				),
-				InputRootReference: inputRootReference.Message.Reference,
-				ExecutionTimeout:   &durationpb.Duration{Seconds: 300},
+				Action: &model_analysis_pb.Action{
+					PlatformPkixPublicKey: mrc.repoPlatform.Message.ExecPkixPublicKey,
+					CommandReference: keyPatcher.AddReference(
+						createdCommand.Contents.GetReference(),
+						dag.NewSimpleObjectContentsWalker(createdCommand.Contents, createdCommand.Metadata),
+					),
+					InputRootReference: inputRootReference.Message.Reference,
+					ExecutionTimeout:   &durationpb.Duration{Seconds: 300},
+				},
 			},
 			keyPatcher,
 		),

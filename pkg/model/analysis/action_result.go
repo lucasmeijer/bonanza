@@ -29,7 +29,11 @@ func (c *baseComputer[TReference, TMetadata]) ComputeActionResultValue(ctx conte
 	}
 
 	// Compute shared secret for encrypting the action.
-	platformPublicKey, err := x509.ParsePKIXPublicKey(key.Message.PlatformPkixPublicKey)
+	action := model_core.Nested(key, key.Message.Action)
+	if action.Message == nil {
+		return PatchedActionResultValue{}, errors.New("no action specified")
+	}
+	platformPublicKey, err := x509.ParsePKIXPublicKey(action.Message.PlatformPkixPublicKey)
 	if err != nil {
 		return PatchedActionResultValue{}, fmt.Errorf("invalid platform PKIX public key: %w", err)
 	}
@@ -42,13 +46,13 @@ func (c *baseComputer[TReference, TMetadata]) ComputeActionResultValue(ctx conte
 	// fingerprint of the action, which the scheduler can use to
 	// keep track of performance characteristics. Compute a hash to
 	// masquerade the actual Command reference.
-	commandReference, err := model_core.FlattenReference(model_core.Nested(key, key.Message.CommandReference))
+	commandReference, err := model_core.FlattenReference(model_core.Nested(action, action.Message.CommandReference))
 	if err != nil {
 		return PatchedActionResultValue{}, fmt.Errorf("invalid command reference: %w", err)
 	}
 	commandReferenceSHA256 := sha256.Sum256(commandReference.GetRawReference())
 
-	inputRootReference, err := model_core.FlattenReference(model_core.Nested(key, key.Message.InputRootReference))
+	inputRootReference, err := model_core.FlattenReference(model_core.Nested(action, action.Message.InputRootReference))
 	if err != nil {
 		return PatchedActionResultValue{}, fmt.Errorf("invalid input root reference: %w", err)
 	}
@@ -66,7 +70,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeActionResultValue(ctx conte
 		},
 		&remoteexecution_pb.Action_AdditionalData{
 			StableFingerprint: commandReferenceSHA256[:],
-			ExecutionTimeout:  key.Message.ExecutionTimeout,
+			ExecutionTimeout:  action.Message.ExecutionTimeout,
 		},
 		&completionEvent,
 		&errExecution,
@@ -79,9 +83,6 @@ func (c *baseComputer[TReference, TMetadata]) ComputeActionResultValue(ctx conte
 
 	if err := status.ErrorProto(completionEvent.Status); err != nil {
 		return PatchedActionResultValue{}, err
-	}
-	if key.Message.ExitCodeMustBeZero && completionEvent.ExitCode != 0 {
-		return PatchedActionResultValue{}, fmt.Errorf("action completed with non-zero exit code %d", completionEvent.ExitCode)
 	}
 
 	result := &model_analysis_pb.ActionResult_Value{
