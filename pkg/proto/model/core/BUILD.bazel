@@ -6,6 +6,10 @@ proto_library(
     name = "core_proto",
     srcs = ["core.proto"],
     visibility = ["//visibility:public"],
+    deps = [
+        "@protobuf//:descriptor_proto",
+        "@protobuf//:empty_proto",
+    ],
 )
 
 go_proto_library(

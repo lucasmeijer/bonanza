@@ -18,15 +18,21 @@ message Action {
   // used to execute the action in PKIX, ASN.1 DER form.
   bytes platform_pkix_public_key = 1;
 
-  // Reference to a bonanza.model.command.Command message, containing
-  // the command line arguments, environment variables, and set of paths
-  // to capture.
-  bonanza.model.core.Reference command_reference = 2;
+  // Reference to a Command message, containing the command line
+  // arguments, environment variables, and set of paths to capture.
+  bonanza.model.core.Reference command_reference = 2
+      [(bonanza.model.core.object_format) = {
+        message_type_name:
+          "bonanza.model.command.Command";
+      }];
 
-  // Reference to a bonanza.model.filesystem.Directory message,
-  // containing the files that need to be present on the worker when
-  // executing.
-  bonanza.model.core.Reference input_root_reference = 3;
+  // Reference to a Directory message, containing the files that need to
+  // be present on the worker when executing.
+  bonanza.model.core.Reference input_root_reference = 3
+      [(bonanza.model.core.object_format) = {
+        message_type_name:
+          "bonanza.model.filesystem.Directory";
+      }];
 
   // The timeout that the worker needs to enforce when executing the
   // action.
@@ -41,7 +47,11 @@ message ActionResult {
   message Value {
     int64 exit_code = 1;
 
-    bonanza.model.core.Reference outputs_reference = 2;
+    bonanza.model.core.Reference outputs_reference = 2
+        [(bonanza.model.core.object_format) = {
+          message_type_name:
+            "bonanza.model.command.Outputs";
+        }];
   }
 }
 
@@ -132,7 +142,11 @@ message CompatibleToolchainsForType {
     //
     // If this reference is not set, toolchains need to be selected
     // without any platform constraints and build settings in place.
-    bonanza.model.core.Reference configuration_reference = 2;
+    bonanza.model.core.Reference configuration_reference = 2
+        [(bonanza.model.core.object_format) = {
+          message_list_type_name:
+            "bonanza.model.analysis.BuildSettingOverride";
+        }];
   }
 
   message Value {
@@ -198,13 +212,17 @@ message BuildSettingOverride {
   }
 
   message Parent {
-    // Reference to an object of type RepoList that contains
-    // properties of repos in the module extension.
-    bonanza.model.core.Reference reference = 1;
+    // Reference to an object containing additional build setting
+    // overrides.
+    bonanza.model.core.Reference reference = 1
+        [(bonanza.model.core.object_format) = {
+          message_list_type_name:
+            "bonanza.model.analysis.BuildSettingOverride";
+        }];
 
-    // The name of the first repo contained in this B-tree.
-    // This field can be used to efficiently look up repos
-    // contained in the B-tree.
+    // The label of the first build setting override contained in this
+    // B-tree. This field can be used to efficiently look up build
+    // setting overrides contained in the B-tree.
     string first_label = 2;
   }
 
@@ -221,7 +239,11 @@ message BuildSettingOverride {
 message Args {
   message Parent {
     // Reference to the B-tree node containing additional arguments.
-    bonanza.model.core.Reference reference = 1;
+    bonanza.model.core.Reference reference = 1
+        [(bonanza.model.core.object_format) = {
+          message_list_type_name:
+            "bonanza.model.analysis.Args";
+        }];
   }
 
   message Leaf {
@@ -229,7 +251,11 @@ message Args {
       message Parent {
         // Reference to the B-tree node containing additional
         // Args.add*() invocations.
-        bonanza.model.core.Reference reference = 1;
+        bonanza.model.core.Reference reference = 1
+            [(bonanza.model.core.object_format) = {
+              message_list_type_name:
+                "bonanza.model.analysis.Args.Leaf.Add";
+            }];
       }
 
       message Leaf {
@@ -382,7 +408,11 @@ message ConfiguredTarget {
     //
     // If this reference is not set, the target is configured without
     // any platform constraints and build settings in place.
-    bonanza.model.core.Reference configuration_reference = 2;
+    bonanza.model.core.Reference configuration_reference = 2
+        [(bonanza.model.core.object_format) = {
+          message_list_type_name:
+            "bonanza.model.analysis.BuildSettingOverride";
+        }];
   }
 
   message Value {
@@ -393,7 +423,11 @@ message ConfiguredTarget {
     message Output {
       message Parent {
         // Reference to the B-tree node containing additional outputs.
-        bonanza.model.core.Reference reference = 1;
+        bonanza.model.core.Reference reference = 1
+            [(bonanza.model.core.object_format) = {
+              message_list_type_name:
+                "bonanza.model.analysis.ConfiguredTarget.Value.Output";
+            }];
 
         // The package relative path of the first output contained in
         // the B-tree that is referenced.
@@ -465,7 +499,11 @@ message ConfiguredTarget {
     message Action {
       message Parent {
         // Reference to the B-tree node containing additional actions.
-        bonanza.model.core.Reference reference = 1;
+        bonanza.model.core.Reference reference = 1
+            [(bonanza.model.core.object_format) = {
+              message_list_type_name:
+                "bonanza.model.analysis.ConfiguredTarget.Value.Action";
+            }];
 
         // The identifier of the first output contained in the B-tree
         // that is referenced.
@@ -541,13 +579,21 @@ message ExecTransition {
     string platform_label = 1;
 
     // The configuration from which inputs need to be sourced.
-    bonanza.model.core.Reference input_configuration_reference = 2;
+    bonanza.model.core.Reference input_configuration_reference = 2
+        [(bonanza.model.core.object_format) = {
+          message_list_type_name:
+            "bonanza.model.analysis.BuildSettingOverride";
+        }];
   }
 
   message Value {
     // The configuration that should be used to configure the attribute
     // that has cfg = "exec" or cfg = exec_group(...).
-    bonanza.model.core.Reference output_configuration_reference = 2;
+    bonanza.model.core.Reference output_configuration_reference = 2
+        [(bonanza.model.core.object_format) = {
+          message_list_type_name:
+            "bonanza.model.analysis.BuildSettingOverride";
+        }];
   }
 }
 
@@ -598,7 +644,11 @@ message FileReader {
 message FileListRoot {
   message Key {
     // Reference to a Starlark list containing files.
-    bonanza.model.core.Reference list_reference = 1;
+    bonanza.model.core.Reference list_reference = 1
+        [(bonanza.model.core.object_format) = {
+          message_list_type_name:
+            "bonanza.model.starlark.List.Element";
+        }];
   }
 
   message Value {
@@ -827,7 +877,11 @@ message MakeVariables {
     //
     // If this reference is not set, the target is built without any
     // platform constraints and build settings in place.
-    bonanza.model.core.Reference configuration_reference = 2;
+    bonanza.model.core.Reference configuration_reference = 2
+        [(bonanza.model.core.object_format) = {
+          message_list_type_name:
+            "bonanza.model.analysis.BuildSettingOverride";
+        }];
 
     // The set of targets whose Make variables should be obtained. These
     // targets are instances of rules that provide TemplateVariableInfo.
@@ -916,7 +970,11 @@ message ModuleExtensionRepos {
       message Parent {
         // Reference to an object with a list of Repo messages that
         // contains properties of repos in the module extension.
-        bonanza.model.core.Reference reference = 1;
+        bonanza.model.core.Reference reference = 1
+            [(bonanza.model.core.object_format) = {
+              message_list_type_name:
+                "bonanza.model.analysis.ModuleExtensionRepos.Value.Repo";
+            }];
 
         // The name of the first repo contained in this B-tree.
         // This field can be used to efficiently look up repos
@@ -1077,7 +1135,11 @@ message Package {
       message Parent {
         // Reference to an object with a list of Target messages that
         // contain properties of targets in the package.
-        bonanza.model.core.Reference reference = 1;
+        bonanza.model.core.Reference reference = 1
+            [(bonanza.model.core.object_format) = {
+              message_list_type_name:
+                "bonanza.model.analysis.Package.Value.Target";
+            }];
 
         // The name of the first target contained in this B-tree.
         // This field can be used to efficiently look up targets
@@ -1301,7 +1363,11 @@ message ResolvedToolchains {
     //
     // If this reference is not set, toolchains needd to be resolved
     // without any platform constraints and build settings in place.
-    bonanza.model.core.Reference configuration_reference = 2;
+    bonanza.model.core.Reference configuration_reference = 2
+        [(bonanza.model.core.object_format) = {
+          message_list_type_name:
+            "bonanza.model.analysis.BuildSettingOverride";
+        }];
 
     // The set of toolchains to resolve, and any constraints placed on
     // the execution platform.
@@ -1350,7 +1416,11 @@ message Select {
     //
     // If this reference is not set, conditions are selected without any
     // platform constraints and build settings in place.
-    bonanza.model.core.Reference configuration_reference = 2;
+    bonanza.model.core.Reference configuration_reference = 2
+        [(bonanza.model.core.object_format) = {
+          message_list_type_name:
+            "bonanza.model.analysis.BuildSettingOverride";
+        }];
 
     // The package that invokes select().
     string from_package = 3;
@@ -1393,7 +1463,11 @@ message SuccessfulActionResult {
   }
 
   message Value {
-    bonanza.model.core.Reference outputs_reference = 2;
+    bonanza.model.core.Reference outputs_reference = 2
+        [(bonanza.model.core.object_format) = {
+          message_list_type_name:
+            "bonanza.model.command.Outputs";
+        }];
   }
 }
 
@@ -1415,7 +1489,11 @@ message TargetActionResult {
 
     // The configuration that was used to compute the configured target
     // declaring the action.
-    bonanza.model.core.Reference configuration_reference = 2;
+    bonanza.model.core.Reference configuration_reference = 2
+        [(bonanza.model.core.object_format) = {
+          message_list_type_name:
+            "bonanza.model.analysis.BuildSettingOverride";
+        }];
 
     // The identifier of the action within the configured target.
     bytes action_id = 3;
@@ -1438,7 +1516,11 @@ message TargetCompletion {
     //
     // If this reference is not set, the target is built without any
     // platform constraints and build settings in place.
-    bonanza.model.core.Reference configuration_reference = 2;
+    bonanza.model.core.Reference configuration_reference = 2
+        [(bonanza.model.core.object_format) = {
+          message_list_type_name:
+            "bonanza.model.analysis.BuildSettingOverride";
+        }];
   }
 
   message Value {}
@@ -1462,7 +1544,11 @@ message TargetPatternExpansion {
         // Reference to an object of type TargetLabelList that
         // contains a list of labels of targets matched by the
         // target pattern.
-        bonanza.model.core.Reference reference = 1;
+        bonanza.model.core.Reference
+            reference = 1 [(bonanza.model.core.object_format) = {
+          message_list_type_name:
+            "bonanza.model.analysis.TargetPatternExpansion.Value.TargetLabel";
+        }];
       }
 
       oneof level {
@@ -1560,7 +1646,11 @@ message UserDefinedTransition {
     string transition_identifier = 1;
 
     // The configuration from which inputs need to be sourced.
-    bonanza.model.core.Reference input_configuration_reference = 2;
+    bonanza.model.core.Reference input_configuration_reference = 2
+        [(bonanza.model.core.object_format) = {
+          message_list_type_name:
+            "bonanza.model.analysis.BuildSettingOverride";
+        }];
   }
 
   message Value {
@@ -1570,7 +1660,11 @@ message UserDefinedTransition {
         string key = 1;
 
         // Output configuration that is identified by this key.
-        bonanza.model.core.Reference output_configuration_reference = 2;
+        bonanza.model.core.Reference output_configuration_reference = 2
+            [(bonanza.model.core.object_format) = {
+              message_list_type_name:
+                "bonanza.model.analysis.BuildSettingOverride";
+            }];
       }
 
       // Dictionary of output configurations yielded by the transition.
@@ -1614,7 +1708,11 @@ message VisibleTarget {
     //
     // If this reference is not set, the alias is resolved without any
     // platform constraints and build settings into account.
-    bonanza.model.core.Reference configuration_reference = 4;
+    bonanza.model.core.Reference configuration_reference = 4
+        [(bonanza.model.core.object_format) = {
+          message_list_type_name:
+            "bonanza.model.analysis.BuildSettingOverride";
+        }];
 
     // Instead expanding targets of type label_setting() taking the
     // configuration into account, return the label identifier of the

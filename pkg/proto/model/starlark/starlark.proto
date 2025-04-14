@@ -281,7 +281,11 @@ message Dict {
     }
 
     message Parent {
-      bonanza.model.core.Reference reference = 1;
+      bonanza.model.core.Reference reference = 1
+          [(bonanza.model.core.object_format) = {
+            message_list_type_name:
+              "bonanza.model.starlark.Dict.Entry";
+          }];
     }
 
     oneof level {
@@ -306,7 +310,11 @@ message ExecGroup {
 message File {
   message Owner {
     // Configuration that is used to build the file.
-    bonanza.model.core.Reference configuration_reference = 1;
+    bonanza.model.core.Reference configuration_reference = 1
+        [(bonanza.model.core.object_format) = {
+          message_list_type_name:
+            "bonanza.model.analysis.BuildSettingOverride";
+        }];
 
     // Name of the target inside the canonical package that creates
     // this file.
@@ -419,7 +427,11 @@ message List {
   message Element {
     message Parent {
       // Reference to an object containing additional list elements.
-      bonanza.model.core.Reference reference = 1;
+      bonanza.model.core.Reference reference = 1
+          [(bonanza.model.core.object_format) = {
+            message_list_type_name:
+              "bonanza.model.starlark.List.Element";
+          }];
 
       // The total number of leaf elements in the list that is
       // referenced. If the total number of leaf elements exceeds
@@ -490,7 +502,11 @@ message PackageGroup {
     oneof overrides {
       // Set if there are too many overrides to store in the current
       // object.
-      bonanza.model.core.Reference overrides_external = 2;
+      bonanza.model.core.Reference overrides_external = 2
+          [(bonanza.model.core.object_format) = {
+            message_type_name:
+              "bonanza.model.starlark.PackageGroup.Subpackages.Overrides";
+          }];
 
       // Set if there are only few overrides.
       Overrides overrides_inline = 3;

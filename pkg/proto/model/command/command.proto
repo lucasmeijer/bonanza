@@ -84,7 +84,11 @@ message PathPattern {
   oneof children {
     // Set if there are too many children to store in the current
     // object.
-    bonanza.model.core.Reference children_external = 1;
+    bonanza.model.core.Reference children_external = 1
+        [(bonanza.model.core.object_format) = {
+          message_type_name:
+            "bonanza.model.command.PathPattern.Children";
+        }];
 
     // Set if there are only few children to match.
     Children children_inline = 2;
@@ -95,7 +99,11 @@ message ArgumentList {
   message Element {
     oneof level {
       string leaf = 1;
-      bonanza.model.core.Reference parent = 2;
+      bonanza.model.core.Reference parent = 2
+          [(bonanza.model.core.object_format) = {
+            message_list_type_name:
+              "bonanza.model.command.ArgumentList.Element";
+          }];
     }
   }
 
@@ -111,7 +119,11 @@ message EnvironmentVariableList {
 
     oneof level {
       Leaf leaf = 1;
-      bonanza.model.core.Reference parent = 2;
+      bonanza.model.core.Reference parent = 2
+          [(bonanza.model.core.object_format) = {
+            message_list_type_name:
+              "bonanza.model.command.EnvironmentVariableList.Element";
+          }];
     }
   }
 

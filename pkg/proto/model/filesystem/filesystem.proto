@@ -20,7 +20,11 @@ message Leaves {
 
 message LeavesReference {
   // Reference to an object containing a Leaves message.
-  bonanza.model.core.Reference reference = 1;
+  bonanza.model.core.Reference reference = 1
+      [(bonanza.model.core.object_format) = {
+        message_type_name:
+          "bonanza.model.filesystem.Leaves";
+      }];
 
   // Value indicating up to how many levels the symbolic links contained
   // in the current directory escape it.
@@ -87,7 +91,11 @@ message DirectoryNode {
 
 message DirectoryReference {
   // Reference to an object containing a Directory message.
-  bonanza.model.core.Reference reference = 1;
+  bonanza.model.core.Reference reference = 1
+      [(bonanza.model.core.object_format) = {
+        message_type_name:
+          "bonanza.model.filesystem.Leaves";
+      }];
 
   // The number of subdirectories present in the directory. This value
   // needs to be provided to make the link count of directories accurate

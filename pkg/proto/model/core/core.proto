@@ -2,7 +2,31 @@ syntax = "proto3";
 
 package bonanza.model.core;
 
+import "google/protobuf/descriptor.proto";
+import "google/protobuf/empty.proto";
+
 option go_package = "github.com/buildbarn/bonanza/pkg/proto/model/core";
+
+extend google.protobuf.FieldOptions {
+  // If the field is a Reference, this option denotes the format of the
+  // data contained in the object that it references.
+  ObjectFormat object_format = 66941;
+}
+
+message ObjectFormat {
+  oneof format {
+    // The referenced object stores binary data (e.g., a file chunk).
+    google.protobuf.Empty raw = 1;
+
+    // The referenced object stores a Protobuf message. The full name of
+    // the message type is provided.
+    string message_type_name = 2;
+
+    // The referenced object stores a varint separated list of Protobuf
+    // messages. The full name of the message type is provided.
+    string message_list_type_name = 3;
+  }
+}
 
 // Reference to another object contained in the same namespace.
 message Reference {
