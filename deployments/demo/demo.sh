@@ -21,6 +21,8 @@ mkdir -p "${STATE_PATH}/bonanza_builder_filepool"
 umount "${STATE_PATH}/bonanza_worker_mount" || true
 mkdir -p "${STATE_PATH}/bonanza_worker_mount" || true
 
+# Launch processes that should be killed last.
+set -m
 for replica in a b; do
   for shard in 0 1 2 3; do
     REPLICA="${replica}" SHARD="${shard}" \
@@ -31,13 +33,22 @@ done
 
 "$(rlocation com_github_buildbarn_bonanza/cmd/bonanza_storage_frontend/bonanza_storage_frontend_/bonanza_storage_frontend)" \
     "$(rlocation com_github_buildbarn_bonanza/deployments/demo/bonanza_storage_frontend.jsonnet)" &
-"$(rlocation com_github_buildbarn_bonanza/cmd/bonanza_builder/bonanza_builder_/bonanza_builder)" \
-    "$(rlocation com_github_buildbarn_bonanza/deployments/demo/bonanza_builder.jsonnet)" &
 "$(rlocation com_github_buildbarn_bonanza/cmd/bonanza_scheduler/bonanza_scheduler_/bonanza_scheduler)" \
     "$(rlocation com_github_buildbarn_bonanza/deployments/demo/bonanza_scheduler.jsonnet)" &
-"$(rlocation com_github_buildbarn_bonanza/cmd/bonanza_worker/bonanza_worker_/bonanza_worker)" \
-    "$(rlocation com_github_buildbarn_bonanza/deployments/demo/bonanza_worker.jsonnet)" &
 "$(rlocation com_github_buildbarn_bb_remote_execution/cmd/bb_runner/bb_runner_/bb_runner)" \
     "$(rlocation com_github_buildbarn_bonanza/deployments/demo/bb_runner.jsonnet)" &
+
+# Launch processes that should be killed first.
+set +m
+"$(rlocation com_github_buildbarn_bonanza/cmd/bonanza_builder/bonanza_builder_/bonanza_builder)" \
+    "$(rlocation com_github_buildbarn_bonanza/deployments/demo/bonanza_builder.jsonnet)" &
+builder_pid=$!
+"$(rlocation com_github_buildbarn_bonanza/cmd/bonanza_worker/bonanza_worker_/bonanza_worker)" \
+    "$(rlocation com_github_buildbarn_bonanza/deployments/demo/bonanza_worker.jsonnet)" &
+worker_pid=$!
+
+# Install trap handler that first kills the builder and worker, and only
+# kills the rest afterwards.
+trap 'trap - EXIT INT; wait ${builder_pid} ${worker_pid} || true; kill $(jobs -p); wait' EXIT INT
 
 wait
