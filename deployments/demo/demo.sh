@@ -35,6 +35,8 @@ done
     "$(rlocation com_github_buildbarn_bonanza/deployments/demo/bonanza_storage_frontend.jsonnet)" &
 "$(rlocation com_github_buildbarn_bonanza/cmd/bonanza_scheduler/bonanza_scheduler_/bonanza_scheduler)" \
     "$(rlocation com_github_buildbarn_bonanza/deployments/demo/bonanza_scheduler.jsonnet)" &
+"$(rlocation com_github_buildbarn_bonanza/cmd/bonanza_browser/bonanza_browser_/bonanza_browser)" \
+    "$(rlocation com_github_buildbarn_bonanza/deployments/demo/bonanza_browser.jsonnet)" &
 "$(rlocation com_github_buildbarn_bb_remote_execution/cmd/bb_runner/bb_runner_/bb_runner)" \
     "$(rlocation com_github_buildbarn_bonanza/deployments/demo/bb_runner.jsonnet)" &
 

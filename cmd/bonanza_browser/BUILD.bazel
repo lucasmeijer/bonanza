@@ -1,0 +1,67 @@
+load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_run_binary")
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "bonanza_browser_lib",
+    srcs = [
+        "browser_service.go",
+        "main.go",
+    ],
+    embedsrcs = ["stylesheet.css"],
+    importpath = "github.com/buildbarn/bonanza/cmd/bonanza_browser",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//pkg/encoding/varint",
+        "//pkg/model/core",
+        "//pkg/model/encoding",
+        "//pkg/proto/browser",
+        "//pkg/proto/configuration/bonanza_browser",
+        "//pkg/proto/model/analysis",
+        "//pkg/proto/model/command",
+        "//pkg/proto/model/core",
+        "//pkg/proto/model/encoding",
+        "//pkg/proto/model/filesystem",
+        "//pkg/proto/storage/object",
+        "//pkg/storage/object",
+        "//pkg/storage/object/grpc",
+        "@com_github_buildbarn_bb_storage//pkg/global",
+        "@com_github_buildbarn_bb_storage//pkg/http",
+        "@com_github_buildbarn_bb_storage//pkg/program",
+        "@com_github_buildbarn_bb_storage//pkg/util",
+        "@dev_maragu_gomponents//:gomponents",
+        "@dev_maragu_gomponents//components",
+        "@dev_maragu_gomponents//html",
+        "@org_golang_google_grpc//codes",
+        "@org_golang_google_grpc//status",
+        "@org_golang_google_protobuf//encoding/protojson",
+        "@org_golang_google_protobuf//proto",
+        "@org_golang_google_protobuf//reflect/protoreflect",
+        "@org_golang_google_protobuf//reflect/protoregistry",
+        "@org_golang_google_protobuf//types/descriptorpb",
+        "@org_golang_google_protobuf//types/known/timestamppb",
+    ],
+)
+
+go_binary(
+    name = "bonanza_browser",
+    embed = [":bonanza_browser_lib"],
+    visibility = ["//visibility:public"],
+)
+
+js_binary(
+    name = "generate_stylesheet",
+    data = [
+        "//:node_modules/@tailwindcss/node",
+        "//:node_modules/daisyui",
+        "//:node_modules/tailwindcss",
+    ],
+    entry_point = "generate_stylesheet.js",
+)
+
+js_run_binary(
+    name = "stylesheet",
+    outs = ["stylesheet.css"],
+    args = ["stylesheet.css"],
+    chdir = package_name(),
+    tool = ":generate_stylesheet",
+)

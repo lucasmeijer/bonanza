@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package bonanza.browser;
+
+import "google/protobuf/timestamp.proto";
+import "pkg/proto/model/encoding/encoding.proto";
+
+option go_package = "github.com/buildbarn/bonanza/pkg/proto/browser";
+
+message RecentlyObservedEncoder {
+  // Configuration of object encoders.
+  repeated bonanza.model.encoding.BinaryEncoder configuration = 1;
+
+  message LastObservation {
+    // The time at which the encoder was last observed as part of an
+    // object's payload.
+    google.protobuf.Timestamp time = 1;
+
+    // The full name of the Protobuf message type that contained the
+    // encoder.
+    string message_type = 2;
+
+    // The name of the field in the Protobuf message containing the
+    // encoder.
+    string field_name = 3;
+  }
+
+  // If set, the encoder was stored in the payload of a recently
+  // accessed object.
+  LastObservation last_observation = 2;
+}
+
+message Cookie {
+  // Encoders that were recently provided by the user, or were part of
+  // recently accessed objects.
+  repeated RecentlyObservedEncoder recently_observed_encoders = 1;
+}

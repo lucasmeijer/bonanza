@@ -1,0 +1,10 @@
+{
+   "dependencies": {
+      "@tailwindcss/node": "^4.1.4",
+      "daisyui": "^5.0.22",
+      "tailwindcss": "^4.1.4"
+   },
+   "pnpm": {
+      "onlyBuiltDependencies": []
+   }
+}

@@ -1,5 +1,6 @@
 module(name = "com_github_buildbarn_bonanza")
 
+bazel_dep(name = "aspect_rules_js", version = "2.3.5")
 bazel_dep(name = "bazel_remote_apis", version = "0.0.0")
 bazel_dep(name = "bazel_skylib", version = "1.7.1")
 bazel_dep(name = "com_github_buildbarn_bb_remote_execution")
@@ -74,6 +75,7 @@ use_repo(
     "com_github_seehuhn_mt19937",
     "com_github_stretchr_testify",
     "com_github_ulikunitz_xz",
+    "dev_maragu_gomponents",
     "net_starlark_go",
     "org_golang_google_genproto_googleapis_rpc",
     "org_golang_google_grpc",
@@ -138,3 +140,11 @@ llvm.toolchain(
     llvm_version = "17.0.6",
 )
 use_repo(llvm, "llvm_toolchain_llvm")
+
+npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm")
+npm.npm_translate_lock(
+    name = "com_github_buildbarn_bonanza_npm",
+    link_workspace = "com_github_buildbarn_bonanza",
+    pnpm_lock = "//:pnpm-lock.yaml",
+)
+use_repo(npm, "com_github_buildbarn_bonanza_npm")

@@ -1,0 +1,28 @@
+load("@rules_go//go:def.bzl", "go_library")
+load("@rules_go//proto:def.bzl", "go_proto_library")
+load("@rules_proto//proto:defs.bzl", "proto_library")
+
+proto_library(
+    name = "browser_proto",
+    srcs = ["browser.proto"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/proto/model/encoding:encoding_proto",
+        "@protobuf//:timestamp_proto",
+    ],
+)
+
+go_proto_library(
+    name = "browser_go_proto",
+    importpath = "github.com/buildbarn/bonanza/pkg/proto/browser",
+    proto = ":browser_proto",
+    visibility = ["//visibility:public"],
+    deps = ["//pkg/proto/model/encoding"],
+)
+
+go_library(
+    name = "browser",
+    embed = [":browser_go_proto"],
+    importpath = "github.com/buildbarn/bonanza/pkg/proto/browser",
+    visibility = ["//visibility:public"],
+)

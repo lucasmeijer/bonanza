@@ -3,11 +3,13 @@ sh_binary(
     srcs = ["demo.sh"],
     data = [
         ":bb_runner.jsonnet",
+        ":bonanza_browser.jsonnet",
         ":bonanza_builder.jsonnet",
         ":bonanza_scheduler.jsonnet",
         ":bonanza_storage_frontend.jsonnet",
         ":bonanza_storage_shard.jsonnet",
         ":bonanza_worker.jsonnet",
+        "//cmd/bonanza_browser",
         "//cmd/bonanza_builder",
         "//cmd/bonanza_scheduler",
         "//cmd/bonanza_storage_frontend",

@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package bonanza.configuration.bonanza_browser;
+
+import "pkg/proto/configuration/global/global.proto";
+import "pkg/proto/configuration/grpc/grpc.proto";
+import "pkg/proto/configuration/http/http.proto";
+
+option go_package = "github.com/buildbarn/bonanza/pkg/proto/configuration/bonanza_browser";
+
+message ApplicationConfiguration {
+  // Common configuration options that apply to all Buildbarn binaries.
+  buildbarn.configuration.global.Configuration global = 1;
+
+  // Configuration for HTTP servers that expose the web UI.
+  repeated buildbarn.configuration.http.ServerConfiguration http_servers = 2;
+
+  // gRPC client that communicates with the storage frontend.
+  buildbarn.configuration.grpc.ClientConfiguration storage_grpc_client = 3;
+}
