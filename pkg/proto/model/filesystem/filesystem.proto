@@ -94,7 +94,7 @@ message DirectoryReference {
   bonanza.model.core.Reference reference = 1
       [(bonanza.model.core.object_format) = {
         message_type_name:
-          "bonanza.model.filesystem.Leaves";
+          "bonanza.model.filesystem.Directory";
       }];
 
   // The number of subdirectories present in the directory. This value
