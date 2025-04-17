@@ -7,6 +7,7 @@ import (
 	"github.com/buildbarn/bonanza/pkg/proto/model/encoding"
 
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // BinaryEncoder can be used to encode binary data. Examples of encoding
@@ -43,6 +44,8 @@ func NewBinaryEncoderFromProto(configurations []*encoding.BinaryEncoder, maximum
 				encoders,
 				NewDeterministicEncryptingBinaryEncoder(encryptionKey),
 			)
+		default:
+			return nil, status.Error(codes.InvalidArgument, "Unknown binary encoder type")
 		}
 	}
 	return NewChainedBinaryEncoder(encoders), nil
