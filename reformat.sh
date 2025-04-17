@@ -33,3 +33,13 @@ bazel build $(bazel query --output=label 'kind("go_proto_library", //...)')
 find bazel-bin/pkg/proto -name '*.pb.go' | while read f; do
   cat $f > $(echo $f | sed -e 's|.*/pkg/proto/|pkg/proto/|')
 done
+
+# Files embedded into Go binaries
+bazel build $(git grep '^[[:space:]]*//go:embed ' | sed -e 's|\(.*\)/.*//go:embed |//\1:|; s|"||g; s| .*||' | sort -u)
+git grep '^[[:space:]]*//go:embed ' | sed -e 's|\(.*\)/.*//go:embed |\1/|' | while read o; do
+  if [ -e "bazel-bin/$o" ]; then
+    rm -rf "$o"
+    cp -r "bazel-bin/$o" "$o"
+    find "$o" -type f -exec chmod -x {} +
+  fi
+done
