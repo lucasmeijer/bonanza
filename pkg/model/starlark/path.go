@@ -206,15 +206,28 @@ func (p *path) Attr(thread *starlark.Thread, name string) (starlark.Value, error
 		}
 		return starlark.Bool(isDir), nil
 	case "readdir":
-		names, err := p.filesystem.Readdir(p.bare)
-		if err != nil {
-			return nil, err
-		}
-		paths := make([]starlark.Value, 0, len(names))
-		for _, name := range names {
-			paths = append(paths, NewPath(bp.Append(name), p.filesystem))
-		}
-		return starlark.NewList(paths), nil
+		return starlark.NewBuiltin(
+			"path.readdir",
+			func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+				var watch string
+				if err := starlark.UnpackArgs(
+					b.Name(), args, kwargs,
+					"watch?", unpack.Bind(thread, &watch, unpack.String),
+				); err != nil {
+					return nil, err
+				}
+
+				names, err := p.filesystem.Readdir(p.bare)
+				if err != nil {
+					return nil, err
+				}
+				paths := make([]starlark.Value, 0, len(names))
+				for _, name := range names {
+					paths = append(paths, NewPath(bp.Append(name), p.filesystem))
+				}
+				return starlark.NewList(paths), nil
+			},
+		), nil
 	case "realpath":
 		realpath, err := p.filesystem.Realpath(p.bare)
 		if err != nil {
