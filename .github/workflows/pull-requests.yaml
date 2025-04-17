@@ -73,11 +73,11 @@
             },
             {
                "name": "freebsd_amd64: build and test",
-               "run": "bazel build --platforms=@rules_go//go/toolchain:freebsd_amd64 //cmd/bonanza_bazel //cmd/bonanza_builder //cmd/bonanza_scheduler //cmd/bonanza_storage_frontend //cmd/bonanza_storage_shard //cmd/bonanza_worker"
+               "run": "bazel build --platforms=@rules_go//go/toolchain:freebsd_amd64 //cmd/bonanza_bazel //cmd/bonanza_browser //cmd/bonanza_builder //cmd/bonanza_scheduler //cmd/bonanza_storage_frontend //cmd/bonanza_storage_shard //cmd/bonanza_worker"
             },
             {
                "name": "windows_amd64: build and test",
-               "run": "bazel build --platforms=@rules_go//go/toolchain:windows_amd64 //cmd/bonanza_bazel //cmd/bonanza_builder //cmd/bonanza_scheduler //cmd/bonanza_storage_frontend //cmd/bonanza_storage_shard //cmd/bonanza_worker"
+               "run": "bazel build --platforms=@rules_go//go/toolchain:windows_amd64 //cmd/bonanza_bazel //cmd/bonanza_browser //cmd/bonanza_builder //cmd/bonanza_scheduler //cmd/bonanza_storage_frontend //cmd/bonanza_storage_shard //cmd/bonanza_worker"
             }
          ]
       }

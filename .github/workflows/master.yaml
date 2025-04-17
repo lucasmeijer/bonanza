@@ -64,6 +64,18 @@
                }
             },
             {
+               "name": "linux_amd64: copy bonanza_browser",
+               "run": "rm -f bonanza_browser && bazel run --run_under cp --platforms=@rules_go//go/toolchain:linux_amd64 //cmd/bonanza_browser $(pwd)/bonanza_browser"
+            },
+            {
+               "name": "linux_amd64: upload bonanza_browser",
+               "uses": "actions/upload-artifact@v4",
+               "with": {
+                  "name": "bonanza_browser.linux_amd64",
+                  "path": "bonanza_browser"
+               }
+            },
+            {
                "name": "linux_amd64: copy bonanza_builder",
                "run": "rm -f bonanza_builder && bazel run --run_under cp --platforms=@rules_go//go/toolchain:linux_amd64 //cmd/bonanza_builder $(pwd)/bonanza_builder"
             },
@@ -137,6 +149,18 @@
                "with": {
                   "name": "bonanza_bazel.linux_386",
                   "path": "bonanza_bazel"
+               }
+            },
+            {
+               "name": "linux_386: copy bonanza_browser",
+               "run": "rm -f bonanza_browser && bazel run --run_under cp --platforms=@rules_go//go/toolchain:linux_386 //cmd/bonanza_browser $(pwd)/bonanza_browser"
+            },
+            {
+               "name": "linux_386: upload bonanza_browser",
+               "uses": "actions/upload-artifact@v4",
+               "with": {
+                  "name": "bonanza_browser.linux_386",
+                  "path": "bonanza_browser"
                }
             },
             {
@@ -216,6 +240,18 @@
                }
             },
             {
+               "name": "linux_arm: copy bonanza_browser",
+               "run": "rm -f bonanza_browser && bazel run --run_under cp --platforms=@rules_go//go/toolchain:linux_arm //cmd/bonanza_browser $(pwd)/bonanza_browser"
+            },
+            {
+               "name": "linux_arm: upload bonanza_browser",
+               "uses": "actions/upload-artifact@v4",
+               "with": {
+                  "name": "bonanza_browser.linux_arm",
+                  "path": "bonanza_browser"
+               }
+            },
+            {
                "name": "linux_arm: copy bonanza_builder",
                "run": "rm -f bonanza_builder && bazel run --run_under cp --platforms=@rules_go//go/toolchain:linux_arm //cmd/bonanza_builder $(pwd)/bonanza_builder"
             },
@@ -289,6 +325,18 @@
                "with": {
                   "name": "bonanza_bazel.linux_arm64",
                   "path": "bonanza_bazel"
+               }
+            },
+            {
+               "name": "linux_arm64: copy bonanza_browser",
+               "run": "rm -f bonanza_browser && bazel run --run_under cp --platforms=@rules_go//go/toolchain:linux_arm64 //cmd/bonanza_browser $(pwd)/bonanza_browser"
+            },
+            {
+               "name": "linux_arm64: upload bonanza_browser",
+               "uses": "actions/upload-artifact@v4",
+               "with": {
+                  "name": "bonanza_browser.linux_arm64",
+                  "path": "bonanza_browser"
                }
             },
             {
@@ -368,6 +416,18 @@
                }
             },
             {
+               "name": "darwin_amd64: copy bonanza_browser",
+               "run": "rm -f bonanza_browser && bazel run --run_under cp --platforms=@rules_go//go/toolchain:darwin_amd64 //cmd/bonanza_browser $(pwd)/bonanza_browser"
+            },
+            {
+               "name": "darwin_amd64: upload bonanza_browser",
+               "uses": "actions/upload-artifact@v4",
+               "with": {
+                  "name": "bonanza_browser.darwin_amd64",
+                  "path": "bonanza_browser"
+               }
+            },
+            {
                "name": "darwin_amd64: copy bonanza_builder",
                "run": "rm -f bonanza_builder && bazel run --run_under cp --platforms=@rules_go//go/toolchain:darwin_amd64 //cmd/bonanza_builder $(pwd)/bonanza_builder"
             },
@@ -444,6 +504,18 @@
                }
             },
             {
+               "name": "darwin_arm64: copy bonanza_browser",
+               "run": "rm -f bonanza_browser && bazel run --run_under cp --platforms=@rules_go//go/toolchain:darwin_arm64 //cmd/bonanza_browser $(pwd)/bonanza_browser"
+            },
+            {
+               "name": "darwin_arm64: upload bonanza_browser",
+               "uses": "actions/upload-artifact@v4",
+               "with": {
+                  "name": "bonanza_browser.darwin_arm64",
+                  "path": "bonanza_browser"
+               }
+            },
+            {
                "name": "darwin_arm64: copy bonanza_builder",
                "run": "rm -f bonanza_builder && bazel run --run_under cp --platforms=@rules_go//go/toolchain:darwin_arm64 //cmd/bonanza_builder $(pwd)/bonanza_builder"
             },
@@ -505,7 +577,7 @@
             },
             {
                "name": "freebsd_amd64: build and test",
-               "run": "bazel build --platforms=@rules_go//go/toolchain:freebsd_amd64 //cmd/bonanza_bazel //cmd/bonanza_builder //cmd/bonanza_scheduler //cmd/bonanza_storage_frontend //cmd/bonanza_storage_shard //cmd/bonanza_worker"
+               "run": "bazel build --platforms=@rules_go//go/toolchain:freebsd_amd64 //cmd/bonanza_bazel //cmd/bonanza_browser //cmd/bonanza_builder //cmd/bonanza_scheduler //cmd/bonanza_storage_frontend //cmd/bonanza_storage_shard //cmd/bonanza_worker"
             },
             {
                "name": "freebsd_amd64: copy bonanza_bazel",
@@ -517,6 +589,18 @@
                "with": {
                   "name": "bonanza_bazel.freebsd_amd64",
                   "path": "bonanza_bazel"
+               }
+            },
+            {
+               "name": "freebsd_amd64: copy bonanza_browser",
+               "run": "rm -f bonanza_browser && bazel run --run_under cp --platforms=@rules_go//go/toolchain:freebsd_amd64 //cmd/bonanza_browser $(pwd)/bonanza_browser"
+            },
+            {
+               "name": "freebsd_amd64: upload bonanza_browser",
+               "uses": "actions/upload-artifact@v4",
+               "with": {
+                  "name": "bonanza_browser.freebsd_amd64",
+                  "path": "bonanza_browser"
                }
             },
             {
@@ -581,7 +665,7 @@
             },
             {
                "name": "windows_amd64: build and test",
-               "run": "bazel build --platforms=@rules_go//go/toolchain:windows_amd64 //cmd/bonanza_bazel //cmd/bonanza_builder //cmd/bonanza_scheduler //cmd/bonanza_storage_frontend //cmd/bonanza_storage_shard //cmd/bonanza_worker"
+               "run": "bazel build --platforms=@rules_go//go/toolchain:windows_amd64 //cmd/bonanza_bazel //cmd/bonanza_browser //cmd/bonanza_builder //cmd/bonanza_scheduler //cmd/bonanza_storage_frontend //cmd/bonanza_storage_shard //cmd/bonanza_worker"
             },
             {
                "name": "windows_amd64: copy bonanza_bazel",
@@ -593,6 +677,18 @@
                "with": {
                   "name": "bonanza_bazel.windows_amd64",
                   "path": "bonanza_bazel.exe"
+               }
+            },
+            {
+               "name": "windows_amd64: copy bonanza_browser",
+               "run": "rm -f bonanza_browser.exe && bazel run --run_under cp --platforms=@rules_go//go/toolchain:windows_amd64 //cmd/bonanza_browser $(pwd)/bonanza_browser.exe"
+            },
+            {
+               "name": "windows_amd64: upload bonanza_browser",
+               "uses": "actions/upload-artifact@v4",
+               "with": {
+                  "name": "bonanza_browser.windows_amd64",
+                  "path": "bonanza_browser.exe"
                }
             },
             {
@@ -661,6 +757,10 @@
                },
                "name": "Install Docker credentials",
                "run": "echo \"${GITHUB_TOKEN}\" | docker login ghcr.io -u $ --password-stdin"
+            },
+            {
+               "name": "Push container bonanza_browser:bonanza_browser",
+               "run": "bazel run --stamp //cmd/bonanza_browser:bonanza_browser_container_push"
             },
             {
                "name": "Push container bonanza_builder:bonanza_builder",
