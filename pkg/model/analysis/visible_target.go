@@ -28,7 +28,7 @@ type getValueFromSelectGroupEnvironment[TReference, TMetadata any] interface {
 
 func getValueFromSelectGroup[TReference object.BasicReference, TMetadata model_core.WalkableReferenceMetadata](
 	e getValueFromSelectGroupEnvironment[TReference, TMetadata],
-	configurationReference model_core.Message[*model_core_pb.Reference, TReference],
+	configurationReference model_core.Message[*model_core_pb.DecodableReference, TReference],
 	fromPackage label.CanonicalPackage,
 	selectGroup *model_starlark_pb.Select_Group,
 	permitNoMatch bool,
@@ -269,7 +269,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeVisibleTargetValue(ctx cont
 			ctx,
 			c.buildSettingOverrideReader,
 			getBuildSettingOverridesFromReference(model_core.Nested(key, key.Message.ConfigurationReference)),
-			func(entry *model_analysis_pb.BuildSettingOverride) (int, *model_core_pb.Reference) {
+			func(entry *model_analysis_pb.BuildSettingOverride) (int, *model_core_pb.DecodableReference) {
 				switch level := entry.Level.(type) {
 				case *model_analysis_pb.BuildSettingOverride_Leaf_:
 					return strings.Compare(toLabelStr, level.Leaf.Label), nil

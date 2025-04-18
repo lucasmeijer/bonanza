@@ -1,6 +1,7 @@
 package filesystem
 
 import (
+	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	model_filesystem_pb "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 
@@ -62,10 +63,14 @@ func NewFileCreationParametersFromProto(m *model_filesystem_pb.FileCreationParam
 	}, nil
 }
 
-func (p *FileCreationParameters) EncodeChunk(data []byte) (*object.Contents, error) {
-	encodedChunk, err := p.chunkEncoder.EncodeBinary(data)
+func (p *FileCreationParameters) EncodeChunk(data []byte) (model_core.Decodable[*object.Contents], error) {
+	encodedChunk, decodingParameters, err := p.chunkEncoder.EncodeBinary(data)
 	if err != nil {
-		return nil, err
+		return model_core.Decodable[*object.Contents]{}, err
 	}
-	return p.referenceFormat.NewContents(nil, encodedChunk)
+	contents, err := p.referenceFormat.NewContents(nil, encodedChunk)
+	if err != nil {
+		return model_core.Decodable[*object.Contents]{}, err
+	}
+	return model_core.NewDecodable(contents, decodingParameters), nil
 }

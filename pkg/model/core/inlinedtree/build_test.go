@@ -24,6 +24,7 @@ func TestBuild(t *testing.T) {
 		// If no candidates are provided, there is no data,
 		// meaning an empty message needs to be emitted.
 		encoder := NewMockBinaryEncoder(ctrl)
+		encoder.EXPECT().GetDecodingParametersSizeBytes().Return(4)
 
 		output, err := inlinedtree.Build(
 			inlinedtree.CandidateList[*model_filesystem_pb.Directory, model_core.ReferenceMetadata]{},
@@ -47,6 +48,8 @@ func TestBuild(t *testing.T) {
 		// inlined, even if the maximum output size does not
 		// permit it.
 		encoder := NewMockBinaryEncoder(ctrl)
+		encoder.EXPECT().GetDecodingParametersSizeBytes().Return(4)
+
 		leaves := &model_filesystem_pb.Leaves{
 			Symlinks: []*model_filesystem_pb.SymlinkNode{{
 				Name:   "a",
@@ -58,16 +61,19 @@ func TestBuild(t *testing.T) {
 		}
 		parentAppender := NewMockParentAppenderForTesting(ctrl)
 		metadata1 := NewMockReferenceMetadata(ctrl)
-		parentAppender.EXPECT().Call(gomock.Any(), model_core.CreatedObject[model_core.ReferenceMetadata]{}).
-			Do(func(output model_core.PatchedMessage[*model_filesystem_pb.Directory, model_core.ReferenceMetadata], externalObject model_core.CreatedObject[model_core.ReferenceMetadata]) {
+		parentAppender.EXPECT().Call(gomock.Any(), nil).
+			Do(func(output model_core.PatchedMessage[*model_filesystem_pb.Directory, model_core.ReferenceMetadata], externalObject *model_core.Decodable[model_core.CreatedObject[model_core.ReferenceMetadata]]) {
 				output.Message.Leaves = leavesInline
 			}).
 			Times(2)
-		parentAppender.EXPECT().Call(gomock.Any(), gomock.Not(model_core.CreatedObject[model_core.ReferenceMetadata]{})).
-			Do(func(output model_core.PatchedMessage[*model_filesystem_pb.Directory, model_core.ReferenceMetadata], externalObject model_core.CreatedObject[model_core.ReferenceMetadata]) {
+		parentAppender.EXPECT().Call(gomock.Any(), gomock.Not(nil)).
+			Do(func(output model_core.PatchedMessage[*model_filesystem_pb.Directory, model_core.ReferenceMetadata], externalObject *model_core.Decodable[model_core.CreatedObject[model_core.ReferenceMetadata]]) {
 				output.Message.Leaves = &model_filesystem_pb.Directory_LeavesExternal{
 					LeavesExternal: &model_filesystem_pb.LeavesReference{
-						Reference: output.Patcher.AddReference(externalObject.Contents.GetReference(), metadata1),
+						Reference: &model_core_pb.DecodableReference{
+							Reference:          output.Patcher.AddReference(externalObject.Value.Contents.GetReference(), metadata1),
+							DecodingParameters: externalObject.GetDecodingParameters(),
+						},
 					},
 				}
 			}).
@@ -100,10 +106,12 @@ func TestBuild(t *testing.T) {
 		// takes up less space than inlining the data, we should
 		// emit a reference.
 		encoder := NewMockBinaryEncoder(ctrl)
+		encoder.EXPECT().GetDecodingParametersSizeBytes().Return(4)
 		encoder.EXPECT().EncodeBinary(gomock.Any()).
-			DoAndReturn(func(in []byte) ([]byte, error) {
-				return in, nil
+			DoAndReturn(func(in []byte) ([]byte, []byte, error) {
+				return in, []byte{1, 2, 3, 4}, nil
 			})
+
 		leaves := &model_filesystem_pb.Leaves{
 			Symlinks: []*model_filesystem_pb.SymlinkNode{{
 				Name:   "This is a very long symbolic link name",
@@ -111,19 +119,22 @@ func TestBuild(t *testing.T) {
 			}},
 		}
 		parentAppender := NewMockParentAppenderForTesting(ctrl)
-		parentAppender.EXPECT().Call(gomock.Any(), model_core.CreatedObject[model_core.ReferenceMetadata]{}).
-			Do(func(output model_core.PatchedMessage[*model_filesystem_pb.Directory, model_core.ReferenceMetadata], externalObject model_core.CreatedObject[model_core.ReferenceMetadata]) {
+		parentAppender.EXPECT().Call(gomock.Any(), nil).
+			Do(func(output model_core.PatchedMessage[*model_filesystem_pb.Directory, model_core.ReferenceMetadata], externalObject *model_core.Decodable[model_core.CreatedObject[model_core.ReferenceMetadata]]) {
 				output.Message.Leaves = &model_filesystem_pb.Directory_LeavesInline{
 					LeavesInline: leaves,
 				}
 			}).
 			Times(1)
 		metadata1 := NewMockReferenceMetadata(ctrl)
-		parentAppender.EXPECT().Call(gomock.Any(), gomock.Not(model_core.CreatedObject[model_core.ReferenceMetadata]{})).
-			Do(func(output model_core.PatchedMessage[*model_filesystem_pb.Directory, model_core.ReferenceMetadata], externalObject model_core.CreatedObject[model_core.ReferenceMetadata]) {
+		parentAppender.EXPECT().Call(gomock.Any(), gomock.Not(nil)).
+			Do(func(output model_core.PatchedMessage[*model_filesystem_pb.Directory, model_core.ReferenceMetadata], externalObject *model_core.Decodable[model_core.CreatedObject[model_core.ReferenceMetadata]]) {
 				output.Message.Leaves = &model_filesystem_pb.Directory_LeavesExternal{
 					LeavesExternal: &model_filesystem_pb.LeavesReference{
-						Reference: output.Patcher.AddReference(externalObject.Contents.GetReference(), metadata1),
+						Reference: &model_core_pb.DecodableReference{
+							Reference:          output.Patcher.AddReference(externalObject.Value.Contents.GetReference(), metadata1),
+							DecodingParameters: externalObject.GetDecodingParameters(),
+						},
 					},
 				}
 			}).
@@ -147,8 +158,11 @@ func TestBuild(t *testing.T) {
 		testutil.RequireEqualProto(t, &model_filesystem_pb.Directory{
 			Leaves: &model_filesystem_pb.Directory_LeavesExternal{
 				LeavesExternal: &model_filesystem_pb.LeavesReference{
-					Reference: &model_core_pb.Reference{
-						Index: 1,
+					Reference: &model_core_pb.DecodableReference{
+						Reference: &model_core_pb.Reference{
+							Index: 1,
+						},
+						DecodingParameters: []byte{1, 2, 3, 4},
 					},
 				},
 			},
@@ -166,6 +180,8 @@ func TestBuild(t *testing.T) {
 		// be able to inline the candidate, it should not store
 		// the data externally.
 		encoder := NewMockBinaryEncoder(ctrl)
+		encoder.EXPECT().GetDecodingParametersSizeBytes().Return(4)
+
 		leaves := &model_filesystem_pb.Leaves{
 			Symlinks: []*model_filesystem_pb.SymlinkNode{{
 				Name:   "This is a very long symbolic link name",
@@ -176,17 +192,20 @@ func TestBuild(t *testing.T) {
 			LeavesInline: leaves,
 		}
 		parentAppender := NewMockParentAppenderForTesting(ctrl)
-		parentAppender.EXPECT().Call(gomock.Any(), model_core.CreatedObject[model_core.ReferenceMetadata]{}).
-			Do(func(output model_core.PatchedMessage[*model_filesystem_pb.Directory, model_core.ReferenceMetadata], externalObject model_core.CreatedObject[model_core.ReferenceMetadata]) {
+		parentAppender.EXPECT().Call(gomock.Any(), nil).
+			Do(func(output model_core.PatchedMessage[*model_filesystem_pb.Directory, model_core.ReferenceMetadata], externalObject *model_core.Decodable[model_core.CreatedObject[model_core.ReferenceMetadata]]) {
 				output.Message.Leaves = leavesInline
 			}).
 			Times(2)
 		metadata1 := NewMockReferenceMetadata(ctrl)
-		parentAppender.EXPECT().Call(gomock.Any(), gomock.Not(model_core.CreatedObject[model_core.ReferenceMetadata]{})).
-			Do(func(output model_core.PatchedMessage[*model_filesystem_pb.Directory, model_core.ReferenceMetadata], externalObject model_core.CreatedObject[model_core.ReferenceMetadata]) {
+		parentAppender.EXPECT().Call(gomock.Any(), gomock.Not(nil)).
+			Do(func(output model_core.PatchedMessage[*model_filesystem_pb.Directory, model_core.ReferenceMetadata], externalObject *model_core.Decodable[model_core.CreatedObject[model_core.ReferenceMetadata]]) {
 				output.Message.Leaves = &model_filesystem_pb.Directory_LeavesExternal{
 					LeavesExternal: &model_filesystem_pb.LeavesReference{
-						Reference: output.Patcher.AddReference(externalObject.Contents.GetReference(), metadata1),
+						Reference: &model_core_pb.DecodableReference{
+							Reference:          output.Patcher.AddReference(externalObject.Value.Contents.GetReference(), metadata1),
+							DecodingParameters: externalObject.GetDecodingParameters(),
+						},
 					},
 				}
 			}).

@@ -27,7 +27,7 @@ func NewDeterministicEncryptingBinaryEncoder(blockCipher cipher.Block) BinaryEnc
 	}
 }
 
-// getEncodedSizeBytes computes the size of the encrypted output, with
+// getPaddedSizeBytes computes the size of the encrypted output, with
 // padding in place. Because we use Counter (CTR) mode, we don't need
 // any padding to encrypt the data itself. However, adding it reduces
 // information leakage by obfuscating the original size.
@@ -39,56 +39,54 @@ func NewDeterministicEncryptingBinaryEncoder(blockCipher cipher.Block) BinaryEnc
 // More details: Reducing Metadata Leakage from Encrypted Files and
 // Communication with PURBs, Algorithm 1 "PADMÉ".
 // https://petsymposium.org/popets/2019/popets-2019-0056.pdf
-func (be *deterministicEncryptingBinaryEncoder) getEncodedSizeBytes(dataSizeBytes int) int {
-	unpaddedSizeBytes := be.blockSizeBytes + dataSizeBytes
-	e := bits.Len(uint(unpaddedSizeBytes)) - 1
+func getPaddedSizeBytes(dataSizeBytes int) int {
+	e := bits.Len(uint(dataSizeBytes)) - 1
 	bitsToClear := e - bits.Len(uint(e))
-	return (unpaddedSizeBytes>>bitsToClear + 1) << bitsToClear
+	return (dataSizeBytes>>bitsToClear + 1) << bitsToClear
 }
 
-func (be *deterministicEncryptingBinaryEncoder) EncodeBinary(in []byte) ([]byte, error) {
-	if len(in) == 0 {
-		return []byte{}, nil
-	}
-
+func (be *deterministicEncryptingBinaryEncoder) EncodeBinary(in []byte) ([]byte, []byte, error) {
 	// Pick an initialization vector. Because this has to work
 	// deterministically, hash the input. Encrypt it, so that the
 	// hash itself isn't revealed. That would allow fingerprinting
 	// of objects, even if the key is changed.
 	ivHash := sha256.Sum256(in)
-	out := make([]byte, be.getEncodedSizeBytes(len(in)))
-	iv := out[:be.blockSizeBytes]
-	be.blockCipher.Encrypt(iv, ivHash[:be.blockSizeBytes])
+	initializationVector := make([]byte, be.blockSizeBytes)
+	be.blockCipher.Encrypt(initializationVector, ivHash[:be.blockSizeBytes])
 
-	outPayload := out[be.blockSizeBytes:]
-	stream := cipher.NewCTR(be.blockCipher, iv)
-	stream.XORKeyStream(outPayload, in)
+	if len(in) == 0 {
+		return []byte{}, initializationVector, nil
+	}
 
-	outPadding := outPayload[len(in):]
+	out := make([]byte, getPaddedSizeBytes(len(in)))
+	stream := cipher.NewCTR(be.blockCipher, initializationVector)
+	stream.XORKeyStream(out, in)
+
+	outPadding := out[len(in):]
 	outPadding[0] = 0x80
 	stream.XORKeyStream(outPadding, outPadding)
-	return out, nil
+	return out, initializationVector, nil
 }
 
-func (be *deterministicEncryptingBinaryEncoder) DecodeBinary(in []byte) ([]byte, error) {
-	if len(in) == 0 {
-		return []byte{}, nil
-	}
-	if len(in) <= be.blockSizeBytes {
+func (be *deterministicEncryptingBinaryEncoder) DecodeBinary(in, initializationVector []byte) ([]byte, error) {
+	if len(initializationVector) != be.blockSizeBytes {
 		return nil, status.Errorf(
 			codes.InvalidArgument,
-			"Encoded data is %d bytes in size, which is too small hold an encrypted initialization vector of %d bytes and a payload",
-			len(in),
+			"Decoding parameters are %d bytes in size, while the initialization vector was expected to be %d bytes in size",
+			len(initializationVector),
 			be.blockSizeBytes,
 		)
 	}
 
+	if len(in) == 0 {
+		return []byte{}, nil
+	}
+
 	// Decrypt the data, using the initialization vector that is
 	// stored before it.
-	encryptedData := in[be.blockSizeBytes:]
-	out := make([]byte, len(encryptedData))
-	stream := cipher.NewCTR(be.blockCipher, in[:be.blockSizeBytes])
-	stream.XORKeyStream(out, encryptedData)
+	out := make([]byte, len(in))
+	stream := cipher.NewCTR(be.blockCipher, initializationVector)
+	stream.XORKeyStream(out, in)
 
 	// Remove trailing padding.
 	for l := len(out) - 1; l > 0; l-- {
@@ -96,13 +94,12 @@ func (be *deterministicEncryptingBinaryEncoder) DecodeBinary(in []byte) ([]byte,
 		case 0x00:
 		case 0x80:
 			out = out[:l]
-			if encodedSizeBytes := be.getEncodedSizeBytes(len(out)); len(in) != encodedSizeBytes {
+			if encodedSizeBytes := getPaddedSizeBytes(len(out)); len(in) != encodedSizeBytes {
 				return nil, status.Errorf(
 					codes.InvalidArgument,
-					"Encoded data is %d bytes in size, while %d bytes were expected for an initialization vector of %d bytes and a payload of %d bytes",
+					"Encoded data is %d bytes in size, while %d bytes were expected for a payload of %d bytes",
 					len(in),
 					encodedSizeBytes,
-					be.blockSizeBytes,
 					len(out),
 				)
 			}
@@ -112,4 +109,8 @@ func (be *deterministicEncryptingBinaryEncoder) DecodeBinary(in []byte) ([]byte,
 		}
 	}
 	return nil, status.Error(codes.InvalidArgument, "No data remains after removing padding")
+}
+
+func (be *deterministicEncryptingBinaryEncoder) GetDecodingParametersSizeBytes() int {
+	return be.blockSizeBytes
 }

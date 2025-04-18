@@ -18,13 +18,14 @@ func TestChainedBinaryEncoder(t *testing.T) {
 		binaryEncoder := encoding.NewChainedBinaryEncoder(nil)
 
 		t.Run("Encode", func(t *testing.T) {
-			encodedData, err := binaryEncoder.EncodeBinary([]byte("Hello"))
+			encodedData, decodingParameters, err := binaryEncoder.EncodeBinary([]byte("Hello"))
 			require.NoError(t, err)
 			require.Equal(t, []byte("Hello"), encodedData)
+			require.Empty(t, decodingParameters)
 		})
 
 		t.Run("Decode", func(t *testing.T) {
-			decodedData, err := binaryEncoder.DecodeBinary([]byte("Hello"))
+			decodedData, err := binaryEncoder.DecodeBinary([]byte("Hello"), nil)
 			require.NoError(t, err)
 			require.Equal(t, []byte("Hello"), decodedData)
 		})
@@ -38,18 +39,19 @@ func TestChainedBinaryEncoder(t *testing.T) {
 
 		t.Run("Encode", func(t *testing.T) {
 			binaryEncoder1.EXPECT().EncodeBinary([]byte("Hello")).
-				Return([]byte("World"), nil)
+				Return([]byte("World"), []byte("Parameters"), nil)
 
-			encodedData, err := binaryEncoder.EncodeBinary([]byte("Hello"))
+			encodedData, decodingParameters, err := binaryEncoder.EncodeBinary([]byte("Hello"))
 			require.NoError(t, err)
 			require.Equal(t, []byte("World"), encodedData)
+			require.Equal(t, []byte("Parameters"), decodingParameters)
 		})
 
 		t.Run("Decode", func(t *testing.T) {
-			binaryEncoder1.EXPECT().DecodeBinary([]byte("World")).
+			binaryEncoder1.EXPECT().DecodeBinary([]byte("World"), []byte("Parameters")).
 				Return([]byte("Hello"), nil)
 
-			decodedData, err := binaryEncoder.DecodeBinary([]byte("World"))
+			decodedData, err := binaryEncoder.DecodeBinary([]byte("World"), []byte("Parameters"))
 			require.NoError(t, err)
 			require.Equal(t, []byte("Hello"), decodedData)
 		})
@@ -69,14 +71,15 @@ func TestChainedBinaryEncoder(t *testing.T) {
 			// encrypt).
 			gomock.InOrder(
 				binaryEncoder1.EXPECT().EncodeBinary([]byte("Foo")).
-					Return([]byte("Bar"), nil),
+					Return([]byte("Bar"), nil, nil),
 				binaryEncoder2.EXPECT().EncodeBinary([]byte("Bar")).
-					Return([]byte("Baz"), nil),
+					Return([]byte("Baz"), []byte("Parameters"), nil),
 			)
 
-			encodedData, err := binaryEncoder.EncodeBinary([]byte("Foo"))
+			encodedData, decodingParameters, err := binaryEncoder.EncodeBinary([]byte("Foo"))
 			require.NoError(t, err)
 			require.Equal(t, []byte("Baz"), encodedData)
+			require.Equal(t, []byte("Parameters"), decodingParameters)
 		})
 
 		t.Run("Decode", func(t *testing.T) {
@@ -84,13 +87,13 @@ func TestChainedBinaryEncoder(t *testing.T) {
 			// the other way around (e.g., decrypt and
 			// decompress).
 			gomock.InOrder(
-				binaryEncoder2.EXPECT().DecodeBinary([]byte("Baz")).
+				binaryEncoder2.EXPECT().DecodeBinary([]byte("Baz"), []byte("Parameters")).
 					Return([]byte("Bar"), nil),
-				binaryEncoder1.EXPECT().DecodeBinary([]byte("Bar")).
+				binaryEncoder1.EXPECT().DecodeBinary([]byte("Bar"), nil).
 					Return([]byte("Foo"), nil),
 			)
 
-			decodedData, err := binaryEncoder.DecodeBinary([]byte("Baz"))
+			decodedData, err := binaryEncoder.DecodeBinary([]byte("Baz"), []byte("Parameters"))
 			require.NoError(t, err)
 			require.Equal(t, []byte("Foo"), decodedData)
 		})

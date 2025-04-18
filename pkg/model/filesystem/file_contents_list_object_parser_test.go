@@ -38,6 +38,7 @@ func TestFileContentsListObjectParser(t *testing.T) {
 			model_core.NewSimpleMessage[object.LocalReference](
 				[]byte("Not a valid Protobuf message"),
 			),
+			/* decodingParameters = */ nil,
 		)
 		testutil.RequireEqualStatus(t, status.Error(codes.InvalidArgument, "Length of element at offset 0 is 3695 bytes, which exceeds maximum permitted size of 26 bytes"), err)
 	})
@@ -49,8 +50,11 @@ func TestFileContentsListObjectParser(t *testing.T) {
 		data := marshalFileContentsList([]*model_filesystem_pb.FileContents{{
 			TotalSizeBytes: 42,
 			Level: &model_filesystem_pb.FileContents_ChunkReference{
-				ChunkReference: &model_core_pb.Reference{
-					Index: 1,
+				ChunkReference: &model_core_pb.DecodableReference{
+					Reference: &model_core_pb.Reference{
+						Index: 1,
+					},
+					DecodingParameters: []byte{1, 2, 3, 4},
 				},
 			},
 		}})
@@ -61,6 +65,7 @@ func TestFileContentsListObjectParser(t *testing.T) {
 					object.MustNewSHA256V1LocalReference("f5eeff3dfd9cdee18e36c40bd7853d427f560b2ce1d71ddcb4015af94e21626e", 42, 0, 0, 0),
 				},
 			),
+			/* decodingParameters = */ nil,
 		)
 		testutil.RequireEqualStatus(t, status.Error(codes.InvalidArgument, "File contents list contains fewer than two parts"), err)
 	})
@@ -73,24 +78,33 @@ func TestFileContentsListObjectParser(t *testing.T) {
 			{
 				TotalSizeBytes: 12,
 				Level: &model_filesystem_pb.FileContents_ChunkReference{
-					ChunkReference: &model_core_pb.Reference{
-						Index: 1,
+					ChunkReference: &model_core_pb.DecodableReference{
+						Reference: &model_core_pb.Reference{
+							Index: 1,
+						},
+						DecodingParameters: []byte{1, 2, 3, 4},
 					},
 				},
 			},
 			{
 				TotalSizeBytes: 0,
 				Level: &model_filesystem_pb.FileContents_ChunkReference{
-					ChunkReference: &model_core_pb.Reference{
-						Index: 2,
+					ChunkReference: &model_core_pb.DecodableReference{
+						Reference: &model_core_pb.Reference{
+							Index: 2,
+						},
+						DecodingParameters: []byte{1, 2, 3, 4},
 					},
 				},
 			},
 			{
 				TotalSizeBytes: 70,
 				Level: &model_filesystem_pb.FileContents_ChunkReference{
-					ChunkReference: &model_core_pb.Reference{
-						Index: 3,
+					ChunkReference: &model_core_pb.DecodableReference{
+						Reference: &model_core_pb.Reference{
+							Index: 3,
+						},
+						DecodingParameters: []byte{1, 2, 3, 4},
 					},
 				},
 			},
@@ -104,6 +118,7 @@ func TestFileContentsListObjectParser(t *testing.T) {
 					object.MustNewSHA256V1LocalReference("a17c02397e375773f33ca1d55e275ece80c13f950ca5bd813dc70cb32a111fd2", 70, 0, 0, 0),
 				},
 			),
+			/* decodingParameters = */ nil,
 		)
 		testutil.RequireEqualStatus(t, status.Error(codes.InvalidArgument, "Part at index 1 does not contain any data"), err)
 	})
@@ -117,16 +132,22 @@ func TestFileContentsListObjectParser(t *testing.T) {
 			{
 				TotalSizeBytes: 0x8000000000000000,
 				Level: &model_filesystem_pb.FileContents_FileContentsListReference{
-					FileContentsListReference: &model_core_pb.Reference{
-						Index: 1,
+					FileContentsListReference: &model_core_pb.DecodableReference{
+						Reference: &model_core_pb.Reference{
+							Index: 1,
+						},
+						DecodingParameters: []byte{1, 2, 3, 4},
 					},
 				},
 			},
 			{
 				TotalSizeBytes: 0x8000000000000000,
 				Level: &model_filesystem_pb.FileContents_FileContentsListReference{
-					FileContentsListReference: &model_core_pb.Reference{
-						Index: 2,
+					FileContentsListReference: &model_core_pb.DecodableReference{
+						Reference: &model_core_pb.Reference{
+							Index: 2,
+						},
+						DecodingParameters: []byte{1, 2, 3, 4},
 					},
 				},
 			},
@@ -139,6 +160,7 @@ func TestFileContentsListObjectParser(t *testing.T) {
 					object.MustNewSHA256V1LocalReference("a5f8c2ce71af9856ac04423d776688766c05f3b4a0b8850f68bfcbd1bc94b45c", 50000, 4, 1000, 900000),
 				},
 			),
+			/* decodingParameters = */ nil,
 		)
 		testutil.RequireEqualStatus(t, status.Error(codes.InvalidArgument, "Combined size of all parts exceeds maximum file size of 18446744073709551615 bytes"), err)
 	})
@@ -148,16 +170,22 @@ func TestFileContentsListObjectParser(t *testing.T) {
 			{
 				TotalSizeBytes: 200,
 				Level: &model_filesystem_pb.FileContents_ChunkReference{
-					ChunkReference: &model_core_pb.Reference{
-						Index: 7,
+					ChunkReference: &model_core_pb.DecodableReference{
+						Reference: &model_core_pb.Reference{
+							Index: 7,
+						},
+						DecodingParameters: []byte{1, 2, 3, 4},
 					},
 				},
 			},
 			{
 				TotalSizeBytes: 300,
 				Level: &model_filesystem_pb.FileContents_ChunkReference{
-					ChunkReference: &model_core_pb.Reference{
-						Index: 2,
+					ChunkReference: &model_core_pb.DecodableReference{
+						Reference: &model_core_pb.Reference{
+							Index: 2,
+						},
+						DecodingParameters: []byte{1, 2, 3, 4},
 					},
 				},
 			},
@@ -170,6 +198,7 @@ func TestFileContentsListObjectParser(t *testing.T) {
 					object.MustNewSHA256V1LocalReference("635fef9b02b336f9254473d6b09c41f5027c38046c46bb514afc788292c1508e", 300, 0, 0, 0),
 				},
 			),
+			/* decodingParameters = */ nil,
 		)
 		testutil.RequireEqualStatus(t, status.Error(codes.InvalidArgument, "Invalid reference for part at index 0: Reference message contains index 7, which is outside expected range [1, 2]"), err)
 	})
@@ -179,16 +208,22 @@ func TestFileContentsListObjectParser(t *testing.T) {
 			{
 				TotalSizeBytes: 200,
 				Level: &model_filesystem_pb.FileContents_ChunkReference{
-					ChunkReference: &model_core_pb.Reference{
-						Index: 1,
+					ChunkReference: &model_core_pb.DecodableReference{
+						Reference: &model_core_pb.Reference{
+							Index: 1,
+						},
+						DecodingParameters: []byte{1, 2, 3, 4},
 					},
 				},
 			},
 			{
 				TotalSizeBytes: 300,
 				Level: &model_filesystem_pb.FileContents_ChunkReference{
-					ChunkReference: &model_core_pb.Reference{
-						Index: 2,
+					ChunkReference: &model_core_pb.DecodableReference{
+						Reference: &model_core_pb.Reference{
+							Index: 2,
+						},
+						DecodingParameters: []byte{1, 2, 3, 4},
 					},
 				},
 			},
@@ -201,6 +236,7 @@ func TestFileContentsListObjectParser(t *testing.T) {
 					object.MustNewSHA256V1LocalReference("635fef9b02b336f9254473d6b09c41f5027c38046c46bb514afc788292c1508e", 300, 0, 0, 0),
 				},
 			),
+			/* decodingParameters = */ nil,
 		)
 		require.NoError(t, err)
 		require.Equal(
@@ -208,15 +244,15 @@ func TestFileContentsListObjectParser(t *testing.T) {
 			model_filesystem.FileContentsList[object.LocalReference]{
 				{
 					EndBytes:  200,
-					Reference: object.MustNewSHA256V1LocalReference("38dc1b3b70088a0bde56511eeb571e0b5aa873407ad198148befb347ef31282a", 200, 0, 0, 0),
+					Reference: model_core.NewDecodable(object.MustNewSHA256V1LocalReference("38dc1b3b70088a0bde56511eeb571e0b5aa873407ad198148befb347ef31282a", 200, 0, 0, 0), []byte{1, 2, 3, 4}),
 				},
 				{
 					EndBytes:  500,
-					Reference: object.MustNewSHA256V1LocalReference("635fef9b02b336f9254473d6b09c41f5027c38046c46bb514afc788292c1508e", 300, 0, 0, 0),
+					Reference: model_core.NewDecodable(object.MustNewSHA256V1LocalReference("635fef9b02b336f9254473d6b09c41f5027c38046c46bb514afc788292c1508e", 300, 0, 0, 0), []byte{1, 2, 3, 4}),
 				},
 			},
 			fileContentsList,
 		)
-		require.Equal(t, 22, sizeBytes)
+		require.Equal(t, 38, sizeBytes)
 	})
 }

@@ -8,4 +8,5 @@ import (
 
 type FileFactory interface {
 	LookupFile(fileContents model_filesystem.FileContentsEntry[object.LocalReference], isExecutable bool) virtual.LinkableLeaf
+	GetDecodingParametersSizeBytes(isFileContentsList bool) int
 }

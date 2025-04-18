@@ -1,7 +1,6 @@
 package starlark
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"hash/fnv"
@@ -96,7 +95,7 @@ func (f *File[TReference, TMetadata]) CompareSameType(thread *starlark.Thread, o
 // ConfigurationReferenceToComponent determines the pathname component
 // to use for a given configuration, so that it may be embedded into
 // bazel-out/.../bin pathnames.
-func ConfigurationReferenceToComponent[TReference object.BasicReference](configurationReference model_core.Message[*model_core_pb.Reference, TReference]) (string, error) {
+func ConfigurationReferenceToComponent[TReference object.BasicReference](configurationReference model_core.Message[*model_core_pb.DecodableReference, TReference]) (string, error) {
 	if configurationReference.Message == nil {
 		// The configuration is empty, meaning all build
 		// settings are set to their default values. Use the
@@ -105,14 +104,15 @@ func ConfigurationReferenceToComponent[TReference object.BasicReference](configu
 	}
 
 	// The configuration is non-empty. Put the reference of the
-	// configuration in the pathname. In addition to guaranteeing
-	// there are no collisions, it makes it easy to inspect the
-	// configuration that was used to build these files.
-	r, err := model_core.FlattenReference(configurationReference)
+	// configuration and its decoding parameters in the pathname. In
+	// addition to guaranteeing there are no collisions, it makes it
+	// easy to inspect the configuration that was used to build
+	// these files.
+	r, err := model_core.FlattenDecodableReference(configurationReference)
 	if err != nil {
 		return "", err
 	}
-	return base64.RawURLEncoding.EncodeToString(r.GetRawReference()), nil
+	return model_core.DecodableLocalReferenceToString(r), nil
 }
 
 func (f *File[TReference, TMetadata]) Attr(thread *starlark.Thread, name string) (starlark.Value, error) {

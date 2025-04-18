@@ -281,7 +281,7 @@ message Dict {
     }
 
     message Parent {
-      bonanza.model.core.Reference reference = 1
+      bonanza.model.core.DecodableReference reference = 1
           [(bonanza.model.core.object_format) = {
             message_list_type_name:
               "bonanza.model.starlark.Dict.Entry";
@@ -310,7 +310,7 @@ message ExecGroup {
 message File {
   message Owner {
     // Configuration that is used to build the file.
-    bonanza.model.core.Reference configuration_reference = 1
+    bonanza.model.core.DecodableReference configuration_reference = 1
         [(bonanza.model.core.object_format) = {
           message_list_type_name:
             "bonanza.model.analysis.BuildSettingOverride";
@@ -427,7 +427,7 @@ message List {
   message Element {
     message Parent {
       // Reference to an object containing additional list elements.
-      bonanza.model.core.Reference reference = 1
+      bonanza.model.core.DecodableReference reference = 1
           [(bonanza.model.core.object_format) = {
             message_list_type_name:
               "bonanza.model.starlark.List.Element";
@@ -502,7 +502,7 @@ message PackageGroup {
     oneof overrides {
       // Set if there are too many overrides to store in the current
       // object.
-      bonanza.model.core.Reference overrides_external = 2
+      bonanza.model.core.DecodableReference overrides_external = 2
           [(bonanza.model.core.object_format) = {
             message_type_name:
               "bonanza.model.starlark.PackageGroup.Subpackages.Overrides";

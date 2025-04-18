@@ -25,63 +25,80 @@ func TestDeterministicEncryptingBinaryEncoder(t *testing.T) {
 
 	t.Run("EncodeBinary", func(t *testing.T) {
 		t.Run("Empty", func(t *testing.T) {
-			encodedData, err := binaryEncoder.EncodeBinary(nil)
+			encodedData, initializationVector, err := binaryEncoder.EncodeBinary(nil)
 			require.NoError(t, err)
 			require.Empty(t, encodedData)
+			require.Equal(t, []byte{
+				0x23, 0x35, 0x89, 0xdf, 0x0e, 0xf7, 0xe4, 0xd6,
+				0x0b, 0xb5, 0x21, 0xfd, 0x18, 0x50, 0xc1, 0xce,
+			}, initializationVector)
 		})
 
 		t.Run("HelloWorld", func(t *testing.T) {
-			encodedData, err := binaryEncoder.EncodeBinary([]byte("Hello world"))
+			encodedData, initializationVector, err := binaryEncoder.EncodeBinary([]byte("Hello world"))
 			require.NoError(t, err)
 			require.Equal(t, []byte{
-				// Initialization vector.
-				0x10, 0x23, 0x7d, 0x7d, 0xe1, 0x80, 0x2e, 0xe0,
-				0x7c, 0x0c, 0xbe, 0x21, 0x53, 0x9d, 0x7e, 0xde,
 				// Encrypted payload.
 				0x31, 0x9c, 0x21, 0xeb, 0x5a, 0x33, 0xd0, 0xb7,
 				0x8b, 0xde, 0x31,
 				// Padding.
 				0x03,
 			}, encodedData)
+			require.Equal(t, []byte{
+				0x10, 0x23, 0x7d, 0x7d, 0xe1, 0x80, 0x2e, 0xe0,
+				0x7c, 0x0c, 0xbe, 0x21, 0x53, 0x9d, 0x7e, 0xde,
+			}, initializationVector)
 		})
 	})
 
 	t.Run("DecodeBinary", func(t *testing.T) {
 		t.Run("Empty", func(t *testing.T) {
-			decodedData, err := binaryEncoder.DecodeBinary(nil)
+			decodedData, err := binaryEncoder.DecodeBinary(
+				/* in = */ nil,
+				/* initializationVector = */ []byte{
+					0x7e, 0x2d, 0x56, 0x18, 0xc7, 0x3b, 0xda, 0x73,
+					0x0a, 0x97, 0xef, 0xfd, 0xaf, 0x6d, 0xec, 0x96,
+				},
+			)
 			require.NoError(t, err)
 			require.Empty(t, decodedData)
 		})
 
 		t.Run("HelloWorld", func(t *testing.T) {
-			decodedData, err := binaryEncoder.DecodeBinary([]byte{
-				// Initialization vector.
-				0x10, 0x23, 0x7d, 0x7d, 0xe1, 0x80, 0x2e, 0xe0,
-				0x7c, 0x0c, 0xbe, 0x21, 0x53, 0x9d, 0x7e, 0xde,
-				// Encrypted payload.
-				0x31, 0x9c, 0x21, 0xeb, 0x5a, 0x33, 0xd0, 0xb7,
-				0x8b, 0xde, 0x31,
-				// Padding.
-				0x03,
-			})
+			decodedData, err := binaryEncoder.DecodeBinary(
+				[]byte{
+					// Encrypted payload.
+					0x31, 0x9c, 0x21, 0xeb, 0x5a, 0x33, 0xd0, 0xb7,
+					0x8b, 0xde, 0x31,
+					// Padding.
+					0x03,
+				},
+				/* initializationVector = */ []byte{
+					0x10, 0x23, 0x7d, 0x7d, 0xe1, 0x80, 0x2e, 0xe0,
+					0x7c, 0x0c, 0xbe, 0x21, 0x53, 0x9d, 0x7e, 0xde,
+				},
+			)
 			require.NoError(t, err)
 			require.Equal(t, []byte("Hello world"), decodedData)
 		})
 
-		t.Run("TooShort", func(t *testing.T) {
-			_, err := binaryEncoder.DecodeBinary([]byte("Hello"))
-			testutil.RequireEqualStatus(t, status.Error(codes.InvalidArgument, "Encoded data is 5 bytes in size, which is too small hold an encrypted initialization vector of 16 bytes and a payload"), err)
+		t.Run("DecodingParametersTooShort", func(t *testing.T) {
+			_, err := binaryEncoder.DecodeBinary([]byte("Hello"), nil)
+			testutil.RequireEqualStatus(t, status.Error(codes.InvalidArgument, "Decoding parameters are 0 bytes in size, while the initialization vector was expected to be 16 bytes in size"), err)
 		})
 
 		t.Run("BadPadding", func(t *testing.T) {
-			_, err := binaryEncoder.DecodeBinary([]byte{
-				// Initialization vector.
-				0x3a, 0xd1, 0xc5, 0xdc, 0xd0, 0x85, 0xf3, 0xd1,
-				0xac, 0x1e, 0xaf, 0xd1, 0xe3, 0x92, 0x0d, 0x92,
-				// Padding.
-				0x60, 0x94, 0x5b, 0x87, 0x83, 0x5d, 0xeb, 0xd2,
-				0x11, 0x4a, 0x9e, 0xa3, 0x0c, 0xf3, 0x4d, 0xba,
-			})
+			_, err := binaryEncoder.DecodeBinary(
+				[]byte{
+					// Padding.
+					0x60, 0x94, 0x5b, 0x87, 0x83, 0x5d, 0xeb, 0xd2,
+					0x11, 0x4a, 0x9e, 0xa3, 0x0c, 0xf3, 0x4d, 0xba,
+				},
+				/* initializationVector = */ []byte{
+					0x3a, 0xd1, 0xc5, 0xdc, 0xd0, 0x85, 0xf3, 0xd1,
+					0xac, 0x1e, 0xaf, 0xd1, 0xe3, 0x92, 0x0d, 0x92,
+				},
+			)
 			testutil.RequireEqualStatus(t, status.Error(codes.InvalidArgument, "Padding contains invalid byte with value 118"), err)
 		})
 
@@ -90,17 +107,20 @@ func TestDeterministicEncryptingBinaryEncoder(t *testing.T) {
 			// implementations encode data the same way.
 			// Using different amounts of padding may
 			// introduce information leakage.
-			_, err := binaryEncoder.DecodeBinary([]byte{
-				// Initialization vector.
-				0x10, 0x23, 0x7d, 0x7d, 0xe1, 0x80, 0x2e, 0xe0,
-				0x7c, 0x0c, 0xbe, 0x21, 0x53, 0x9d, 0x7e, 0xde,
-				// Encrypted payload.
-				0x31, 0x9c, 0x21, 0xeb, 0x5a, 0x33, 0xd0, 0xb7,
-				0x8b, 0xde, 0x31,
-				// Padding.
-				0x03, 0x44,
-			})
-			testutil.RequireEqualStatus(t, status.Error(codes.InvalidArgument, "Encoded data is 29 bytes in size, while 28 bytes were expected for an initialization vector of 16 bytes and a payload of 11 bytes"), err)
+			_, err := binaryEncoder.DecodeBinary(
+				[]byte{
+					// Encrypted payload.
+					0x31, 0x9c, 0x21, 0xeb, 0x5a, 0x33, 0xd0, 0xb7,
+					0x8b, 0xde, 0x31,
+					// Padding.
+					0x03, 0x44,
+				},
+				/* initializationVector = */ []byte{
+					0x10, 0x23, 0x7d, 0x7d, 0xe1, 0x80, 0x2e, 0xe0,
+					0x7c, 0x0c, 0xbe, 0x21, 0x53, 0x9d, 0x7e, 0xde,
+				},
+			)
+			testutil.RequireEqualStatus(t, status.Error(codes.InvalidArgument, "Encoded data is 13 bytes in size, while 12 bytes were expected for a payload of 11 bytes"), err)
 		})
 	})
 
@@ -111,10 +131,10 @@ func TestDeterministicEncryptingBinaryEncoder(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, length, n)
 
-			encoded, err := binaryEncoder.EncodeBinary(original[:length])
+			encoded, initializationVector, err := binaryEncoder.EncodeBinary(original[:length])
 			require.NoError(t, err)
 
-			decoded, err := binaryEncoder.DecodeBinary(encoded)
+			decoded, err := binaryEncoder.DecodeBinary(encoded, initializationVector)
 			require.NoError(t, err)
 			require.Equal(t, original[:length], decoded)
 		}

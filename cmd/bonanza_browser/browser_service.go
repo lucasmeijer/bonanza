@@ -132,8 +132,8 @@ func (s *BrowserService) doWelcome(w http.ResponseWriter, r *http.Request) (g.No
 // getReferenceFromRequest extracts the instance name, reference format,
 // and reference fields embedded in a request's URL and converts them to
 // an object.GlobalReference that can be used to download an object.
-func getReferenceFromRequest(r *http.Request) (object.GlobalReference, error) {
-	var bad object.GlobalReference
+func getReferenceFromRequest(r *http.Request) (model_core.Decodable[object.GlobalReference], error) {
+	var bad model_core.Decodable[object.GlobalReference]
 	referenceFormatStr := r.PathValue("reference_format")
 	referenceFormatValue, ok := object_pb.ReferenceFormat_Value_value[referenceFormatStr]
 	if !ok {
@@ -143,19 +143,22 @@ func getReferenceFromRequest(r *http.Request) (object.GlobalReference, error) {
 	if err != nil {
 		return bad, util.StatusWrapf(err, "Invalid reference format %#v", referenceFormatStr)
 	}
-	namespace := object.Namespace{
-		InstanceName:    object.NewInstanceName(r.PathValue("instance_name")),
-		ReferenceFormat: referenceFormat,
-	}
-	rawReference, err := base64.RawURLEncoding.DecodeString(r.PathValue("reference"))
+
+	localReference, err := model_core.NewDecodableLocalReferenceFromString(
+		referenceFormat,
+		r.PathValue("reference"),
+	)
 	if err != nil {
 		return bad, util.StatusWrapWithCode(err, codes.InvalidArgument, "Invalid reference")
 	}
-	globalReference, err := namespace.NewGlobalReference(rawReference)
-	if err != nil {
-		return bad, util.StatusWrap(err, "Invalid reference")
-	}
-	return globalReference, nil
+
+	return model_core.CopyDecodable(
+		localReference,
+		object.GlobalReference{
+			InstanceName:   object.NewInstanceName(r.PathValue("instance_name")),
+			LocalReference: localReference.Value,
+		},
+	), nil
 }
 
 // trimRecentlyObservedEncoders takes a list of recently observed object
@@ -297,7 +300,7 @@ func renderTabsLiftWithNeutralContent(tabs [][]g.Node, selectedTabIndex int, con
 // renderObjectPage renders a HTML page for displaying the contents of
 // an object.
 func renderObjectPage(
-	objectReference object.GlobalReference,
+	decodableReference model_core.Decodable[object.GlobalReference],
 	payloadRenderers []payloadRenderer,
 	currentPayloadRendererIndex int,
 	currentEncoderConfiguration string,
@@ -386,7 +389,7 @@ func renderObjectPage(
 		)
 	}
 
-	rawReference := base64.RawURLEncoding.EncodeToString(objectReference.GetRawReference())
+	rawReference := base64.RawURLEncoding.EncodeToString(decodableReference.Value.GetRawReference())
 	return renderPage(rawReference, []g.Node{
 		h.Div(
 			h.Class("flex w-full space-x-4 p-4"),
@@ -406,7 +409,7 @@ func renderObjectPage(
 						h.Tr(
 							h.Th(
 								h.Class("whitespace-nowrap"),
-								g.Text("Raw:"),
+								g.Text("Object:"),
 							),
 							h.Td(
 								h.Class("break-all"),
@@ -419,13 +422,26 @@ func renderObjectPage(
 						h.Tr(
 							h.Th(
 								h.Class("whitespace-nowrap"),
+								g.Text("Decoding parameters:"),
+							),
+							h.Td(
+								h.Class("break-all"),
+								h.Span(
+									h.Class("font-mono"),
+									g.Text(base64.RawURLEncoding.EncodeToString(decodableReference.GetDecodingParameters())),
+								),
+							),
+						),
+						h.Tr(
+							h.Th(
+								h.Class("whitespace-nowrap"),
 								g.Text("SHA-256 hash:"),
 							),
 							h.Td(
 								h.Class("break-all"),
 								h.Span(
 									h.Class("font-mono"),
-									g.Text(hex.EncodeToString(objectReference.GetHash())),
+									g.Text(hex.EncodeToString(decodableReference.Value.GetHash())),
 								),
 							),
 						),
@@ -435,7 +451,7 @@ func renderObjectPage(
 								g.Text("Size:"),
 							),
 							h.Td(
-								g.Textf("%d byte(s)", objectReference.GetSizeBytes()),
+								g.Textf("%d byte(s)", decodableReference.Value.GetSizeBytes()),
 							),
 						),
 						h.Tr(
@@ -444,7 +460,7 @@ func renderObjectPage(
 								g.Text("Height:"),
 							),
 							h.Td(
-								g.Textf("%d", objectReference.GetHeight()),
+								g.Textf("%d", decodableReference.Value.GetHeight()),
 							),
 						),
 						h.Tr(
@@ -453,7 +469,7 @@ func renderObjectPage(
 								g.Text("Degree:"),
 							),
 							h.Td(
-								g.Textf("%d outgoing reference(s)", objectReference.GetDegree()),
+								g.Textf("%d outgoing reference(s)", decodableReference.Value.GetDegree()),
 							),
 						),
 						h.Tr(
@@ -462,7 +478,7 @@ func renderObjectPage(
 								g.Text("Maximum total parents size:"),
 							),
 							h.Td(
-								g.Textf("%d byte(s)", objectReference.GetMaximumTotalParentsSizeBytes(false)),
+								g.Textf("%d byte(s)", decodableReference.Value.GetMaximumTotalParentsSizeBytes(false)),
 							),
 						),
 					),
@@ -565,7 +581,7 @@ func (s *BrowserService) doObject(
 	}
 
 	// Fetch and render the object.
-	o, err := s.objectDownloader.DownloadObject(r.Context(), objectReference)
+	o, err := s.objectDownloader.DownloadObject(r.Context(), objectReference.Value)
 	if err != nil {
 		return renderObjectPage(
 			objectReference,
@@ -578,7 +594,7 @@ func (s *BrowserService) doObject(
 	}
 	rendered, encodersInObject := payloadRenderers[currentPayloadRendererIndex].render(
 		r,
-		o,
+		model_core.CopyDecodable(objectReference, o),
 		recentlyObservedEncoders[0].Configuration,
 	)
 
@@ -726,7 +742,7 @@ func (ml *messageUnmarshaler[TMessage, TMessagePtr]) UnmarshalJSON(b []byte) err
 type payloadRenderer interface {
 	queryParameter() string
 	name() string
-	render(r *http.Request, o *object.Contents, encoders []*model_encoding_pb.BinaryEncoder) ([]g.Node, []*browser_pb.RecentlyObservedEncoder)
+	render(r *http.Request, o model_core.Decodable[*object.Contents], encoders []*model_encoding_pb.BinaryEncoder) ([]g.Node, []*browser_pb.RecentlyObservedEncoder)
 }
 
 // rawPayloadRenderer renders an object without performing any decoding
@@ -738,14 +754,14 @@ var _ payloadRenderer = rawPayloadRenderer{}
 func (rawPayloadRenderer) queryParameter() string { return "raw" }
 func (rawPayloadRenderer) name() string           { return "Raw" }
 
-func (rawPayloadRenderer) render(r *http.Request, o *object.Contents, encoders []*model_encoding_pb.BinaryEncoder) ([]g.Node, []*browser_pb.RecentlyObservedEncoder) {
+func (rawPayloadRenderer) render(r *http.Request, o model_core.Decodable[*object.Contents], encoders []*model_encoding_pb.BinaryEncoder) ([]g.Node, []*browser_pb.RecentlyObservedEncoder) {
 	return []g.Node{
-		h.Pre(g.Text(hex.Dump(o.GetPayload()))),
+		h.Pre(g.Text(hex.Dump(o.Value.GetPayload()))),
 	}, nil
 }
 
-func decodeObject(o *object.Contents, encoders []*model_encoding_pb.BinaryEncoder) ([]byte, error) {
-	objectReference := o.GetReference()
+func decodeObject(o model_core.Decodable[*object.Contents], encoders []*model_encoding_pb.BinaryEncoder) ([]byte, error) {
+	objectReference := o.Value.GetReference()
 	binaryEncoder, err := model_encoding.NewBinaryEncoderFromProto(
 		encoders,
 		uint32(objectReference.GetReferenceFormat().GetMaximumObjectSizeBytes()),
@@ -753,7 +769,7 @@ func decodeObject(o *object.Contents, encoders []*model_encoding_pb.BinaryEncode
 	if err != nil {
 		return nil, fmt.Errorf("failed to create encoder: %w", err)
 	}
-	decodedObject, err := binaryEncoder.DecodeBinary(o.GetPayload())
+	decodedObject, err := binaryEncoder.DecodeBinary(o.Value.GetPayload(), o.GetDecodingParameters())
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode object: %w", err)
 	}
@@ -769,7 +785,7 @@ var _ payloadRenderer = decodedPayloadRenderer{}
 func (decodedPayloadRenderer) queryParameter() string { return "decoded" }
 func (decodedPayloadRenderer) name() string           { return "Decoded" }
 
-func (decodedPayloadRenderer) render(r *http.Request, o *object.Contents, encoders []*model_encoding_pb.BinaryEncoder) ([]g.Node, []*browser_pb.RecentlyObservedEncoder) {
+func (decodedPayloadRenderer) render(r *http.Request, o model_core.Decodable[*object.Contents], encoders []*model_encoding_pb.BinaryEncoder) ([]g.Node, []*browser_pb.RecentlyObservedEncoder) {
 	decodedObject, err := decodeObject(o, encoders)
 	if err != nil {
 		return renderErrorAlert(err), nil
@@ -790,7 +806,7 @@ var _ payloadRenderer = textPayloadRenderer{}
 func (textPayloadRenderer) queryParameter() string { return "text" }
 func (textPayloadRenderer) name() string           { return "Text" }
 
-func (textPayloadRenderer) render(r *http.Request, o *object.Contents, encoders []*model_encoding_pb.BinaryEncoder) ([]g.Node, []*browser_pb.RecentlyObservedEncoder) {
+func (textPayloadRenderer) render(r *http.Request, o model_core.Decodable[*object.Contents], encoders []*model_encoding_pb.BinaryEncoder) ([]g.Node, []*browser_pb.RecentlyObservedEncoder) {
 	decodedObject, err := decodeObject(o, encoders)
 	if err != nil {
 		return renderErrorAlert(err), nil
@@ -857,9 +873,9 @@ func (d *messageJSONRenderer) renderValue(fieldDescriptor protoreflect.FieldDesc
 		v = value.Bytes()
 
 	case protoreflect.GroupKind, protoreflect.MessageKind:
-		if r, ok := value.Message().Interface().(*model_core_pb.Reference); ok {
-			if reference, err := model_core.FlattenReference(model_core.NewMessage(r, d.outgoingReferences)); err == nil {
-				rawReference := base64.RawURLEncoding.EncodeToString(reference.GetRawReference())
+		if r, ok := value.Message().Interface().(*model_core_pb.DecodableReference); ok {
+			if reference, err := model_core.FlattenDecodableReference(model_core.NewMessage(r, d.outgoingReferences)); err == nil {
+				rawReference := model_core.DecodableLocalReferenceToString(reference)
 				if fieldOptions, ok := fieldDescriptor.Options().(*descriptorpb.FieldOptions); ok {
 					// Field is a valid reference for
 					// which we have type information in
@@ -1047,7 +1063,7 @@ var _ payloadRenderer = messageJSONPayloadRenderer{}
 func (messageJSONPayloadRenderer) queryParameter() string { return "json" }
 func (messageJSONPayloadRenderer) name() string           { return "JSON" }
 
-func (messageJSONPayloadRenderer) render(r *http.Request, o *object.Contents, encoders []*model_encoding_pb.BinaryEncoder) ([]g.Node, []*browser_pb.RecentlyObservedEncoder) {
+func (messageJSONPayloadRenderer) render(r *http.Request, o model_core.Decodable[*object.Contents], encoders []*model_encoding_pb.BinaryEncoder) ([]g.Node, []*browser_pb.RecentlyObservedEncoder) {
 	decodedObject, err := decodeObject(o, encoders)
 	if err != nil {
 		return renderErrorAlert(err), nil
@@ -1065,7 +1081,7 @@ func (messageJSONPayloadRenderer) render(r *http.Request, o *object.Contents, en
 	}
 	d := messageJSONRenderer{
 		now:                time.Now(),
-		outgoingReferences: o,
+		outgoingReferences: o.Value,
 	}
 	rendered := d.renderMessage(message)
 	return rendered, d.observedEncoders
@@ -1081,7 +1097,7 @@ var _ payloadRenderer = messageListJSONPayloadRenderer{}
 func (messageListJSONPayloadRenderer) queryParameter() string { return "json" }
 func (messageListJSONPayloadRenderer) name() string           { return "JSON" }
 
-func (messageListJSONPayloadRenderer) render(r *http.Request, o *object.Contents, encoders []*model_encoding_pb.BinaryEncoder) ([]g.Node, []*browser_pb.RecentlyObservedEncoder) {
+func (messageListJSONPayloadRenderer) render(r *http.Request, o model_core.Decodable[*object.Contents], encoders []*model_encoding_pb.BinaryEncoder) ([]g.Node, []*browser_pb.RecentlyObservedEncoder) {
 	decodedObject, err := decodeObject(o, encoders)
 	if err != nil {
 		return renderErrorAlert(err), nil
@@ -1120,7 +1136,7 @@ func (messageListJSONPayloadRenderer) render(r *http.Request, o *object.Contents
 
 	d := messageJSONRenderer{
 		now:                time.Now(),
-		outgoingReferences: o,
+		outgoingReferences: o.Value,
 	}
 	rendered := d.renderMessageList(elements)
 	return rendered, d.observedEncoders

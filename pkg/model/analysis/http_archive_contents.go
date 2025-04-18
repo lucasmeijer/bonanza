@@ -18,6 +18,7 @@ import (
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
+	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
 	model_filesystem_pb "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
 	"github.com/buildbarn/bonanza/pkg/storage/dag"
 	"github.com/ulikunitz/xz"
@@ -410,7 +411,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeHttpArchiveContentsValue(ct
 	if err != nil {
 		return PatchedHttpArchiveContentsValue{}, err
 	}
-	capturedRootDirectory := fileWritingObjectCapturer.CaptureCreatedObject(createdRootDirectoryObject)
+	capturedRootDirectory := fileWritingObjectCapturer.CaptureCreatedObject(createdRootDirectoryObject.Value)
 
 	// Finalize writing of Merkle tree nodes to disk, and provide
 	// read access to the nodes, so that they can be uploaded.
@@ -422,15 +423,18 @@ func (c *baseComputer[TReference, TMetadata]) ComputeHttpArchiveContentsValue(ct
 	merkleTreeNodes = nil
 
 	patcher := model_core.NewReferenceMessagePatcher[dag.ObjectContentsWalker]()
-	rootReference := createdRootDirectoryObject.Contents.GetReference()
+	rootReference := createdRootDirectoryObject.Value.Contents.GetReference()
 	return model_core.NewPatchedMessage(
 		&model_analysis_pb.HttpArchiveContents_Value{
 			Exists: &model_analysis_pb.HttpArchiveContents_Value_Exists{
 				Contents: createdRootDirectory.ToDirectoryReference(
-					patcher.AddReference(
-						rootReference,
-						objectContentsWalkerFactory.CreateObjectContentsWalker(rootReference, capturedRootDirectory),
-					),
+					&model_core_pb.DecodableReference{
+						Reference: patcher.AddReference(
+							rootReference,
+							objectContentsWalkerFactory.CreateObjectContentsWalker(rootReference, capturedRootDirectory),
+						),
+						DecodingParameters: createdRootDirectoryObject.GetDecodingParameters(),
+					},
 				),
 				Sha256: httpFileContentsValue.Message.Exists.Sha256,
 			},

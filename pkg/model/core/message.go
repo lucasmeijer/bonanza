@@ -4,6 +4,8 @@ import (
 	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -63,6 +65,21 @@ func FlattenReference[TReference any](m Message[*model_core_pb.Reference, TRefer
 		return badReference, err
 	}
 	return m.OutgoingReferences.GetOutgoingReference(index), nil
+}
+
+// FlattenDecodableReference returns the actual reference that is
+// associated with a given DecodableReference Protobuf message, and
+// attaches decoding parameters to it.
+func FlattenDecodableReference[TReference any](m Message[*model_core_pb.DecodableReference, TReference]) (Decodable[TReference], error) {
+	var badReference Decodable[TReference]
+	if m.Message == nil {
+		return badReference, status.Error(codes.InvalidArgument, "No decodable reference message provided")
+	}
+	reference, err := FlattenReference(Nested(m, m.Message.Reference))
+	if err != nil {
+		return badReference, err
+	}
+	return NewDecodable[TReference](reference, m.Message.DecodingParameters), nil
 }
 
 func MessagesEqual[

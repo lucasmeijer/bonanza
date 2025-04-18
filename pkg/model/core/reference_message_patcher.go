@@ -75,6 +75,22 @@ func (p *ReferenceMessagePatcher[TMetadata]) AddReference(reference object.Local
 	return message
 }
 
+// CaptureAndAddDecodableReference is a helper function for AddReference
+// that can be called in the common case where a DecodableReference
+// needs to be emitted, referring to a newly created object.
+func (p *ReferenceMessagePatcher[TMetadata]) CaptureAndAddDecodableReference(
+	createdObject Decodable[CreatedObject[TMetadata]],
+	capturer CreatedObjectCapturer[TMetadata],
+) *core.DecodableReference {
+	return &core.DecodableReference{
+		Reference: p.AddReference(
+			createdObject.Value.Contents.GetReference(),
+			capturer.CaptureCreatedObject(createdObject.Value),
+		),
+		DecodingParameters: createdObject.GetDecodingParameters(),
+	}
+}
+
 func (p *ReferenceMessagePatcher[TMetadata]) addReferenceMessage(message *core.Reference, reference object.LocalReference, metadata TMetadata) {
 	if p.messagesByReference == nil {
 		p.messagesByReference = map[object.LocalReference]referenceMessages[TMetadata]{}

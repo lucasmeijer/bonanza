@@ -39,8 +39,8 @@ func NewDirectoryAccessParametersFromProto(m *model_filesystem_pb.DirectoryAcces
 	}, nil
 }
 
-func (p *DirectoryAccessParameters) DecodeDirectory(contents *object.Contents) (*model_filesystem_pb.Directory, error) {
-	decodedData, err := p.encoder.DecodeBinary(contents.GetPayload())
+func (p *DirectoryAccessParameters) DecodeDirectory(contents *object.Contents, decodingParameters []byte) (*model_filesystem_pb.Directory, error) {
+	decodedData, err := p.encoder.DecodeBinary(contents.GetPayload(), decodingParameters)
 	if err != nil {
 		return nil, err
 	}
@@ -51,8 +51,8 @@ func (p *DirectoryAccessParameters) DecodeDirectory(contents *object.Contents) (
 	return &directory, nil
 }
 
-func (p *DirectoryAccessParameters) DecodeLeaves(contents *object.Contents) (*model_filesystem_pb.Leaves, error) {
-	decodedData, err := p.encoder.DecodeBinary(contents.GetPayload())
+func (p *DirectoryAccessParameters) DecodeLeaves(contents *object.Contents, decodingParameters []byte) (*model_filesystem_pb.Leaves, error) {
+	decodedData, err := p.encoder.DecodeBinary(contents.GetPayload(), decodingParameters)
 	if err != nil {
 		return nil, err
 	}

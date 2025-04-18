@@ -20,7 +20,7 @@ message Leaves {
 
 message LeavesReference {
   // Reference to an object containing a Leaves message.
-  bonanza.model.core.Reference reference = 1
+  bonanza.model.core.DecodableReference reference = 1
       [(bonanza.model.core.object_format) = {
         message_type_name:
           "bonanza.model.filesystem.Leaves";
@@ -91,7 +91,7 @@ message DirectoryNode {
 
 message DirectoryReference {
   // Reference to an object containing a Directory message.
-  bonanza.model.core.Reference reference = 1
+  bonanza.model.core.DecodableReference reference = 1
       [(bonanza.model.core.object_format) = {
         message_type_name:
           "bonanza.model.filesystem.Directory";
@@ -131,7 +131,7 @@ message FileContents {
     // zero, containing a list of FileContents messages. The file's
     // contents can be reobtained by concatenating the parts referenced
     // by this message.
-    bonanza.model.core.Reference file_contents_list_reference = 1
+    bonanza.model.core.DecodableReference file_contents_list_reference = 1
         [(bonanza.model.core.object_format) = {
           message_list_type_name:
             "bonanza.model.filesystem.FileContents";
@@ -139,7 +139,7 @@ message FileContents {
 
     // The reference points to an object of height zero, containing the
     // literal contents of the file.
-    bonanza.model.core.Reference chunk_reference = 2
+    bonanza.model.core.DecodableReference chunk_reference = 2
         [(bonanza.model.core.object_format) = { raw: {} }];
   }
 

@@ -6,19 +6,20 @@ import (
 
 	"github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual"
 	"github.com/buildbarn/bonanza/pkg/encoding/varint"
+	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
 	object_pb "github.com/buildbarn/bonanza/pkg/proto/storage/object"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 )
 
 type resolvableHandleAllocatingFileFactory struct {
-	base            FileFactory
+	FileFactory
 	handleAllocator virtual.ResolvableHandleAllocator
 }
 
 func NewResolvableHandleAllocatingFileFactory(base FileFactory, handleAllocation virtual.ResolvableHandleAllocation) FileFactory {
 	ff := &resolvableHandleAllocatingFileFactory{
-		base: base,
+		FileFactory: base,
 	}
 	ff.handleAllocator = handleAllocation.AsResolvableAllocator(ff.resolveHandle)
 	return ff
@@ -30,7 +31,7 @@ func (ff *resolvableHandleAllocatingFileFactory) resolveHandle(r io.ByteReader) 
 		return virtual.DirectoryChild{}, virtual.StatusErrBadHandle
 	}
 
-	var reference object.LocalReference
+	var reference model_core.Decodable[object.LocalReference]
 	if endBytes > 0 {
 		referenceFormatValue, err := varint.ReadForward[object_pb.ReferenceFormat_Value](r)
 		if err != nil {
@@ -49,10 +50,20 @@ func (ff *resolvableHandleAllocatingFileFactory) resolveHandle(r io.ByteReader) 
 			}
 			rawReference = append(rawReference, b)
 		}
-		reference, err = referenceFormat.NewLocalReference(rawReference)
+		localReference, err := referenceFormat.NewLocalReference(rawReference)
 		if err != nil {
 			return virtual.DirectoryChild{}, virtual.StatusErrBadHandle
 		}
+		decodingParametersSizeBytes := ff.FileFactory.GetDecodingParametersSizeBytes(localReference.GetHeight() > 0)
+		decodingParameters := make([]byte, 0, decodingParametersSizeBytes)
+		for i := 0; i < int(decodingParametersSizeBytes); i++ {
+			b, err := r.ReadByte()
+			if err != nil {
+				return virtual.DirectoryChild{}, virtual.StatusErrBadHandle
+			}
+			decodingParameters = append(decodingParameters, b)
+		}
+		reference = model_core.NewDecodable(localReference, decodingParameters)
 	}
 
 	b, err := r.ReadByte()
@@ -75,8 +86,9 @@ func (ff *resolvableHandleAllocatingFileFactory) resolveHandle(r io.ByteReader) 
 func computeFileID(fileContents model_filesystem.FileContentsEntry[object.LocalReference], isExecutable bool) io.WriterTo {
 	handle := varint.AppendForward(nil, fileContents.EndBytes)
 	if fileContents.EndBytes > 0 {
-		handle = varint.AppendForward(handle, fileContents.Reference.GetReferenceFormat().ToProto())
-		handle = append(handle, fileContents.Reference.GetRawReference()...)
+		handle = varint.AppendForward(handle, fileContents.Reference.Value.GetReferenceFormat().ToProto())
+		handle = append(handle, fileContents.Reference.Value.GetRawReference()...)
+		handle = append(handle, fileContents.Reference.GetDecodingParameters()...)
 	}
 	if isExecutable {
 		handle = append(handle, 0x01)
@@ -89,5 +101,5 @@ func computeFileID(fileContents model_filesystem.FileContentsEntry[object.LocalR
 func (ff *resolvableHandleAllocatingFileFactory) LookupFile(fileContents model_filesystem.FileContentsEntry[object.LocalReference], isExecutable bool) virtual.LinkableLeaf {
 	return ff.handleAllocator.
 		New(computeFileID(fileContents, isExecutable)).
-		AsLinkableLeaf(ff.base.LookupFile(fileContents, isExecutable))
+		AsLinkableLeaf(ff.FileFactory.LookupFile(fileContents, isExecutable))
 }

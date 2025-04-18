@@ -84,7 +84,7 @@ message PathPattern {
   oneof children {
     // Set if there are too many children to store in the current
     // object.
-    bonanza.model.core.Reference children_external = 1
+    bonanza.model.core.DecodableReference children_external = 1
         [(bonanza.model.core.object_format) = {
           message_type_name:
             "bonanza.model.command.PathPattern.Children";
@@ -99,7 +99,7 @@ message ArgumentList {
   message Element {
     oneof level {
       string leaf = 1;
-      bonanza.model.core.Reference parent = 2
+      bonanza.model.core.DecodableReference parent = 2
           [(bonanza.model.core.object_format) = {
             message_list_type_name:
               "bonanza.model.command.ArgumentList.Element";
@@ -119,7 +119,7 @@ message EnvironmentVariableList {
 
     oneof level {
       Leaf leaf = 1;
-      bonanza.model.core.Reference parent = 2
+      bonanza.model.core.DecodableReference parent = 2
           [(bonanza.model.core.object_format) = {
             message_list_type_name:
               "bonanza.model.command.EnvironmentVariableList.Element";
@@ -155,9 +155,17 @@ message Action {
 
   // Reference of the Command message, which is a specification of the
   // process to launch and files to capture.
-  bytes command_reference = 3;
+  bonanza.model.core.WeakDecodableReference command_reference = 3
+      [(bonanza.model.core.object_format) = {
+        message_list_type_name:
+          "bonanza.model.command.Command";
+      }];
 
-  bytes input_root_reference = 4;
+  bonanza.model.core.WeakDecodableReference input_root_reference = 4
+      [(bonanza.model.core.object_format) = {
+        message_list_type_name:
+          "bonanza.model.filesystem.Directory";
+      }];
 }
 
 message Result {
@@ -169,7 +177,11 @@ message Result {
   // Reference to an Outputs message that describes the contents of any
   // output files that were generated. The Outputs message is encoded
   // the same way as directories.
-  bytes outputs_reference = 3;
+  bonanza.model.core.WeakDecodableReference outputs_reference = 3
+      [(bonanza.model.core.object_format) = {
+        message_list_type_name:
+          "bonanza.model.command.Outputs";
+      }];
 
   // Details that are specific to the kind of worker used. For example,
   // on POSIX-like systems this could contain a message with

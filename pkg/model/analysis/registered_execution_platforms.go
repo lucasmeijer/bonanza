@@ -97,7 +97,7 @@ func (h *registeredExecutionPlatformExtractingModuleDotBazelHandler[TReference, 
 				platformInfoProvider, err := getProviderFromConfiguredTarget(
 					h.environment,
 					canonicalPlatformLabelStr,
-					model_core.NewSimplePatchedMessage[model_core.WalkableReferenceMetadata, *model_core_pb.Reference](nil),
+					model_core.NewSimplePatchedMessage[model_core.WalkableReferenceMetadata, *model_core_pb.DecodableReference](nil),
 					platformInfoProviderIdentifier,
 				)
 				if err != nil {

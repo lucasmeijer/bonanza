@@ -52,7 +52,7 @@ func (c *baseComputer[TReference, TMetadata]) expandCanonicalTargetPattern(
 			ctx,
 			c.targetPatternExpansionValueTargetLabelReader,
 			model_core.Nested(targetPatternExpansion, targetPatternExpansion.Message.TargetLabels),
-			func(entry model_core.Message[*model_analysis_pb.TargetPatternExpansion_Value_TargetLabel, TReference]) (*model_core_pb.Reference, error) {
+			func(entry model_core.Message[*model_analysis_pb.TargetPatternExpansion_Value_TargetLabel, TReference]) (*model_core_pb.DecodableReference, error) {
 				if level, ok := entry.Message.Level.(*model_analysis_pb.TargetPatternExpansion_Value_TargetLabel_Parent_); ok {
 					return level.Parent.Reference, nil
 				}
@@ -85,16 +85,13 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetPatternExpansionValue
 		btree.NewObjectCreatingNodeMerger(
 			c.getValueObjectEncoder(),
 			c.getReferenceFormat(),
-			/* parentNodeComputer = */ func(createdObject model_core.CreatedObject[TMetadata], childNodes []*model_analysis_pb.TargetPatternExpansion_Value_TargetLabel) (model_core.PatchedMessage[*model_analysis_pb.TargetPatternExpansion_Value_TargetLabel, TMetadata], error) {
+			/* parentNodeComputer = */ func(createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]], childNodes []*model_analysis_pb.TargetPatternExpansion_Value_TargetLabel) (model_core.PatchedMessage[*model_analysis_pb.TargetPatternExpansion_Value_TargetLabel, TMetadata], error) {
 				patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
 				return model_core.NewPatchedMessage(
 					&model_analysis_pb.TargetPatternExpansion_Value_TargetLabel{
 						Level: &model_analysis_pb.TargetPatternExpansion_Value_TargetLabel_Parent_{
 							Parent: &model_analysis_pb.TargetPatternExpansion_Value_TargetLabel_Parent{
-								Reference: patcher.AddReference(
-									createdObject.Contents.GetReference(),
-									e.CaptureCreatedObject(createdObject),
-								),
+								Reference: patcher.CaptureAndAddDecodableReference(createdObject, e),
 							},
 						},
 					},
@@ -227,7 +224,7 @@ func (c *baseComputer[TReference, TMetadata]) addPackageToTargetPatternExpansion
 		ctx,
 		c.packageValueTargetReader,
 		model_core.Nested(packageValue, packageValue.Message.Targets),
-		func(entry model_core.Message[*model_analysis_pb.Package_Value_Target, TReference]) (*model_core_pb.Reference, error) {
+		func(entry model_core.Message[*model_analysis_pb.Package_Value_Target, TReference]) (*model_core_pb.DecodableReference, error) {
 			if level, ok := entry.Message.Level.(*model_analysis_pb.Package_Value_Target_Parent_); ok {
 				return level.Parent.Reference, nil
 			}

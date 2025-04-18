@@ -2,6 +2,9 @@ package encoding
 
 import (
 	"github.com/buildbarn/bonanza/pkg/compress/simplelzw"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type lzwCompressingBinaryEncoder struct {
@@ -16,10 +19,18 @@ func NewLZWCompressingBinaryEncoder(maximumDecodedSizeBytes uint32) BinaryEncode
 	}
 }
 
-func (be *lzwCompressingBinaryEncoder) EncodeBinary(in []byte) ([]byte, error) {
-	return simplelzw.MaybeCompress(in)
+func (be *lzwCompressingBinaryEncoder) EncodeBinary(in []byte) ([]byte, []byte, error) {
+	compressed, err := simplelzw.MaybeCompress(in)
+	return compressed, nil, err
 }
 
-func (be *lzwCompressingBinaryEncoder) DecodeBinary(in []byte) ([]byte, error) {
+func (be *lzwCompressingBinaryEncoder) DecodeBinary(in, parameters []byte) ([]byte, error) {
+	if len(parameters) > 0 {
+		return nil, status.Error(codes.InvalidArgument, "Unexpected decoding parameters")
+	}
 	return simplelzw.Decompress(in, be.maximumDecodedSizeBytes)
+}
+
+func (be *lzwCompressingBinaryEncoder) GetDecodingParametersSizeBytes() int {
+	return 0
 }

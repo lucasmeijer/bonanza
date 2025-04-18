@@ -265,16 +265,16 @@ func (b *directoryMerkleTreeBuilder[TDirectory, TFile]) maybeFinalizeDirectory(u
 				),
 				ParentAppender: func(
 					directory model_core.PatchedMessage[*model_filesystem_pb.Directory, TDirectory],
-					externalObject model_core.CreatedObject[TDirectory],
+					externalObject *model_core.Decodable[model_core.CreatedObject[TDirectory]],
 				) {
-					if externalObject.Contents == nil {
+					if externalObject == nil {
 						directory.Message.Leaves = leavesInline
 					} else {
 						directory.Message.Leaves = &model_filesystem_pb.Directory_LeavesExternal{
 							LeavesExternal: &model_filesystem_pb.LeavesReference{
-								Reference: directory.Patcher.AddReference(
-									externalObject.Contents.GetReference(),
-									b.capturer.CaptureDirectory(externalObject),
+								Reference: directory.Patcher.CaptureAndAddDecodableReference(
+									*externalObject,
+									model_core.CreatedObjectCapturerFunc[TDirectory](b.capturer.CaptureDirectory),
 								),
 								MaximumSymlinkEscapementLevels: ud.leavesMaximumSymlinkEscapementLevels,
 							},
@@ -303,18 +303,18 @@ func (b *directoryMerkleTreeBuilder[TDirectory, TFile]) maybeFinalizeDirectory(u
 					),
 					ParentAppender: func(
 						directory model_core.PatchedMessage[*model_filesystem_pb.Directory, TDirectory],
-						externalObject model_core.CreatedObject[TDirectory],
+						externalObject *model_core.Decodable[model_core.CreatedObject[TDirectory]],
 					) {
-						if externalObject.Contents == nil {
+						if externalObject == nil {
 							directory.Message.Directories = append(directory.Message.Directories, &inlineDirectoryNode)
 						} else {
 							directory.Message.Directories = append(directory.Message.Directories, &model_filesystem_pb.DirectoryNode{
 								Name: nameStr,
 								Contents: &model_filesystem_pb.DirectoryNode_ContentsExternal{
 									ContentsExternal: createdDirectory.ToDirectoryReference(
-										directory.Patcher.AddReference(
-											externalObject.Contents.GetReference(),
-											b.capturer.CaptureLeaves(externalObject),
+										directory.Patcher.CaptureAndAddDecodableReference(
+											*externalObject,
+											model_core.CreatedObjectCapturerFunc[TDirectory](b.capturer.CaptureLeaves),
 										),
 									),
 								},
@@ -446,7 +446,7 @@ func (cd *CreatedDirectory[TDirectory]) raiseDirectoryMaximumSymlinkEscapementLe
 
 // ToDirectoryReference creates a DirectoryReference message that
 // corresponds to the current directory.
-func (cd *CreatedDirectory[TDirectory]) ToDirectoryReference(reference *model_core_pb.Reference) *model_filesystem_pb.DirectoryReference {
+func (cd *CreatedDirectory[TDirectory]) ToDirectoryReference(reference *model_core_pb.DecodableReference) *model_filesystem_pb.DirectoryReference {
 	return &model_filesystem_pb.DirectoryReference{
 		Reference:                      reference,
 		DirectoriesCount:               uint32(len(cd.Message.Message.Directories)),

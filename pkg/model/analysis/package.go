@@ -154,7 +154,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputePackageValue(ctx context.Co
 			btree.NewObjectCreatingNodeMerger(
 				c.getValueObjectEncoder(),
 				c.getReferenceFormat(),
-				/* parentNodeComputer = */ func(createdObject model_core.CreatedObject[TMetadata], childNodes []*model_analysis_pb.Package_Value_Target) (model_core.PatchedMessage[*model_analysis_pb.Package_Value_Target, TMetadata], error) {
+				/* parentNodeComputer = */ func(createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]], childNodes []*model_analysis_pb.Package_Value_Target) (model_core.PatchedMessage[*model_analysis_pb.Package_Value_Target, TMetadata], error) {
 					var firstName string
 					switch firstElement := childNodes[0].Level.(type) {
 					case *model_analysis_pb.Package_Value_Target_Leaf:
@@ -167,10 +167,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputePackageValue(ctx context.Co
 						&model_analysis_pb.Package_Value_Target{
 							Level: &model_analysis_pb.Package_Value_Target_Parent_{
 								Parent: &model_analysis_pb.Package_Value_Target_Parent{
-									Reference: patcher.AddReference(
-										createdObject.Contents.GetReference(),
-										e.CaptureCreatedObject(createdObject),
-									),
+									Reference: patcher.CaptureAndAddDecodableReference(createdObject, e),
 									FirstName: firstName,
 								},
 							},

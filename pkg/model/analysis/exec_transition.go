@@ -29,16 +29,16 @@ func (c *baseComputer[TReference, TMetadata]) createInitialConfiguration(
 	thread *starlark.Thread,
 	rootPackage label.CanonicalPackage,
 	targetPlatform string,
-) (model_core.PatchedMessage[*model_core_pb.Reference, TMetadata], error) {
+) (model_core.PatchedMessage[*model_core_pb.DecodableReference, TMetadata], error) {
 	commandLineOptionPlatformsLabelStr := commandLineOptionPlatformsLabel.String()
 	platformExpectedTransitionOutput, err := getExpectedTransitionOutput[TReference, TMetadata](e, rootPackage, commandLineOptionPlatformsLabelStr)
 	if err != nil {
-		return model_core.PatchedMessage[*model_core_pb.Reference, TMetadata]{}, err
+		return model_core.PatchedMessage[*model_core_pb.DecodableReference, TMetadata]{}, err
 	}
 
 	apparentTargetPlatform, err := label.NewApparentLabel(targetPlatform)
 	if err != nil {
-		return model_core.PatchedMessage[*model_core_pb.Reference, TMetadata]{}, fmt.Errorf("invalid target platform %#v: %w", targetPlatform, err)
+		return model_core.PatchedMessage[*model_core_pb.DecodableReference, TMetadata]{}, fmt.Errorf("invalid target platform %#v: %w", targetPlatform, err)
 	}
 	canonicalTargetPlatform, err := label.Canonicalize(
 		newLabelResolver(e),
@@ -46,13 +46,13 @@ func (c *baseComputer[TReference, TMetadata]) createInitialConfiguration(
 		apparentTargetPlatform,
 	)
 	if err != nil {
-		return model_core.PatchedMessage[*model_core_pb.Reference, TMetadata]{}, fmt.Errorf("failed to resolve target platform %#v: %w", targetPlatform, err)
+		return model_core.PatchedMessage[*model_core_pb.DecodableReference, TMetadata]{}, fmt.Errorf("failed to resolve target platform %#v: %w", targetPlatform, err)
 	}
 
 	return c.applyTransition(
 		ctx,
 		e,
-		model_core.NewSimpleMessage[TReference]((*model_core_pb.Reference)(nil)),
+		model_core.NewSimpleMessage[TReference]((*model_core_pb.DecodableReference)(nil)),
 		[]expectedTransitionOutput[TReference]{platformExpectedTransitionOutput},
 		thread,
 		starlark.StringDict{

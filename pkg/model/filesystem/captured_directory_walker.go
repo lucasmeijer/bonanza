@@ -73,7 +73,7 @@ func (o *capturedDirectoryWalkerOptions) gatherWalkersForLeaves(leaves model_cor
 		if contents := properties.Contents; contents != nil {
 			switch level := contents.Level.(type) {
 			case *model_filesystem_pb.FileContents_ChunkReference:
-				index, err := model_core.GetIndexFromReferenceMessage(level.ChunkReference, len(walkers))
+				index, err := model_core.GetIndexFromReferenceMessage(level.ChunkReference.Reference, len(walkers))
 				if err != nil {
 					return util.StatusWrapf(err, "Invalid chunk reference index for file %#v", childPathTrace.GetUNIXString())
 				}
@@ -84,7 +84,7 @@ func (o *capturedDirectoryWalkerOptions) gatherWalkersForLeaves(leaves model_cor
 					sizeBytes: uint32(contents.TotalSizeBytes),
 				}
 			case *model_filesystem_pb.FileContents_FileContentsListReference:
-				index, err := model_core.GetIndexFromReferenceMessage(level.FileContentsListReference, len(walkers))
+				index, err := model_core.GetIndexFromReferenceMessage(level.FileContentsListReference.Reference, len(walkers))
 				if err != nil {
 					return util.StatusWrapf(err, "Invalid file contents list reference index for file %#v", childPathTrace.GetUNIXString())
 				}
@@ -104,9 +104,10 @@ func (o *capturedDirectoryWalkerOptions) gatherWalkersForLeaves(leaves model_cor
 // capturedDirectoryWalker is an ObjectContentsWalker that is backed by
 // a CreatedObjectTree corresponding to a Directory message.
 type capturedDirectoryWalker struct {
-	options   *capturedDirectoryWalkerOptions
-	object    *model_core.CreatedObjectTree
-	pathTrace *path.Trace
+	options            *capturedDirectoryWalkerOptions
+	object             *model_core.CreatedObjectTree
+	decodingParameters []byte
+	pathTrace          *path.Trace
 }
 
 // NewCapturedDirectoryWalker returns an implementation of
@@ -121,19 +122,20 @@ type capturedDirectoryWalker struct {
 // must reobtain them from the underlying file system. This is why the
 // caller must provide a handle to the root directory on which the
 // provided Merkle tree is based.
-func NewCapturedDirectoryWalker(directoryParameters *DirectoryAccessParameters, fileParameters *FileCreationParameters, rootDirectory CapturedDirectory, rootObject *model_core.CreatedObjectTree) dag.ObjectContentsWalker {
+func NewCapturedDirectoryWalker(directoryParameters *DirectoryAccessParameters, fileParameters *FileCreationParameters, rootDirectory CapturedDirectory, rootObject *model_core.CreatedObjectTree, decodingParameters []byte) dag.ObjectContentsWalker {
 	return &capturedDirectoryWalker{
 		options: &capturedDirectoryWalkerOptions{
 			directoryParameters: directoryParameters,
 			fileParameters:      fileParameters,
 			rootDirectory:       rootDirectory,
 		},
-		object: rootObject,
+		object:             rootObject,
+		decodingParameters: decodingParameters,
 	}
 }
 
 func (w *capturedDirectoryWalker) GetContents(ctx context.Context) (*object.Contents, []dag.ObjectContentsWalker, error) {
-	directory, err := w.options.directoryParameters.DecodeDirectory(w.object.Contents)
+	directory, err := w.options.directoryParameters.DecodeDirectory(w.object.Contents, w.decodingParameters)
 	if err != nil {
 		return nil, nil, util.StatusWrapf(err, "Failed to decode directory %#v", w.pathTrace.GetUNIXString())
 	}
@@ -148,14 +150,15 @@ func (w *capturedDirectoryWalker) GetContents(ctx context.Context) (*object.Cont
 func (w *capturedDirectoryWalker) gatherWalkers(directory *model_filesystem_pb.Directory, pathTrace *path.Trace, walkers []dag.ObjectContentsWalker) error {
 	switch leaves := directory.Leaves.(type) {
 	case *model_filesystem_pb.Directory_LeavesExternal:
-		index, err := model_core.GetIndexFromReferenceMessage(leaves.LeavesExternal.Reference, len(walkers))
+		index, err := model_core.GetIndexFromReferenceMessage(leaves.LeavesExternal.Reference.GetReference(), len(walkers))
 		if err != nil {
 			return util.StatusWrapf(err, "Invalid reference index for leaves of directory %#v", pathTrace.GetUNIXString())
 		}
 		walkers[index] = &capturedLeavesWalker{
-			options:   w.options,
-			object:    &w.object.Metadata[index],
-			pathTrace: pathTrace,
+			options:            w.options,
+			object:             &w.object.Metadata[index],
+			decodingParameters: leaves.LeavesExternal.Reference.DecodingParameters,
+			pathTrace:          pathTrace,
 		}
 	case *model_filesystem_pb.Directory_LeavesInline:
 		if err := w.options.gatherWalkersForLeaves(model_core.NewMessage(leaves.LeavesInline, w.object.Contents), pathTrace, walkers); err != nil {
@@ -169,14 +172,15 @@ func (w *capturedDirectoryWalker) gatherWalkers(directory *model_filesystem_pb.D
 		childPathTrace := pathTrace.Append(path.MustNewComponent(childDirectory.Name))
 		switch contents := childDirectory.Contents.(type) {
 		case *model_filesystem_pb.DirectoryNode_ContentsExternal:
-			index, err := model_core.GetIndexFromReferenceMessage(contents.ContentsExternal.Reference, len(walkers))
+			index, err := model_core.GetIndexFromReferenceMessage(contents.ContentsExternal.Reference.GetReference(), len(walkers))
 			if err != nil {
 				return util.StatusWrapf(err, "Invalid reference index for directory %#v", childPathTrace.GetUNIXString())
 			}
 			walkers[index] = &capturedDirectoryWalker{
-				options:   w.options,
-				object:    &w.object.Metadata[index],
-				pathTrace: childPathTrace,
+				options:            w.options,
+				object:             &w.object.Metadata[index],
+				decodingParameters: contents.ContentsExternal.Reference.DecodingParameters,
+				pathTrace:          childPathTrace,
 			}
 		case *model_filesystem_pb.DirectoryNode_ContentsInline:
 			if err := w.gatherWalkers(contents.ContentsInline, childPathTrace, walkers); err != nil {
@@ -194,13 +198,14 @@ func (w *capturedDirectoryWalker) Discard() {}
 // capturedLeaves is an ObjectContentsWalker that is backed by a
 // CreatedObjectTree corresponding to a Leaves message.
 type capturedLeavesWalker struct {
-	options   *capturedDirectoryWalkerOptions
-	object    *model_core.CreatedObjectTree
-	pathTrace *path.Trace
+	options            *capturedDirectoryWalkerOptions
+	object             *model_core.CreatedObjectTree
+	decodingParameters []byte
+	pathTrace          *path.Trace
 }
 
 func (w *capturedLeavesWalker) GetContents(ctx context.Context) (*object.Contents, []dag.ObjectContentsWalker, error) {
-	leaves, err := w.options.directoryParameters.DecodeLeaves(w.object.Contents)
+	leaves, err := w.options.directoryParameters.DecodeLeaves(w.object.Contents, w.decodingParameters)
 	if err != nil {
 		return nil, nil, util.StatusWrapf(err, "Failed to decode leaves of directory %#v", w.pathTrace.GetUNIXString())
 	}
@@ -238,10 +243,10 @@ func (w *smallFileWalker) GetContents(ctx context.Context) (*object.Contents, []
 	if err != nil {
 		return nil, nil, util.StatusWrapf(err, "Failed to encode %#v", w.pathTrace.GetUNIXString())
 	}
-	if actualReference := contents.GetReference(); actualReference != w.reference {
+	if actualReference := contents.Value.GetReference(); actualReference != w.reference {
 		return nil, nil, status.Errorf(codes.InvalidArgument, "File %#v has reference %s, while %s was expected", w.pathTrace.GetUNIXString(), actualReference, w.reference)
 	}
-	return contents, nil, nil
+	return contents.Value, nil, nil
 }
 
 func (w *smallFileWalker) Discard() {}
@@ -288,13 +293,14 @@ func (w *recomputingConcatenatedFileWalker) GetContents(ctx context.Context) (*o
 	}
 	options.referenceCount.Store(1)
 	wComputed := &computedConcatenatedFileWalker{
-		options: options,
-		object:  &objects[0],
+		options:            options,
+		object:             &objects[0],
+		decodingParameters: fileContents.Message.Level.(*model_filesystem_pb.FileContents_FileContentsListReference).FileContentsListReference.DecodingParameters,
 	}
 	return wComputed.GetContents(ctx)
 }
 
-func NewCapturedFileWalker(fileParameters *FileCreationParameters, r filesystem.FileReader, fileReference object.LocalReference, fileSizeBytes uint64, fileObject *model_core.CreatedObjectTree) dag.ObjectContentsWalker {
+func NewCapturedFileWalker(fileParameters *FileCreationParameters, r filesystem.FileReader, fileReference object.LocalReference, fileSizeBytes uint64, fileObject *model_core.CreatedObjectTree, decodingParameters []byte) dag.ObjectContentsWalker {
 	options := &computedConcatenatedFileObjectOptions{
 		fileParameters: fileParameters,
 		file:           r,
@@ -302,14 +308,16 @@ func NewCapturedFileWalker(fileParameters *FileCreationParameters, r filesystem.
 	options.referenceCount.Store(1)
 	if fileReference.GetHeight() == 0 {
 		return &concatenatedFileChunkWalker{
-			options:   options,
-			reference: fileReference,
-			sizeBytes: uint32(fileSizeBytes),
+			options:            options,
+			reference:          fileReference,
+			decodingParameters: decodingParameters,
+			sizeBytes:          uint32(fileSizeBytes),
 		}
 	}
 	return &computedConcatenatedFileWalker{
-		options: options,
-		object:  fileObject,
+		options:            options,
+		object:             fileObject,
+		decodingParameters: decodingParameters,
 	}
 }
 
@@ -326,13 +334,14 @@ type computedConcatenatedFileObjectOptions struct {
 }
 
 type computedConcatenatedFileWalker struct {
-	options     *computedConcatenatedFileObjectOptions
-	object      *model_core.CreatedObjectTree
-	offsetBytes uint64
+	options            *computedConcatenatedFileObjectOptions
+	object             *model_core.CreatedObjectTree
+	decodingParameters []byte
+	offsetBytes        uint64
 }
 
 func (w *computedConcatenatedFileWalker) GetContents(ctx context.Context) (*object.Contents, []dag.ObjectContentsWalker, error) {
-	fileContentsList, err := w.options.fileParameters.DecodeFileContentsList(w.object.Contents)
+	fileContentsList, err := w.options.fileParameters.DecodeFileContentsList(w.object.Contents, w.decodingParameters)
 	if err != nil {
 		return nil, nil, util.StatusWrapf(err, "Failed to decode file contents list for file %#v at offset %d", w.options.pathTrace.GetUNIXString(), w.offsetBytes)
 	}
@@ -342,25 +351,27 @@ func (w *computedConcatenatedFileWalker) GetContents(ctx context.Context) (*obje
 	for _, part := range fileContentsList {
 		switch level := part.Level.(type) {
 		case *model_filesystem_pb.FileContents_ChunkReference:
-			index, err := model_core.GetIndexFromReferenceMessage(level.ChunkReference, len(walkers))
+			index, err := model_core.GetIndexFromReferenceMessage(level.ChunkReference.Reference, len(walkers))
 			if err != nil {
 				return nil, nil, util.StatusWrapf(err, "Invalid chunk reference index for part of file %#v at offset %d", w.options.pathTrace.GetUNIXString(), offsetBytes)
 			}
 			walkers[index] = &concatenatedFileChunkWalker{
-				options:     w.options,
-				reference:   w.object.Contents.GetOutgoingReference(index),
-				offsetBytes: offsetBytes,
-				sizeBytes:   uint32(part.TotalSizeBytes),
+				options:            w.options,
+				reference:          w.object.Contents.GetOutgoingReference(index),
+				decodingParameters: level.ChunkReference.DecodingParameters,
+				offsetBytes:        offsetBytes,
+				sizeBytes:          uint32(part.TotalSizeBytes),
 			}
 		case *model_filesystem_pb.FileContents_FileContentsListReference:
-			index, err := model_core.GetIndexFromReferenceMessage(level.FileContentsListReference, len(walkers))
+			index, err := model_core.GetIndexFromReferenceMessage(level.FileContentsListReference.Reference, len(walkers))
 			if err != nil {
 				return nil, nil, util.StatusWrapf(err, "Invalid file contents list reference index for part of file %#v at offset %d", w.options.pathTrace.GetUNIXString(), offsetBytes)
 			}
 			walkers[index] = &computedConcatenatedFileWalker{
-				options:     w.options,
-				object:      &w.object.Metadata[index],
-				offsetBytes: offsetBytes,
+				options:            w.options,
+				object:             &w.object.Metadata[index],
+				decodingParameters: level.FileContentsListReference.DecodingParameters,
+				offsetBytes:        offsetBytes,
 			}
 		default:
 			return nil, nil, status.Errorf(codes.InvalidArgument, "Part of %#v at offset %d has an unknown file contents type", w.options.pathTrace.GetUNIXString(), offsetBytes)
@@ -382,10 +393,11 @@ func (w *computedConcatenatedFileWalker) Discard() {
 // concatenatedFileChunkWalker is an ObjectContentsWalker that is backed
 // by a single chunk of data contained in a large file.
 type concatenatedFileChunkWalker struct {
-	options     *computedConcatenatedFileObjectOptions
-	reference   object.LocalReference
-	offsetBytes uint64
-	sizeBytes   uint32
+	options            *computedConcatenatedFileObjectOptions
+	reference          object.LocalReference
+	decodingParameters []byte
+	offsetBytes        uint64
+	sizeBytes          uint32
 }
 
 func (w *concatenatedFileChunkWalker) GetContents(ctx context.Context) (*object.Contents, []dag.ObjectContentsWalker, error) {
@@ -399,10 +411,10 @@ func (w *concatenatedFileChunkWalker) GetContents(ctx context.Context) (*object.
 	if err != nil {
 		return nil, nil, util.StatusWrapf(err, "Failed to encode %#v", w.options.pathTrace.GetUNIXString())
 	}
-	if actualReference := contents.GetReference(); actualReference != w.reference {
+	if actualReference := contents.Value.GetReference(); actualReference != w.reference {
 		return nil, nil, status.Errorf(codes.InvalidArgument, "Chunk at offset %d in file %#v has reference %s, while %s was expected", w.offsetBytes, w.options.pathTrace.GetUNIXString(), actualReference, w.reference)
 	}
-	return contents, nil, nil
+	return contents.Value, nil, nil
 }
 
 func (w *concatenatedFileChunkWalker) Discard() {

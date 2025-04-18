@@ -5,6 +5,7 @@ import (
 
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/model/core/btree"
+	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
 	model_filesystem_pb "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 	"github.com/stretchr/testify/require"
@@ -49,10 +50,12 @@ func TestProllyChunkerFactory(t *testing.T) {
 				&model_filesystem_pb.FileContents{
 					TotalSizeBytes: uint64(i),
 					Level: &model_filesystem_pb.FileContents_ChunkReference{
-						ChunkReference: patcher.AddReference(
-							object.MustNewSHA256V1LocalReference("5b2484693d5051be0fae63f4f862ce606cdc30ffbcd8a8a44b5b1b226b459262", uint32(i), 0, 0, 0),
-							metadata,
-						),
+						ChunkReference: &model_core_pb.DecodableReference{
+							Reference: patcher.AddReference(
+								object.MustNewSHA256V1LocalReference("5b2484693d5051be0fae63f4f862ce606cdc30ffbcd8a8a44b5b1b226b459262", uint32(i), 0, 0, 0),
+								metadata,
+							),
+						},
 					},
 				},
 				patcher,

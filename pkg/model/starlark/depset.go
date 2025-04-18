@@ -41,7 +41,7 @@ func deduplicateAndAddDirect(thread *starlark.Thread, children *[]any, direct it
 	return nil
 }
 
-func deduplicateAndAddTransitive[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](thread *starlark.Thread, children *[]any, transitive iter.Seq2[int, *Depset[TReference, TMetadata]], valuesSeen *valueSet, encodedListsSeen map[object.LocalReference]struct{}, depsetsSeen map[*any]struct{}, order model_starlark_pb.Depset_Order) error {
+func deduplicateAndAddTransitive[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](thread *starlark.Thread, children *[]any, transitive iter.Seq2[int, *Depset[TReference, TMetadata]], valuesSeen *valueSet, encodedListsSeen map[model_core.Decodable[object.LocalReference]]struct{}, depsetsSeen map[*any]struct{}, order model_starlark_pb.Depset_Order) error {
 	for _, d := range transitive {
 		switch v := d.children.(type) {
 		case nil:
@@ -63,11 +63,11 @@ func deduplicateAndAddTransitive[TReference object.BasicReference, TMetadata mod
 			case *model_starlark_pb.List_Element_Parent_:
 				// Multiple encoded children. Deduplicate
 				// them by list object reference.
-				listReference, err := model_core.FlattenReference(model_core.Nested(v, level.Parent.Reference))
+				listReference, err := model_core.FlattenDecodableReference(model_core.Nested(v, level.Parent.Reference))
 				if err != nil {
 					return err
 				}
-				localReference := listReference.GetLocalReference()
+				localReference := model_core.CopyDecodable(listReference, listReference.Value.GetLocalReference())
 				if _, ok := encodedListsSeen[localReference]; !ok {
 					*children = append(*children, v)
 					encodedListsSeen[localReference] = struct{}{}
@@ -112,7 +112,7 @@ func NewDepset[TReference object.BasicReference, TMetadata model_core.CloneableR
 	}
 
 	var valuesSeen valueSet
-	encodedListsSeen := map[object.LocalReference]struct{}{}
+	encodedListsSeen := map[model_core.Decodable[object.LocalReference]]struct{}{}
 	depsetsSeen := map[*any]struct{}{}
 	children := make([]any, 0, len(direct)+len(transitive))
 	if preorder {
@@ -335,7 +335,7 @@ type depsetToListConverter[TReference object.BasicReference, TMetadata model_cor
 
 	list             []starlark.Value
 	valuesSeen       valueSet
-	encodedListsSeen map[object.LocalReference]struct{}
+	encodedListsSeen map[model_core.Decodable[object.LocalReference]]struct{}
 	depsetsSeen      map[*any]struct{}
 }
 
@@ -398,7 +398,7 @@ func (dlc *depsetToListConverter[TReference, TMetadata]) appendChildren(children
 func (d *Depset[TReference, TMetadata]) ToList(thread *starlark.Thread) ([]starlark.Value, error) {
 	dlc := depsetToListConverter[TReference, TMetadata]{
 		thread:           thread,
-		encodedListsSeen: map[object.LocalReference]struct{}{},
+		encodedListsSeen: map[model_core.Decodable[object.LocalReference]]struct{}{},
 		depsetsSeen:      map[*any]struct{}{},
 	}
 	if d.children != nil {

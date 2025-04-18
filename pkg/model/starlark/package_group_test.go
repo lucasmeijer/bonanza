@@ -18,6 +18,9 @@ import (
 func TestNewPackageGroupFromVisibility(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
+	encoder := NewMockBinaryEncoder(ctrl)
+	encoder.EXPECT().GetDecodingParametersSizeBytes().Return(0).AnyTimes()
+
 	t.Run("private", func(t *testing.T) {
 		t.Run("Success", func(t *testing.T) {
 			packageGroup, err := model_starlark.NewPackageGroupFromVisibility(
@@ -26,7 +29,7 @@ func TestNewPackageGroupFromVisibility(t *testing.T) {
 				},
 				&inlinedtree.Options{
 					ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
-					Encoder:          NewMockBinaryEncoder(ctrl),
+					Encoder:          encoder,
 					MaximumSizeBytes: 0,
 				},
 				NewMockCreatedObjectCapturerForTesting(ctrl),
@@ -45,7 +48,7 @@ func TestNewPackageGroupFromVisibility(t *testing.T) {
 				},
 				&inlinedtree.Options{
 					ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
-					Encoder:          NewMockBinaryEncoder(ctrl),
+					Encoder:          encoder,
 					MaximumSizeBytes: 0,
 				},
 				NewMockCreatedObjectCapturerForTesting(ctrl),
@@ -62,7 +65,7 @@ func TestNewPackageGroupFromVisibility(t *testing.T) {
 				},
 				&inlinedtree.Options{
 					ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
-					Encoder:          NewMockBinaryEncoder(ctrl),
+					Encoder:          encoder,
 					MaximumSizeBytes: 0,
 				},
 				NewMockCreatedObjectCapturerForTesting(ctrl),
@@ -83,7 +86,7 @@ func TestNewPackageGroupFromVisibility(t *testing.T) {
 				},
 				&inlinedtree.Options{
 					ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
-					Encoder:          NewMockBinaryEncoder(ctrl),
+					Encoder:          encoder,
 					MaximumSizeBytes: 0,
 				},
 				NewMockCreatedObjectCapturerForTesting(ctrl),
@@ -129,7 +132,7 @@ func TestNewPackageGroupFromVisibility(t *testing.T) {
 			},
 			&inlinedtree.Options{
 				ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
-				Encoder:          NewMockBinaryEncoder(ctrl),
+				Encoder:          encoder,
 				MaximumSizeBytes: 1 << 20,
 			},
 			objectCapturer,

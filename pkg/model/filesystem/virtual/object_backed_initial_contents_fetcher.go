@@ -18,25 +18,25 @@ import (
 
 type objectBackedInitialContentsFetcherOptions struct {
 	context                context.Context
-	directoryClusterReader model_parser.ParsedObjectReader[object.LocalReference, model_core.Message[model_filesystem.DirectoryCluster, object.LocalReference]]
-	leavesReader           model_parser.ParsedObjectReader[object.LocalReference, model_core.Message[*model_filesystem_pb.Leaves, object.LocalReference]]
+	directoryClusterReader model_parser.ParsedObjectReader[model_core.Decodable[object.LocalReference], model_core.Message[model_filesystem.DirectoryCluster, object.LocalReference]]
+	leavesReader           model_parser.ParsedObjectReader[model_core.Decodable[object.LocalReference], model_core.Message[*model_filesystem_pb.Leaves, object.LocalReference]]
 	fileFactory            FileFactory
 	symlinkFactory         virtual.SymlinkFactory
 }
 
 type objectBackedInitialContentsFetcher struct {
 	options          *objectBackedInitialContentsFetcherOptions
-	clusterReference object.LocalReference
+	clusterReference model_core.Decodable[object.LocalReference]
 	directoryIndex   int
 }
 
 func NewObjectBackedInitialContentsFetcher(
 	ctx context.Context,
-	directoryClusterReader model_parser.ParsedObjectReader[object.LocalReference, model_core.Message[model_filesystem.DirectoryCluster, object.LocalReference]],
-	leavesReader model_parser.ParsedObjectReader[object.LocalReference, model_core.Message[*model_filesystem_pb.Leaves, object.LocalReference]],
+	directoryClusterReader model_parser.ParsedObjectReader[model_core.Decodable[object.LocalReference], model_core.Message[model_filesystem.DirectoryCluster, object.LocalReference]],
+	leavesReader model_parser.ParsedObjectReader[model_core.Decodable[object.LocalReference], model_core.Message[*model_filesystem_pb.Leaves, object.LocalReference]],
 	fileFactory FileFactory,
 	symlinkFactory virtual.SymlinkFactory,
-	rootClusterReference object.LocalReference,
+	rootClusterReference model_core.Decodable[object.LocalReference],
 ) virtual.InitialContentsFetcher {
 	return &objectBackedInitialContentsFetcher{
 		options: &objectBackedInitialContentsFetcherOptions{
@@ -94,7 +94,7 @@ func (icf *objectBackedInitialContentsFetcher) FetchContents(fileReadMonitorFact
 		var child virtual.InitialContentsFetcher
 		switch contents := entry.Contents.(type) {
 		case *model_filesystem_pb.DirectoryNode_ContentsExternal:
-			childReference, err := model_core.FlattenReference(model_core.Nested(directory, contents.ContentsExternal.Reference))
+			childReference, err := model_core.FlattenDecodableReference(model_core.Nested(directory, contents.ContentsExternal.Reference))
 			if err != nil {
 				return nil, util.StatusWrapf(err, "Invalid reference for directory with name %#v", entry.Name)
 			}

@@ -13,9 +13,17 @@ func NewRawObjectParser[TReference any]() ObjectParser[TReference, []byte] {
 	return &rawObjectParser[TReference]{}
 }
 
-func (p *rawObjectParser[TReference]) ParseObject(in model_core.Message[[]byte, TReference]) ([]byte, int, error) {
+func (p *rawObjectParser[TReference]) ParseObject(in model_core.Message[[]byte, TReference], decodingParameters []byte) ([]byte, int, error) {
+	if len(decodingParameters) > 0 {
+		return nil, 0, status.Error(codes.InvalidArgument, "Unexpected decoding parameters")
+	}
+
 	if degree := in.OutgoingReferences.GetDegree(); degree > 0 {
 		return nil, 0, status.Errorf(codes.InvalidArgument, "Object has a degree of %d, while zero was expected", degree)
 	}
 	return in.Message, len(in.Message), nil
+}
+
+func (p *rawObjectParser[TReference]) GetDecodingParametersSizeBytes() int {
+	return 0
 }

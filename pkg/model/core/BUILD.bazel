@@ -6,6 +6,7 @@ go_library(
     srcs = [
         "cloneable_reference_metadata.go",
         "created_object.go",
+        "decodable.go",
         "file_writing_object_capturer.go",
         "get_index_from_reference_message.go",
         "message.go",
@@ -24,6 +25,7 @@ go_library(
         "//pkg/proto/model/core",
         "//pkg/storage/dag",
         "//pkg/storage/object",
+        "@com_github_buildbarn_bb_storage//pkg/util",
         "@org_golang_google_grpc//codes",
         "@org_golang_google_grpc//status",
         "@org_golang_google_protobuf//proto",

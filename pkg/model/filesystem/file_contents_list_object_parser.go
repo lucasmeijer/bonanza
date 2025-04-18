@@ -7,6 +7,7 @@ import (
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/model/parser"
 	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
+	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
 	model_filesystem_pb "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
 	"github.com/buildbarn/bonanza/pkg/storage/dag"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
@@ -20,27 +21,27 @@ import (
 // non-zero.
 type FileContentsEntry[TReference any] struct {
 	EndBytes  uint64
-	Reference TReference
+	Reference model_core.Decodable[TReference]
 }
 
-func flattenFileContentsReference[TReference object.BasicReference](fileContents model_core.Message[*model_filesystem_pb.FileContents, TReference]) (TReference, error) {
-	var bad TReference
+func flattenFileContentsReference[TReference object.BasicReference](fileContents model_core.Message[*model_filesystem_pb.FileContents, TReference]) (model_core.Decodable[TReference], error) {
+	var bad model_core.Decodable[TReference]
 	switch level := fileContents.Message.Level.(type) {
 	case *model_filesystem_pb.FileContents_ChunkReference:
-		reference, err := model_core.FlattenReference(model_core.Nested(fileContents, level.ChunkReference))
+		reference, err := model_core.FlattenDecodableReference(model_core.Nested(fileContents, level.ChunkReference))
 		if err != nil {
 			return bad, err
 		}
-		if reference.GetHeight() != 0 {
+		if reference.Value.GetHeight() != 0 {
 			return bad, status.Error(codes.InvalidArgument, "Chunk reference must have height 0")
 		}
 		return reference, nil
 	case *model_filesystem_pb.FileContents_FileContentsListReference:
-		reference, err := model_core.FlattenReference(model_core.Nested(fileContents, level.FileContentsListReference))
+		reference, err := model_core.FlattenDecodableReference(model_core.Nested(fileContents, level.FileContentsListReference))
 		if err != nil {
 			return bad, err
 		}
-		if reference.GetHeight() == 0 {
+		if reference.Value.GetHeight() == 0 {
 			return bad, status.Error(codes.InvalidArgument, "File contents list reference cannot have height 0")
 		}
 		return reference, nil
@@ -81,16 +82,19 @@ func FileContentsEntryToProto[TReference object.BasicReference](
 		return model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker]((*model_filesystem_pb.FileContents)(nil))
 	}
 
-	if entry.Reference.GetHeight() > 0 {
+	if entry.Reference.Value.GetHeight() > 0 {
 		// Large file.
 		patcher := model_core.NewReferenceMessagePatcher[dag.ObjectContentsWalker]()
 		return model_core.NewPatchedMessage(
 			&model_filesystem_pb.FileContents{
 				Level: &model_filesystem_pb.FileContents_FileContentsListReference{
-					FileContentsListReference: patcher.AddReference(
-						entry.Reference.GetLocalReference(),
-						dag.ExistingObjectContentsWalker,
-					),
+					FileContentsListReference: &model_core_pb.DecodableReference{
+						Reference: patcher.AddReference(
+							entry.Reference.Value.GetLocalReference(),
+							dag.ExistingObjectContentsWalker,
+						),
+						DecodingParameters: entry.Reference.GetDecodingParameters(),
+					},
 				},
 				TotalSizeBytes: entry.EndBytes,
 			},
@@ -103,10 +107,13 @@ func FileContentsEntryToProto[TReference object.BasicReference](
 	return model_core.NewPatchedMessage(
 		&model_filesystem_pb.FileContents{
 			Level: &model_filesystem_pb.FileContents_ChunkReference{
-				ChunkReference: patcher.AddReference(
-					entry.Reference.GetLocalReference(),
-					dag.ExistingObjectContentsWalker,
-				),
+				ChunkReference: &model_core_pb.DecodableReference{
+					Reference: patcher.AddReference(
+						entry.Reference.Value.GetLocalReference(),
+						dag.ExistingObjectContentsWalker,
+					),
+					DecodingParameters: entry.Reference.GetDecodingParameters(),
+				},
 			},
 			TotalSizeBytes: entry.EndBytes,
 		},
@@ -128,8 +135,9 @@ func NewFileContentsListObjectParser[TReference object.BasicReference]() parser.
 	return &fileContentsListObjectParser[TReference]{}
 }
 
-func (p *fileContentsListObjectParser[TReference]) ParseObject(in model_core.Message[[]byte, TReference]) (FileContentsList[TReference], int, error) {
-	l, sizeBytes, err := model_parser.NewMessageListObjectParser[TReference, model_filesystem_pb.FileContents]().ParseObject(in)
+func (p *fileContentsListObjectParser[TReference]) ParseObject(in model_core.Message[[]byte, TReference], decodingParameters []byte) (FileContentsList[TReference], int, error) {
+	l, sizeBytes, err := model_parser.NewMessageListObjectParser[TReference, model_filesystem_pb.FileContents]().
+		ParseObject(in, decodingParameters)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -161,4 +169,8 @@ func (p *fileContentsListObjectParser[TReference]) ParseObject(in model_core.Mes
 		})
 	}
 	return fileContentsList, sizeBytes, nil
+}
+
+func (p *fileContentsListObjectParser[TReference]) GetDecodingParametersSizeBytes() int {
+	return 0
 }

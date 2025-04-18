@@ -6,6 +6,7 @@ go_library(
     importpath = "github.com/buildbarn/bonanza/cmd/mount_directory",
     visibility = ["//visibility:private"],
     deps = [
+        "//pkg/model/core",
         "//pkg/model/encoding",
         "//pkg/model/filesystem",
         "//pkg/model/filesystem/virtual",

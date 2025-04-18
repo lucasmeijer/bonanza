@@ -32,6 +32,10 @@ func (ff *objectBackedFileFactory) LookupFile(fileContents model_filesystem.File
 	}
 }
 
+func (ff *objectBackedFileFactory) GetDecodingParametersSizeBytes(isFilecontentsList bool) int {
+	return ff.fileReader.GetDecodingParametersSizeBytes(isFilecontentsList)
+}
+
 type objectBackedFile struct {
 	factory      *objectBackedFileFactory
 	fileContents model_filesystem.FileContentsEntry[object.LocalReference]

@@ -14,10 +14,10 @@ func Dereference[
 	TReference any,
 ](
 	ctx context.Context,
-	reader ParsedObjectReader[TReference, TValue],
-	m model_core.Message[*model_core_pb.Reference, TReference],
+	reader ParsedObjectReader[model_core.Decodable[TReference], TValue],
+	m model_core.Message[*model_core_pb.DecodableReference, TReference],
 ) (TValue, error) {
-	reference, err := model_core.FlattenReference(m)
+	reference, err := model_core.FlattenDecodableReference(m)
 	if err != nil {
 		var bad TValue
 		return bad, err
@@ -33,8 +33,8 @@ func MaybeDereference[
 	TReference any,
 ](
 	ctx context.Context,
-	reader ParsedObjectReader[TReference, TValue],
-	m model_core.Message[*model_core_pb.Reference, TReference],
+	reader ParsedObjectReader[model_core.Decodable[TReference], TValue],
+	m model_core.Message[*model_core_pb.DecodableReference, TReference],
 ) (TValue, error) {
 	if m.Message == nil {
 		var zero TValue

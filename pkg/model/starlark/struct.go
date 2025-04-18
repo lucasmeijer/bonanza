@@ -431,7 +431,7 @@ func (s *Struct[TReference, TMetadata]) GetProviderIdentifier() (pg_label.Canoni
 // struct that has been encoded and is backed by storage.
 func AllStructFields[TReference any](
 	ctx context.Context,
-	reader model_parser.ParsedObjectReader[TReference, model_core.Message[[]*model_starlark_pb.List_Element, TReference]],
+	reader model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[[]*model_starlark_pb.List_Element, TReference]],
 	structFields model_core.Message[*model_starlark_pb.Struct_Fields, TReference],
 	errOut *error,
 ) iter.Seq2[string, model_core.Message[*model_starlark_pb.Value, TReference]] {
@@ -445,7 +445,7 @@ func AllStructFields[TReference any](
 		ctx,
 		reader,
 		model_core.Nested(structFields, structFields.Message.Values),
-		func(element model_core.Message[*model_starlark_pb.List_Element, TReference]) (*model_core_pb.Reference, error) {
+		func(element model_core.Message[*model_starlark_pb.List_Element, TReference]) (*model_core_pb.DecodableReference, error) {
 			if level, ok := element.Message.Level.(*model_starlark_pb.List_Element_Parent_); ok {
 				return level.Parent.Reference, nil
 			}
@@ -480,7 +480,7 @@ func AllStructFields[TReference any](
 // previous and is backed by storage.
 func GetStructFieldValue[TReference any](
 	ctx context.Context,
-	reader model_parser.ParsedObjectReader[TReference, model_core.Message[[]*model_starlark_pb.List_Element, TReference]],
+	reader model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[[]*model_starlark_pb.List_Element, TReference]],
 	structFields model_core.Message[*model_starlark_pb.Struct_Fields, TReference],
 	key string,
 ) (model_core.Message[*model_starlark_pb.Value, TReference], error) {

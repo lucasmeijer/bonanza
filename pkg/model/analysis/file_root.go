@@ -67,7 +67,7 @@ func getStarlarkFileProperties[TReference object.BasicReference, TMetadata model
 		func() (path.ComponentWalker, error) {
 			return nil, errors.New("path resolution escapes input root")
 		},
-		model_core.Message[*model_core_pb.Reference, TReference]{},
+		model_core.Message[*model_core_pb.DecodableReference, TReference]{},
 		[]model_core.Message[*model_filesystem_pb.Directory, TReference]{
 			model_core.Nested(targetOutput, targetOutput.Message.RootDirectory),
 		},
@@ -85,7 +85,7 @@ func getStarlarkFileProperties[TReference object.BasicReference, TMetadata model
 	return fileProperties, nil
 }
 
-func getPackageOutputDirectoryComponents[TReference object.BasicReference](configurationReference model_core.Message[*model_core_pb.Reference, TReference], canonicalPackage label.CanonicalPackage) ([]path.Component, error) {
+func getPackageOutputDirectoryComponents[TReference object.BasicReference](configurationReference model_core.Message[*model_core_pb.DecodableReference, TReference], canonicalPackage label.CanonicalPackage) ([]path.Component, error) {
 	// TODO: Add more utility functions to pkg/label, so that we
 	// don't need to call path.MustNewComponent() from here.
 	configurationComponent, err := model_starlark.ConfigurationReferenceToComponent(configurationReference)
@@ -142,7 +142,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 			ctx,
 			c.configuredTargetOutputReader,
 			model_core.Nested(configuredTarget, configuredTarget.Message.Outputs),
-			func(entry *model_analysis_pb.ConfiguredTarget_Value_Output) (int, *model_core_pb.Reference) {
+			func(entry *model_analysis_pb.ConfiguredTarget_Value_Output) (int, *model_core_pb.DecodableReference) {
 				switch level := entry.Level.(type) {
 				case *model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_:
 					return strings.Compare(packageRelativePathStr, level.Leaf.PackageRelativePath), nil

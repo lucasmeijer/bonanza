@@ -19,12 +19,12 @@ import (
 type DirectoryComponentWalker[TReference object.BasicReference] struct {
 	// Constant fields.
 	context         context.Context
-	directoryReader model_parser.ParsedObjectReader[TReference, model_core.Message[*model_filesystem_pb.Directory, TReference]]
-	leavesReader    model_parser.ParsedObjectReader[TReference, model_core.Message[*model_filesystem_pb.Leaves, TReference]]
+	directoryReader model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_filesystem_pb.Directory, TReference]]
+	leavesReader    model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_filesystem_pb.Leaves, TReference]]
 	onUpHandler     func() (path.ComponentWalker, error)
 
 	// Variable fields.
-	currentDirectoryReference model_core.Message[*model_core_pb.Reference, TReference]
+	currentDirectoryReference model_core.Message[*model_core_pb.DecodableReference, TReference]
 	stack                     []model_core.Message[*model_filesystem_pb.Directory, TReference]
 	fileProperties            model_core.Message[*model_filesystem_pb.FileProperties, TReference]
 }
@@ -33,10 +33,10 @@ var _ path.ComponentWalker = (*DirectoryComponentWalker[object.BasicReference])(
 
 func NewDirectoryComponentWalker[TReference object.BasicReference](
 	ctx context.Context,
-	directoryReader model_parser.ParsedObjectReader[TReference, model_core.Message[*model_filesystem_pb.Directory, TReference]],
-	leavesReader model_parser.ParsedObjectReader[TReference, model_core.Message[*model_filesystem_pb.Leaves, TReference]],
+	directoryReader model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_filesystem_pb.Directory, TReference]],
+	leavesReader model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_filesystem_pb.Leaves, TReference]],
 	onUpHandler func() (path.ComponentWalker, error),
-	currentDirectoryReference model_core.Message[*model_core_pb.Reference, TReference],
+	currentDirectoryReference model_core.Message[*model_core_pb.DecodableReference, TReference],
 	stack []model_core.Message[*model_filesystem_pb.Directory, TReference],
 ) *DirectoryComponentWalker[TReference] {
 	return &DirectoryComponentWalker[TReference]{
@@ -181,7 +181,7 @@ func (cw *DirectoryComponentWalker[TReference]) GetCurrentFileProperties() model
 // contained in a directory.
 func DirectoryGetLeaves[TReference any](
 	ctx context.Context,
-	reader model_parser.ParsedObjectReader[TReference, model_core.Message[*model_filesystem_pb.Leaves, TReference]],
+	reader model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_filesystem_pb.Leaves, TReference]],
 	directory model_core.Message[*model_filesystem_pb.Directory, TReference],
 ) (model_core.Message[*model_filesystem_pb.Leaves, TReference], error) {
 	switch leaves := directory.Message.Leaves.(type) {
@@ -198,7 +198,7 @@ func DirectoryGetLeaves[TReference any](
 // contents of a directory node.
 func DirectoryNodeGetContents[TReference any](
 	ctx context.Context,
-	reader model_parser.ParsedObjectReader[TReference, model_core.Message[*model_filesystem_pb.Directory, TReference]],
+	reader model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_filesystem_pb.Directory, TReference]],
 	directoryNode model_core.Message[*model_filesystem_pb.DirectoryNode, TReference],
 ) (model_core.Message[*model_filesystem_pb.Directory, TReference], error) {
 	switch contents := directoryNode.Message.Contents.(type) {

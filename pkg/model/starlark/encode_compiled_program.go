@@ -60,7 +60,7 @@ func newSplitBTreeBuilder[TReference any, TMessage proto.Message, TMetadata mode
 func NewListBuilder[TReference any, TMetadata model_core.CloneableReferenceMetadata](options *ValueEncodingOptions[TReference, TMetadata]) btree.Builder[*model_starlark_pb.List_Element, TMetadata] {
 	return newSplitBTreeBuilder(
 		options,
-		/* parentNodeComputer = */ func(createdObject model_core.CreatedObject[TMetadata], childNodes []*model_starlark_pb.List_Element) (model_core.PatchedMessage[*model_starlark_pb.List_Element, TMetadata], error) {
+		/* parentNodeComputer = */ func(createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]], childNodes []*model_starlark_pb.List_Element) (model_core.PatchedMessage[*model_starlark_pb.List_Element, TMetadata], error) {
 			// Compute the total number of elements
 			// contained in the new list.
 			//
@@ -95,9 +95,9 @@ func NewListBuilder[TReference any, TMetadata model_core.CloneableReferenceMetad
 				&model_starlark_pb.List_Element{
 					Level: &model_starlark_pb.List_Element_Parent_{
 						Parent: &model_starlark_pb.List_Element_Parent{
-							Reference: patcher.AddReference(
-								createdObject.Contents.GetReference(),
-								options.ObjectCapturer.CaptureCreatedObject(createdObject),
+							Reference: patcher.CaptureAndAddDecodableReference(
+								createdObject,
+								options.ObjectCapturer,
 							),
 							Count: count,
 						},
@@ -208,15 +208,18 @@ func EncodeValue[TReference any, TMetadata model_core.CloneableReferenceMetadata
 
 		treeBuilder := newSplitBTreeBuilder(
 			options,
-			/* parentNodeComputer = */ func(createdObject model_core.CreatedObject[TMetadata], childNodes []*model_starlark_pb.Dict_Entry) (model_core.PatchedMessage[*model_starlark_pb.Dict_Entry, TMetadata], error) {
+			/* parentNodeComputer = */ func(
+				createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]],
+				childNodes []*model_starlark_pb.Dict_Entry,
+			) (model_core.PatchedMessage[*model_starlark_pb.Dict_Entry, TMetadata], error) {
 				patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
 				return model_core.NewPatchedMessage(
 					&model_starlark_pb.Dict_Entry{
 						Level: &model_starlark_pb.Dict_Entry_Parent_{
 							Parent: &model_starlark_pb.Dict_Entry_Parent{
-								Reference: patcher.AddReference(
-									createdObject.Contents.GetReference(),
-									options.ObjectCapturer.CaptureCreatedObject(createdObject),
+								Reference: patcher.CaptureAndAddDecodableReference(
+									createdObject,
+									options.ObjectCapturer,
 								),
 							},
 						},
@@ -405,8 +408,8 @@ func DecodeGlobals[TReference object.BasicReference, TMetadata model_core.Clonea
 const ValueDecodingOptionsKey = "value_decoding_options"
 
 type ValueReaders[TReference any] struct {
-	Dict model_parser.ParsedObjectReader[TReference, model_core.Message[[]*model_starlark_pb.Dict_Entry, TReference]]
-	List model_parser.ParsedObjectReader[TReference, model_core.Message[[]*model_starlark_pb.List_Element, TReference]]
+	Dict model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[[]*model_starlark_pb.Dict_Entry, TReference]]
+	List model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[[]*model_starlark_pb.List_Element, TReference]]
 }
 
 type ValueDecodingOptions[TReference any] struct {
@@ -915,7 +918,7 @@ func decodeList_Elements[TReference object.BasicReference, TMetadata model_core.
 		options.valueDecodingOptions.Context,
 		options.valueDecodingOptions.Readers.List,
 		model_core.Nested(in, in.Message.Elements),
-		func(element model_core.Message[*model_starlark_pb.List_Element, TReference]) (*model_core_pb.Reference, error) {
+		func(element model_core.Message[*model_starlark_pb.List_Element, TReference]) (*model_core_pb.DecodableReference, error) {
 			if level, ok := element.Message.Level.(*model_starlark_pb.List_Element_Parent_); ok {
 				return level.Parent.Reference, nil
 			}

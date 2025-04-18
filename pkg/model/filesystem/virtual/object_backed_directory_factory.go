@@ -24,25 +24,27 @@ import (
 )
 
 type ObjectBackedDirectoryFactory struct {
-	handleAllocator        virtual.ResolvableHandleAllocator
-	directoryClusterReader model_parser.ParsedObjectReader[object.LocalReference, model_core.Message[model_filesystem.DirectoryCluster, object.LocalReference]]
-	leavesReader           model_parser.ParsedObjectReader[object.LocalReference, model_core.Message[*model_filesystem_pb.Leaves, object.LocalReference]]
-	fileFactory            FileFactory
-	errorLogger            util.ErrorLogger
+	handleAllocator                             virtual.ResolvableHandleAllocator
+	directoryClusterReader                      model_parser.ParsedObjectReader[model_core.Decodable[object.LocalReference], model_core.Message[model_filesystem.DirectoryCluster, object.LocalReference]]
+	directoryClusterDecodingParametersSizeBytes int
+	leavesReader                                model_parser.ParsedObjectReader[model_core.Decodable[object.LocalReference], model_core.Message[*model_filesystem_pb.Leaves, object.LocalReference]]
+	fileFactory                                 FileFactory
+	errorLogger                                 util.ErrorLogger
 }
 
 func NewObjectBackedDirectoryFactory(
 	handleAllocation virtual.ResolvableHandleAllocation,
-	directoryClusterReader model_parser.ParsedObjectReader[object.LocalReference, model_core.Message[model_filesystem.DirectoryCluster, object.LocalReference]],
-	leavesReader model_parser.ParsedObjectReader[object.LocalReference, model_core.Message[*model_filesystem_pb.Leaves, object.LocalReference]],
+	directoryClusterReader model_parser.ParsedObjectReader[model_core.Decodable[object.LocalReference], model_core.Message[model_filesystem.DirectoryCluster, object.LocalReference]],
+	leavesReader model_parser.ParsedObjectReader[model_core.Decodable[object.LocalReference], model_core.Message[*model_filesystem_pb.Leaves, object.LocalReference]],
 	fileFactory FileFactory,
 	errorLogger util.ErrorLogger,
 ) *ObjectBackedDirectoryFactory {
 	df := &ObjectBackedDirectoryFactory{
-		directoryClusterReader: directoryClusterReader,
-		leavesReader:           leavesReader,
-		fileFactory:            fileFactory,
-		errorLogger:            errorLogger,
+		directoryClusterReader:                      directoryClusterReader,
+		directoryClusterDecodingParametersSizeBytes: directoryClusterReader.GetDecodingParametersSizeBytes(),
+		leavesReader: leavesReader,
+		fileFactory:  fileFactory,
+		errorLogger:  errorLogger,
 	}
 	df.handleAllocator = handleAllocation.AsResolvableAllocator(df.resolveHandle)
 	return df
@@ -67,10 +69,19 @@ func (df *ObjectBackedDirectoryFactory) resolveHandle(r io.ByteReader) (virtual.
 		}
 		rawReference = append(rawReference, b)
 	}
-	clusterReference, err := referenceFormat.NewLocalReference(rawReference)
+	localReference, err := referenceFormat.NewLocalReference(rawReference)
 	if err != nil {
 		return virtual.DirectoryChild{}, virtual.StatusErrBadHandle
 	}
+	decodingParameters := make([]byte, 0, df.directoryClusterDecodingParametersSizeBytes)
+	for i := 0; i < df.directoryClusterDecodingParametersSizeBytes; i++ {
+		b, err := r.ReadByte()
+		if err != nil {
+			return virtual.DirectoryChild{}, virtual.StatusErrBadHandle
+		}
+		decodingParameters = append(decodingParameters, b)
+	}
+	clusterReference := model_core.NewDecodable(localReference, decodingParameters)
 
 	directoryIndex, err := varint.ReadForward[uint](r)
 	if err != nil {
@@ -121,9 +132,10 @@ func (df *ObjectBackedDirectoryFactory) resolveHandle(r io.ByteReader) (virtual.
 	return virtual.DirectoryChild{}.FromLeaf(df.createSymlink(clusterReference, directoryIndex, symlinkIndex, symlinks[symlinkIndex-1].Target)), virtual.StatusOK
 }
 
-func (df *ObjectBackedDirectoryFactory) LookupDirectory(clusterReference object.LocalReference, directoryIndex uint, directoriesCount uint32) virtual.Directory {
-	handle := varint.AppendForward(nil, clusterReference.GetReferenceFormat().ToProto())
-	handle = append(handle, clusterReference.GetRawReference()...)
+func (df *ObjectBackedDirectoryFactory) LookupDirectory(clusterReference model_core.Decodable[object.LocalReference], directoryIndex uint, directoriesCount uint32) virtual.Directory {
+	handle := varint.AppendForward(nil, clusterReference.Value.GetReferenceFormat().ToProto())
+	handle = append(handle, clusterReference.Value.GetRawReference()...)
+	handle = append(handle, clusterReference.GetDecodingParameters()...)
 	handle = varint.AppendForward(handle, directoryIndex)
 	handle = varint.AppendForward(handle, 0)
 	handle = varint.AppendForward(handle, directoriesCount)
@@ -136,9 +148,10 @@ func (df *ObjectBackedDirectoryFactory) LookupDirectory(clusterReference object.
 		})
 }
 
-func (df *ObjectBackedDirectoryFactory) createSymlink(clusterReference object.LocalReference, directoryIndex, symlinkIndex uint, target string) virtual.LinkableLeaf {
-	handle := varint.AppendForward(nil, clusterReference.GetReferenceFormat().ToProto())
-	handle = append(handle, clusterReference.GetRawReference()...)
+func (df *ObjectBackedDirectoryFactory) createSymlink(clusterReference model_core.Decodable[object.LocalReference], directoryIndex, symlinkIndex uint, target string) virtual.LinkableLeaf {
+	handle := varint.AppendForward(nil, clusterReference.Value.GetReferenceFormat().ToProto())
+	handle = append(handle, clusterReference.Value.GetRawReference()...)
+	handle = append(handle, clusterReference.GetDecodingParameters()...)
 	handle = varint.AppendForward(handle, directoryIndex)
 	handle = varint.AppendForward(handle, symlinkIndex+1)
 	return df.handleAllocator.New(bytes.NewBuffer(handle)).
@@ -149,7 +162,7 @@ type objectBackedDirectory struct {
 	virtual.ReadOnlyDirectory
 
 	factory          *ObjectBackedDirectoryFactory
-	clusterReference object.LocalReference
+	clusterReference model_core.Decodable[object.LocalReference]
 	directoryIndex   uint
 	directoriesCount uint32
 }
@@ -177,7 +190,7 @@ func (d *objectBackedDirectory) VirtualGetAttributes(ctx context.Context, reques
 	attributes.SetLinkCount(virtual.EmptyDirectoryLinkCount + d.directoriesCount)
 	attributes.SetFileType(filesystem.FileTypeDirectory)
 	attributes.SetPermissions(virtual.PermissionsRead | virtual.PermissionsExecute)
-	attributes.SetSizeBytes(uint64(d.clusterReference.GetSizeBytes()))
+	attributes.SetSizeBytes(uint64(d.clusterReference.Value.GetSizeBytes()))
 }
 
 func (d *objectBackedDirectory) getDirectory(ctx context.Context) (model_core.Message[*model_filesystem.Directory, object.LocalReference], virtual.Status) {
@@ -198,7 +211,7 @@ func (d objectBackedDirectory) lookupDirectoryNode(directoryNode model_core.Mess
 	df := d.factory
 	switch contents := directoryNode.Message.Contents.(type) {
 	case *model_filesystem_pb.DirectoryNode_ContentsExternal:
-		childReference, err := model_core.FlattenReference(model_core.Nested(directoryNode, contents.ContentsExternal.Reference))
+		childReference, err := model_core.FlattenDecodableReference(model_core.Nested(directoryNode, contents.ContentsExternal.Reference))
 		if err != nil {
 			df.errorLogger.Log(util.StatusWrapf(err, "Invalid reference for directory with name %#v in directory %d in directory cluster with reference %s", directoryNode.Message.Name, d.directoryIndex, d.clusterReference))
 			return nil, virtual.StatusErrIO

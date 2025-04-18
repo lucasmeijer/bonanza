@@ -115,7 +115,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 		ctx,
 		c.configuredTargetActionReader,
 		model_core.Nested(configuredTarget, configuredTarget.Message.Actions),
-		func(entry *model_analysis_pb.ConfiguredTarget_Value_Action) (int, *model_core_pb.Reference) {
+		func(entry *model_analysis_pb.ConfiguredTarget_Value_Action) (int, *model_core_pb.DecodableReference) {
 			switch level := entry.Level.(type) {
 			case *model_analysis_pb.ConfiguredTarget_Value_Action_Leaf_:
 				return bytes.Compare(actionID, level.Leaf.Id), nil
@@ -151,7 +151,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 		ctx,
 		c.argsReader,
 		model_core.Nested(action, actionLeaf.Arguments),
-		/* traverser = */ func(element model_core.Message[*model_analysis_pb.Args, TReference]) (*model_core_pb.Reference, error) {
+		/* traverser = */ func(element model_core.Message[*model_analysis_pb.Args, TReference]) (*model_core_pb.DecodableReference, error) {
 			if level, ok := element.Message.Level.(*model_analysis_pb.Args_Parent_); ok {
 				return level.Parent.Reference, nil
 			}
@@ -168,7 +168,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 			ctx,
 			c.argsAddReader,
 			model_core.Nested(args, argsLeaf.Leaf.Adds),
-			/* traverser = */ func(element model_core.Message[*model_analysis_pb.Args_Leaf_Add, TReference]) (*model_core_pb.Reference, error) {
+			/* traverser = */ func(element model_core.Message[*model_analysis_pb.Args_Leaf_Add, TReference]) (*model_core_pb.DecodableReference, error) {
 				if level, ok := element.Message.Level.(*model_analysis_pb.Args_Leaf_Add_Parent_); ok {
 					return level.Parent.Reference, nil
 				}
@@ -512,20 +512,14 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 		model_core.NewPatchedMessage(
 			&model_analysis_pb.SuccessfulActionResult_Key{
 				Action: &model_analysis_pb.Action{
-					CommandReference: patcher.AddReference(
-						createdCommand.Contents.GetReference(),
-						e.CaptureCreatedObject(createdCommand),
-					),
+					CommandReference: patcher.CaptureAndAddDecodableReference(createdCommand, e),
 					// TODO: Should we make the execution
 					// timeout on build actions configurable?
 					// Bazel with REv2 does not set this field
 					// for build actions, relying on the cluster
 					// to pick a default.
-					ExecutionTimeout: &durationpb.Duration{Seconds: 3600},
-					InputRootReference: patcher.AddReference(
-						rootDirectoryObject.Contents.GetReference(),
-						e.CaptureCreatedObject(rootDirectoryObject),
-					),
+					ExecutionTimeout:      &durationpb.Duration{Seconds: 3600},
+					InputRootReference:    patcher.CaptureAndAddDecodableReference(rootDirectoryObject, e),
 					PlatformPkixPublicKey: actionLeaf.PlatformPkixPublicKey,
 				},
 			},

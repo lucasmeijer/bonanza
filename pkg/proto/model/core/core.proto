@@ -8,8 +8,9 @@ import "google/protobuf/empty.proto";
 option go_package = "github.com/buildbarn/bonanza/pkg/proto/model/core";
 
 extend google.protobuf.FieldOptions {
-  // If the field is a Reference, this option denotes the format of the
-  // data contained in the object that it references.
+  // If the field is a DecodableReference or WeakDecodableReference,
+  // this option denotes the format of the data contained in the object
+  // that it references.
   ObjectFormat object_format = 66941;
 }
 
@@ -29,6 +30,12 @@ message ObjectFormat {
 }
 
 // Reference to another object contained in the same namespace.
+//
+// Note that this message merely acts as a way to address other objects.
+// This does not imply that the payload of the object can be interpreted
+// in a meaningful way, as it may be encoded. If the intent is that the
+// referenced object can be decoded (which generally is the case),
+// DecodableReference should be used.
 message Reference {
   // One-based index of an outgoing reference of the current object that
   // refers to the child object.
@@ -37,4 +44,50 @@ message Reference {
   // affecting the encoding of other parts of messages. One-based
   // indexing is used to ensure that the field is always encoded.
   fixed32 index = 1;
+}
+
+// DecodableReference is a reference to another object contained in the
+// namespace, stored together with any decoding parameters, such as
+// initialization vectors needed to decrypt the object. This not only
+// allows an object to be addressed, it also allows its contents to be
+// accessed.
+message DecodableReference {
+  // Reference to the object that can be decoded.
+  Reference reference = 1;
+
+  // Parameters to provide to the binary encoders to facilitate decoding
+  // of the object.
+  //
+  // Binary decoders should generally be written in such a way that all
+  // parameters necessary for decoding are stored in the object's
+  // payload. However, in the case of encryption this has the
+  // disadvantage that if an encryption key is given to a party to
+  // decrypt a single object, it can effectively decrypt all objects
+  // encrypted with that key. By storing the initialization vector in
+  // the parent object, objects can only be decrypted by traversing the
+  // object graph.
+  //
+  // This field is currently only intended to be used for encryption
+  // purposes. As there is no point in encrypting objects repeatedly,
+  // this field can therefore only be empty or contain a 128-bit
+  // initialization vector.
+  bytes decoding_parameters = 2;
+}
+
+// WeakDecodableReference is similar to DecodableReference, except that
+// the reference of the object is directly embedded into the message, as
+// opposed to being an index of an outgoing reference of the object
+// containing the message. This causes storage to be oblivious of the
+// reference, meaning that retention of the object is not guaranteed.
+//
+// This message can also be used to embed decodable references into
+// messages that are not backed by storage, such as RPC request/response
+// bodies.
+message WeakDecodableReference {
+  // Reference to the object that can be decoded.
+  bytes reference = 1;
+
+  // Parameters to provide to the binary encoders to facilitate decoding
+  // of the object.
+  bytes decoding_parameters = 2;
 }

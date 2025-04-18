@@ -5,6 +5,7 @@ import (
 
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/model/core/btree"
+	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
 	model_filesystem_pb "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 	"github.com/stretchr/testify/require"
@@ -35,10 +36,12 @@ func TestUniformBuilder(t *testing.T) {
 		node := model_core.NewPatchedMessage(
 			&model_filesystem_pb.FileContents{
 				Level: &model_filesystem_pb.FileContents_ChunkReference{
-					ChunkReference: patcher.AddReference(
-						object.MustNewSHA256V1LocalReference("8e81422ce5470c6fde1f2455d2eb0eb0eec4d6352eada7c36f99c8182dd3a1df", 42, 0, 0, 0),
-						metadata,
-					),
+					ChunkReference: &model_core_pb.DecodableReference{
+						Reference: patcher.AddReference(
+							object.MustNewSHA256V1LocalReference("8e81422ce5470c6fde1f2455d2eb0eb0eec4d6352eada7c36f99c8182dd3a1df", 42, 0, 0, 0),
+							metadata,
+						),
+					},
 				},
 				TotalSizeBytes: 42,
 			},
@@ -61,10 +64,12 @@ func TestUniformBuilder(t *testing.T) {
 		metadata1 := NewMockReferenceMetadata(ctrl)
 		fileContents1 := &model_filesystem_pb.FileContents{
 			Level: &model_filesystem_pb.FileContents_ChunkReference{
-				ChunkReference: patcher1.AddReference(
-					object.MustNewSHA256V1LocalReference("8e81422ce5470c6fde1f2455d2eb0eb0eec4d6352eada7c36f99c8182dd3a1df", 42, 0, 0, 0),
-					metadata1,
-				),
+				ChunkReference: &model_core_pb.DecodableReference{
+					Reference: patcher1.AddReference(
+						object.MustNewSHA256V1LocalReference("8e81422ce5470c6fde1f2455d2eb0eb0eec4d6352eada7c36f99c8182dd3a1df", 42, 0, 0, 0),
+						metadata1,
+					),
+				},
 			},
 			TotalSizeBytes: 42,
 		}
@@ -78,10 +83,12 @@ func TestUniformBuilder(t *testing.T) {
 		node2 := model_core.NewPatchedMessage(
 			&model_filesystem_pb.FileContents{
 				Level: &model_filesystem_pb.FileContents_ChunkReference{
-					ChunkReference: patcher2.AddReference(
-						object.MustNewSHA256V1LocalReference("8a5aae1152fcf85722d50b557e8462c92d0fe02e34f17aae9e70c389d4d0c140", 51, 0, 0, 0),
-						metadata2,
-					),
+					ChunkReference: &model_core_pb.DecodableReference{
+						Reference: patcher2.AddReference(
+							object.MustNewSHA256V1LocalReference("8a5aae1152fcf85722d50b557e8462c92d0fe02e34f17aae9e70c389d4d0c140", 51, 0, 0, 0),
+							metadata2,
+						),
+					},
 				},
 				TotalSizeBytes: 51,
 			},
@@ -113,10 +120,12 @@ func TestUniformBuilder(t *testing.T) {
 		node3 := model_core.NewPatchedMessage(
 			&model_filesystem_pb.FileContents{
 				Level: &model_filesystem_pb.FileContents_ChunkReference{
-					ChunkReference: patcher3.AddReference(
-						object.MustNewSHA256V1LocalReference("4a552ba6f6bbd650497185ec68791ba2749364f493b17cbd318d6a53a2fd48eb", 100, 1, 2, 0),
-						metadata3,
-					),
+					ChunkReference: &model_core_pb.DecodableReference{
+						Reference: patcher3.AddReference(
+							object.MustNewSHA256V1LocalReference("4a552ba6f6bbd650497185ec68791ba2749364f493b17cbd318d6a53a2fd48eb", 100, 1, 2, 0),
+							metadata3,
+						),
+					},
 				},
 				TotalSizeBytes: 93,
 			},

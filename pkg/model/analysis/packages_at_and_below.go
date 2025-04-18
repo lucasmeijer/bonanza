@@ -25,7 +25,7 @@ type getPackageDirectoryEnvironment[TReference any] interface {
 func (c *baseComputer[TReference, TMetadata]) getPackageDirectory(
 	ctx context.Context,
 	e getPackageDirectoryEnvironment[TReference],
-	directoryReader model_parser.ParsedObjectReader[TReference, model_core.Message[*model_filesystem_pb.Directory, TReference]],
+	directoryReader model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_filesystem_pb.Directory, TReference]],
 	canonicalPackageStr string,
 ) (model_core.Message[*model_filesystem_pb.Directory, TReference], error) {
 	canonicalPackage, err := label.NewCanonicalPackage(canonicalPackageStr)
@@ -139,7 +139,7 @@ func (pec *packageExistenceChecker[TReference]) findPackagesBelow(d model_core.M
 // directoryPackage returns true if the provided directory is the root
 // directory of a package. A directory is a root directory of a package
 // if it contains a BUILD.bazel or BUILD file.
-func directoryIsPackage[TReference any](ctx context.Context, leavesReader model_parser.ParsedObjectReader[TReference, model_core.Message[*model_filesystem_pb.Leaves, TReference]], d model_core.Message[*model_filesystem_pb.Directory, TReference]) (bool, error) {
+func directoryIsPackage[TReference any](ctx context.Context, leavesReader model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_filesystem_pb.Leaves, TReference]], d model_core.Message[*model_filesystem_pb.Directory, TReference]) (bool, error) {
 	leaves, err := model_filesystem.DirectoryGetLeaves(ctx, leavesReader, d)
 	if err != nil {
 		return false, err

@@ -3,6 +3,7 @@ package filesystem
 import (
 	"sort"
 
+	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 
 	"google.golang.org/grpc/codes"
@@ -28,7 +29,7 @@ type FileContentsIterator[TReference any] struct {
 func NewFileContentsIterator[TReference object.BasicReference](root FileContentsEntry[TReference], initialOffsetBytes uint64) FileContentsIterator[TReference] {
 	maxHeight := 1
 	if root.EndBytes > 0 {
-		maxHeight += root.Reference.GetHeight()
+		maxHeight += root.Reference.Value.GetHeight()
 	}
 	return FileContentsIterator[TReference]{
 		spans: append(
@@ -54,7 +55,7 @@ func NewFileContentsIterator[TReference object.BasicReference](root FileContents
 // It is the caller's responsibility to track whether iteration has
 // reached the end of the file. Once the end of the file has been
 // reached, GetCurrentPart() may no longer be called.
-func (i *FileContentsIterator[TReference]) GetCurrentPart() (reference TReference, offsetBytes, sizeBytes uint64) {
+func (i *FileContentsIterator[TReference]) GetCurrentPart() (reference model_core.Decodable[TReference], offsetBytes, sizeBytes uint64) {
 	lastSpan := &i.spans[len(i.spans)-1]
 	return lastSpan.list[0].Reference, i.initialOffsetBytes, lastSpan.list[0].EndBytes - lastSpan.startBytes
 }

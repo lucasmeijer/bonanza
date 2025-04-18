@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/buildbarn/bb-storage/pkg/util"
+	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 
@@ -13,18 +14,25 @@ import (
 )
 
 type FileReader[TReference object.BasicReference] struct {
-	fileContentsListReader model_parser.ParsedObjectReader[TReference, FileContentsList[TReference]]
-	fileChunkReader        model_parser.ParsedObjectReader[TReference, []byte]
+	fileContentsListReader model_parser.ParsedObjectReader[model_core.Decodable[TReference], FileContentsList[TReference]]
+	fileChunkReader        model_parser.ParsedObjectReader[model_core.Decodable[TReference], []byte]
 }
 
 func NewFileReader[TReference object.BasicReference](
-	fileContentsListReader model_parser.ParsedObjectReader[TReference, FileContentsList[TReference]],
-	fileChunkReader model_parser.ParsedObjectReader[TReference, []byte],
+	fileContentsListReader model_parser.ParsedObjectReader[model_core.Decodable[TReference], FileContentsList[TReference]],
+	fileChunkReader model_parser.ParsedObjectReader[model_core.Decodable[TReference], []byte],
 ) *FileReader[TReference] {
 	return &FileReader[TReference]{
 		fileContentsListReader: fileContentsListReader,
 		fileChunkReader:        fileChunkReader,
 	}
+}
+
+func (fr *FileReader[TReference]) GetDecodingParametersSizeBytes(isFileContentsList bool) int {
+	if isFileContentsList {
+		return fr.fileContentsListReader.GetDecodingParametersSizeBytes()
+	}
+	return fr.fileChunkReader.GetDecodingParametersSizeBytes()
 }
 
 func (fr *FileReader[TReference]) FileReadAll(ctx context.Context, fileContents FileContentsEntry[TReference], maximumSizeBytes uint64) ([]byte, error) {
@@ -41,7 +49,7 @@ func (fr *FileReader[TReference]) FileReadAll(ctx context.Context, fileContents 
 func (fr *FileReader[TReference]) readNextChunk(ctx context.Context, fileContentsIterator *FileContentsIterator[TReference]) ([]byte, error) {
 	for {
 		partReference, partOffsetBytes, partSizeBytes := fileContentsIterator.GetCurrentPart()
-		if partReference.GetDegree() == 0 {
+		if partReference.Value.GetDegree() == 0 {
 			// Reached a chunk.
 			chunk, err := fr.fileChunkReader.ReadParsedObject(ctx, partReference)
 			if err != nil {

@@ -71,7 +71,7 @@ func packageGroupNodeToProto[TMetadata model_core.ReferenceMetadata](n *packageG
 		ExternalMessage: model_core.NewSimplePatchedMessage[TMetadata](proto.Message(nil)),
 		ParentAppender: func(
 			subpackages model_core.PatchedMessage[*model_starlark_pb.PackageGroup_Subpackages, TMetadata],
-			externalObject model_core.CreatedObject[TMetadata],
+			externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
 		) {
 			subpackages.Message.IncludeSubpackages = n.includeSubpackages
 		},
@@ -101,17 +101,17 @@ func packageGroupNodeToProto[TMetadata model_core.ReferenceMetadata](n *packageG
 			ExternalMessage: model_core.NewPatchedMessage[proto.Message](&overrides, patcher),
 			ParentAppender: func(
 				subpackages model_core.PatchedMessage[*model_starlark_pb.PackageGroup_Subpackages, TMetadata],
-				externalObject model_core.CreatedObject[TMetadata],
+				externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
 			) {
-				if externalObject.Contents == nil {
+				if externalObject == nil {
 					subpackages.Message.Overrides = &model_starlark_pb.PackageGroup_Subpackages_OverridesInline{
 						OverridesInline: &overrides,
 					}
 				} else {
 					subpackages.Message.Overrides = &model_starlark_pb.PackageGroup_Subpackages_OverridesExternal{
-						OverridesExternal: subpackages.Patcher.AddReference(
-							externalObject.Contents.GetReference(),
-							objectCapturer.CaptureCreatedObject(externalObject),
+						OverridesExternal: subpackages.Patcher.CaptureAndAddDecodableReference(
+							*externalObject,
+							objectCapturer,
 						),
 					}
 				}

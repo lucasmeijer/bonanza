@@ -56,7 +56,7 @@ func (c *baseComputer[TReference, TMetadata]) constraintValuesToConstraints(ctx 
 			e,
 			fromPackage.String(),
 			constraintValue,
-			model_core.NewSimpleMessage[model_core.CloneableReference[TMetadata]]((*model_core_pb.Reference)(nil)),
+			model_core.NewSimpleMessage[model_core.CloneableReference[TMetadata]]((*model_core_pb.DecodableReference)(nil)),
 			model_core.CloningObjectManager[TMetadata]{},
 			constraintValueInfoProviderIdentifier,
 		)
@@ -266,7 +266,7 @@ func getSingleFileConfiguredTargetValue[TMetadata model_core.WalkableReferenceMe
 
 func getAttrValueParts[TReference object.BasicReference, TMetadata model_core.WalkableReferenceMetadata](
 	e getValueFromSelectGroupEnvironment[TReference, TMetadata],
-	configurationReference model_core.Message[*model_core_pb.Reference, TReference],
+	configurationReference model_core.Message[*model_core_pb.DecodableReference, TReference],
 	ruleTargetPackage label.CanonicalPackage,
 	namedAttr model_core.Message[*model_starlark_pb.NamedAttr, TReference],
 	publicAttrValue model_core.Message[*model_starlark_pb.RuleTarget_PublicAttrValue, TReference],
@@ -323,7 +323,7 @@ func (c *baseComputer[TReference, TMetadata]) configureAttrValueParts(
 	thread *starlark.Thread,
 	namedAttr *model_starlark_pb.NamedAttr,
 	valueParts model_core.Message[[]*model_starlark_pb.Value, TReference],
-	configurationReference model_core.Message[*model_core_pb.Reference, TReference],
+	configurationReference model_core.Message[*model_core_pb.DecodableReference, TReference],
 	visibilityFromPackage label.CanonicalPackage,
 	execGroupPlatformLabels map[string]string,
 ) (starlark.Value, error) {
@@ -340,7 +340,7 @@ func (c *baseComputer[TReference, TMetadata]) configureAttrValueParts(
 		cfg = attrType.LabelList.ListValueOptions.GetCfg()
 	}
 
-	var configurationReferences []model_core.Message[*model_core_pb.Reference, TReference]
+	var configurationReferences []model_core.Message[*model_core_pb.DecodableReference, TReference]
 	mayHaveMultipleConfigurations := false
 	if cfg != nil {
 		var patchedResult model_core.PatchedMessage[*model_analysis_pb.UserDefinedTransition_Value_Success, TMetadata]
@@ -955,7 +955,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 				// Perform select() without a configuration.
 				valueParts, _, err := getAttrValueParts(
 					e,
-					model_core.NewSimpleMessage[TReference]((*model_core_pb.Reference)(nil)),
+					model_core.NewSimpleMessage[TReference]((*model_core_pb.DecodableReference)(nil)),
 					targetPackage,
 					model_core.Nested(ruleDefinition, namedAttr),
 					model_core.Nested(targetValue, publicAttrValue),
@@ -1452,7 +1452,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 			btree.NewObjectCreatingNodeMerger(
 				c.getValueObjectEncoder(),
 				c.getReferenceFormat(),
-				/* parentNodeComputer = */ func(createdObject model_core.CreatedObject[TMetadata], childNodes []*model_analysis_pb.ConfiguredTarget_Value_Output) (model_core.PatchedMessage[*model_analysis_pb.ConfiguredTarget_Value_Output, TMetadata], error) {
+				/* parentNodeComputer = */ func(createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]], childNodes []*model_analysis_pb.ConfiguredTarget_Value_Output) (model_core.PatchedMessage[*model_analysis_pb.ConfiguredTarget_Value_Output, TMetadata], error) {
 					var firstPackageRelativePath string
 					switch firstElement := childNodes[0].Level.(type) {
 					case *model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_:
@@ -1465,10 +1465,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 						&model_analysis_pb.ConfiguredTarget_Value_Output{
 							Level: &model_analysis_pb.ConfiguredTarget_Value_Output_Parent_{
 								Parent: &model_analysis_pb.ConfiguredTarget_Value_Output_Parent{
-									Reference: patcher.AddReference(
-										createdObject.Contents.GetReference(),
-										e.CaptureCreatedObject(createdObject),
-									),
+									Reference:                patcher.CaptureAndAddDecodableReference(createdObject, e),
 									FirstPackageRelativePath: firstPackageRelativePath,
 								},
 							},
@@ -1508,7 +1505,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 			btree.NewObjectCreatingNodeMerger(
 				c.getValueObjectEncoder(),
 				c.getReferenceFormat(),
-				/* parentNodeComputer = */ func(createdObject model_core.CreatedObject[TMetadata], childNodes []*model_analysis_pb.ConfiguredTarget_Value_Action) (model_core.PatchedMessage[*model_analysis_pb.ConfiguredTarget_Value_Action, TMetadata], error) {
+				/* parentNodeComputer = */ func(createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]], childNodes []*model_analysis_pb.ConfiguredTarget_Value_Action) (model_core.PatchedMessage[*model_analysis_pb.ConfiguredTarget_Value_Action, TMetadata], error) {
 					var firstID []byte
 					switch firstElement := childNodes[0].Level.(type) {
 					case *model_analysis_pb.ConfiguredTarget_Value_Action_Leaf_:
@@ -1521,11 +1518,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 						&model_analysis_pb.ConfiguredTarget_Value_Action{
 							Level: &model_analysis_pb.ConfiguredTarget_Value_Action_Parent_{
 								Parent: &model_analysis_pb.ConfiguredTarget_Value_Action_Parent{
-									Reference: patcher.AddReference(
-										createdObject.Contents.GetReference(),
-										e.CaptureCreatedObject(createdObject),
-									),
-									FirstId: firstID,
+									Reference: patcher.CaptureAndAddDecodableReference(createdObject, e),
+									FirstId:   firstID,
 								},
 							},
 						},
@@ -1670,7 +1664,7 @@ type ruleContext[TReference object.BasicReference, TMetadata BaseComputerReferen
 	environment                 ConfiguredTargetEnvironment[TReference, TMetadata]
 	ruleIdentifier              label.CanonicalStarlarkIdentifier
 	targetLabel                 label.CanonicalLabel
-	configurationReference      model_core.Message[*model_core_pb.Reference, TReference]
+	configurationReference      model_core.Message[*model_core_pb.DecodableReference, TReference]
 	ruleDefinition              model_core.Message[*model_starlark_pb.Rule_Definition, TReference]
 	ruleTarget                  model_core.Message[*model_starlark_pb.RuleTarget, TReference]
 	attr                        starlark.Value
@@ -1732,7 +1726,7 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 				rc.context,
 				rc.computer.buildSettingOverrideReader,
 				getBuildSettingOverridesFromReference(rc.configurationReference),
-				func(entry *model_analysis_pb.BuildSettingOverride) (int, *model_core_pb.Reference) {
+				func(entry *model_analysis_pb.BuildSettingOverride) (int, *model_core_pb.DecodableReference) {
 					switch level := entry.Level.(type) {
 					case *model_analysis_pb.BuildSettingOverride_Leaf_:
 						return strings.Compare(targetLabelStr, level.Leaf.Label), nil
@@ -2535,15 +2529,15 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 		btree.NewObjectCreatingNodeMerger(
 			valueEncodingOptions.ObjectEncoder,
 			valueEncodingOptions.ObjectReferenceFormat,
-			func(createdObject model_core.CreatedObject[TMetadata], childNodes []*model_analysis_pb.Args) (model_core.PatchedMessage[*model_analysis_pb.Args, TMetadata], error) {
+			func(createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]], childNodes []*model_analysis_pb.Args) (model_core.PatchedMessage[*model_analysis_pb.Args, TMetadata], error) {
 				patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
 				return model_core.NewPatchedMessage(
 					&model_analysis_pb.Args{
 						Level: &model_analysis_pb.Args_Parent_{
 							Parent: &model_analysis_pb.Args_Parent{
-								Reference: patcher.AddReference(
-									createdObject.Contents.GetReference(),
-									valueEncodingOptions.ObjectCapturer.CaptureCreatedObject(createdObject),
+								Reference: patcher.CaptureAndAddDecodableReference(
+									createdObject,
+									valueEncodingOptions.ObjectCapturer,
 								),
 							},
 						},
@@ -3127,7 +3121,7 @@ type getProviderFromConfiguredTargetEnvironment[TReference any] interface {
 
 // getProviderFromConfiguredTarget looks up a single provider that is
 // provided by a configured target.
-func getProviderFromConfiguredTarget[TReference any, TMetadata model_core.WalkableReferenceMetadata](e getProviderFromConfiguredTargetEnvironment[TReference], targetLabel string, configurationReference model_core.PatchedMessage[*model_core_pb.Reference, TMetadata], providerIdentifier label.CanonicalStarlarkIdentifier) (model_core.Message[*model_starlark_pb.Struct_Fields, TReference], error) {
+func getProviderFromConfiguredTarget[TReference any, TMetadata model_core.WalkableReferenceMetadata](e getProviderFromConfiguredTargetEnvironment[TReference], targetLabel string, configurationReference model_core.PatchedMessage[*model_core_pb.DecodableReference, TMetadata], providerIdentifier label.CanonicalStarlarkIdentifier) (model_core.Message[*model_starlark_pb.Struct_Fields, TReference], error) {
 	configuredTargetValue := e.GetConfiguredTargetValue(
 		model_core.NewPatchedMessage(
 			&model_analysis_pb.ConfiguredTarget_Key{
@@ -3163,7 +3157,7 @@ func getProviderFromVisibleConfiguredTarget[TReference any, TConfigurationRefere
 	e getProviderFromVisibleConfiguredTargetEnvironment[TReference],
 	fromPackage string,
 	targetLabel string,
-	configurationReference model_core.Message[*model_core_pb.Reference, TConfigurationReference],
+	configurationReference model_core.Message[*model_core_pb.DecodableReference, TConfigurationReference],
 	configurationObjectCapturer model_core.ExistingObjectCapturer[TConfigurationReference, TMetadata],
 	providerIdentifier label.CanonicalStarlarkIdentifier,
 ) (model_core.Message[*model_starlark_pb.Struct_Fields, TReference], string, error) {
@@ -3289,15 +3283,15 @@ func (a *args[TReference, TMetadata]) Encode(path map[starlark.Value]struct{}, o
 		btree.NewObjectCreatingNodeMerger(
 			options.ObjectEncoder,
 			options.ObjectReferenceFormat,
-			func(createdObject model_core.CreatedObject[TMetadata], childNodes []*model_analysis_pb.Args_Leaf_Add) (model_core.PatchedMessage[*model_analysis_pb.Args_Leaf_Add, TMetadata], error) {
+			func(createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]], childNodes []*model_analysis_pb.Args_Leaf_Add) (model_core.PatchedMessage[*model_analysis_pb.Args_Leaf_Add, TMetadata], error) {
 				patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
 				return model_core.NewPatchedMessage(
 					&model_analysis_pb.Args_Leaf_Add{
 						Level: &model_analysis_pb.Args_Leaf_Add_Parent_{
 							Parent: &model_analysis_pb.Args_Leaf_Add_Parent{
-								Reference: patcher.AddReference(
-									createdObject.Contents.GetReference(),
-									options.ObjectCapturer.CaptureCreatedObject(createdObject),
+								Reference: patcher.CaptureAndAddDecodableReference(
+									createdObject,
+									options.ObjectCapturer,
 								),
 							},
 						},

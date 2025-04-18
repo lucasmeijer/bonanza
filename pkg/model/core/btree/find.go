@@ -20,13 +20,13 @@ func Find[
 	TReference any,
 ](
 	ctx context.Context,
-	reader model_parser.ParsedObjectReader[TReference, model_core.Message[[]TMessagePtr, TReference]],
+	reader model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[[]TMessagePtr, TReference]],
 	list model_core.Message[[]TMessagePtr, TReference],
-	cmp func(TMessagePtr) (int, *model_core_pb.Reference),
+	cmp func(TMessagePtr) (int, *model_core_pb.DecodableReference),
 ) (model_core.Message[TMessagePtr, TReference], error) {
 	for {
 		low, high := 0, len(list.Message)
-		var childReference *model_core_pb.Reference
+		var childReference *model_core_pb.DecodableReference
 		for low < high {
 			index := int(uint(low+high) >> 1)
 			r, reference := cmp(list.Message[index])

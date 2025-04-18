@@ -14,7 +14,7 @@ import (
 
 func AllDictLeafEntries[TReference any](
 	ctx context.Context,
-	reader model_parser.ParsedObjectReader[TReference, model_core.Message[[]*model_starlark_pb.Dict_Entry, TReference]],
+	reader model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[[]*model_starlark_pb.Dict_Entry, TReference]],
 	rootDict model_core.Message[*model_starlark_pb.Dict, TReference],
 	errOut *error,
 ) iter.Seq2[model_core.Message[*model_starlark_pb.Value, TReference], model_core.Message[*model_starlark_pb.Value, TReference]] {
@@ -22,7 +22,7 @@ func AllDictLeafEntries[TReference any](
 		ctx,
 		reader,
 		model_core.Nested(rootDict, rootDict.Message.Entries),
-		func(entry model_core.Message[*model_starlark_pb.Dict_Entry, TReference]) (*model_core_pb.Reference, error) {
+		func(entry model_core.Message[*model_starlark_pb.Dict_Entry, TReference]) (*model_core_pb.DecodableReference, error) {
 			if parent, ok := entry.Message.Level.(*model_starlark_pb.Dict_Entry_Parent_); ok {
 				return parent.Parent.Reference, nil
 			}

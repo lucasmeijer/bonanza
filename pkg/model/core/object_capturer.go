@@ -14,6 +14,12 @@ type CreatedObjectCapturer[TMetadata any] interface {
 	CaptureCreatedObject(CreatedObject[TMetadata]) TMetadata
 }
 
+type CreatedObjectCapturerFunc[TMetadata any] func(CreatedObject[TMetadata]) TMetadata
+
+func (f CreatedObjectCapturerFunc[TMetadata]) CaptureCreatedObject(createdObject CreatedObject[TMetadata]) TMetadata {
+	return f(createdObject)
+}
+
 type walkableCreatedObjectCapturer struct{}
 
 // WalkableCreatedObjectCapturer is an implementation of ObjectCapturer

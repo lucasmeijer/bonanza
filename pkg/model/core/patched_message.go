@@ -89,13 +89,37 @@ func (m *PatchedMessage[T, TMetadata]) Discard() {
 	m.Clear()
 }
 
-// SortAndSetReferences assigns indices to outgoing references
+// SortAndSetReferences assigns indices to outgoing references.
 func (m PatchedMessage[T, TMetadata]) SortAndSetReferences() (Message[T, object.LocalReference], []TMetadata) {
 	references, metadata := m.Patcher.SortAndSetReferences()
 	return Message[T, object.LocalReference]{
 		Message:            m.Message,
 		OutgoingReferences: references,
 	}, metadata
+}
+
+func encode[TMetadata ReferenceMetadata](
+	data []byte,
+	references []object.LocalReference,
+	metadata []TMetadata,
+	referenceFormat object.ReferenceFormat,
+	encoder model_encoding.BinaryEncoder,
+) (Decodable[CreatedObject[TMetadata]], error) {
+	encodedData, decodingParameters, err := encoder.EncodeBinary(data)
+	if err != nil {
+		return Decodable[CreatedObject[TMetadata]]{}, err
+	}
+	contents, err := referenceFormat.NewContents(references, encodedData)
+	if err != nil {
+		return Decodable[CreatedObject[TMetadata]]{}, err
+	}
+	return NewDecodable(
+		CreatedObject[TMetadata]{
+			Contents: contents,
+			Metadata: metadata,
+		},
+		decodingParameters,
+	), nil
 }
 
 var marshalOptions = proto.MarshalOptions{
@@ -109,24 +133,13 @@ func MarshalAndEncodePatchedMessage[TMessage proto.Message, TMetadata ReferenceM
 	m PatchedMessage[TMessage, TMetadata],
 	referenceFormat object.ReferenceFormat,
 	encoder model_encoding.BinaryEncoder,
-) (CreatedObject[TMetadata], error) {
+) (Decodable[CreatedObject[TMetadata]], error) {
 	references, metadata := m.Patcher.SortAndSetReferences()
 	data, err := marshalOptions.Marshal(m.Message)
 	if err != nil {
-		return CreatedObject[TMetadata]{}, err
+		return Decodable[CreatedObject[TMetadata]]{}, err
 	}
-	encodedData, err := encoder.EncodeBinary(data)
-	if err != nil {
-		return CreatedObject[TMetadata]{}, err
-	}
-	contents, err := referenceFormat.NewContents(references, encodedData)
-	if err != nil {
-		return CreatedObject[TMetadata]{}, err
-	}
-	return CreatedObject[TMetadata]{
-		Contents: contents,
-		Metadata: metadata,
-	}, nil
+	return encode(data, references, metadata, referenceFormat, encoder)
 }
 
 // MarshalAndEncodePatchedListMessage marshals a list of Protobuf
@@ -136,7 +149,7 @@ func MarshalAndEncodePatchedListMessage[TMessage proto.Message, TMetadata Refere
 	m PatchedMessage[[]TMessage, TMetadata],
 	referenceFormat object.ReferenceFormat,
 	encoder model_encoding.BinaryEncoder,
-) (CreatedObject[TMetadata], error) {
+) (Decodable[CreatedObject[TMetadata]], error) {
 	references, metadata := m.Patcher.SortAndSetReferences()
 	var data []byte
 	for _, node := range m.Message {
@@ -144,19 +157,8 @@ func MarshalAndEncodePatchedListMessage[TMessage proto.Message, TMetadata Refere
 		var err error
 		data, err = marshalOptions.MarshalAppend(data, node)
 		if err != nil {
-			return CreatedObject[TMetadata]{}, err
+			return Decodable[CreatedObject[TMetadata]]{}, err
 		}
 	}
-	encodedData, err := encoder.EncodeBinary(data)
-	if err != nil {
-		return CreatedObject[TMetadata]{}, err
-	}
-	contents, err := referenceFormat.NewContents(references, encodedData)
-	if err != nil {
-		return CreatedObject[TMetadata]{}, err
-	}
-	return CreatedObject[TMetadata]{
-		Contents: contents,
-		Metadata: metadata,
-	}, nil
+	return encode(data, references, metadata, referenceFormat, encoder)
 }

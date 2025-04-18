@@ -201,6 +201,10 @@ func (r *referenceWrappingParsedObjectReader) ReadParsedObject(ctx context.Conte
 	return model_core.NewMessage(m.Message, outgoingReferences), nil
 }
 
+func (r *referenceWrappingParsedObjectReader) GetDecodingParametersSizeBytes() int {
+	return 0
+}
+
 type builderReference struct {
 	object.LocalReference
 	embeddedMetadata builderReferenceMetadata
@@ -278,7 +282,7 @@ func (e *builderExecutor) Execute(ctx context.Context, action *model_build_pb.Ac
 		}, 0, remoteworker_pb.CurrentState_Completed_FAILED
 	}
 	instanceName := namespace.InstanceName
-	buildSpecificationReference, err := namespace.NewLocalReference(action.BuildSpecificationReference)
+	buildSpecificationReference, err := model_core.NewDecodableLocalReferenceFromWeakProto(namespace.ReferenceFormat, action.BuildSpecificationReference)
 	if err != nil {
 		return &model_build_pb.Result{
 			Status: status.Convert(util.StatusWrap(err, "Invalid build specification reference")).Proto(),
@@ -304,9 +308,12 @@ func (e *builderExecutor) Execute(ctx context.Context, action *model_build_pb.Ac
 					),
 				},
 			),
-			builderReference{
-				LocalReference: buildSpecificationReference,
-			},
+			model_core.CopyDecodable(
+				buildSpecificationReference,
+				builderReference{
+					LocalReference: buildSpecificationReference.Value,
+				},
+			),
 			buildSpecificationEncoder,
 			e.httpClient,
 			e.filePool,

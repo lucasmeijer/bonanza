@@ -24,7 +24,7 @@ type getTargetPlatformInfoProviderEnvironment[TReference any, TMetadata any] int
 
 func getTargetPlatformInfoProvider[TReference object.BasicReference, TMetadata BaseComputerReferenceMetadata](
 	e getTargetPlatformInfoProviderEnvironment[TReference, TMetadata],
-	configurationReference model_core.Message[*model_core_pb.Reference, TReference],
+	configurationReference model_core.Message[*model_core_pb.DecodableReference, TReference],
 ) (model_core.Message[*model_starlark_pb.Struct_Fields, TReference], error) {
 	platformsLabelStr := commandLineOptionPlatformsLabel.String()
 	platformInfoProvider, _, err := getProviderFromVisibleConfiguredTarget(

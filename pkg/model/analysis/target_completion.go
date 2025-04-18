@@ -40,7 +40,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetCompletionValue(ctx c
 		ctx,
 		c.valueReaders.List,
 		model_core.Nested(files, filesDepset.Depset.Elements),
-		map[object.LocalReference]struct{}{},
+		map[model_core.Decodable[object.LocalReference]]struct{}{},
 		&errIter,
 	) {
 		elementFile, ok := element.Message.Kind.(*model_starlark_pb.Value_File)

@@ -94,13 +94,13 @@ func (c *baseComputer[TReference, TMetadata]) ComputeStableInputRootPathValue(ct
 			&model_analysis_pb.SuccessfulActionResult_Key{
 				Action: &model_analysis_pb.Action{
 					PlatformPkixPublicKey: repoPlatform.Message.ExecPkixPublicKey,
-					CommandReference: keyPatcher.AddReference(
-						createdCommand.Contents.GetReference(),
-						dag.NewSimpleObjectContentsWalker(createdCommand.Contents, createdCommand.Metadata),
+					CommandReference: keyPatcher.CaptureAndAddDecodableReference(
+						createdCommand,
+						model_core.WalkableCreatedObjectCapturer,
 					),
-					InputRootReference: keyPatcher.AddReference(
-						createdInputRoot.Contents.GetReference(),
-						dag.NewSimpleObjectContentsWalker(createdInputRoot.Contents, createdInputRoot.Metadata),
+					InputRootReference: keyPatcher.CaptureAndAddDecodableReference(
+						createdInputRoot,
+						model_core.WalkableCreatedObjectCapturer,
 					),
 					ExecutionTimeout: &durationpb.Duration{Seconds: 60},
 				},

@@ -7,13 +7,13 @@ import (
 )
 
 type statelessHandleAllocatingFileFactory struct {
-	base            FileFactory
+	FileFactory
 	handleAllocator virtual.StatelessHandleAllocator
 }
 
 func NewStatelessHandleAllocatingFileFactory(base FileFactory, handleAllocation virtual.StatelessHandleAllocation) FileFactory {
 	return &statelessHandleAllocatingFileFactory{
-		base:            base,
+		FileFactory:     base,
 		handleAllocator: handleAllocation.AsStatelessAllocator(),
 	}
 }
@@ -21,5 +21,5 @@ func NewStatelessHandleAllocatingFileFactory(base FileFactory, handleAllocation 
 func (ff *statelessHandleAllocatingFileFactory) LookupFile(fileContents model_filesystem.FileContentsEntry[object.LocalReference], isExecutable bool) virtual.LinkableLeaf {
 	return ff.handleAllocator.
 		New(computeFileID(fileContents, isExecutable)).
-		AsLinkableLeaf(ff.base.LookupFile(fileContents, isExecutable))
+		AsLinkableLeaf(ff.FileFactory.LookupFile(fileContents, isExecutable))
 }

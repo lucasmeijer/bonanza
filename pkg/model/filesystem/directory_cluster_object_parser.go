@@ -40,7 +40,11 @@ func NewDirectoryClusterObjectParser[TReference any]() model_parser.ObjectParser
 	return &directoryClusterObjectParser[TReference]{}
 }
 
-func (p *directoryClusterObjectParser[TReference]) ParseObject(in model_core.Message[[]byte, TReference]) (model_core.Message[DirectoryCluster, TReference], int, error) {
+func (p *directoryClusterObjectParser[TReference]) ParseObject(in model_core.Message[[]byte, TReference], decodingParameters []byte) (model_core.Message[DirectoryCluster, TReference], int, error) {
+	if len(decodingParameters) > 0 {
+		return model_core.Message[DirectoryCluster, TReference]{}, 0, status.Error(codes.InvalidArgument, "Unexpected decoding parameters")
+	}
+
 	var d model_filesystem_pb.Directory
 	if err := proto.Unmarshal(in.Message, &d); err != nil {
 		return model_core.Message[DirectoryCluster, TReference]{}, 0, util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to parse directory")
@@ -59,6 +63,10 @@ func (p *directoryClusterObjectParser[TReference]) ParseObject(in model_core.Mes
 		return model_core.Message[DirectoryCluster, TReference]{}, 0, err
 	}
 	return model_core.Nested(in, cluster), len(in.Message), nil
+}
+
+func (p *directoryClusterObjectParser[TReference]) GetDecodingParametersSizeBytes() int {
+	return 0
 }
 
 func addDirectoriesToCluster[TReference any](c *DirectoryCluster, d model_core.Message[*model_filesystem_pb.Directory, TReference], dTrace *path.Trace) (int, error) {

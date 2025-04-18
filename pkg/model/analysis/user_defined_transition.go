@@ -149,7 +149,7 @@ func getExpectedTransitionOutput[TReference object.BasicReference, TMetadata mod
 	}, nil
 }
 
-func getBuildSettingOverridesFromReference[TReference any](configurationReference model_core.Message[*model_core_pb.Reference, TReference]) model_core.Message[[]*model_analysis_pb.BuildSettingOverride, TReference] {
+func getBuildSettingOverridesFromReference[TReference any](configurationReference model_core.Message[*model_core_pb.DecodableReference, TReference]) model_core.Message[[]*model_analysis_pb.BuildSettingOverride, TReference] {
 	if configurationReference.Message == nil {
 		return model_core.Nested(configurationReference, ([]*model_analysis_pb.BuildSettingOverride)(nil))
 	}
@@ -165,14 +165,14 @@ func getBuildSettingOverridesFromReference[TReference any](configurationReferenc
 func (c *baseComputer[TReference, TMetadata]) applyTransition(
 	ctx context.Context,
 	e model_core.ObjectCapturer[TReference, TMetadata],
-	configurationReference model_core.Message[*model_core_pb.Reference, TReference],
+	configurationReference model_core.Message[*model_core_pb.DecodableReference, TReference],
 	expectedOutputs []expectedTransitionOutput[TReference],
 	thread *starlark.Thread,
 	outputs map[string]starlark.Value,
 	valueEncodingOptions *model_starlark.ValueEncodingOptions[TReference, TMetadata],
-) (model_core.PatchedMessage[*model_core_pb.Reference, TMetadata], error) {
+) (model_core.PatchedMessage[*model_core_pb.DecodableReference, TMetadata], error) {
 	if len(outputs) != len(expectedOutputs) {
-		return model_core.PatchedMessage[*model_core_pb.Reference, TMetadata]{}, fmt.Errorf("output dictionary contains %d keys, while the transition's definition only has %d outputs", len(outputs), len(expectedOutputs))
+		return model_core.PatchedMessage[*model_core_pb.DecodableReference, TMetadata]{}, fmt.Errorf("output dictionary contains %d keys, while the transition's definition only has %d outputs", len(outputs), len(expectedOutputs))
 	}
 
 	var errIter error
@@ -180,7 +180,7 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 		ctx,
 		c.buildSettingOverrideReader,
 		getBuildSettingOverridesFromReference(configurationReference),
-		func(override model_core.Message[*model_analysis_pb.BuildSettingOverride, TReference]) (*model_core_pb.Reference, error) {
+		func(override model_core.Message[*model_analysis_pb.BuildSettingOverride, TReference]) (*model_core_pb.DecodableReference, error) {
 			if level, ok := override.Message.Level.(*model_analysis_pb.BuildSettingOverride_Parent_); ok {
 				return level.Parent.Reference, nil
 			}
@@ -197,7 +197,7 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 		btree.NewObjectCreatingNodeMerger(
 			c.getValueObjectEncoder(),
 			c.getReferenceFormat(),
-			/* parentNodeComputer = */ func(createdObject model_core.CreatedObject[TMetadata], childNodes []*model_analysis_pb.BuildSettingOverride) (model_core.PatchedMessage[*model_analysis_pb.BuildSettingOverride, TMetadata], error) {
+			/* parentNodeComputer = */ func(createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]], childNodes []*model_analysis_pb.BuildSettingOverride) (model_core.PatchedMessage[*model_analysis_pb.BuildSettingOverride, TMetadata], error) {
 				var firstLabel string
 				switch firstEntry := childNodes[0].Level.(type) {
 				case *model_analysis_pb.BuildSettingOverride_Leaf_:
@@ -210,10 +210,7 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 					&model_analysis_pb.BuildSettingOverride{
 						Level: &model_analysis_pb.BuildSettingOverride_Parent_{
 							Parent: &model_analysis_pb.BuildSettingOverride_Parent{
-								Reference: patcher.AddReference(
-									createdObject.Contents.GetReference(),
-									e.CaptureCreatedObject(createdObject),
-								),
+								Reference:  patcher.CaptureAndAddDecodableReference(createdObject, e),
 								FirstLabel: firstLabel,
 							},
 						},
@@ -234,7 +231,7 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 		} else {
 			level, ok := existingOverride.Message.Level.(*model_analysis_pb.BuildSettingOverride_Leaf_)
 			if !ok {
-				return model_core.PatchedMessage[*model_core_pb.Reference, TMetadata]{}, errors.New("build setting override is not a valid leaf")
+				return model_core.PatchedMessage[*model_core_pb.DecodableReference, TMetadata]{}, errors.New("build setting override is not a valid leaf")
 			}
 			cmp = strings.Compare(level.Leaf.Label, expectedOutputs[0].label)
 		}
@@ -248,11 +245,11 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 			expectedOutputs = expectedOutputs[1:]
 			literalValue, ok := outputs[expectedOutput.key]
 			if !ok {
-				return model_core.PatchedMessage[*model_core_pb.Reference, TMetadata]{}, fmt.Errorf("no value for output %#v has been provided", expectedOutput.label)
+				return model_core.PatchedMessage[*model_core_pb.DecodableReference, TMetadata]{}, fmt.Errorf("no value for output %#v has been provided", expectedOutput.label)
 			}
 			canonicalizedValue, err := expectedOutput.canonicalizer.Canonicalize(thread, literalValue)
 			if err != nil {
-				return model_core.PatchedMessage[*model_core_pb.Reference, TMetadata]{}, fmt.Errorf("failed to canonicalize output %#v: %w", expectedOutput.label, err)
+				return model_core.PatchedMessage[*model_core_pb.DecodableReference, TMetadata]{}, fmt.Errorf("failed to canonicalize output %#v: %w", expectedOutput.label, err)
 			}
 			encodedValue, _, err := model_starlark.EncodeValue(
 				canonicalizedValue,
@@ -261,7 +258,7 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 				valueEncodingOptions,
 			)
 			if err != nil {
-				return model_core.PatchedMessage[*model_core_pb.Reference, TMetadata]{}, fmt.Errorf("failed to encode \"build_setting_default\": %w", err)
+				return model_core.PatchedMessage[*model_core_pb.DecodableReference, TMetadata]{}, fmt.Errorf("failed to encode \"build_setting_default\": %w", err)
 			}
 
 			// Only store the build setting override if its
@@ -289,14 +286,14 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 		}
 	}
 	if errIter != nil {
-		return model_core.PatchedMessage[*model_core_pb.Reference, TMetadata]{}, errIter
+		return model_core.PatchedMessage[*model_core_pb.DecodableReference, TMetadata]{}, errIter
 	}
 	buildSettingOverrides, err := treeBuilder.FinalizeList()
 	if err != nil {
-		return model_core.PatchedMessage[*model_core_pb.Reference, TMetadata]{}, fmt.Errorf("failed to finalize build setting overrides: %w", err)
+		return model_core.PatchedMessage[*model_core_pb.DecodableReference, TMetadata]{}, fmt.Errorf("failed to finalize build setting overrides: %w", err)
 	}
 	if len(buildSettingOverrides.Message) == 0 {
-		return model_core.NewSimplePatchedMessage[TMetadata, *model_core_pb.Reference](nil), nil
+		return model_core.NewSimplePatchedMessage[TMetadata, *model_core_pb.DecodableReference](nil), nil
 	}
 
 	createdConfiguration, err := model_core.MarshalAndEncodePatchedListMessage(
@@ -305,14 +302,11 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 		c.getValueObjectEncoder(),
 	)
 	if err != nil {
-		return model_core.PatchedMessage[*model_core_pb.Reference, TMetadata]{}, fmt.Errorf("failed to marshal configuration: %w", err)
+		return model_core.PatchedMessage[*model_core_pb.DecodableReference, TMetadata]{}, fmt.Errorf("failed to marshal configuration: %w", err)
 	}
 	configurationReferencePatcher := model_core.NewReferenceMessagePatcher[TMetadata]()
 	return model_core.NewPatchedMessage(
-		configurationReferencePatcher.AddReference(
-			createdConfiguration.Contents.GetReference(),
-			e.CaptureCreatedObject(createdConfiguration),
-		),
+		configurationReferencePatcher.CaptureAndAddDecodableReference(createdConfiguration, e),
 		configurationReferencePatcher,
 	), nil
 }
@@ -326,7 +320,7 @@ type getBuildSettingValueEnvironment[TReference any, TMetadata any] interface {
 
 var featureFlagInfoProviderIdentifier = label.MustNewCanonicalStarlarkIdentifier("@@builtins_core+//:exports.bzl%FeatureFlagInfo")
 
-func (c *baseComputer[TReference, TMetadata]) getBuildSettingValue(ctx context.Context, e getBuildSettingValueEnvironment[TReference, TMetadata], fromPackage label.CanonicalPackage, buildSettingLabel string, configurationReference model_core.Message[*model_core_pb.Reference, TReference]) (model_core.Message[*model_starlark_pb.Value, TReference], error) {
+func (c *baseComputer[TReference, TMetadata]) getBuildSettingValue(ctx context.Context, e getBuildSettingValueEnvironment[TReference, TMetadata], fromPackage label.CanonicalPackage, buildSettingLabel string, configurationReference model_core.Message[*model_core_pb.DecodableReference, TReference]) (model_core.Message[*model_starlark_pb.Value, TReference], error) {
 	patchedConfigurationReference := model_core.Patch(e, configurationReference)
 	visibleTargetValue := e.GetVisibleTargetValue(
 		model_core.NewPatchedMessage(
@@ -349,7 +343,7 @@ func (c *baseComputer[TReference, TMetadata]) getBuildSettingValue(ctx context.C
 		ctx,
 		c.buildSettingOverrideReader,
 		getBuildSettingOverridesFromReference(configurationReference),
-		func(entry *model_analysis_pb.BuildSettingOverride) (int, *model_core_pb.Reference) {
+		func(entry *model_analysis_pb.BuildSettingOverride) (int, *model_core_pb.DecodableReference) {
 			switch level := entry.Level.(type) {
 			case *model_analysis_pb.BuildSettingOverride_Leaf_:
 				return strings.Compare(visibleBuildSettingLabel, level.Leaf.Label), nil
@@ -468,7 +462,7 @@ type performUserDefinedTransitionEnvironment[TReference, TMetadata any] interfac
 	GetCompiledBzlFileGlobalValue(*model_analysis_pb.CompiledBzlFileGlobal_Key) model_core.Message[*model_analysis_pb.CompiledBzlFileGlobal_Value, TReference]
 }
 
-func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx context.Context, e performUserDefinedTransitionEnvironment[TReference, TMetadata], thread *starlark.Thread, transitionIdentifierStr string, configurationReference model_core.Message[*model_core_pb.Reference, TReference], attrParameter starlark.Value) ([]expectedTransitionOutput[TReference], map[string]map[string]starlark.Value, error) {
+func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx context.Context, e performUserDefinedTransitionEnvironment[TReference, TMetadata], thread *starlark.Thread, transitionIdentifierStr string, configurationReference model_core.Message[*model_core_pb.DecodableReference, TReference], attrParameter starlark.Value) ([]expectedTransitionOutput[TReference], map[string]map[string]starlark.Value, error) {
 	transitionIdentifier, err := label.NewCanonicalStarlarkIdentifier(transitionIdentifierStr)
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid transition identifier: %w", err)
@@ -653,7 +647,7 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx c
 
 type performAndApplyUserDefinedTransitionResult[TMetadata model_core.ReferenceMetadata] = model_core.PatchedMessage[*model_analysis_pb.UserDefinedTransition_Value_Success, TMetadata]
 
-func (c *baseComputer[TReference, TMetadata]) performAndApplyUserDefinedTransition(ctx context.Context, e performUserDefinedTransitionEnvironment[TReference, TMetadata], transitionIdentifierStr string, configurationReference model_core.Message[*model_core_pb.Reference, TReference], attrParameter starlark.Value) (performAndApplyUserDefinedTransitionResult[TMetadata], error) {
+func (c *baseComputer[TReference, TMetadata]) performAndApplyUserDefinedTransition(ctx context.Context, e performUserDefinedTransitionEnvironment[TReference, TMetadata], transitionIdentifierStr string, configurationReference model_core.Message[*model_core_pb.DecodableReference, TReference], attrParameter starlark.Value) (performAndApplyUserDefinedTransitionResult[TMetadata], error) {
 	allBuiltinsModulesNames := e.GetBuiltinsModuleNamesValue(&model_analysis_pb.BuiltinsModuleNames_Key{})
 	if !allBuiltinsModulesNames.IsSet() {
 		return performAndApplyUserDefinedTransitionResult[TMetadata]{}, evaluation.ErrMissingDependency
@@ -704,7 +698,7 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransitionCached
 	ctx context.Context,
 	e performUserDefinedTransitionCachedEnvironment[TReference, TMetadata],
 	transitionIdentifierStr string,
-	configurationReference model_core.Message[*model_core_pb.Reference, TReference],
+	configurationReference model_core.Message[*model_core_pb.DecodableReference, TReference],
 	attrParameter starlark.Value,
 ) (performAndApplyUserDefinedTransitionResult[TMetadata], error) {
 	// First attempt to call into the UserDefinedTransition
@@ -752,7 +746,7 @@ func (c *baseComputer[TReference, TMetadata]) performTransition(
 	ctx context.Context,
 	e performTransitionEnvironment[TReference, TMetadata],
 	transitionReference *model_starlark_pb.Transition_Reference,
-	configurationReference model_core.Message[*model_core_pb.Reference, TReference],
+	configurationReference model_core.Message[*model_core_pb.DecodableReference, TReference],
 	attrParameter starlark.Value,
 	execGroupPlatformLabels map[string]string,
 ) (performAndApplyUserDefinedTransitionResult[TMetadata], bool, error) {

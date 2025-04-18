@@ -8,6 +8,7 @@ proto_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/proto/configuration/model/parser:bonanza_configuration_model_parser_proto",
+        "//pkg/proto/model/core:core_proto",
         "//pkg/proto/model/encoding:encoding_proto",
         "//pkg/proto/storage/object:object_proto",
         "@com_github_buildbarn_bb_remote_execution//pkg/proto/configuration/filesystem/virtual:virtual_proto",
@@ -24,6 +25,7 @@ go_proto_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/proto/configuration/model/parser",
+        "//pkg/proto/model/core",
         "//pkg/proto/model/encoding",
         "//pkg/proto/storage/object",
         "@com_github_buildbarn_bb_remote_execution//pkg/proto/configuration/filesystem/virtual",

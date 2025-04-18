@@ -32,6 +32,7 @@ import (
 	model_starlark "github.com/buildbarn/bonanza/pkg/model/starlark"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
 	model_command_pb "github.com/buildbarn/bonanza/pkg/proto/model/command"
+	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
 	model_filesystem_pb "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
 	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
 	"github.com/buildbarn/bonanza/pkg/search"
@@ -320,8 +321,8 @@ func (d *changeTrackingDirectory[TReference, TMetadata]) setSymlink(loadOptions 
 
 type changeTrackingDirectoryLoadOptions[TReference any] struct {
 	context         context.Context
-	directoryReader model_parser.ParsedObjectReader[TReference, model_core.Message[*model_filesystem_pb.Directory, TReference]]
-	leavesReader    model_parser.ParsedObjectReader[TReference, model_core.Message[*model_filesystem_pb.Leaves, TReference]]
+	directoryReader model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_filesystem_pb.Directory, TReference]]
+	leavesReader    model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_filesystem_pb.Leaves, TReference]]
 }
 
 func (d *changeTrackingDirectory[TReference, TMetadata]) maybeLoadContents(options *changeTrackingDirectoryLoadOptions[TReference]) error {
@@ -446,7 +447,7 @@ func (r *changeTrackingDirectoryResolver[TReference, TMetadata]) OnUp() (path.Co
 
 type capturableChangeTrackingDirectoryOptions[TReference, TMetadata any] struct {
 	context                context.Context
-	directoryReader        model_parser.ParsedObjectReader[TReference, model_core.Message[*model_filesystem_pb.Directory, TReference]]
+	directoryReader        model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_filesystem_pb.Directory, TReference]]
 	fileCreationParameters *model_filesystem.FileCreationParameters
 	fileMerkleTreeCapturer model_filesystem.FileMerkleTreeCapturer[TMetadata]
 	patchedFiles           io.ReaderAt
@@ -1633,15 +1634,12 @@ func newArgumentsBuilder[TMetadata model_core.ReferenceMetadata](commandEncoder 
 		btree.NewObjectCreatingNodeMerger(
 			commandEncoder,
 			referenceFormat,
-			/* parentNodeComputer = */ func(createdObject model_core.CreatedObject[TMetadata], childNodes []*model_command_pb.ArgumentList_Element) (model_core.PatchedMessage[*model_command_pb.ArgumentList_Element, TMetadata], error) {
+			/* parentNodeComputer = */ func(createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]], childNodes []*model_command_pb.ArgumentList_Element) (model_core.PatchedMessage[*model_command_pb.ArgumentList_Element, TMetadata], error) {
 				patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
 				return model_core.NewPatchedMessage(
 					&model_command_pb.ArgumentList_Element{
 						Level: &model_command_pb.ArgumentList_Element_Parent{
-							Parent: patcher.AddReference(
-								createdObject.Contents.GetReference(),
-								objectCapturer.CaptureCreatedObject(createdObject),
-							),
+							Parent: patcher.CaptureAndAddDecodableReference(createdObject, objectCapturer),
 						},
 					},
 					patcher,
@@ -1808,9 +1806,9 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 			&model_analysis_pb.ActionResult_Key{
 				Action: &model_analysis_pb.Action{
 					PlatformPkixPublicKey: mrc.repoPlatform.Message.ExecPkixPublicKey,
-					CommandReference: keyPatcher.AddReference(
-						createdCommand.Contents.GetReference(),
-						dag.NewSimpleObjectContentsWalker(createdCommand.Contents, createdCommand.Metadata),
+					CommandReference: keyPatcher.CaptureAndAddDecodableReference(
+						createdCommand,
+						model_core.WalkableCreatedObjectCapturer,
 					),
 					InputRootReference: inputRootReference.Message.Reference,
 					ExecutionTimeout:   &durationpb.Duration{Seconds: timeout},
@@ -2119,9 +2117,9 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doRead(thread *star
 			&model_analysis_pb.SuccessfulActionResult_Key{
 				Action: &model_analysis_pb.Action{
 					PlatformPkixPublicKey: mrc.repoPlatform.Message.ExecPkixPublicKey,
-					CommandReference: keyPatcher.AddReference(
-						createdCommand.Contents.GetReference(),
-						dag.NewSimpleObjectContentsWalker(createdCommand.Contents, createdCommand.Metadata),
+					CommandReference: keyPatcher.CaptureAndAddDecodableReference(
+						createdCommand,
+						model_core.WalkableCreatedObjectCapturer,
 					),
 					InputRootReference: inputRootReference.Message.Reference,
 					ExecutionTimeout:   &durationpb.Duration{Seconds: 300},
@@ -2271,13 +2269,13 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doWhich(thread *sta
 			&model_analysis_pb.ActionResult_Key{
 				Action: &model_analysis_pb.Action{
 					PlatformPkixPublicKey: mrc.repoPlatform.Message.ExecPkixPublicKey,
-					CommandReference: keyPatcher.AddReference(
-						createdCommand.Contents.GetReference(),
-						dag.NewSimpleObjectContentsWalker(createdCommand.Contents, createdCommand.Metadata),
+					CommandReference: keyPatcher.CaptureAndAddDecodableReference(
+						createdCommand,
+						model_core.WalkableCreatedObjectCapturer,
 					),
-					InputRootReference: keyPatcher.AddReference(
-						createdInputRoot.Contents.GetReference(),
-						dag.NewSimpleObjectContentsWalker(createdInputRoot.Contents, createdInputRoot.Metadata),
+					InputRootReference: keyPatcher.CaptureAndAddDecodableReference(
+						createdInputRoot,
+						model_core.WalkableCreatedObjectCapturer,
 					),
 					ExecutionTimeout: &durationpb.Duration{Seconds: 60},
 				},
@@ -2440,9 +2438,9 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) Exists(p *model_sta
 			&model_analysis_pb.ActionResult_Key{
 				Action: &model_analysis_pb.Action{
 					PlatformPkixPublicKey: mrc.repoPlatform.Message.ExecPkixPublicKey,
-					CommandReference: keyPatcher.AddReference(
-						createdCommand.Contents.GetReference(),
-						dag.NewSimpleObjectContentsWalker(createdCommand.Contents, createdCommand.Metadata),
+					CommandReference: keyPatcher.CaptureAndAddDecodableReference(
+						createdCommand,
+						model_core.WalkableCreatedObjectCapturer,
 					),
 					InputRootReference: inputRootReference.Message.Reference,
 					ExecutionTimeout:   &durationpb.Duration{Seconds: 300},
@@ -2562,9 +2560,9 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) Readdir(p *model_st
 			&model_analysis_pb.SuccessfulActionResult_Key{
 				Action: &model_analysis_pb.Action{
 					PlatformPkixPublicKey: mrc.repoPlatform.Message.ExecPkixPublicKey,
-					CommandReference: keyPatcher.AddReference(
-						createdCommand.Contents.GetReference(),
-						dag.NewSimpleObjectContentsWalker(createdCommand.Contents, createdCommand.Metadata),
+					CommandReference: keyPatcher.CaptureAndAddDecodableReference(
+						createdCommand,
+						model_core.WalkableCreatedObjectCapturer,
 					),
 					InputRootReference: inputRootReference.Message.Reference,
 					ExecutionTimeout:   &durationpb.Duration{Seconds: 300},
@@ -3366,7 +3364,7 @@ func (c *baseComputer[TReference, TMetadata]) createMerkleTreeFromChangeTracking
 	if err != nil {
 		return model_core.PatchedMessage[*model_filesystem_pb.DirectoryReference, dag.ObjectContentsWalker]{}, err
 	}
-	capturedRootDirectory := fileWritingObjectCapturer.CaptureCreatedObject(createdRootDirectoryObject)
+	capturedRootDirectory := fileWritingObjectCapturer.CaptureCreatedObject(createdRootDirectoryObject.Value)
 
 	// Finalize writing of Merkle tree nodes to disk, and provide
 	// read access to the nodes, so that they can be uploaded.
@@ -3378,13 +3376,16 @@ func (c *baseComputer[TReference, TMetadata]) createMerkleTreeFromChangeTracking
 	merkleTreeNodes = nil
 
 	patcher := model_core.NewReferenceMessagePatcher[dag.ObjectContentsWalker]()
-	rootReference := createdRootDirectoryObject.Contents.GetReference()
+	rootReference := createdRootDirectoryObject.Value.Contents.GetReference()
 	return model_core.NewPatchedMessage(
 		createdRootDirectory.ToDirectoryReference(
-			patcher.AddReference(
-				rootReference,
-				objectContentsWalkerFactory.CreateObjectContentsWalker(rootReference, capturedRootDirectory),
-			),
+			&model_core_pb.DecodableReference{
+				Reference: patcher.AddReference(
+					rootReference,
+					objectContentsWalkerFactory.CreateObjectContentsWalker(rootReference, capturedRootDirectory),
+				),
+				DecodingParameters: createdRootDirectoryObject.GetDecodingParameters(),
+			},
 		),
 		patcher,
 	), nil

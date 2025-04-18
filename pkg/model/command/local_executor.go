@@ -222,7 +222,7 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 		),
 	)
 
-	commandReference, err := namespace.NewLocalReference(action.CommandReference)
+	commandReference, err := model_core.NewDecodableLocalReferenceFromWeakProto(namespace.ReferenceFormat, action.CommandReference)
 	if err != nil {
 		return &model_command_pb.Result{
 			Status: status.Convert(util.StatusWrap(err, "Invalid command reference")).Proto(),
@@ -250,7 +250,7 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 			),
 		),
 		model_core.Nested(command, command.Message.Arguments),
-		func(element model_core.Message[*model_command_pb.ArgumentList_Element, object.LocalReference]) (*model_core_pb.Reference, error) {
+		func(element model_core.Message[*model_command_pb.ArgumentList_Element, object.LocalReference]) (*model_core_pb.DecodableReference, error) {
 			if level, ok := element.Message.Level.(*model_command_pb.ArgumentList_Element_Parent); ok {
 				return level.Parent, nil
 			}
@@ -283,7 +283,7 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 			),
 		),
 		model_core.Nested(command, command.Message.EnvironmentVariables),
-		func(entry model_core.Message[*model_command_pb.EnvironmentVariableList_Element, object.LocalReference]) (*model_core_pb.Reference, error) {
+		func(entry model_core.Message[*model_command_pb.EnvironmentVariableList_Element, object.LocalReference]) (*model_core_pb.DecodableReference, error) {
 			if level, ok := entry.Message.Level.(*model_command_pb.EnvironmentVariableList_Element_Parent); ok {
 				return level.Parent, nil
 			}
@@ -347,9 +347,7 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 
 	// Create subdirectories that should be present when the command
 	// is executed, such as the input root directory.
-	//
-	// TODO: Add caching to the input root!
-	inputRootReference, err := namespace.NewLocalReference(action.InputRootReference)
+	inputRootReference, err := model_core.NewDecodableLocalReferenceFromWeakProto(namespace.ReferenceFormat, action.InputRootReference)
 	if err != nil {
 		return &model_command_pb.Result{
 			Status: status.Convert(util.StatusWrap(err, "Invalid input root reference")).Proto(),
@@ -558,7 +556,7 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 			namespace.ReferenceFormat,
 			directoryEncoder,
 		); err == nil {
-			outputsReference := createdObject.Contents.GetReference()
+			outputsReference := createdObject.Value.Contents.GetReference()
 			if err := dag.UploadDAG(
 				ctx,
 				e.dagUploaderClient,
@@ -566,11 +564,16 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 					LocalReference: outputsReference,
 					InstanceName:   namespace.InstanceName,
 				},
-				dag.NewSimpleObjectContentsWalker(createdObject.Contents, createdObject.Metadata),
+				dag.NewSimpleObjectContentsWalker(
+					createdObject.Value.Contents,
+					createdObject.Value.Metadata,
+				),
 				e.objectContentsWalkerSemaphore,
 				object.Unlimited,
 			); err == nil {
-				resultMessage.OutputsReference = outputsReference.GetRawReference()
+				resultMessage.OutputsReference = model_core.DecodableLocalReferenceToWeakProto(
+					model_core.CopyDecodable(createdObject, outputsReference),
+				)
 			} else {
 				setError(util.StatusWrap(err, "Failed to upload outputs"))
 			}

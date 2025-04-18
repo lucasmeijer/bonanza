@@ -13,15 +13,16 @@ func TestLZWCompressingBinaryEncoder(t *testing.T) {
 
 	t.Run("EncodeBinary", func(t *testing.T) {
 		t.Run("Empty", func(t *testing.T) {
-			encodedData, err := binaryEncoder.EncodeBinary(nil)
+			encodedData, decodingState, err := binaryEncoder.EncodeBinary(nil)
 			require.NoError(t, err)
 			require.Empty(t, encodedData)
+			require.Empty(t, decodingState)
 		})
 	})
 
 	t.Run("DecodeBinary", func(t *testing.T) {
 		t.Run("Empty", func(t *testing.T) {
-			decodedData, err := binaryEncoder.DecodeBinary(nil)
+			decodedData, err := binaryEncoder.DecodeBinary(nil, nil)
 			require.NoError(t, err)
 			require.Empty(t, decodedData)
 		})
@@ -34,10 +35,11 @@ func TestLZWCompressingBinaryEncoder(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, length, n)
 
-			encoded, err := binaryEncoder.EncodeBinary(original[:length])
+			encoded, decodingState, err := binaryEncoder.EncodeBinary(original[:length])
 			require.NoError(t, err)
+			require.Empty(t, decodingState)
 
-			decoded, err := binaryEncoder.DecodeBinary(encoded)
+			decoded, err := binaryEncoder.DecodeBinary(encoded, decodingState)
 			require.NoError(t, err)
 			require.Equal(t, original[:length], decoded)
 		}

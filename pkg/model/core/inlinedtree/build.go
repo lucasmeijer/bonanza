@@ -23,7 +23,7 @@ import (
 // storing it externally.
 type ParentAppender[TParentMessage any, TMetadata model_core.ReferenceMetadata] func(
 	parent model_core.PatchedMessage[TParentMessage, TMetadata],
-	externalObject model_core.CreatedObject[TMetadata],
+	externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
 )
 
 // Candidate of data that needs to be stored in a message, but can
@@ -107,10 +107,20 @@ func Build[
 
 	// For each candidate, compute how much the size of the output
 	// message increases, either when inlined or stored externally.
-	bogusContents, err := options.ReferenceFormat.NewContents(nil, []byte("A"))
+	//
+	// TODO: Prevent these from getting recomputed every time.
+	bogusData := []byte("A")
+	bogusContents, err := options.ReferenceFormat.NewContents(nil, bogusData)
 	if err != nil {
 		panic(err)
 	}
+	bogusCreatedObject := model_core.NewDecodable(
+		model_core.CreatedObject[TMetadata]{
+			Contents: bogusContents,
+		},
+		make([]byte, options.Encoder.GetDecodingParametersSizeBytes()),
+	)
+
 	candidatesToInline := make([]bool, len(candidates))
 	queuedCandidates := queuedCandidates{
 		Slice: make(ds.Slice[queuedCandidate], 0, len(candidates)),
@@ -119,11 +129,11 @@ func Build[
 		parentInlined := model_core.PatchedMessage[TParentMessagePtr, TMetadata]{
 			Message: TParentMessagePtr(new(TParentMessage)),
 		}
-		candidate.ParentAppender(parentInlined, model_core.CreatedObject[TMetadata]{})
+		candidate.ParentAppender(parentInlined, nil)
 		inlinedSizeBytes := candidate.ExternalMessage.Patcher.GetReferencesSizeBytes() + marshalOptions.Size(parentInlined.Message)
 
 		parentExternal := model_core.NewSimplePatchedMessage[TMetadata](TParentMessagePtr(new(TParentMessage)))
-		candidate.ParentAppender(parentExternal, model_core.CreatedObject[TMetadata]{Contents: bogusContents})
+		candidate.ParentAppender(parentExternal, &bogusCreatedObject)
 		externalSizeBytes := parentExternal.Patcher.GetReferencesSizeBytes() + marshalOptions.Size(parentExternal.Message)
 		parentExternal.Discard()
 
@@ -216,7 +226,7 @@ func Build[
 		candidate := &candidates[i]
 		if candidatesToInline[i] {
 			// Inline the message into the parent.
-			candidate.ParentAppender(output, model_core.CreatedObject[TMetadata]{})
+			candidate.ParentAppender(output, nil)
 		} else {
 			// Store the message separately, and store a
 			// reference in the parent.
@@ -225,7 +235,7 @@ func Build[
 				output.Discard()
 				return model_core.PatchedMessage[TParentMessagePtr, TMetadata]{}, util.StatusWrapf(err, "Failed to create object contents for candidate at index %d", i)
 			}
-			candidate.ParentAppender(output, createdObject)
+			candidate.ParentAppender(output, &createdObject)
 			candidate.ExternalMessage.Clear()
 		}
 	}

@@ -21,9 +21,9 @@ func AllLeaves[
 	TReference any,
 ](
 	ctx context.Context,
-	reader model_parser.ParsedObjectReader[TReference, model_core.Message[[]TMessagePtr, TReference]],
+	reader model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[[]TMessagePtr, TReference]],
 	root model_core.Message[[]TMessagePtr, TReference],
-	traverser func(model_core.Message[TMessagePtr, TReference]) (*model_core_pb.Reference, error),
+	traverser func(model_core.Message[TMessagePtr, TReference]) (*model_core_pb.DecodableReference, error),
 	errOut *error,
 ) iter.Seq[model_core.Message[TMessagePtr, TReference]] {
 	lists := []model_core.Message[[]TMessagePtr, TReference]{root}

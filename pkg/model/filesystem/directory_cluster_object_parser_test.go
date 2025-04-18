@@ -20,6 +20,7 @@ func TestDirectoryClusterObjectParser(t *testing.T) {
 			model_core.NewSimpleMessage[object.LocalReference](
 				[]byte("Not a valid Protobuf message"),
 			),
+			nil,
 		)
 		testutil.RequirePrefixedStatus(t, status.Error(codes.InvalidArgument, "Failed to parse directory: "), err)
 	})

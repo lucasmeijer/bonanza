@@ -113,7 +113,7 @@ func (h *registeredToolchainExtractingModuleDotBazelHandler[TReference, TMetadat
 				declaredToolchainInfoProvider, err := getProviderFromConfiguredTarget(
 					h.environment,
 					toolchainLabelStr,
-					model_core.NewSimplePatchedMessage[model_core.WalkableReferenceMetadata, *model_core_pb.Reference](nil),
+					model_core.NewSimplePatchedMessage[model_core.WalkableReferenceMetadata, *model_core_pb.DecodableReference](nil),
 					declaredToolchainInfoProviderIdentifier,
 				)
 				if err != nil {
@@ -144,7 +144,7 @@ func (h *registeredToolchainExtractingModuleDotBazelHandler[TReference, TMetadat
 							h.context,
 							listReader,
 							model_core.Nested(value, l.List.Elements),
-							map[object.LocalReference]struct{}{},
+							map[model_core.Decodable[object.LocalReference]]struct{}{},
 							&errIter,
 						) {
 							targetSettingLabel, ok := targetSetting.Message.Kind.(*model_starlark_pb.Value_Label)
@@ -201,7 +201,7 @@ func (h *registeredToolchainExtractingModuleDotBazelHandler[TReference, TMetadat
 				for _, selectGroup := range ruleTarget.RuleTarget.TargetCompatibleWith {
 					targetCompatibleWithValue, err := getValueFromSelectGroup(
 						h.environment,
-						model_core.NewSimpleMessage[TReference]((*model_core_pb.Reference)(nil)),
+						model_core.NewSimpleMessage[TReference]((*model_core_pb.DecodableReference)(nil)),
 						toolchainLabel.GetCanonicalPackage(),
 						selectGroup,
 						/* permitNoMatch = */ false,
@@ -219,7 +219,7 @@ func (h *registeredToolchainExtractingModuleDotBazelHandler[TReference, TMetadat
 						h.context,
 						listReader,
 						model_core.Nested(targetValue, targetCompatibleWithList.List.Elements),
-						func(element model_core.Message[*model_starlark_pb.List_Element, TReference]) (*model_core_pb.Reference, error) {
+						func(element model_core.Message[*model_starlark_pb.List_Element, TReference]) (*model_core_pb.DecodableReference, error) {
 							if level, ok := element.Message.Level.(*model_starlark_pb.List_Element_Parent_); ok {
 								return level.Parent.Reference, nil
 							}

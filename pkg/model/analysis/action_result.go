@@ -16,6 +16,7 @@ import (
 	model_encoding "github.com/buildbarn/bonanza/pkg/model/encoding"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
 	model_command_pb "github.com/buildbarn/bonanza/pkg/proto/model/command"
+	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
 	remoteexecution_pb "github.com/buildbarn/bonanza/pkg/proto/remoteexecution"
 	"github.com/buildbarn/bonanza/pkg/storage/dag"
 
@@ -46,13 +47,13 @@ func (c *baseComputer[TReference, TMetadata]) ComputeActionResultValue(ctx conte
 	// fingerprint of the action, which the scheduler can use to
 	// keep track of performance characteristics. Compute a hash to
 	// masquerade the actual Command reference.
-	commandReference, err := model_core.FlattenReference(model_core.Nested(action, action.Message.CommandReference))
+	commandReference, err := model_core.FlattenDecodableReference(model_core.Nested(action, action.Message.CommandReference))
 	if err != nil {
 		return PatchedActionResultValue{}, fmt.Errorf("invalid command reference: %w", err)
 	}
-	commandReferenceSHA256 := sha256.Sum256(commandReference.GetRawReference())
+	commandReferenceSHA256 := sha256.Sum256(commandReference.Value.GetRawReference())
 
-	inputRootReference, err := model_core.FlattenReference(model_core.Nested(action, action.Message.InputRootReference))
+	inputRootReference, err := model_core.FlattenDecodableReference(model_core.Nested(action, action.Message.InputRootReference))
 	if err != nil {
 		return PatchedActionResultValue{}, fmt.Errorf("invalid input root reference: %w", err)
 	}
@@ -65,8 +66,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeActionResultValue(ctx conte
 		&model_command_pb.Action{
 			Namespace:          c.executionNamespace,
 			CommandEncoders:    commandEncodersValue.Message.CommandEncoders,
-			CommandReference:   commandReference.GetRawReference(),
-			InputRootReference: inputRootReference.GetRawReference(),
+			CommandReference:   model_core.DecodableLocalReferenceToWeakProto(commandReference),
+			InputRootReference: model_core.DecodableLocalReferenceToWeakProto(inputRootReference),
 		},
 		&remoteexecution_pb.Action_AdditionalData{
 			StableFingerprint: commandReferenceSHA256[:],
@@ -89,12 +90,15 @@ func (c *baseComputer[TReference, TMetadata]) ComputeActionResultValue(ctx conte
 		ExitCode: completionEvent.ExitCode,
 	}
 	patcher := model_core.NewReferenceMessagePatcher[dag.ObjectContentsWalker]()
-	if len(completionEvent.OutputsReference) > 0 {
-		outputsReference, err := c.getReferenceFormat().NewLocalReference(completionEvent.OutputsReference)
+	if completionEvent.OutputsReference != nil {
+		outputsReference, err := model_core.NewDecodableLocalReferenceFromWeakProto(c.getReferenceFormat(), completionEvent.OutputsReference)
 		if err != nil {
 			return PatchedActionResultValue{}, fmt.Errorf("invalid outputs reference: %w", err)
 		}
-		result.OutputsReference = patcher.AddReference(outputsReference, dag.ExistingObjectContentsWalker)
+		result.OutputsReference = &model_core_pb.DecodableReference{
+			Reference:          patcher.AddReference(outputsReference.Value, dag.ExistingObjectContentsWalker),
+			DecodingParameters: outputsReference.GetDecodingParameters(),
+		}
 	}
 	return model_core.NewPatchedMessage(result, patcher), nil
 }
@@ -106,14 +110,14 @@ func (c *baseComputer[TReference, TMetadata]) convertDictToEnvironmentVariableLi
 		btree.NewObjectCreatingNodeMerger(
 			commandEncoder,
 			c.getReferenceFormat(),
-			/* parentNodeComputer = */ func(createdObject model_core.CreatedObject[dag.ObjectContentsWalker], childNodes []*model_command_pb.EnvironmentVariableList_Element) (model_core.PatchedMessage[*model_command_pb.EnvironmentVariableList_Element, dag.ObjectContentsWalker], error) {
+			/* parentNodeComputer = */ func(createdObject model_core.Decodable[model_core.CreatedObject[dag.ObjectContentsWalker]], childNodes []*model_command_pb.EnvironmentVariableList_Element) (model_core.PatchedMessage[*model_command_pb.EnvironmentVariableList_Element, dag.ObjectContentsWalker], error) {
 				patcher := model_core.NewReferenceMessagePatcher[dag.ObjectContentsWalker]()
 				return model_core.NewPatchedMessage(
 					&model_command_pb.EnvironmentVariableList_Element{
 						Level: &model_command_pb.EnvironmentVariableList_Element_Parent{
-							Parent: patcher.AddReference(
-								createdObject.Contents.GetReference(),
-								dag.NewSimpleObjectContentsWalker(createdObject.Contents, createdObject.Metadata),
+							Parent: patcher.CaptureAndAddDecodableReference(
+								createdObject,
+								model_core.WalkableCreatedObjectCapturer,
 							),
 						},
 					},

@@ -9,6 +9,7 @@ import (
 	"github.com/buildbarn/bb-storage/pkg/util"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/model/core/btree"
+	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
 	model_filesystem_pb "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
 	"github.com/buildbarn/bonanza/pkg/storage/dag"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
@@ -36,7 +37,7 @@ func CreateFileMerkleTree[T model_core.ReferenceMetadata](ctx context.Context, p
 		btree.NewObjectCreatingNodeMerger[*model_filesystem_pb.FileContents, T](
 			parameters.fileContentsListEncoder,
 			parameters.referenceFormat,
-			/* parentNodeComputer = */ func(createdObject model_core.CreatedObject[T], childNodes []*model_filesystem_pb.FileContents) (model_core.PatchedMessage[*model_filesystem_pb.FileContents, T], error) {
+			/* parentNodeComputer = */ func(createdObject model_core.Decodable[model_core.CreatedObject[T]], childNodes []*model_filesystem_pb.FileContents) (model_core.PatchedMessage[*model_filesystem_pb.FileContents, T], error) {
 				// Compute the total file size to store
 				// in the parent FileContents node.
 				var totalSizeBytes uint64
@@ -48,9 +49,9 @@ func CreateFileMerkleTree[T model_core.ReferenceMetadata](ctx context.Context, p
 				return model_core.NewPatchedMessage(
 					&model_filesystem_pb.FileContents{
 						Level: &model_filesystem_pb.FileContents_FileContentsListReference{
-							FileContentsListReference: patcher.AddReference(
-								createdObject.Contents.GetReference(),
-								capturer.CaptureFileContentsList(createdObject),
+							FileContentsListReference: patcher.CaptureAndAddDecodableReference(
+								createdObject,
+								model_core.CreatedObjectCapturerFunc[T](capturer.CaptureFileContentsList),
 							),
 						},
 						TotalSizeBytes: totalSizeBytes,
@@ -79,7 +80,7 @@ func CreateFileMerkleTree[T model_core.ReferenceMetadata](ctx context.Context, p
 			}
 			return model_core.PatchedMessage[*model_filesystem_pb.FileContents, T]{}, err
 		}
-		chunkContents, err := parameters.EncodeChunk(chunk)
+		decodableContents, err := parameters.EncodeChunk(chunk)
 		if err != nil {
 			return model_core.PatchedMessage[*model_filesystem_pb.FileContents, T]{}, err
 		}
@@ -89,7 +90,13 @@ func CreateFileMerkleTree[T model_core.ReferenceMetadata](ctx context.Context, p
 		if err := treeBuilder.PushChild(model_core.NewPatchedMessage(
 			&model_filesystem_pb.FileContents{
 				Level: &model_filesystem_pb.FileContents_ChunkReference{
-					ChunkReference: patcher.AddReference(chunkContents.GetReference(), capturer.CaptureChunk(chunkContents)),
+					ChunkReference: &model_core_pb.DecodableReference{
+						Reference: patcher.AddReference(
+							decodableContents.Value.GetReference(),
+							capturer.CaptureChunk(decodableContents.Value),
+						),
+						DecodingParameters: decodableContents.GetDecodingParameters(),
+					},
 				},
 				TotalSizeBytes: uint64(len(chunk)),
 			},
@@ -122,7 +129,17 @@ func CreateChunkDiscardingFileMerkleTree(ctx context.Context, parameters *FileCr
 		// File is empty. Close the file immediately, so that it
 		// doesn't leak.
 		f.Close()
-		return model_core.PatchedMessage[*model_filesystem_pb.FileContents, dag.ObjectContentsWalker]{}, err
+		return model_core.PatchedMessage[*model_filesystem_pb.FileContents, dag.ObjectContentsWalker]{}, nil
+	}
+
+	var decodingParameters []byte
+	switch level := fileContents.Message.Level.(type) {
+	case *model_filesystem_pb.FileContents_ChunkReference:
+		decodingParameters = level.ChunkReference.DecodingParameters
+	case *model_filesystem_pb.FileContents_FileContentsListReference:
+		decodingParameters = level.FileContentsListReference.DecodingParameters
+	default:
+		panic("unknown file contents level")
 	}
 
 	return model_core.NewPatchedMessage(
@@ -136,6 +153,7 @@ func CreateChunkDiscardingFileMerkleTree(ctx context.Context, parameters *FileCr
 					reference,
 					fileContents.Message.TotalSizeBytes,
 					&metadata,
+					decodingParameters,
 				)
 			},
 		),

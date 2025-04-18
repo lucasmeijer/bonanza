@@ -25,31 +25,31 @@ import (
 // elements. Only parents are deduplicated.
 func AllListLeafElementsSkippingDuplicateParents[TReference object.BasicReference](
 	ctx context.Context,
-	reader model_parser.ParsedObjectReader[TReference, model_core.Message[[]*model_starlark_pb.List_Element, TReference]],
+	reader model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[[]*model_starlark_pb.List_Element, TReference]],
 	rootList model_core.Message[[]*model_starlark_pb.List_Element, TReference],
-	listsSeen map[object.LocalReference]struct{},
+	listsSeen map[model_core.Decodable[object.LocalReference]]struct{},
 	errOut *error,
 ) iter.Seq[model_core.Message[*model_starlark_pb.Value, TReference]] {
 	allLeaves := btree.AllLeaves(
 		ctx,
 		reader,
 		rootList,
-		func(element model_core.Message[*model_starlark_pb.List_Element, TReference]) (*model_core_pb.Reference, error) {
+		func(element model_core.Message[*model_starlark_pb.List_Element, TReference]) (*model_core_pb.DecodableReference, error) {
 			if level, ok := element.Message.Level.(*model_starlark_pb.List_Element_Parent_); ok {
 				listReferenceMessage := level.Parent.Reference
-				listReference, err := model_core.FlattenReference(model_core.Nested(element, level.Parent.Reference))
+				listReference, err := model_core.FlattenDecodableReference(model_core.Nested(element, level.Parent.Reference))
 				if err != nil {
 					return nil, err
 				}
-				localReference := listReference.GetLocalReference()
-				if _, ok := listsSeen[localReference]; ok {
+				key := model_core.CopyDecodable(listReference, listReference.Value.GetLocalReference())
+				if _, ok := listsSeen[key]; ok {
 					// Parent was already seen before.
 					// Skip it.
 					return nil, nil
 				}
 
 				// Parent was not seen before. Enter it.
-				listsSeen[localReference] = struct{}{}
+				listsSeen[key] = struct{}{}
 				return listReferenceMessage, nil
 			}
 			return nil, nil

@@ -8,6 +8,7 @@ import (
 	"github.com/buildbarn/bb-storage/pkg/global"
 	"github.com/buildbarn/bb-storage/pkg/program"
 	"github.com/buildbarn/bb-storage/pkg/util"
+	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/model/encoding"
 	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
 	model_filesystem_virtual "github.com/buildbarn/bonanza/pkg/model/filesystem/virtual"
@@ -114,14 +115,16 @@ func main() {
 			),
 		)
 
-		rootDirectoryReference, err := namespace.NewGlobalReference(configuration.RootDirectoryReference)
+		rootDirectoryReference, err := model_core.NewDecodableLocalReferenceFromWeakProto(
+			namespace.ReferenceFormat,
+			configuration.RootDirectoryReference,
+		)
 		if err != nil {
 			return util.StatusWrap(err, "Invalid root directory reference")
 		}
-		rootDirectoryLocalReference := rootDirectoryReference.GetLocalReference()
 
 		rootDirectoryIndex := uint(0)
-		rootDirectoryCluster, err := directoryClusterReader.ReadParsedObject(ctx, rootDirectoryLocalReference)
+		rootDirectoryCluster, err := directoryClusterReader.ReadParsedObject(ctx, rootDirectoryReference)
 		if err != nil {
 			return util.StatusWrap(err, "Failed to fetch contents of root directory")
 		}
@@ -145,7 +148,7 @@ func main() {
 			util.DefaultErrorLogger,
 		)
 		rootDirectory := directoryFactory.LookupDirectory(
-			rootDirectoryLocalReference,
+			rootDirectoryReference,
 			rootDirectoryIndex,
 			uint32(len(rootDirectoryCluster.Message[0].Directory.Directories)),
 		)

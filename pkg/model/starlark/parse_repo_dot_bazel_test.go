@@ -19,6 +19,9 @@ import (
 func TestParseModuleDotBazel(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
+	encoder := NewMockBinaryEncoder(ctrl)
+	encoder.EXPECT().GetDecodingParametersSizeBytes().Return(0).AnyTimes()
+
 	t.Run("Empty", func(t *testing.T) {
 		// If no calls to repo() are made, the resulting
 		// attributes should be identical to the constant
@@ -30,7 +33,7 @@ func TestParseModuleDotBazel(t *testing.T) {
 			label.MustNewCanonicalLabel("@@foo+//:REPO.bazel"),
 			&inlinedtree.Options{
 				ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
-				Encoder:          NewMockBinaryEncoder(ctrl),
+				Encoder:          encoder,
 				MaximumSizeBytes: 0,
 			},
 			model_core.CreatedObjectCapturer[model_core.CloneableReferenceMetadata](nil),
@@ -51,7 +54,7 @@ func TestParseModuleDotBazel(t *testing.T) {
 			label.MustNewCanonicalLabel("@@foo+//:REPO.bazel"),
 			&inlinedtree.Options{
 				ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
-				Encoder:          NewMockBinaryEncoder(ctrl),
+				Encoder:          encoder,
 				MaximumSizeBytes: 0,
 			},
 			model_core.CreatedObjectCapturer[model_core.CloneableReferenceMetadata](nil),
@@ -70,7 +73,7 @@ func TestParseModuleDotBazel(t *testing.T) {
 			label.MustNewCanonicalLabel("@@foo+//:REPO.bazel"),
 			&inlinedtree.Options{
 				ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
-				Encoder:          NewMockBinaryEncoder(ctrl),
+				Encoder:          encoder,
 				MaximumSizeBytes: 0,
 			},
 			model_core.CreatedObjectCapturer[model_core.CloneableReferenceMetadata](nil),
@@ -93,7 +96,7 @@ func TestParseModuleDotBazel(t *testing.T) {
 			label.MustNewCanonicalLabel("@@foo+//:REPO.bazel"),
 			&inlinedtree.Options{
 				ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
-				Encoder:          NewMockBinaryEncoder(ctrl),
+				Encoder:          encoder,
 				MaximumSizeBytes: 0,
 			},
 			model_core.CreatedObjectCapturer[model_core.CloneableReferenceMetadata](nil),
@@ -121,7 +124,7 @@ func TestParseModuleDotBazel(t *testing.T) {
 			label.MustNewCanonicalLabel("@@foo+//:REPO.bazel"),
 			&inlinedtree.Options{
 				ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
-				Encoder:          NewMockBinaryEncoder(ctrl),
+				Encoder:          encoder,
 				MaximumSizeBytes: 0,
 			},
 			objectCapturer,

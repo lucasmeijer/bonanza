@@ -27,6 +27,7 @@ import (
 	model_encoding "github.com/buildbarn/bonanza/pkg/model/encoding"
 	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
 	model_build_pb "github.com/buildbarn/bonanza/pkg/proto/model/build"
+	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
 	model_encoding_pb "github.com/buildbarn/bonanza/pkg/proto/model/encoding"
 	model_filesystem_pb "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
 	remoteexecution_pb "github.com/buildbarn/bonanza/pkg/proto/remoteexecution"
@@ -346,21 +347,26 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 			logger.Fatalf("Failed to create root directory object for module %#v: %s", moduleName.String(), err)
 		}
 
-		createdObjectTree := model_core.CreatedObjectTree(createdObject)
+		createdObjectTree := model_core.CreatedObjectTree(createdObject.Value)
+		decodingParameters := createdObject.GetDecodingParameters()
 		buildSpecification.Modules = append(
 			buildSpecification.Modules,
 			&model_build_pb.Module{
 				Name: moduleName.String(),
 				RootDirectoryReference: createdRootDirectory.ToDirectoryReference(
-					buildSpecificationPatcher.AddReference(
-						createdObject.Contents.GetReference(),
-						model_filesystem.NewCapturedDirectoryWalker(
-							directoryParameters.DirectoryAccessParameters,
-							fileParameters,
-							moduleRootDirectories[i],
-							&createdObjectTree,
+					&model_core_pb.DecodableReference{
+						Reference: buildSpecificationPatcher.AddReference(
+							createdObject.Value.Contents.GetReference(),
+							model_filesystem.NewCapturedDirectoryWalker(
+								directoryParameters.DirectoryAccessParameters,
+								fileParameters,
+								moduleRootDirectories[i],
+								&createdObjectTree,
+								decodingParameters,
+							),
 						),
-					),
+						DecodingParameters: decodingParameters,
+					},
 				),
 			},
 		)
@@ -385,7 +391,7 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 
 	logger.Info("Uploading module sources")
 	instanceName := object.NewInstanceName(args.CommonFlags.RemoteInstanceName)
-	buildSpecificationReference := createdBuildSpecification.Contents.GetReference()
+	buildSpecificationReference := createdBuildSpecification.Value.Contents.GetReference()
 	if err := dag.UploadDAG(
 		context.Background(),
 		dag_pb.NewUploaderClient(remoteCacheClient),
@@ -394,8 +400,8 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 			LocalReference: buildSpecificationReference,
 		},
 		dag.NewSimpleObjectContentsWalker(
-			createdBuildSpecification.Contents,
-			createdBuildSpecification.Metadata,
+			createdBuildSpecification.Value.Contents,
+			createdBuildSpecification.Value.Metadata,
 		),
 		semaphore.NewWeighted(10),
 		object.NewLimit(&object_pb.Limit{
@@ -466,7 +472,11 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 		}
 	}
 
-	logger.Info("Performing build")
+	decodableBuildSpecificationReference := model_core.CopyDecodable(createdBuildSpecification, buildSpecificationReference)
+	logger.Infof(
+		"Performing build of specification %s",
+		model_core.DecodableLocalReferenceToString(decodableBuildSpecificationReference),
+	)
 	var result model_build_pb.Result
 	var errBuild error
 	for event := range builderClient.RunAction(
@@ -479,7 +489,7 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 				InstanceName:    instanceName,
 				ReferenceFormat: referenceFormat,
 			}.ToProto(),
-			BuildSpecificationReference: buildSpecificationReference.GetRawReference(),
+			BuildSpecificationReference: model_core.DecodableLocalReferenceToWeakProto(decodableBuildSpecificationReference),
 			BuildSpecificationEncoders:  defaultEncoders,
 		},
 		&remoteexecution_pb.Action_AdditionalData{

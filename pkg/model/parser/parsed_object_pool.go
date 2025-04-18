@@ -12,8 +12,9 @@ import (
 type ParsedObjectEvictionKey struct {
 	// TODO: Have a stable key for identifying readers. That will
 	// allow us to get cache hits between builds.
-	reader    any
-	reference object.LocalReference
+	reader             any
+	reference          object.LocalReference
+	decodingParameters string
 }
 
 type cachedParsedObject struct {
@@ -54,24 +55,27 @@ func NewParsedObjectPoolIngester[TReference any](
 }
 
 type poolBackedParsedObjectReader[TReference object.BasicReference, TParsedObject any] struct {
-	ingester *ParsedObjectPoolIngester[TReference]
-	parser   ObjectParser[TReference, TParsedObject]
+	ingester                    *ParsedObjectPoolIngester[TReference]
+	parser                      ObjectParser[TReference, TParsedObject]
+	decodingParametersSizeBytes int
 }
 
 func LookupParsedObjectReader[TReference object.BasicReference, TParsedObject any](
 	ingester *ParsedObjectPoolIngester[TReference],
 	parser ObjectParser[TReference, TParsedObject],
-) ParsedObjectReader[TReference, TParsedObject] {
+) ParsedObjectReader[model_core.Decodable[TReference], TParsedObject] {
 	return &poolBackedParsedObjectReader[TReference, TParsedObject]{
-		ingester: ingester,
-		parser:   parser,
+		ingester:                    ingester,
+		parser:                      parser,
+		decodingParametersSizeBytes: parser.GetDecodingParametersSizeBytes(),
 	}
 }
 
-func (r *poolBackedParsedObjectReader[TReference, TParsedObject]) ReadParsedObject(ctx context.Context, reference TReference) (TParsedObject, error) {
+func (r *poolBackedParsedObjectReader[TReference, TParsedObject]) ReadParsedObject(ctx context.Context, reference model_core.Decodable[TReference]) (TParsedObject, error) {
 	insertionKey := ParsedObjectEvictionKey{
-		reader:    r,
-		reference: reference.GetLocalReference(),
+		reader:             r,
+		reference:          reference.Value.GetLocalReference(),
+		decodingParameters: string(reference.GetDecodingParameters()),
 	}
 
 	i := r.ingester
@@ -85,18 +89,18 @@ func (r *poolBackedParsedObjectReader[TReference, TParsedObject]) ReadParsedObje
 	}
 	p.lock.Unlock()
 
-	raw, err := i.rawReader.ReadParsedObject(ctx, reference)
+	raw, err := i.rawReader.ReadParsedObject(ctx, reference.Value)
 	if err != nil {
 		var badParsedObject TParsedObject
 		return badParsedObject, err
 	}
 
-	parsedObject, parsedObjectSizeBytes, err := r.parser.ParseObject(raw)
+	parsedObject, parsedObjectSizeBytes, err := r.parser.ParseObject(raw, reference.GetDecodingParameters())
 	if err != nil {
 		var badParsedObject TParsedObject
 		return badParsedObject, err
 	}
-	sizeBytes := reference.GetSizeBytes() - len(raw.Message) + parsedObjectSizeBytes
+	sizeBytes := reference.Value.GetSizeBytes() - len(raw.Message) + parsedObjectSizeBytes
 
 	p.lock.Lock()
 	if _, ok := p.objects[insertionKey]; ok {
@@ -126,4 +130,8 @@ func (r *poolBackedParsedObjectReader[TReference, TParsedObject]) ReadParsedObje
 	p.lock.Unlock()
 
 	return parsedObject, nil
+}
+
+func (r *poolBackedParsedObjectReader[TReference, TParsedObject]) GetDecodingParametersSizeBytes() int {
+	return r.decodingParametersSizeBytes
 }

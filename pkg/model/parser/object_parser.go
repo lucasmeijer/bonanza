@@ -5,5 +5,6 @@ import (
 )
 
 type ObjectParser[TReference, TParsedObject any] interface {
-	ParseObject(in model_core.Message[[]byte, TReference]) (TParsedObject, int, error)
+	ParseObject(in model_core.Message[[]byte, TReference], decodingParameters []byte) (TParsedObject, int, error)
+	GetDecodingParametersSizeBytes() int
 }

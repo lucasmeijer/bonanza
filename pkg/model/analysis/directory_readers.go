@@ -16,9 +16,9 @@ import (
 // follow references to objects that are encoded using the directory
 // access parameters that are part of the BuildSpecification.
 type DirectoryReaders[TReference any] struct {
-	Directory      model_parser.ParsedObjectReader[TReference, model_core.Message[*model_filesystem_pb.Directory, TReference]]
-	Leaves         model_parser.ParsedObjectReader[TReference, model_core.Message[*model_filesystem_pb.Leaves, TReference]]
-	CommandOutputs model_parser.ParsedObjectReader[TReference, model_core.Message[*model_command_pb.Outputs, TReference]]
+	Directory      model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_filesystem_pb.Directory, TReference]]
+	Leaves         model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_filesystem_pb.Leaves, TReference]]
+	CommandOutputs model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_command_pb.Outputs, TReference]]
 }
 
 func (c *baseComputer[TReference, TMetadata]) ComputeDirectoryReadersValue(ctx context.Context, key *model_analysis_pb.DirectoryReaders_Key, e DirectoryReadersEnvironment[TReference, TMetadata]) (*DirectoryReaders[TReference], error) {

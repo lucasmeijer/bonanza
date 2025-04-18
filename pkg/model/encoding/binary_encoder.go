@@ -19,8 +19,9 @@ import (
 // of that, implementations of BinaryEncoder should ensure that empty
 // data should remain empty when encoded.
 type BinaryEncoder interface {
-	EncodeBinary(in []byte) ([]byte, error)
-	DecodeBinary(in []byte) ([]byte, error)
+	EncodeBinary(in []byte) ([]byte, []byte, error)
+	DecodeBinary(in, parameters []byte) ([]byte, error)
+	GetDecodingParametersSizeBytes() int
 }
 
 // NewBinaryEncoderFromProto creates a BinaryEncoder that behaves
