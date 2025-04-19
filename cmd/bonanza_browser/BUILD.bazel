@@ -1,3 +1,4 @@
+load("@aspect_bazel_lib//lib:transitions.bzl", "platform_transition_filegroup")
 load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_run_binary")
 load("@com_github_buildbarn_bb_storage//tools:container.bzl", "container_push_official", "multiarch_go_image")
 load("@rules_go//go:def.bzl", "go_binary", "go_library")
@@ -8,7 +9,8 @@ go_library(
         "browser_service.go",
         "main.go",
     ],
-    embedsrcs = ["stylesheet.css"],
+    # keep
+    embedsrcs = ["stylesheet_for_host"],
     importpath = "github.com/buildbarn/bonanza/cmd/bonanza_browser",
     visibility = ["//visibility:private"],
     deps = [
@@ -65,6 +67,14 @@ js_run_binary(
     args = ["stylesheet.css"],
     chdir = package_name(),
     tool = ":generate_stylesheet",
+)
+
+# Explicitly build the stylesheet for the host platform. This prevents
+# build errors where it tries to find a C++ compiler for Windows.
+platform_transition_filegroup(
+    name = "stylesheet_for_host",
+    srcs = [":stylesheet"],
+    target_platform = "@platforms//host",
 )
 
 multiarch_go_image(
