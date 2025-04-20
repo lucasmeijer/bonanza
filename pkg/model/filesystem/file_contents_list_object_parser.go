@@ -2,6 +2,7 @@ package filesystem
 
 import (
 	"math"
+	"math/bits"
 
 	"github.com/buildbarn/bb-storage/pkg/util"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
@@ -153,10 +154,11 @@ func (p *fileContentsListObjectParser[TReference]) ParseObject(in model_core.Mes
 		if part.TotalSizeBytes < 1 {
 			return nil, 0, status.Errorf(codes.InvalidArgument, "Part at index %d does not contain any data", i)
 		}
-		if part.TotalSizeBytes > math.MaxUint64-endBytes {
+		var carryOut uint64
+		endBytes, carryOut = bits.Add64(endBytes, part.TotalSizeBytes, 0)
+		if carryOut > 0 {
 			return nil, 0, status.Errorf(codes.InvalidArgument, "Combined size of all parts exceeds maximum file size of %d bytes", uint64(math.MaxUint64))
 		}
-		endBytes += part.TotalSizeBytes
 
 		partReference, err := flattenFileContentsReference(model_core.Nested(l, part))
 		if err != nil {

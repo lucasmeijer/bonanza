@@ -9,6 +9,7 @@ import (
 	"maps"
 	"math"
 	"math/big"
+	"math/bits"
 	"slices"
 	"strings"
 
@@ -71,22 +72,21 @@ func NewListBuilder[TReference any, TMetadata model_core.CloneableReferenceMetad
 			// they can't use this field to jump to
 			// arbitrary elements.
 			count := uint64(0)
-		CountChildren:
 			for _, childNode := range childNodes {
+				var childCount uint64
 				switch level := childNode.Level.(type) {
 				case *model_starlark_pb.List_Element_Leaf:
-					if count == math.MaxUint64 {
-						break CountChildren
-					}
-					count++
+					childCount = 1
 				case *model_starlark_pb.List_Element_Parent_:
-					if count > math.MaxUint64-level.Parent.Count {
-						count = math.MaxUint64
-						break CountChildren
-					}
-					count += level.Parent.Count
+					childCount = level.Parent.Count
 				default:
 					return model_core.PatchedMessage[*model_starlark_pb.List_Element, TMetadata]{}, errors.New("invalid list element level")
+				}
+				var carryOut uint64
+				count, carryOut = bits.Add64(count, childCount, 0)
+				if carryOut > 0 {
+					count = math.MaxUint64
+					break
 				}
 			}
 
