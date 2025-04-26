@@ -52,6 +52,7 @@ go_library(
         "registered_toolchains.go",
         "registered_toolchains_for_type.go",
         "repo.go",
+        "repo_platform_host_path.go",
         "repository_rule_object.go",
         "resolved_toolchains.go",
         "root_module.go",

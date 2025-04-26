@@ -1349,6 +1349,29 @@ message RepoDefaultAttrs {
   }
 }
 
+message RepoPlatformHostPath {
+  message Key {
+    // Absolute path of a file or directory on workers of the repo
+    // platform whose contents should be captured. If the path refers to
+    // a symlink, it should be followed.
+    string absolute_path = 1;
+  }
+
+  message Value {
+    oneof captured_path {
+      // The provided path corresponds to (a symlink pointing to) a
+      // file. The contents of the file are provided.
+      bonanza.model.filesystem.FileProperties file = 1;
+
+      // The provided path corresponds to (a symlink pointing to) a
+      // directory. The resulting directory may not contain any symlinks
+      // that escape the directory hierarchy. If such symlinks are
+      // encountered when creating this directory, they are expanded.
+      bonanza.model.filesystem.Directory directory = 2;
+    }
+  }
+}
+
 message ResolvedToolchains {
   message Key {
     // List of constraints that must be satisfied by an execution

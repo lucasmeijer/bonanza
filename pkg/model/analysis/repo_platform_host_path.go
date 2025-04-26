@@ -1,0 +1,449 @@
+package analysis
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"sort"
+	"strings"
+
+	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
+	"github.com/buildbarn/bb-storage/pkg/util"
+	"github.com/buildbarn/bonanza/pkg/evaluation"
+	model_core "github.com/buildbarn/bonanza/pkg/model/core"
+	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
+	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
+	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
+	model_command_pb "github.com/buildbarn/bonanza/pkg/proto/model/command"
+	"github.com/buildbarn/bonanza/pkg/storage/object"
+
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
+	"google.golang.org/protobuf/types/known/durationpb"
+)
+
+func (c *baseComputer[TReference, TMetadata]) ComputeRepoPlatformHostPathValue(ctx context.Context, key *model_analysis_pb.RepoPlatformHostPath_Key, e RepoPlatformHostPathEnvironment[TReference, TMetadata]) (PatchedRepoPlatformHostPathValue, error) {
+	commandEncoder, gotCommandEncoder := e.GetCommandEncoderObjectValue(&model_analysis_pb.CommandEncoderObject_Key{})
+	directoryCreationParameters, gotDirectoryCreationParameters := e.GetDirectoryCreationParametersObjectValue(&model_analysis_pb.DirectoryCreationParametersObject_Key{})
+	directoryCreationParametersMessage := e.GetDirectoryCreationParametersValue(&model_analysis_pb.DirectoryCreationParameters_Key{})
+	directoryReaders, gotDirectoryReaders := e.GetDirectoryReadersValue(&model_analysis_pb.DirectoryReaders_Key{})
+	fileCreationParametersMessage := e.GetFileCreationParametersValue(&model_analysis_pb.FileCreationParameters_Key{})
+	repoPlatform := e.GetRegisteredRepoPlatformValue(&model_analysis_pb.RegisteredRepoPlatform_Key{})
+	if !gotCommandEncoder ||
+		!gotDirectoryCreationParameters ||
+		!directoryCreationParametersMessage.IsSet() ||
+		!gotDirectoryReaders ||
+		!fileCreationParametersMessage.IsSet() ||
+		!repoPlatform.IsSet() {
+		return PatchedRepoPlatformHostPathValue{}, evaluation.ErrMissingDependency
+	}
+
+	environment := map[string]string{}
+	for _, environmentVariable := range repoPlatform.Message.RepositoryOsEnviron {
+		if _, ok := environment[environmentVariable.Name]; !ok {
+			environment[environmentVariable.Name] = environmentVariable.Value
+		}
+	}
+	referenceFormat := c.getReferenceFormat()
+	environmentVariableList, err := c.convertDictToEnvironmentVariableList(environment, commandEncoder)
+	if err != nil {
+		return PatchedRepoPlatformHostPathValue{}, err
+	}
+
+	// Request that the worker captures a given path by copying it
+	// into its input root directory, using "cp -RH".
+	const capturedFilename = "captured"
+	createdCommand, err := model_core.MarshalAndEncodePatchedMessage(
+		model_core.NewPatchedMessage(
+			&model_command_pb.Command{
+				Arguments: []*model_command_pb.ArgumentList_Element{
+					{
+						Level: &model_command_pb.ArgumentList_Element_Leaf{
+							Leaf: "cp",
+						},
+					},
+					{
+						Level: &model_command_pb.ArgumentList_Element_Leaf{
+							Leaf: "-RH",
+						},
+					},
+					{
+						Level: &model_command_pb.ArgumentList_Element_Leaf{
+							Leaf: key.AbsolutePath,
+						},
+					},
+					{
+						Level: &model_command_pb.ArgumentList_Element_Leaf{
+							Leaf: capturedFilename,
+						},
+					},
+				},
+				EnvironmentVariables:        environmentVariableList.Message,
+				DirectoryCreationParameters: directoryCreationParametersMessage.Message.DirectoryCreationParameters,
+				FileCreationParameters:      fileCreationParametersMessage.Message.FileCreationParameters,
+				OutputPathPattern: &model_command_pb.PathPattern{
+					Children: &model_command_pb.PathPattern_ChildrenInline{
+						ChildrenInline: &model_command_pb.PathPattern_Children{
+							Children: []*model_command_pb.PathPattern_Child{{
+								Name:    capturedFilename,
+								Pattern: &model_command_pb.PathPattern{},
+							}},
+						},
+					},
+				},
+				WorkingDirectory: (*path.Trace)(nil).GetUNIXString(),
+			},
+			environmentVariableList.Patcher,
+		),
+		referenceFormat,
+		commandEncoder,
+	)
+	if err != nil {
+		return PatchedRepoPlatformHostPathValue{}, fmt.Errorf("failed to create command: %w", err)
+	}
+
+	// We can assume that paths outside the input root do not
+	// resolve to any location inside the input root. It should
+	// therefore be fine to run these actions with an empty input
+	// root.
+	inputRootReference, err := c.createMerkleTreeFromChangeTrackingDirectory(
+		ctx,
+		e,
+		&changeTrackingDirectory[TReference, model_core.FileBackedObjectLocation]{},
+		directoryCreationParameters,
+		directoryReaders,
+		/* fileCreationParameters = */ nil,
+		/* patchedFiles = */ nil,
+	)
+	if err != nil {
+		return PatchedRepoPlatformHostPathValue{}, fmt.Errorf("failed to create Merkle tree of root directory: %w", err)
+	}
+
+	keyPatcher := inputRootReference.Patcher
+	actionResult := e.GetSuccessfulActionResultValue(
+		model_core.NewPatchedMessage(
+			&model_analysis_pb.SuccessfulActionResult_Key{
+				Action: &model_analysis_pb.Action{
+					PlatformPkixPublicKey: repoPlatform.Message.ExecPkixPublicKey,
+					CommandReference: keyPatcher.CaptureAndAddDecodableReference(
+						createdCommand,
+						model_core.WalkableCreatedObjectCapturer,
+					),
+					InputRootReference: inputRootReference.Message.Reference,
+					ExecutionTimeout:   &durationpb.Duration{Seconds: 600},
+				},
+			},
+			keyPatcher,
+		),
+	)
+	if !actionResult.IsSet() {
+		return PatchedRepoPlatformHostPathValue{}, evaluation.ErrMissingDependency
+	}
+
+	outputs, err := model_parser.MaybeDereference(ctx, directoryReaders.CommandOutputs, model_core.Nested(actionResult, actionResult.Message.OutputsReference))
+	if err != nil {
+		return PatchedRepoPlatformHostPathValue{}, fmt.Errorf("failed to obtain outputs from action result: %w", err)
+	}
+	outputRoot := outputs.Message.OutputRoot
+	if outputRoot == nil {
+		return PatchedRepoPlatformHostPathValue{}, errors.New("action did not yield an output root")
+	}
+
+	directories := outputRoot.Directories
+	if index, ok := sort.Find(
+		len(directories),
+		func(i int) int { return strings.Compare(capturedFilename, directories[i].Name) },
+	); ok {
+		// The captured path is a directory. Check whether it
+		// contains any more symlinks that point to locations
+		// outside this directory. If so, invoke
+		// RepoPlatformHostPath recursively.
+		capturedDirectory, err := model_filesystem.DirectoryNodeGetContents(
+			ctx,
+			directoryReaders.Directory,
+			model_core.Nested(outputs, directories[index]),
+		)
+		if err != nil {
+			return PatchedRepoPlatformHostPathValue{}, err
+		}
+
+		var rootDirectory changeTrackingDirectory[TReference, TMetadata]
+		loadOptions := changeTrackingDirectoryLoadOptions[TReference]{
+			context:         ctx,
+			directoryReader: directoryReaders.Directory,
+			leavesReader:    directoryReaders.Leaves,
+		}
+		if err := rootDirectory.setContents(capturedDirectory, &loadOptions); err != nil {
+			return PatchedRepoPlatformHostPathValue{}, err
+		}
+
+		virtualRootScopeWalkerFactory, err := path.NewVirtualRootScopeWalkerFactory(path.UNIXFormat.NewParser(key.AbsolutePath), nil)
+		if err != nil {
+			return PatchedRepoPlatformHostPathValue{}, err
+		}
+		sr := changeTrackingDirectorySymlinksRelativizer[TReference, TMetadata]{
+			context:                       ctx,
+			environment:                   e,
+			directoryLoadOptions:          &loadOptions,
+			virtualRootScopeWalkerFactory: virtualRootScopeWalkerFactory,
+		}
+		if err := sr.relativizeSymlinksRecursively(
+			util.NewNonEmptyStack(&rootDirectory),
+			/* dPath = */ nil,
+			/* maximumEscapementLevels = */ 0,
+		); err != nil {
+			return PatchedRepoPlatformHostPathValue{}, err
+		}
+
+		group, groupCtx := errgroup.WithContext(ctx)
+		var createdRootDirectory model_filesystem.CreatedDirectory[TMetadata]
+		group.Go(func() error {
+			return model_filesystem.CreateDirectoryMerkleTree(
+				groupCtx,
+				semaphore.NewWeighted(1),
+				group,
+				directoryCreationParameters,
+				&capturableChangeTrackingDirectory[TReference, TMetadata]{
+					options: &capturableChangeTrackingDirectoryOptions[TReference, TMetadata]{
+						context:         groupCtx,
+						directoryReader: directoryReaders.Directory,
+						objectCapturer:  e,
+					},
+					directory: &rootDirectory,
+				},
+				model_filesystem.NewSimpleDirectoryMerkleTreeCapturer(e),
+				&createdRootDirectory,
+			)
+		})
+		if err := group.Wait(); err != nil {
+			return PatchedRepoPlatformHostPathValue{}, err
+		}
+
+		return model_core.NewPatchedMessage(
+			&model_analysis_pb.RepoPlatformHostPath_Value{
+				CapturedPath: &model_analysis_pb.RepoPlatformHostPath_Value_Directory{
+					Directory: createdRootDirectory.Message.Message,
+				},
+			},
+			model_core.MapReferenceMetadataToWalkers(createdRootDirectory.Message.Patcher),
+		), nil
+	}
+
+	leaves, err := model_filesystem.DirectoryGetLeaves(ctx, directoryReaders.Leaves, model_core.Nested(outputs, outputRoot))
+	if err != nil {
+		return PatchedRepoPlatformHostPathValue{}, fmt.Errorf("failed to read leaves of output root: %w", err)
+	}
+
+	files := leaves.Message.Files
+	if index, ok := sort.Find(
+		len(files),
+		func(i int) int { return strings.Compare(capturedFilename, files[i].Name) },
+	); ok {
+		// The captured path is a regular file.
+		patchedFileProperties := model_core.Patch(e, model_core.Nested(leaves, files[index].Properties))
+		return model_core.NewPatchedMessage(
+			&model_analysis_pb.RepoPlatformHostPath_Value{
+				CapturedPath: &model_analysis_pb.RepoPlatformHostPath_Value_File{
+					File: patchedFileProperties.Message,
+				},
+			},
+			model_core.MapReferenceMetadataToWalkers(patchedFileProperties.Patcher),
+		), nil
+	}
+
+	return PatchedRepoPlatformHostPathValue{}, errors.New("action did not capture host path")
+}
+
+type changeTrackingDirectoryNormalizingPathResolver[TReference object.BasicReference, TMetadata model_core.ReferenceMetadata] struct {
+	loadOptions *changeTrackingDirectoryLoadOptions[TReference]
+
+	gotScope    bool
+	directories util.NonEmptyStack[*changeTrackingDirectory[TReference, TMetadata]]
+	components  []path.Component
+}
+
+func (r *changeTrackingDirectoryNormalizingPathResolver[TReference, TMetadata]) OnAbsolute() (path.ComponentWalker, error) {
+	r.gotScope = true
+	r.directories.PopAll()
+	r.components = r.components[:0]
+	return r, nil
+}
+
+func (r *changeTrackingDirectoryNormalizingPathResolver[TReference, TMetadata]) OnRelative() (path.ComponentWalker, error) {
+	r.gotScope = true
+	return r, nil
+}
+
+func (r *changeTrackingDirectoryNormalizingPathResolver[TReference, TMetadata]) OnDriveLetter(driveLetter rune) (path.ComponentWalker, error) {
+	return nil, errors.New("drive letters are not supported")
+}
+
+func (r *changeTrackingDirectoryNormalizingPathResolver[TReference, TMetadata]) OnDirectory(name path.Component) (path.GotDirectoryOrSymlink, error) {
+	d := r.directories.Peek()
+	if err := d.maybeLoadContents(r.loadOptions); err != nil {
+		return nil, err
+	}
+
+	if dChild, ok := d.directories[name]; ok {
+		r.components = append(r.components, name)
+		r.directories.Push(dChild)
+		return path.GotDirectory{
+			Child:        r,
+			IsReversible: true,
+		}, nil
+	}
+
+	return nil, fmt.Errorf("directory %#v does not exist", name.String())
+}
+
+func (r *changeTrackingDirectoryNormalizingPathResolver[TReference, TMetadata]) OnTerminal(name path.Component) (*path.GotSymlink, error) {
+	d := r.directories.Peek()
+	if err := d.maybeLoadContents(r.loadOptions); err != nil {
+		return nil, err
+	}
+	r.components = append(r.components, name)
+	return nil, nil
+}
+
+func (r *changeTrackingDirectoryNormalizingPathResolver[TReference, TMetadata]) OnUp() (path.ComponentWalker, error) {
+	if _, ok := r.directories.PopSingle(); !ok {
+		r.components = r.components[:len(r.components)-1]
+		return nil, errors.New("path resolves to a location above the root directory")
+	}
+	return r, nil
+}
+
+type changeTrackingDirectorySymlinksRelativizerEnvironment[TReference any] interface {
+	GetRepoPlatformHostPathValue(*model_analysis_pb.RepoPlatformHostPath_Key) model_core.Message[*model_analysis_pb.RepoPlatformHostPath_Value, TReference]
+}
+
+// changeTrackingDirectorySymlinksRelativizer is a helper that is used
+// by ComputeRepoPlatformHostPath() that recursively traverses a
+// directory and replaces all symlinks to refer to relative paths, or
+// replace them with the object that is referenced.
+type changeTrackingDirectorySymlinksRelativizer[TReference object.BasicReference, TMetadata model_core.ReferenceMetadata] struct {
+	context                       context.Context
+	environment                   changeTrackingDirectorySymlinksRelativizerEnvironment[TReference]
+	directoryLoadOptions          *changeTrackingDirectoryLoadOptions[TReference]
+	virtualRootScopeWalkerFactory *path.VirtualRootScopeWalkerFactory
+}
+
+func (sr *changeTrackingDirectorySymlinksRelativizer[TReference, TMetadata]) relativizeSymlinksRecursively(dStack util.NonEmptyStack[*changeTrackingDirectory[TReference, TMetadata]], dPath *path.Trace, maximumEscapementLevels uint32) error {
+	d := dStack.Peek()
+	if d.currentReference.IsSet() {
+		currentMaximumEscapementLevels := d.currentReference.Message.MaximumSymlinkEscapementLevels
+		if currentMaximumEscapementLevels != nil && currentMaximumEscapementLevels.Value <= maximumEscapementLevels {
+			// This directory is guaranteed to not contain
+			// any symlinks that escape beyond the maximum
+			// number of permitted levels. There is no need
+			// to traverse it.
+			return nil
+		}
+
+		if err := d.maybeLoadContents(sr.directoryLoadOptions); err != nil {
+			return err
+		}
+	}
+
+	for name, target := range d.symlinks {
+		escapementCounter := model_filesystem.NewEscapementCountingScopeWalker()
+		if err := path.Resolve(target, escapementCounter); err != nil {
+			return fmt.Errorf("failed to resolve symlink %#v %w", name.String(), err)
+		}
+		if levels := escapementCounter.GetLevels(); levels == nil || levels.Value > maximumEscapementLevels {
+			// Target of this symlink is absolute or has too
+			// many ".." components.
+			r := changeTrackingDirectoryNormalizingPathResolver[TReference, TMetadata]{
+				loadOptions: sr.directoryLoadOptions,
+				directories: dStack.Copy(),
+				components:  append([]path.Component(nil), dPath.ToList()...),
+			}
+			normalizedPath, scopeWalker := path.EmptyBuilder.Join(sr.virtualRootScopeWalkerFactory.New(&r))
+			if err := path.Resolve(target, scopeWalker); err != nil {
+				return fmt.Errorf("failed to resolve symlink %#v: %w", dPath.Append(name).GetUNIXString(), err)
+			}
+			if r.gotScope {
+				// Symlink points to a file that resides
+				// inside the directory hierarchy.
+				// Rewrite the target of the symlink to
+				// be of shape "../../a/b/c".
+				directoryComponents := dPath.ToList()
+				targetComponents := r.components
+				matchingCount := 0
+				for matchingCount < len(directoryComponents) && matchingCount < len(targetComponents) && directoryComponents[matchingCount] == targetComponents[matchingCount] {
+					matchingCount++
+				}
+				if matchingCount+int(maximumEscapementLevels) < len(directoryComponents) {
+					// TODO: Copy files as well?
+					return fmt.Errorf("Symlink %#v resolves to a path outside the repo", dPath.Append(name).GetUNIXString())
+				}
+
+				// Replace the symlink's target with a
+				// relative path.
+				// TODO: Any way we can cleanly implement this
+				// on top of pkg/filesystem/path?
+				dotDotsCount := len(directoryComponents) - matchingCount
+				parts := make([]string, 0, dotDotsCount+len(targetComponents)-matchingCount)
+				for i := 0; i < dotDotsCount; i++ {
+					parts = append(parts, "..")
+				}
+				for _, component := range targetComponents[matchingCount:] {
+					parts = append(parts, component.String())
+				}
+				d.symlinks[name] = path.UNIXFormat.NewParser(strings.Join(parts, "/"))
+			} else {
+				// Symlink points to a file that resides
+				// outside the directory hierarchy,
+				// meaning it refers to a file that is
+				// part of the installation of the repo
+				// platform worker. Ask the worker to
+				// upload this file to storage, so that
+				// we can replace the symlink with the
+				// actual contents.
+				replacement := sr.environment.GetRepoPlatformHostPathValue(
+					&model_analysis_pb.RepoPlatformHostPath_Key{
+						AbsolutePath: normalizedPath.GetUNIXString(),
+					},
+				)
+				if !replacement.IsSet() {
+					// TODO: Only return this error at the
+					// very end, so that capturing can be
+					// performed in parallel.
+					return evaluation.ErrMissingDependency
+				}
+
+				delete(d.symlinks, name)
+				switch capturedPath := replacement.Message.CapturedPath.(type) {
+				case *model_analysis_pb.RepoPlatformHostPath_Value_File:
+					f, err := newChangeTrackingFileFromFileProperties[TReference, TMetadata](model_core.Nested(replacement, capturedPath.File))
+					if err != nil {
+						return err
+					}
+					d.setFileSimple(name, f)
+				case *model_analysis_pb.RepoPlatformHostPath_Value_Directory:
+					var dReplacement changeTrackingDirectory[TReference, TMetadata]
+					if err := dReplacement.setContents(
+						model_core.Nested(replacement, capturedPath.Directory),
+						sr.directoryLoadOptions,
+					); err != nil {
+						return err
+					}
+					d.setDirectorySimple(name, &dReplacement)
+				default:
+					return errors.New("captured host path has an unknown type")
+				}
+			}
+		}
+	}
+
+	for name, dChild := range d.directories {
+		dStack.Push(dChild)
+		if err := sr.relativizeSymlinksRecursively(dStack, dPath.Append(name), maximumEscapementLevels+1); err != nil {
+			return err
+		}
+		if _, ok := dStack.PopSingle(); !ok {
+			panic("should have popped previously pushed directory")
+		}
+	}
+	return nil
+}

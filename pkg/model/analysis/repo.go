@@ -1187,6 +1187,7 @@ type moduleOrRepositoryContextEnvironment[TReference object.BasicReference, TMet
 	GetHttpArchiveContentsValue(*model_analysis_pb.HttpArchiveContents_Key) model_core.Message[*model_analysis_pb.HttpArchiveContents_Value, TReference]
 	GetHttpFileContentsValue(*model_analysis_pb.HttpFileContents_Key) model_core.Message[*model_analysis_pb.HttpFileContents_Value, TReference]
 	GetRegisteredRepoPlatformValue(*model_analysis_pb.RegisteredRepoPlatform_Key) model_core.Message[*model_analysis_pb.RegisteredRepoPlatform_Value, TReference]
+	GetRepoPlatformHostPathValue(*model_analysis_pb.RepoPlatformHostPath_Key) model_core.Message[*model_analysis_pb.RepoPlatformHostPath_Value, TReference]
 	GetRepoValue(*model_analysis_pb.Repo_Key) model_core.Message[*model_analysis_pb.Repo_Value, TReference]
 	GetRootModuleValue(*model_analysis_pb.RootModule_Key) model_core.Message[*model_analysis_pb.RootModule_Value, TReference]
 	GetStableInputRootPathObjectValue(*model_analysis_pb.StableInputRootPathObject_Key) (*model_starlark.BarePath, bool)
@@ -2711,143 +2712,14 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) relativizeSymlinks(
 		dStack.Push(d)
 		dPath = dPath.Append(component)
 	}
-	return mrc.relativizeSymlinksRecursively(dStack, dPath, maximumEscapementLevels)
-}
 
-type changeTrackingDirectoryNormalizingPathResolver[TReference object.BasicReference, TMetadata model_core.ReferenceMetadata] struct {
-	loadOptions *changeTrackingDirectoryLoadOptions[TReference]
-
-	gotScope    bool
-	directories util.NonEmptyStack[*changeTrackingDirectory[TReference, TMetadata]]
-	components  []path.Component
-}
-
-func (r *changeTrackingDirectoryNormalizingPathResolver[TReference, TMetadata]) OnAbsolute() (path.ComponentWalker, error) {
-	r.gotScope = true
-	r.directories.PopAll()
-	r.components = r.components[:0]
-	return r, nil
-}
-
-func (r *changeTrackingDirectoryNormalizingPathResolver[TReference, TMetadata]) OnRelative() (path.ComponentWalker, error) {
-	r.gotScope = true
-	return r, nil
-}
-
-func (r *changeTrackingDirectoryNormalizingPathResolver[TReference, TMetadata]) OnDriveLetter(driveLetter rune) (path.ComponentWalker, error) {
-	return nil, errors.New("drive letters are not supported")
-}
-
-func (r *changeTrackingDirectoryNormalizingPathResolver[TReference, TMetadata]) OnDirectory(name path.Component) (path.GotDirectoryOrSymlink, error) {
-	d := r.directories.Peek()
-	if err := d.maybeLoadContents(r.loadOptions); err != nil {
-		return nil, err
+	sr := changeTrackingDirectorySymlinksRelativizer[TReference, model_core.FileBackedObjectLocation]{
+		context:                       mrc.context,
+		environment:                   mrc.environment,
+		directoryLoadOptions:          mrc.directoryLoadOptions,
+		virtualRootScopeWalkerFactory: mrc.virtualRootScopeWalkerFactory,
 	}
-
-	if dChild, ok := d.directories[name]; ok {
-		r.components = append(r.components, name)
-		r.directories.Push(dChild)
-		return path.GotDirectory{
-			Child:        r,
-			IsReversible: true,
-		}, nil
-	}
-
-	return nil, fmt.Errorf("directory %#v does not exist", name.String())
-}
-
-func (r *changeTrackingDirectoryNormalizingPathResolver[TReference, TMetadata]) OnTerminal(name path.Component) (*path.GotSymlink, error) {
-	d := r.directories.Peek()
-	if err := d.maybeLoadContents(r.loadOptions); err != nil {
-		return nil, err
-	}
-	r.components = append(r.components, name)
-	return nil, nil
-}
-
-func (r *changeTrackingDirectoryNormalizingPathResolver[TReference, TMetadata]) OnUp() (path.ComponentWalker, error) {
-	if _, ok := r.directories.PopSingle(); !ok {
-		r.components = r.components[:len(r.components)-1]
-		return nil, errors.New("path resolves to a location above the root directory")
-	}
-	return r, nil
-}
-
-func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) relativizeSymlinksRecursively(dStack util.NonEmptyStack[*changeTrackingDirectory[TReference, model_core.FileBackedObjectLocation]], dPath *path.Trace, maximumEscapementLevels uint32) error {
-	d := dStack.Peek()
-	if d.currentReference.IsSet() {
-		currentMaximumEscapementLevels := d.currentReference.Message.MaximumSymlinkEscapementLevels
-		if currentMaximumEscapementLevels != nil && currentMaximumEscapementLevels.Value <= maximumEscapementLevels {
-			// This directory is guaranteed to not contain
-			// any symlinks that escape beyond the maximum
-			// number of permitted levels. There is no need
-			// to traverse it.
-			return nil
-		}
-
-		if err := d.maybeLoadContents(mrc.directoryLoadOptions); err != nil {
-			return err
-		}
-	}
-
-	for name, target := range d.symlinks {
-		escapementCounter := model_filesystem.NewEscapementCountingScopeWalker()
-		if err := path.Resolve(target, escapementCounter); err != nil {
-			return fmt.Errorf("failed to resolve symlink %#v %w", name.String(), err)
-		}
-		if levels := escapementCounter.GetLevels(); levels == nil || levels.Value > maximumEscapementLevels {
-			// Target of this symlink is absolute or has too
-			// many ".." components. We need to rewrite it
-			// or replace it by its target.
-			r := changeTrackingDirectoryNormalizingPathResolver[TReference, model_core.FileBackedObjectLocation]{
-				loadOptions: mrc.directoryLoadOptions,
-				directories: dStack.Copy(),
-				components:  append([]path.Component(nil), dPath.ToList()...),
-			}
-			if err := path.Resolve(target, mrc.virtualRootScopeWalkerFactory.New(&r)); err != nil {
-				return fmt.Errorf("failed to resolve symlink %#v: %w", dPath.Append(name).GetUNIXString(), err)
-			}
-			if !r.gotScope {
-				// TODO: Copy files from the repo worker's host file system.
-				return fmt.Errorf("Symlink %#v resolves to a path outside the input root", dPath.Append(name).GetUNIXString())
-			}
-
-			directoryComponents := dPath.ToList()
-			targetComponents := r.components
-			matchingCount := 0
-			for matchingCount < len(directoryComponents) && matchingCount < len(targetComponents) && directoryComponents[matchingCount] == targetComponents[matchingCount] {
-				matchingCount++
-			}
-			if matchingCount+int(maximumEscapementLevels) < len(directoryComponents) {
-				// TODO: Copy files as well?
-				return fmt.Errorf("Symlink %#v resolves to a path outside the repo", dPath.Append(name).GetUNIXString())
-			}
-
-			// Replace the symlink's target with a relative path.
-			// TODO: Any way we can cleanly implement this
-			// on top of pkg/filesystem/path?
-			dotDotsCount := len(directoryComponents) - matchingCount
-			parts := make([]string, 0, dotDotsCount+len(targetComponents)-matchingCount)
-			for i := 0; i < dotDotsCount; i++ {
-				parts = append(parts, "..")
-			}
-			for _, component := range targetComponents[matchingCount:] {
-				parts = append(parts, component.String())
-			}
-			d.symlinks[name] = path.UNIXFormat.NewParser(strings.Join(parts, "/"))
-		}
-	}
-
-	for name, dChild := range d.directories {
-		dStack.Push(dChild)
-		if err := mrc.relativizeSymlinksRecursively(dStack, dPath.Append(name), maximumEscapementLevels+1); err != nil {
-			return err
-		}
-		if _, ok := dStack.PopSingle(); !ok {
-			panic("should have popped previously pushed directory")
-		}
-	}
-	return nil
+	return sr.relativizeSymlinksRecursively(dStack, dPath, maximumEscapementLevels)
 }
 
 func (c *baseComputer[TReference, TMetadata]) fetchModuleExtensionRepo(ctx context.Context, canonicalRepo label.CanonicalRepo, apparentRepo label.ApparentRepo, e RepoEnvironment[TReference, TMetadata]) (PatchedRepoValue, error) {

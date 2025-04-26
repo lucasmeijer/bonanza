@@ -304,6 +304,7 @@
             "ModuleDotBazelContents",
             "RegisteredRepoPlatform",
             "Repo",
+            "RepoPlatformHostPath",
             "RootModule",
             "StableInputRootPathObject",
             "SuccessfulActionResult",
@@ -449,6 +450,7 @@
             "ModulesWithRemoteOverrides",
             "RegisteredRepoPlatform",
             "Repo",
+            "RepoPlatformHostPath",
             "RepositoryRuleObject",
             "RootModule",
             "StableInputRootPathObject",
@@ -461,6 +463,18 @@
             "FileProperties",
             "FileReader",
             "RootModule"
+         ]
+      },
+      "RepoPlatformHostPath": {
+         "dependsOn": [
+            "CommandEncoderObject",
+            "DirectoryCreationParameters",
+            "DirectoryCreationParametersObject",
+            "DirectoryReaders",
+            "FileCreationParameters",
+            "RegisteredRepoPlatform",
+            "RepoPlatformHostPath",
+            "SuccessfulActionResult"
          ]
       },
       "RepositoryRuleObject": {
