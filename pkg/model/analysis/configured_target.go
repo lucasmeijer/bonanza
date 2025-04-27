@@ -2471,13 +2471,6 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 		return nil, err
 	}
 
-	// Use the name of the first output file as a somewhat stable
-	// identifier of the action. Associate the outputs with this action.
-	if len(outputs) == 0 {
-		return nil, errors.New("action has no outputs")
-	}
-	actionID := []byte(outputs[0].packageRelativePath.String())
-
 	// Derive argv0 from the executable. Even though it's not
 	// explicitly documented, the executable is also treated as a
 	// tool dependency.
@@ -2499,194 +2492,18 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 			inputsDirect = append(inputsDirect, executableFile)
 		}
 	}
-	valueEncodingOptions := rc.computer.getValueEncodingOptions(rc.environment, nil)
-	stringArgumentsListBuilder := model_starlark.NewListBuilder(valueEncodingOptions)
-	if err := stringArgumentsListBuilder.PushChild(
-		model_core.NewSimplePatchedMessage[TMetadata](
-			&model_starlark_pb.List_Element{
-				Level: &model_starlark_pb.List_Element_Leaf{
-					Leaf: &model_starlark_pb.Value{
-						Kind: &model_starlark_pb.Value_Str{
-							Str: argv0,
-						},
-					},
-				},
-			},
-		),
-	); err != nil {
-		return nil, err
-	}
 
-	// Encode all arguments. Arguments may be a mixture of strings
-	// and Args objects.
-	//
-	// Promote any runs of string arguments to equivalent Args
-	// objects taking a list. That way, computation of target
-	// actions only needs to process Args objects.
-	argsListBuilder := btree.NewSplitProllyBuilder(
-		valueEncodingOptions.ObjectMinimumSizeBytes,
-		valueEncodingOptions.ObjectMaximumSizeBytes,
-		btree.NewObjectCreatingNodeMerger(
-			valueEncodingOptions.ObjectEncoder,
-			valueEncodingOptions.ObjectReferenceFormat,
-			func(createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]], childNodes []*model_analysis_pb.Args) (model_core.PatchedMessage[*model_analysis_pb.Args, TMetadata], error) {
-				patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
-				return model_core.NewPatchedMessage(
-					&model_analysis_pb.Args{
-						Level: &model_analysis_pb.Args_Parent_{
-							Parent: &model_analysis_pb.Args_Parent{
-								Reference: patcher.CaptureAndAddDecodableReference(
-									createdObject,
-									valueEncodingOptions.ObjectCapturer,
-								),
-							},
-						},
-					},
-					patcher,
-				), nil
-			},
-		),
+	return starlark.None, rca.doRunCommon(
+		thread,
+		arguments,
+		execGroup,
+		inputs,
+		outputs,
+		tools,
+		/* leadingArguments = */ []string{argv0},
+		inputsDirect,
+		toolsDirect,
 	)
-	gotStringArguments := true
-	for _, argument := range arguments {
-		switch typedArgument := argument.(type) {
-		case *args[TReference, TMetadata]:
-			if gotStringArguments {
-				if err := promoteStringArgumentsToArgs(stringArgumentsListBuilder, argsListBuilder); err != nil {
-					return nil, err
-				}
-				gotStringArguments = false
-			}
-			encodedArgs, err := typedArgument.Encode(map[starlark.Value]struct{}{}, valueEncodingOptions)
-			if err != nil {
-				return nil, err
-			}
-			if err := argsListBuilder.PushChild(
-				model_core.NewPatchedMessage(
-					&model_analysis_pb.Args{
-						Level: &model_analysis_pb.Args_Leaf_{
-							Leaf: encodedArgs.Message,
-						},
-					},
-					encodedArgs.Patcher,
-				),
-			); err != nil {
-				return nil, err
-			}
-		case string:
-			if !gotStringArguments {
-				stringArgumentsListBuilder = model_starlark.NewListBuilder(valueEncodingOptions)
-				gotStringArguments = true
-			}
-			if err := stringArgumentsListBuilder.PushChild(
-				model_core.NewSimplePatchedMessage[TMetadata](
-					&model_starlark_pb.List_Element{
-						Level: &model_starlark_pb.List_Element_Leaf{
-							Leaf: &model_starlark_pb.Value{
-								Kind: &model_starlark_pb.Value_Str{
-									Str: typedArgument,
-								},
-							},
-						},
-					},
-				),
-			); err != nil {
-				return nil, err
-			}
-		default:
-			panic("unexpected argument type")
-		}
-	}
-	if gotStringArguments {
-		if err := promoteStringArgumentsToArgs(stringArgumentsListBuilder, argsListBuilder); err != nil {
-			return nil, err
-		}
-	}
-	argsList, err := argsListBuilder.FinalizeList()
-	if err != nil {
-		return nil, err
-	}
-	patcher := argsList.Patcher
-
-	execGroups := rc.ruleDefinition.Message.ExecGroups
-	execGroupIndex, ok := sort.Find(
-		len(execGroups),
-		func(i int) int { return strings.Compare(execGroup, execGroups[i].Name) },
-	)
-	if !ok {
-		return nil, fmt.Errorf("rule does not have an exec group with name %#v", execGroup)
-	}
-
-	for _, output := range outputs {
-		if err := output.setDefinition(
-			model_core.NewSimplePatchedMessage[TMetadata](
-				&model_analysis_pb.ConfiguredTarget_Value_Output_Leaf{
-					PackageRelativePath: output.packageRelativePath.String(),
-					Source: &model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_ActionId{
-						ActionId: actionID,
-					},
-				},
-			),
-		); err != nil {
-			return nil, err
-		}
-	}
-
-	// Gather inputs and tools.
-	//
-	// If tools are provided in the form of depsets, or Files that
-	// are not provided by a label attribute marked executable=True,
-	// they will not have their runfiles directories added to the
-	// input root. Demote such tools to regular inputs.
-	var inputsTransitive []*model_starlark.Depset[TReference, TMetadata]
-	if inputs != nil {
-		inputsTransitive = append(inputsTransitive, inputs)
-	}
-	for i, tool := range tools {
-		if d, ok := tool.(*model_starlark.Depset[TReference, TMetadata]); ok {
-			inputsTransitive = append(inputsTransitive, d)
-		} else {
-			if toolFile, isTool, err := rc.getFileFromFileOrFilesToRunProvider(thread, executable); err != nil {
-				return nil, fmt.Errorf("tool at index %d: %w", i, err)
-			} else if isTool {
-				toolsDirect = append(toolsDirect, toolFile)
-			} else {
-				inputsDirect = append(inputsDirect, toolFile)
-			}
-		}
-	}
-
-	mergedInputs, err := model_starlark.NewDepset(thread, inputsDirect, inputsTransitive, model_starlark_pb.Depset_DEFAULT)
-	if err != nil {
-		return nil, err
-	}
-	encodedInputs, _, err := mergedInputs.EncodeList(map[starlark.Value]struct{}{}, valueEncodingOptions)
-	if err != nil {
-		return nil, err
-	}
-	patcher.Merge(encodedInputs.Patcher)
-
-	mergedTools, err := model_starlark.NewDepset[TReference, TMetadata](thread, toolsDirect, nil, model_starlark_pb.Depset_DEFAULT)
-	if err != nil {
-		return nil, err
-	}
-	encodedTools, _, err := mergedTools.EncodeList(map[starlark.Value]struct{}{}, valueEncodingOptions)
-	if err != nil {
-		return nil, err
-	}
-	patcher.Merge(encodedTools.Patcher)
-
-	rc.actions = append(rc.actions, model_core.NewPatchedMessage(
-		&model_analysis_pb.ConfiguredTarget_Value_Action_Leaf{
-			Arguments:             argsList.Message,
-			Id:                    actionID,
-			Inputs:                encodedInputs.Message,
-			Tools:                 encodedTools.Message,
-			PlatformPkixPublicKey: rc.execGroups[execGroupIndex].platformPkixPublicKey,
-		},
-		patcher,
-	))
-	return starlark.None, nil
 }
 
 func (rca *ruleContextActions[TReference, TMetadata]) doRunShell(thread *starlark.Thread, b *starlark.Builtin, fnArgs starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -2743,22 +2560,241 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunShell(thread *starlar
 		return nil, err
 	}
 
-	// TODO: Actually register the action.
+	return starlark.None, rca.doRunCommon(
+		thread,
+		arguments,
+		execGroup,
+		inputs,
+		outputs,
+		tools,
+		/* leadingArguments = */ []string{
+			"/bin/bash",
+			"-c",
+			command,
+			"",
+		},
+		/* inputsDirect = */ nil,
+		/* toolsDirect = */ nil,
+	)
+}
+
+// doRunCommon registers a runnable action. This method provides all
+// logic that is shared between ctx.actions.run() and
+// ctx.actions.run_shell().
+func (rca *ruleContextActions[TReference, TMetadata]) doRunCommon(
+	thread *starlark.Thread,
+	// Arguments shared by ctx.actions.run() and ctx.actions.run_shell().
+	arguments []any,
+	execGroup string,
+	inputs *model_starlark.Depset[TReference, TMetadata],
+	outputs []*targetOutput[TMetadata],
+	tools []any,
+	// Logic to distinguish ctx.actions.run() and ctx.actions.run_shell().
+	leadingArguments []string,
+	inputsDirect []starlark.Value,
+	toolsDirect []starlark.Value,
+) error {
+	// Use the name of the first output file as a somewhat stable
+	// identifier of the action. Associate the outputs with this action.
+	if len(outputs) == 0 {
+		return errors.New("action has no outputs")
+	}
+	actionID := []byte(outputs[0].packageRelativePath.String())
+
+	// ctx.actions.run() needs to prefix the arguments with the name
+	// of the executable. ctx.actions.run_shell() needs to add
+	// "/bin/bash -c ${command}".
+	rc := rca.ruleContext
+	valueEncodingOptions := rc.computer.getValueEncodingOptions(rc.environment, nil)
+	stringArgumentsListBuilder := model_starlark.NewListBuilder(valueEncodingOptions)
+	for _, leadingArgument := range leadingArguments {
+		if err := stringArgumentsListBuilder.PushChild(
+			model_core.NewSimplePatchedMessage[TMetadata](
+				&model_starlark_pb.List_Element{
+					Level: &model_starlark_pb.List_Element_Leaf{
+						Leaf: &model_starlark_pb.Value{
+							Kind: &model_starlark_pb.Value_Str{
+								Str: leadingArgument,
+							},
+						},
+					},
+				},
+			),
+		); err != nil {
+			return err
+		}
+	}
+
+	// Encode all arguments. Arguments may be a mixture of strings
+	// and Args objects.
+	//
+	// Promote any runs of string arguments to equivalent Args
+	// objects taking a list. That way, computation of target
+	// actions only needs to process Args objects.
+	argsListBuilder := btree.NewSplitProllyBuilder(
+		valueEncodingOptions.ObjectMinimumSizeBytes,
+		valueEncodingOptions.ObjectMaximumSizeBytes,
+		btree.NewObjectCreatingNodeMerger(
+			valueEncodingOptions.ObjectEncoder,
+			valueEncodingOptions.ObjectReferenceFormat,
+			func(createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]], childNodes []*model_analysis_pb.Args) (model_core.PatchedMessage[*model_analysis_pb.Args, TMetadata], error) {
+				patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
+				return model_core.NewPatchedMessage(
+					&model_analysis_pb.Args{
+						Level: &model_analysis_pb.Args_Parent_{
+							Parent: &model_analysis_pb.Args_Parent{
+								Reference: patcher.CaptureAndAddDecodableReference(
+									createdObject,
+									valueEncodingOptions.ObjectCapturer,
+								),
+							},
+						},
+					},
+					patcher,
+				), nil
+			},
+		),
+	)
+	gotStringArguments := true
+	for _, argument := range arguments {
+		switch typedArgument := argument.(type) {
+		case *args[TReference, TMetadata]:
+			if gotStringArguments {
+				if err := promoteStringArgumentsToArgs(stringArgumentsListBuilder, argsListBuilder); err != nil {
+					return err
+				}
+				gotStringArguments = false
+			}
+			encodedArgs, err := typedArgument.Encode(map[starlark.Value]struct{}{}, valueEncodingOptions)
+			if err != nil {
+				return err
+			}
+			if err := argsListBuilder.PushChild(
+				model_core.NewPatchedMessage(
+					&model_analysis_pb.Args{
+						Level: &model_analysis_pb.Args_Leaf_{
+							Leaf: encodedArgs.Message,
+						},
+					},
+					encodedArgs.Patcher,
+				),
+			); err != nil {
+				return err
+			}
+		case string:
+			if !gotStringArguments {
+				stringArgumentsListBuilder = model_starlark.NewListBuilder(valueEncodingOptions)
+				gotStringArguments = true
+			}
+			if err := stringArgumentsListBuilder.PushChild(
+				model_core.NewSimplePatchedMessage[TMetadata](
+					&model_starlark_pb.List_Element{
+						Level: &model_starlark_pb.List_Element_Leaf{
+							Leaf: &model_starlark_pb.Value{
+								Kind: &model_starlark_pb.Value_Str{
+									Str: typedArgument,
+								},
+							},
+						},
+					},
+				),
+			); err != nil {
+				return err
+			}
+		default:
+			panic("unexpected argument type")
+		}
+	}
+	if gotStringArguments {
+		if err := promoteStringArgumentsToArgs(stringArgumentsListBuilder, argsListBuilder); err != nil {
+			return err
+		}
+	}
+	argsList, err := argsListBuilder.FinalizeList()
+	if err != nil {
+		return err
+	}
+	patcher := argsList.Patcher
+
+	execGroups := rc.ruleDefinition.Message.ExecGroups
+	execGroupIndex, ok := sort.Find(
+		len(execGroups),
+		func(i int) int { return strings.Compare(execGroup, execGroups[i].Name) },
+	)
+	if !ok {
+		return fmt.Errorf("rule does not have an exec group with name %#v", execGroup)
+	}
+
 	for _, output := range outputs {
 		if err := output.setDefinition(
 			model_core.NewSimplePatchedMessage[TMetadata](
 				&model_analysis_pb.ConfiguredTarget_Value_Output_Leaf{
 					PackageRelativePath: output.packageRelativePath.String(),
 					Source: &model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_ActionId{
-						ActionId: []byte("TODO"),
+						ActionId: actionID,
 					},
 				},
 			),
 		); err != nil {
-			return nil, err
+			return err
 		}
 	}
-	return starlark.None, nil
+
+	// Gather inputs and tools.
+	//
+	// If tools are provided in the form of depsets, or Files that
+	// are not provided by a label attribute marked executable=True,
+	// they will not have their runfiles directories added to the
+	// input root. Demote such tools to regular inputs.
+	var inputsTransitive []*model_starlark.Depset[TReference, TMetadata]
+	if inputs != nil {
+		inputsTransitive = append(inputsTransitive, inputs)
+	}
+	for i, tool := range tools {
+		if d, ok := tool.(*model_starlark.Depset[TReference, TMetadata]); ok {
+			inputsTransitive = append(inputsTransitive, d)
+		} else {
+			if toolFile, isTool, err := rc.getFileFromFileOrFilesToRunProvider(thread, tool); err != nil {
+				return fmt.Errorf("tool at index %d: %w", i, err)
+			} else if isTool {
+				toolsDirect = append(toolsDirect, toolFile)
+			} else {
+				inputsDirect = append(inputsDirect, toolFile)
+			}
+		}
+	}
+
+	mergedInputs, err := model_starlark.NewDepset(thread, inputsDirect, inputsTransitive, model_starlark_pb.Depset_DEFAULT)
+	if err != nil {
+		return err
+	}
+	encodedInputs, _, err := mergedInputs.EncodeList(map[starlark.Value]struct{}{}, valueEncodingOptions)
+	if err != nil {
+		return err
+	}
+	patcher.Merge(encodedInputs.Patcher)
+
+	mergedTools, err := model_starlark.NewDepset[TReference, TMetadata](thread, toolsDirect, nil, model_starlark_pb.Depset_DEFAULT)
+	if err != nil {
+		return err
+	}
+	encodedTools, _, err := mergedTools.EncodeList(map[starlark.Value]struct{}{}, valueEncodingOptions)
+	if err != nil {
+		return err
+	}
+	patcher.Merge(encodedTools.Patcher)
+
+	rc.actions = append(rc.actions, model_core.NewPatchedMessage(
+		&model_analysis_pb.ConfiguredTarget_Value_Action_Leaf{
+			Arguments:             argsList.Message,
+			Id:                    actionID,
+			Inputs:                encodedInputs.Message,
+			Tools:                 encodedTools.Message,
+			PlatformPkixPublicKey: rc.execGroups[execGroupIndex].platformPkixPublicKey,
+		},
+		patcher,
+	))
+	return nil
 }
 
 type singleSymlinkDirectory[TFile, TDirectory model_core.ReferenceMetadata] struct {
