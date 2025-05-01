@@ -602,7 +602,20 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 		return PatchedTargetActionResultValue{}, evaluation.ErrMissingDependency
 	}
 
-	return PatchedTargetActionResultValue{}, errors.New("TODO: Invoke action!")
+	outputs, err := model_parser.MaybeDereference(
+		ctx, directoryReaders.CommandOutputs,
+		model_core.Nested(actionResult, actionResult.Message.OutputsReference),
+	)
+	if err != nil {
+		return PatchedTargetActionResultValue{}, fmt.Errorf("failed to obtain outputs from action result: %w", err)
+	}
+	outputRoot := model_core.Patch(e, model_core.Nested(outputs, outputs.Message.GetOutputRoot()))
+	return model_core.NewPatchedMessage(
+		&model_analysis_pb.TargetActionResult_Value{
+			OutputRoot: outputRoot.Message,
+		},
+		model_core.MapReferenceMetadataToWalkers(outputRoot.Patcher),
+	), nil
 }
 
 // directoryExpander implements the DirectoryExpander type that is
