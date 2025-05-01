@@ -65,6 +65,7 @@ type NamedFunctionDefinition[TReference any, TMetadata model_core.CloneableRefer
 	Encode(path map[starlark.Value]struct{}, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.Function, TMetadata], bool, error)
 	Name() string
 	Position() syntax.Position
+	NumParams(thread *starlark.Thread) (int, error)
 }
 
 type starlarkNamedFunctionDefinition[TReference any, TMetadata model_core.CloneableReferenceMetadata] struct {
@@ -142,6 +143,10 @@ func (d starlarkNamedFunctionDefinition[TReference, TMetadata]) Encode(path map[
 	), needsCode, nil
 }
 
+func (d starlarkNamedFunctionDefinition[TReference, TMetadata]) NumParams(thread *starlark.Thread) (int, error) {
+	return d.Function.NumParams(), nil
+}
+
 type FunctionFactoryResolver = func(filename pg_label.CanonicalLabel) (*starlark.FunctionFactory, error)
 
 const FunctionFactoryResolverKey = "function_factory_resolver"
@@ -157,7 +162,7 @@ func NewProtoNamedFunctionDefinition[TReference object.BasicReference, TMetadata
 	}
 }
 
-func (d *protoNamedFunctionDefinition[TReference, TMetadata]) CallInternal(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+func (d *protoNamedFunctionDefinition[TReference, TMetadata]) getFunction(thread *starlark.Thread) (*starlark.Function, error) {
 	function := d.function.Load()
 	if function == nil {
 		functionFactoryResolver := thread.Local(FunctionFactoryResolverKey)
@@ -212,6 +217,14 @@ func (d *protoNamedFunctionDefinition[TReference, TMetadata]) CallInternal(threa
 
 		d.function.Store(function)
 	}
+	return function, nil
+}
+
+func (d *protoNamedFunctionDefinition[TReference, TMetadata]) CallInternal(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	function, err := d.getFunction(thread)
+	if err != nil {
+		return nil, err
+	}
 	return function.CallInternal(thread, args, kwargs)
 }
 
@@ -231,6 +244,14 @@ func (d *protoNamedFunctionDefinition[TReference, TMetadata]) Position() syntax.
 		return syntax.MakePosition(&m.Filename, m.Line, m.Column)
 	}
 	return syntax.MakePosition(nil, 0, 0)
+}
+
+func (d *protoNamedFunctionDefinition[TReference, TMetadata]) NumParams(thread *starlark.Thread) (int, error) {
+	function, err := d.getFunction(thread)
+	if err != nil {
+		return 0, err
+	}
+	return function.NumParams(), nil
 }
 
 type namedFunctionUnpackerInto[TReference any, TMetadata model_core.CloneableReferenceMetadata] struct{}

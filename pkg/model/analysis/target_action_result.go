@@ -21,6 +21,7 @@ import (
 	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
 	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
 	"github.com/buildbarn/bonanza/pkg/starlark/unpack"
+	"github.com/buildbarn/bonanza/pkg/storage/object"
 
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
@@ -234,17 +235,43 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 						model_core.Nested(add, mapEach),
 					),
 				)
+
+				// The map_each function is allowed to have
+				// multiple shapes. If it has a single
+				// parameter, it's only called with the File.
+				// If it has two parameters, it is invoked
+				// with a DirectoryExpander that can be used
+				// to selectively perform expansion.
+				numParams, err := mapEachFunc.NumParams(thread)
+				if err != nil {
+					return PatchedTargetActionResultValue{}, fmt.Errorf("unable to determine number of parameters of map_each function: %w", err)
+				}
+				var mapEachFuncArgs starlark.Tuple
+				switch numParams {
+				case 1:
+					mapEachFuncArgs = make(starlark.Tuple, 1)
+				case 2:
+					mapEachFuncArgs = make(starlark.Tuple, 2)
+					mapEachFuncArgs[1] = &directoryExpander[TReference, TMetadata]{}
+				default:
+					return PatchedTargetActionResultValue{}, errors.New("map_each function should have 1 or 2 parameters")
+				}
+
 				for v := range valuesIter {
+					mapEachFuncArgs[0] = v
 					returnValue, err := starlark.Call(
 						thread,
 						mapEachFunc,
-						starlark.Tuple{
-							v,
-							// TODO: Provide a DirectoryExpander!
-						},
+						mapEachFuncArgs,
 						nil,
 					)
 					if err != nil {
+						if !errors.Is(err, evaluation.ErrMissingDependency) {
+							var evalErr *starlark.EvalError
+							if errors.As(err, &evalErr) {
+								return PatchedTargetActionResultValue{}, errors.New(evalErr.Backtrace())
+							}
+						}
 						return PatchedTargetActionResultValue{}, err
 					}
 					var s []string
@@ -531,4 +558,60 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 	}
 
 	return PatchedTargetActionResultValue{}, errors.New("TODO: Invoke action!")
+}
+
+// directoryExpander implements the DirectoryExpander type that is
+// provided to the "map_each" callback used by Args.add_*(). It provides
+// the ability to expand directories to a list of files.
+type directoryExpander[TReference object.BasicReference, TMetadata BaseComputerReferenceMetadata] struct{}
+
+var _ starlark.HasAttrs = (*directoryExpander[object.LocalReference, BaseComputerReferenceMetadata])(nil)
+
+func (directoryExpander[TReference, TMetadata]) String() string {
+	return "<DirectoryExpander>"
+}
+
+func (directoryExpander[TReference, TMetadata]) Type() string {
+	return "DirectoryExpander"
+}
+
+func (directoryExpander[TReference, TMetadata]) Freeze() {}
+
+func (directoryExpander[TReference, TMetadata]) Truth() starlark.Bool {
+	return starlark.True
+}
+
+func (directoryExpander[TReference, TMetadata]) Hash(thread *starlark.Thread) (uint32, error) {
+	return 0, errors.New("DirectoryExpander cannot be hashed")
+}
+
+func (d *directoryExpander[TReference, TMetadata]) Attr(thread *starlark.Thread, name string) (starlark.Value, error) {
+	switch name {
+	case "expand":
+		return starlark.NewBuiltin("DirectoryExpander.expand", d.doExpand), nil
+	default:
+		return nil, nil
+	}
+}
+
+var directoryExpanderAttrNames = []string{
+	"expand",
+}
+
+func (directoryExpander[TReference, TMetadata]) AttrNames() []string {
+	return directoryExpanderAttrNames
+}
+
+func (directoryExpander[TReference, TMetadata]) doExpand(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var file *model_starlark.File[TReference, TMetadata]
+	if err := starlark.UnpackArgs(
+		b.Name(), args, kwargs,
+		"file", unpack.Bind(thread, &file, unpack.Type[*model_starlark.File[TReference, TMetadata]]("File")),
+	); err != nil {
+		return nil, err
+	}
+	if d := file.GetDefinition(); d.Message.Type == model_starlark_pb.File_DIRECTORY {
+		return nil, errors.New("TODO: Implement directory expansion!")
+	}
+	return starlark.NewList([]starlark.Value{file}), nil
 }
