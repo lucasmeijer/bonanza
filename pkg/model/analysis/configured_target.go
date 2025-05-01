@@ -1142,14 +1142,14 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 							return starlark.None, nil
 						}
 					})
-					for _, valuePart := range valueParts.Message {
+					for i, valuePart := range valueParts.Message {
 						decodedPart, err := model_starlark.DecodeValue[TReference, TMetadata](
 							model_core.Nested(valueParts, valuePart),
 							/* currentIdentifier = */ nil,
 							valueDecodingOptions,
 						)
 						if err != nil {
-							return PatchedConfiguredTargetValue{}, fmt.Errorf("decode value part: %w", err)
+							return PatchedConfiguredTargetValue{}, fmt.Errorf("decoding attr %#v transition %#v value part %d: %w", namedAttr.Name, transitionEntry.Key, i, err)
 						}
 						if isScalar && mayHaveMultipleConfigurations {
 							if decodedPart == starlark.None {
