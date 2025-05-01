@@ -15,12 +15,14 @@ import (
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/model/core/btree"
 	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
+	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
 	model_starlark "github.com/buildbarn/bonanza/pkg/model/starlark"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
 	model_command_pb "github.com/buildbarn/bonanza/pkg/proto/model/command"
 	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
 	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
 	"github.com/buildbarn/bonanza/pkg/starlark/unpack"
+	"github.com/buildbarn/bonanza/pkg/storage/dag"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 
 	"golang.org/x/sync/errgroup"
@@ -78,6 +80,41 @@ func splitArgsTemplate(template string) (string, string, error) {
 		return "", "", errors.New("template contains no %s substitution placeholders")
 	}
 	return prefix.String(), suffix.String(), nil
+}
+
+type expandFileIfDirectoryEnvironment[TReference, TMetadata any] interface {
+	model_core.ExistingObjectCapturer[TReference, TMetadata]
+
+	GetFileRootValue(key model_core.PatchedMessage[*model_analysis_pb.FileRoot_Key, dag.ObjectContentsWalker]) model_core.Message[*model_analysis_pb.FileRoot_Value, TReference]
+}
+
+// expandFileIfDirectory checks whether a File provided to Args.add*()
+// corresponds to a directory. If so, it expands it to a sequence of
+// File objects corresponding to its children.
+func (c *baseComputer[TReference, TMetadata]) expandFileIfDirectory(e expandFileIfDirectoryEnvironment[TReference, TMetadata], file *model_starlark.File[TReference, TMetadata], errOut *error) iter.Seq[*model_starlark.File[TReference, TMetadata]] {
+	d := file.GetDefinition()
+	if d.Message.Type != model_starlark_pb.File_DIRECTORY {
+		return func(yield func(*model_starlark.File[TReference, TMetadata]) bool) {
+			yield(file)
+		}
+	}
+
+	patchedFile := model_core.Patch(e, d)
+	fileRoot := e.GetFileRootValue(
+		model_core.NewPatchedMessage(
+			&model_analysis_pb.FileRoot_Key{
+				File: patchedFile.Message,
+			},
+			model_core.MapReferenceMetadataToWalkers(patchedFile.Patcher),
+		),
+	)
+	if !fileRoot.IsSet() {
+		*errOut = evaluation.ErrMissingDependency
+		return func(yield func(*model_starlark.File[TReference, TMetadata]) bool) {}
+	}
+
+	*errOut = errors.New("TODO")
+	return func(yield func(*model_starlark.File[TReference, TMetadata]) bool) {}
 }
 
 func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx context.Context, key model_core.Message[*model_analysis_pb.TargetActionResult_Key, TReference], e TargetActionResultEnvironment[TReference, TMetadata]) (PatchedTargetActionResultValue, error) {
@@ -213,11 +250,16 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 				var expandedValues []starlark.Value
 				for v := range valuesIter {
 					if f, ok := v.(*model_starlark.File[TReference, TMetadata]); ok {
-						if d := f.GetDefinition(); d.Message.Type == model_starlark_pb.File_DIRECTORY {
-							return PatchedTargetActionResultValue{}, errors.New("TODO: Implement directory expansion!")
+						var errIter error
+						for child := range c.expandFileIfDirectory(e, f, &errIter) {
+							expandedValues = append(expandedValues, child)
 						}
+						if errIter != nil {
+							return PatchedTargetActionResultValue{}, err
+						}
+					} else {
+						expandedValues = append(expandedValues, v)
 					}
-					expandedValues = append(expandedValues, v)
 				}
 				valuesIter = slices.Values(expandedValues)
 			}
@@ -252,7 +294,10 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 					mapEachFuncArgs = make(starlark.Tuple, 1)
 				case 2:
 					mapEachFuncArgs = make(starlark.Tuple, 2)
-					mapEachFuncArgs[1] = &directoryExpander[TReference, TMetadata]{}
+					mapEachFuncArgs[1] = &directoryExpander[TReference, TMetadata]{
+						computer:    c,
+						environment: e,
+					}
 				default:
 					return PatchedTargetActionResultValue{}, errors.New("map_each function should have 1 or 2 parameters")
 				}
@@ -563,7 +608,10 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 // directoryExpander implements the DirectoryExpander type that is
 // provided to the "map_each" callback used by Args.add_*(). It provides
 // the ability to expand directories to a list of files.
-type directoryExpander[TReference object.BasicReference, TMetadata BaseComputerReferenceMetadata] struct{}
+type directoryExpander[TReference object.BasicReference, TMetadata BaseComputerReferenceMetadata] struct {
+	computer    *baseComputer[TReference, TMetadata]
+	environment expandFileIfDirectoryEnvironment[TReference, TMetadata]
+}
 
 var _ starlark.HasAttrs = (*directoryExpander[object.LocalReference, BaseComputerReferenceMetadata])(nil)
 
@@ -585,10 +633,10 @@ func (directoryExpander[TReference, TMetadata]) Hash(thread *starlark.Thread) (u
 	return 0, errors.New("DirectoryExpander cannot be hashed")
 }
 
-func (d *directoryExpander[TReference, TMetadata]) Attr(thread *starlark.Thread, name string) (starlark.Value, error) {
+func (de *directoryExpander[TReference, TMetadata]) Attr(thread *starlark.Thread, name string) (starlark.Value, error) {
 	switch name {
 	case "expand":
-		return starlark.NewBuiltin("DirectoryExpander.expand", d.doExpand), nil
+		return starlark.NewBuiltin("DirectoryExpander.expand", de.doExpand), nil
 	default:
 		return nil, nil
 	}
@@ -602,7 +650,7 @@ func (directoryExpander[TReference, TMetadata]) AttrNames() []string {
 	return directoryExpanderAttrNames
 }
 
-func (directoryExpander[TReference, TMetadata]) doExpand(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+func (de *directoryExpander[TReference, TMetadata]) doExpand(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var file *model_starlark.File[TReference, TMetadata]
 	if err := starlark.UnpackArgs(
 		b.Name(), args, kwargs,
@@ -610,8 +658,14 @@ func (directoryExpander[TReference, TMetadata]) doExpand(thread *starlark.Thread
 	); err != nil {
 		return nil, err
 	}
-	if d := file.GetDefinition(); d.Message.Type == model_starlark_pb.File_DIRECTORY {
-		return nil, errors.New("TODO: Implement directory expansion!")
+
+	var files []starlark.Value
+	var errIter error
+	for child := range de.computer.expandFileIfDirectory(de.environment, file, &errIter) {
+		files = append(files, child)
 	}
-	return starlark.NewList([]starlark.Value{file}), nil
+	if errIter != nil {
+		return nil, errIter
+	}
+	return starlark.NewList(files), nil
 }
