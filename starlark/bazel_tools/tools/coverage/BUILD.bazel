@@ -3,13 +3,11 @@ config_setting(
     values = {"collect_code_coverage": "true"},
 )
 
-filegroup(name = "empty")
-
 alias(
     name = "coverage_output_generator",
     actual = select({
         ":collect_code_coverage_enabled": "//command_line_option:coverage_output_generator",
-        "//conditions:default": ":empty",
+        "//conditions:default": None,
     }),
     visibility = ["//visibility:public"],
 )

@@ -220,37 +220,45 @@ func (c *baseComputer[TReference, TMetadata]) ComputeVisibleTargetValue(ctx cont
 			// is fine with that.
 			return model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](&model_analysis_pb.VisibleTarget_Value{}), nil
 		}
-		actualLabelValue, ok := actualValue.Kind.(*model_starlark_pb.Value_Label)
-		if !ok {
+		switch actualValueKind := actualValue.Kind.(type) {
+		case *model_starlark_pb.Value_Label:
+			actualLabel, err := label.NewResolvedLabel(actualValueKind.Label)
+			if err != nil {
+				return PatchedVisibleTargetValue{}, fmt.Errorf("invalid label %#v: %w", actualValueKind.Label, err)
+			}
+			actualCanonicalLabel, err := actualLabel.AsCanonical()
+			if err != nil {
+				return PatchedVisibleTargetValue{}, err
+			}
+
+			// The actual target may also be an alias.
+			patchedConfigurationReference := model_core.Patch(e, configurationReference)
+			actualVisibleTargetValue := e.GetVisibleTargetValue(
+				model_core.NewPatchedMessage(
+					&model_analysis_pb.VisibleTarget_Key{
+						FromPackage:            toLabel.GetCanonicalPackage().String(),
+						ToLabel:                actualCanonicalLabel.String(),
+						PermitAliasNoMatch:     key.Message.PermitAliasNoMatch,
+						StopAtLabelSetting:     key.Message.StopAtLabelSetting,
+						ConfigurationReference: patchedConfigurationReference.Message,
+					},
+					model_core.MapReferenceMetadataToWalkers(patchedConfigurationReference.Patcher),
+				),
+			)
+			if !actualVisibleTargetValue.IsSet() {
+				return PatchedVisibleTargetValue{}, evaluation.ErrMissingDependency
+			}
+			return model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](actualVisibleTargetValue.Message), nil
+		case *model_starlark_pb.Value_None:
+			// This implementation allows alias(actual = None).
+			// This extension is necessary to support
+			// configuration_field("coverage", "output_generator")
+			// which may return None if --collect_code_coverage
+			// is not enabled.
+			return model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](&model_analysis_pb.VisibleTarget_Value{}), nil
+		default:
 			return PatchedVisibleTargetValue{}, errors.New("actual target of alias is not a label")
 		}
-		actualLabel, err := label.NewResolvedLabel(actualLabelValue.Label)
-		if err != nil {
-			return PatchedVisibleTargetValue{}, fmt.Errorf("invalid label %#v: %w", actualLabelValue.Label, err)
-		}
-		actualCanonicalLabel, err := actualLabel.AsCanonical()
-		if err != nil {
-			return PatchedVisibleTargetValue{}, err
-		}
-
-		// The actual target may also be an alias.
-		patchedConfigurationReference := model_core.Patch(e, configurationReference)
-		actualVisibleTargetValue := e.GetVisibleTargetValue(
-			model_core.NewPatchedMessage(
-				&model_analysis_pb.VisibleTarget_Key{
-					FromPackage:            toLabel.GetCanonicalPackage().String(),
-					ToLabel:                actualCanonicalLabel.String(),
-					PermitAliasNoMatch:     key.Message.PermitAliasNoMatch,
-					StopAtLabelSetting:     key.Message.StopAtLabelSetting,
-					ConfigurationReference: patchedConfigurationReference.Message,
-				},
-				model_core.MapReferenceMetadataToWalkers(patchedConfigurationReference.Patcher),
-			),
-		)
-		if !actualVisibleTargetValue.IsSet() {
-			return PatchedVisibleTargetValue{}, evaluation.ErrMissingDependency
-		}
-		return model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](actualVisibleTargetValue.Message), nil
 	case *model_starlark_pb.Target_Definition_LabelSetting:
 		if key.Message.StopAtLabelSetting {
 			// We are applying a transition and want to

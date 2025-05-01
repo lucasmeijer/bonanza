@@ -859,7 +859,7 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 					if err := starlark.UnpackArgs(
 						b.Name(), args, kwargs,
 						"name", unpack.Bind(thread, &name, unpack.Stringer(unpack.TargetName)),
-						"actual", unpack.Bind(thread, &actual, NewSelectUnpackerInto[TReference, TMetadata](labelOrStringUnpackerInto)),
+						"actual", unpack.Bind(thread, &actual, NewSelectUnpackerInto[TReference, TMetadata](unpack.IfNotNone(labelOrStringUnpackerInto))),
 						"deprecation?", unpack.Bind(thread, &deprecation, unpack.String),
 						"tags?", unpack.Bind(thread, &tags, unpack.List(unpack.String)),
 						"visibility?", unpack.Bind(thread, &visibility, unpack.IfNotNone(unpack.List(labelOrStringUnpackerInto))),
