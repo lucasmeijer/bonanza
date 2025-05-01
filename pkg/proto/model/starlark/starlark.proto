@@ -35,14 +35,15 @@ message Value {
     Rule rule = 18;
     Runfiles runfiles = 19;
     Select select = 20;
-    string str = 21;
-    Struct struct = 22;
-    Subrule subrule = 23;
-    TagClass tag_class = 24;
-    TargetReference target_reference = 25;
-    ToolchainType toolchain_type = 26;
-    Transition transition = 27;
-    Tuple tuple = 28;
+    Set set = 21;
+    string str = 22;
+    Struct struct = 23;
+    Subrule subrule = 24;
+    TagClass tag_class = 25;
+    TargetReference target_reference = 26;
+    ToolchainType toolchain_type = 27;
+    Transition transition = 28;
+    Tuple tuple = 29;
   }
 }
 
@@ -779,6 +780,10 @@ message Select {
   // If there are multiple groups, the operator that was used to
   // concatenate.
   ConcatenationOperator concatenation_operator = 2;
+}
+
+message Set {
+  repeated List.Element elements = 1;
 }
 
 message SourceFileTarget {
