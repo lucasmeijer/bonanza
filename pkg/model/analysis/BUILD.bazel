@@ -76,6 +76,7 @@ go_library(
         "//pkg/evaluation",
         "//pkg/glob",
         "//pkg/label",
+        "//pkg/model/command",
         "//pkg/model/core",
         "//pkg/model/core/btree",
         "//pkg/model/core/inlinedtree",

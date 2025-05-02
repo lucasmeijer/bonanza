@@ -24,6 +24,7 @@ import (
 	"github.com/buildbarn/bonanza/pkg/diff"
 	"github.com/buildbarn/bonanza/pkg/evaluation"
 	"github.com/buildbarn/bonanza/pkg/label"
+	model_command "github.com/buildbarn/bonanza/pkg/model/command"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/model/core/btree"
 	"github.com/buildbarn/bonanza/pkg/model/core/inlinedtree"
@@ -1761,7 +1762,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 	outputPathPatternChildren := model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker]((*model_command_pb.PathPattern_Children)(nil))
 	commandInlinedTreeOptions := mrc.computer.getCommandInlinedTreeOptions(mrc.commandEncoder)
 	for i := len(mrc.subdirectoryComponents); i > 0; i-- {
-		outputPathPatternChildren, err = prependDirectoryToPathPatternChildren(
+		outputPathPatternChildren, err = model_command.PrependDirectoryToPathPatternChildren(
 			mrc.subdirectoryComponents[i-1].String(),
 			outputPathPatternChildren,
 			commandInlinedTreeOptions,
@@ -1827,7 +1828,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 					command model_core.PatchedMessage[*model_command_pb.Command, dag.ObjectContentsWalker],
 					externalObject *model_core.Decodable[model_core.CreatedObject[dag.ObjectContentsWalker]],
 				) {
-					command.Message.OutputPathPattern = getPathPatternForChildren(
+					command.Message.OutputPathPattern = model_command.GetPathPatternWithChildren(
 						outputPathPatternChildren,
 						externalObject,
 						command.Patcher,

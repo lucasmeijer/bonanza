@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"iter"
 	"maps"
 	"slices"
 	"sort"
@@ -15,6 +14,7 @@ import (
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
 	"github.com/buildbarn/bonanza/pkg/evaluation"
 	"github.com/buildbarn/bonanza/pkg/label"
+	model_command "github.com/buildbarn/bonanza/pkg/model/command"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/model/core/btree"
 	"github.com/buildbarn/bonanza/pkg/model/core/inlinedtree"
@@ -22,7 +22,6 @@ import (
 	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
 	model_starlark "github.com/buildbarn/bonanza/pkg/model/starlark"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
-	model_command_pb "github.com/buildbarn/bonanza/pkg/proto/model/command"
 	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
 	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
 	"github.com/buildbarn/bonanza/pkg/starlark/unpack"
@@ -2736,7 +2735,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunCommon(
 	// be stored in a tree, which the worker uses after execution
 	// completes to determine which parts of the input root to
 	// capture.
-	var outputPathPatternSet pathPatternSet[TMetadata]
+	var outputPathPatternSet model_command.PathPatternSet[TMetadata]
 	for _, output := range outputs {
 		if err := output.setDefinition(
 			model_core.NewSimplePatchedMessage[TMetadata](
@@ -2750,9 +2749,9 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunCommon(
 		); err != nil {
 			return err
 		}
-		outputPathPatternSet.add(strings.SplitSeq(output.packageRelativePath.String(), "/"))
+		outputPathPatternSet.Add(strings.SplitSeq(output.packageRelativePath.String(), "/"))
 	}
-	outputPathPatternChildren, err := outputPathPatternSet.toProto(
+	outputPathPatternChildren, err := outputPathPatternSet.ToProto(
 		rc.computer.getCommandInlinedTreeOptions(rc.commandEncoder),
 		rc.environment,
 	)
@@ -2867,7 +2866,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunCommon(
 					action model_core.PatchedMessage[*model_analysis_pb.ConfiguredTarget_Value_Action_Leaf, TMetadata],
 					externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
 				) {
-					action.Message.OutputPathPattern = getPathPatternForChildren(
+					action.Message.OutputPathPattern = model_command.GetPathPatternWithChildren(
 						outputPathPatternChildren,
 						externalObject,
 						action.Patcher,
@@ -2883,100 +2882,6 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunCommon(
 	}
 	rc.actions = append(rc.actions, action)
 	return nil
-}
-
-func getPathPatternForChildren[TMetadata model_core.ReferenceMetadata](
-	children model_core.PatchedMessage[*model_command_pb.PathPattern_Children, TMetadata],
-	externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
-	patcher *model_core.ReferenceMessagePatcher[TMetadata],
-	objectCapturer model_core.CreatedObjectCapturer[TMetadata],
-) *model_command_pb.PathPattern {
-	if children.Message == nil {
-		return &model_command_pb.PathPattern{}
-	}
-	if externalObject == nil {
-		return &model_command_pb.PathPattern{
-			Children: &model_command_pb.PathPattern_ChildrenInline{
-				ChildrenInline: children.Message,
-			},
-		}
-	}
-	return &model_command_pb.PathPattern{
-		Children: &model_command_pb.PathPattern_ChildrenExternal{
-			ChildrenExternal: patcher.CaptureAndAddDecodableReference(
-				*externalObject,
-				objectCapturer,
-			),
-		},
-	}
-}
-
-func getPathPatternInlineCandidate[TMetadata model_core.ReferenceMetadata](name string, grandChildren model_core.PatchedMessage[*model_command_pb.PathPattern_Children, TMetadata], objectCapturer model_core.CreatedObjectCapturer[TMetadata]) inlinedtree.Candidate[*model_command_pb.PathPattern_Children, TMetadata] {
-	return inlinedtree.Candidate[*model_command_pb.PathPattern_Children, TMetadata]{
-		ExternalMessage: model_core.NewPatchedMessage[proto.Message](grandChildren.Message, grandChildren.Patcher),
-		ParentAppender: func(
-			children model_core.PatchedMessage[*model_command_pb.PathPattern_Children, TMetadata],
-			externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
-		) {
-			children.Message.Children = append(children.Message.Children, &model_command_pb.PathPattern_Child{
-				Name:    name,
-				Pattern: getPathPatternForChildren(grandChildren, externalObject, children.Patcher, objectCapturer),
-			})
-		},
-	}
-}
-
-func prependDirectoryToPathPatternChildren[TMetadata model_core.ReferenceMetadata](name string, grandChildren model_core.PatchedMessage[*model_command_pb.PathPattern_Children, TMetadata], inlinedTreeOptions *inlinedtree.Options, objectCapturer model_core.CreatedObjectCapturer[TMetadata]) (model_core.PatchedMessage[*model_command_pb.PathPattern_Children, TMetadata], error) {
-	return inlinedtree.Build(
-		inlinedtree.CandidateList[*model_command_pb.PathPattern_Children, TMetadata]{
-			getPathPatternInlineCandidate(name, grandChildren, objectCapturer),
-		},
-		inlinedTreeOptions,
-	)
-}
-
-// pathPatternSet is a set of relative pathname strings that should be
-// captured by a remote worker after execution of an action completes.
-type pathPatternSet[TMetadata model_core.ReferenceMetadata] struct {
-	children map[string]*pathPatternSet[TMetadata]
-	included bool
-}
-
-func (s *pathPatternSet[TMetadata]) add(path iter.Seq[string]) {
-	for component := range path {
-		sChild, ok := s.children[component]
-		if !ok {
-			if s.children == nil {
-				s.children = map[string]*pathPatternSet[TMetadata]{}
-			}
-			sChild = &pathPatternSet[TMetadata]{}
-			s.children[component] = sChild
-		}
-		s = sChild
-	}
-	s.included = true
-}
-
-// toProto converts the set of relative pathname strings contained in
-// the set to a PathPattern message that can be embedded in a Command
-// message, which is to be processed by a remote worker.
-func (s *pathPatternSet[TMetadata]) toProto(inlinedTreeOptions *inlinedtree.Options, objectCapturer model_core.CreatedObjectCapturer[TMetadata]) (model_core.PatchedMessage[*model_command_pb.PathPattern_Children, TMetadata], error) {
-	if s.included {
-		return model_core.NewSimplePatchedMessage[TMetadata]((*model_command_pb.PathPattern_Children)(nil)), nil
-	}
-
-	if len(s.children) == 0 {
-		panic("leaf path should have been included in the path pattern set")
-	}
-	inlineCandidates := make(inlinedtree.CandidateList[*model_command_pb.PathPattern_Children, TMetadata], 0, len(s.children))
-	for _, name := range slices.Sorted(maps.Keys(s.children)) {
-		grandChildren, err := s.children[name].toProto(inlinedTreeOptions, objectCapturer)
-		if err != nil {
-			return model_core.PatchedMessage[*model_command_pb.PathPattern_Children, TMetadata]{}, err
-		}
-		inlineCandidates = append(inlineCandidates, getPathPatternInlineCandidate(name, grandChildren, objectCapturer))
-	}
-	return inlinedtree.Build(inlineCandidates, inlinedTreeOptions)
 }
 
 type singleSymlinkDirectory[TFile, TDirectory model_core.ReferenceMetadata] struct {
