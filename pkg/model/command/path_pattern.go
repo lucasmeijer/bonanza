@@ -1,14 +1,18 @@
 package command
 
 import (
+	"context"
 	"iter"
 	"maps"
 	"slices"
 
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/model/core/inlinedtree"
+	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
 	model_command_pb "github.com/buildbarn/bonanza/pkg/proto/model/command"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -104,4 +108,25 @@ func (s *PathPatternSet[TMetadata]) ToProto(inlinedTreeOptions *inlinedtree.Opti
 		inlineCandidates = append(inlineCandidates, GetPathPatternInlineCandidate(name, grandChildren, objectCapturer))
 	}
 	return inlinedtree.Build(inlineCandidates, inlinedTreeOptions)
+}
+
+// PathPatternGetChildren returns the list of children contained in a
+// PathPattern entry. This either causes it to return children that are
+// inlined or stored externally.
+func PathPatternGetChildren[TReference any](
+	ctx context.Context,
+	reader model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_command_pb.PathPattern_Children, TReference]],
+	pathPattern model_core.Message[*model_command_pb.PathPattern, TReference],
+) (model_core.Message[*model_command_pb.PathPattern_Children, TReference], error) {
+	switch children := pathPattern.Message.Children.(type) {
+	case *model_command_pb.PathPattern_ChildrenExternal:
+		return model_parser.Dereference(ctx, reader, model_core.Nested(pathPattern, children.ChildrenExternal))
+	case *model_command_pb.PathPattern_ChildrenInline:
+		return model_core.Nested(pathPattern, children.ChildrenInline), nil
+	case nil:
+		// No children present.
+		return model_core.Message[*model_command_pb.PathPattern_Children, TReference]{}, nil
+	default:
+		return model_core.Message[*model_command_pb.PathPattern_Children, TReference]{}, status.Error(codes.InvalidArgument, "Path pattern has unknown children")
+	}
 }

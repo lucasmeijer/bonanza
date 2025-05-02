@@ -529,6 +529,14 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 					directoryCreationParameters,
 					&prepopulatedCapturableDirectory{
 						options: &prepopulatedCapturableDirectoryOptions{
+							context: groupCtx,
+							pathPatternChildrenReader: model_parser.LookupParsedObjectReader[object.LocalReference](
+								parsedObjectPoolIngester,
+								model_parser.NewChainedObjectParser(
+									model_parser.NewEncodedObjectParser[object.LocalReference](commandEncoder),
+									model_parser.NewMessageObjectParser[object.LocalReference, model_command_pb.PathPattern_Children](),
+								),
+							),
 							writableFileUploadDelay: writableFileUploadDelayChan,
 							fileCreationParameters:  fileCreationParameters,
 						},
@@ -586,6 +594,9 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 }
 
 type prepopulatedCapturableDirectoryOptions struct {
+	context                   context.Context
+	pathPatternChildrenReader model_parser.ParsedObjectReader[model_core.Decodable[object.LocalReference], model_core.Message[*model_command_pb.PathPattern_Children, object.LocalReference]]
+
 	writableFileUploadDelay <-chan struct{}
 	fileCreationParameters  *model_filesystem.FileCreationParameters
 }
@@ -602,16 +613,9 @@ func (d *prepopulatedCapturableDirectory) getPatternChildren() (model_core.Messa
 		return *patternChildren, nil
 	}
 
-	var patternChildren model_core.Message[*model_command_pb.PathPattern_Children, object.LocalReference]
-	switch childrenType := d.pattern.Message.Children.(type) {
-	case *model_command_pb.PathPattern_ChildrenExternal:
-		return model_core.Message[*model_command_pb.PathPattern_Children, object.LocalReference]{}, status.Error(codes.Unimplemented, "TODO: Fetch path pattern from storage")
-	case *model_command_pb.PathPattern_ChildrenInline:
-		patternChildren = model_core.Nested(d.pattern, childrenType.ChildrenInline)
-	case nil:
-		// Capture all children.
-	default:
-		return model_core.Message[*model_command_pb.PathPattern_Children, object.LocalReference]{}, status.Error(codes.InvalidArgument, "Unknown children type in path pattern")
+	patternChildren, err := PathPatternGetChildren(d.options.context, d.options.pathPatternChildrenReader, d.pattern)
+	if err != nil {
+		return model_core.Message[*model_command_pb.PathPattern_Children, object.LocalReference]{}, err
 	}
 
 	d.patternChildren.Store(&patternChildren)
