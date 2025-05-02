@@ -534,7 +534,8 @@ message ConfiguredTarget {
         repeated Args arguments = 5;
 
         // Pattern of output paths that this action is expected to
-        // generate when executed.
+        // generate when executed. Output paths are relative to the
+        // output directory of the current configuration and package.
         bonanza.model.command.PathPattern output_path_pattern = 6;
       }
 
