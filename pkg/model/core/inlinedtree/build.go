@@ -126,33 +126,42 @@ func Build[
 		Slice: make(ds.Slice[queuedCandidate], 0, len(candidates)),
 	}
 	for i, candidate := range candidates {
+		// Determine how much space this candidate uses when inlined.
 		parentInlined := model_core.PatchedMessage[TParentMessagePtr, TMetadata]{
 			Message: TParentMessagePtr(new(TParentMessage)),
 		}
 		candidate.ParentAppender(parentInlined, nil)
 		inlinedSizeBytes := candidate.ExternalMessage.Patcher.GetReferencesSizeBytes() + marshalOptions.Size(parentInlined.Message)
 
-		parentExternal := model_core.NewSimplePatchedMessage[TMetadata](TParentMessagePtr(new(TParentMessage)))
-		candidate.ParentAppender(parentExternal, &bogusCreatedObject)
-		externalSizeBytes := parentExternal.Patcher.GetReferencesSizeBytes() + marshalOptions.Size(parentExternal.Message)
-		parentExternal.Discard()
+		// Determine how much space this candidate uses when
+		// stored externally. The caller can set
+		// ExternalMessage.Message to nil to indicate that
+		// inlining should always be performed, meaning this can
+		// be skipped.
+		if candidate.ExternalMessage.Message != nil {
+			parentExternal := model_core.NewSimplePatchedMessage[TMetadata](TParentMessagePtr(new(TParentMessage)))
+			candidate.ParentAppender(parentExternal, &bogusCreatedObject)
+			externalSizeBytes := parentExternal.Patcher.GetReferencesSizeBytes() + marshalOptions.Size(parentExternal.Message)
+			parentExternal.Discard()
 
-		if inlinedSizeBytes <= externalSizeBytes {
-			// Inlining the data is smaller than storing it
-			// externally. Inline it immediately.
-			candidatesToInline[i] = true
-			output.Patcher.Merge(candidate.ExternalMessage.Patcher)
-			outputSizeBytes += inlinedSizeBytes
-		} else {
-			// Inlining the data takes up more space. Queue
-			// it, so that we can inline it if enough space
-			// is available.
-			outputSizeBytes += externalSizeBytes
-			queuedCandidates.Push(queuedCandidate{
-				candidateIndex:           i,
-				inlinedSizeIncreaseBytes: inlinedSizeBytes - externalSizeBytes,
-			})
+			if inlinedSizeBytes > externalSizeBytes {
+				// Inlining the data takes up more space.
+				// Queue it, so that we can inline it only
+				// if enough space is available.
+				outputSizeBytes += externalSizeBytes
+				queuedCandidates.Push(queuedCandidate{
+					candidateIndex:           i,
+					inlinedSizeIncreaseBytes: inlinedSizeBytes - externalSizeBytes,
+				})
+				continue
+			}
 		}
+
+		// Inlining the data is smaller than storing it
+		// externally. Inline it immediately.
+		candidatesToInline[i] = true
+		output.Patcher.Merge(candidate.ExternalMessage.Patcher)
+		outputSizeBytes += inlinedSizeBytes
 	}
 
 	// Determine how much space is needed to inline all candidates

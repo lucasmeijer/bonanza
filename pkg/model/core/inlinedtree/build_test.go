@@ -232,4 +232,49 @@ func TestBuild(t *testing.T) {
 		require.Empty(t, references)
 		require.Empty(t, metadata)
 	})
+
+	t.Run("SingleCandidateForceInline", func(t *testing.T) {
+		// If ExternalMessage.Message is not set, the caller
+		// forces inlining to be performed. In this case there
+		// should be no need to invoke the ParentAppender to
+		// compute the size of the externally stored instance.
+		encoder := NewMockBinaryEncoder(ctrl)
+		encoder.EXPECT().GetDecodingParametersSizeBytes().Return(4)
+
+		leaves := &model_filesystem_pb.Leaves{
+			Symlinks: []*model_filesystem_pb.SymlinkNode{{
+				Name:   "This is a very long symbolic link name",
+				Target: "This is a very long symbolic link target",
+			}},
+		}
+		leavesInline := &model_filesystem_pb.Directory_LeavesInline{
+			LeavesInline: leaves,
+		}
+		parentAppender := NewMockParentAppenderForTesting(ctrl)
+		parentAppender.EXPECT().Call(gomock.Any(), nil).
+			Do(func(output model_core.PatchedMessage[*model_filesystem_pb.Directory, model_core.ReferenceMetadata], externalObject *model_core.Decodable[model_core.CreatedObject[model_core.ReferenceMetadata]]) {
+				output.Message.Leaves = leavesInline
+			}).
+			Times(2)
+
+		output, err := inlinedtree.Build(
+			inlinedtree.CandidateList[*model_filesystem_pb.Directory, model_core.ReferenceMetadata]{{
+				ExternalMessage: model_core.NewSimplePatchedMessage[model_core.ReferenceMetadata](proto.Message(nil)),
+				ParentAppender:  parentAppender.Call,
+			}},
+			&inlinedtree.Options{
+				ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
+				Encoder:          encoder,
+				MaximumSizeBytes: 100,
+			},
+		)
+		require.NoError(t, err)
+
+		references, metadata := output.Patcher.SortAndSetReferences()
+		testutil.RequireEqualProto(t, &model_filesystem_pb.Directory{
+			Leaves: leavesInline,
+		}, output.Message)
+		require.Empty(t, references)
+		require.Empty(t, metadata)
+	})
 }
