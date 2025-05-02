@@ -26,6 +26,7 @@ import (
 	"github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/model/core/btree"
+	"github.com/buildbarn/bonanza/pkg/model/core/inlinedtree"
 	model_encoding "github.com/buildbarn/bonanza/pkg/model/encoding"
 	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
 	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
@@ -43,6 +44,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"go.starlark.net/starlark"
@@ -1757,12 +1759,12 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 	// final contents. Construct a pattern for capturing the
 	// directory in the input root belonging to the repo.
 	outputPathPatternChildren := model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker]((*model_command_pb.PathPattern_Children)(nil))
-	inlinedTreeOptions := mrc.computer.getInlinedTreeOptions()
+	commandInlinedTreeOptions := mrc.computer.getCommandInlinedTreeOptions(mrc.commandEncoder)
 	for i := len(mrc.subdirectoryComponents); i > 0; i-- {
 		outputPathPatternChildren, err = prependDirectoryToPathPatternChildren(
 			mrc.subdirectoryComponents[i-1].String(),
 			outputPathPatternChildren,
-			inlinedTreeOptions,
+			commandInlinedTreeOptions,
 			model_core.WalkableCreatedObjectCapturer,
 		)
 		if err != nil {
@@ -1770,26 +1772,77 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 		}
 	}
 
-	// TODO: Use inlinedtree to construct this message, so that we
-	// can push out Arguments, EnvironmentVariables and
-	// OutputPathPattern if the resulting message ends up becoming
-	// too big.
-	commandPatcher := argumentList.Patcher
-	commandPatcher.Merge(environmentVariableList.Patcher)
-	commandPatcher.Merge(outputPathPatternChildren.Patcher)
-	createdCommand, err := model_core.MarshalAndEncodePatchedMessage(
-		model_core.NewPatchedMessage(
-			&model_command_pb.Command{
-				Arguments:                   argumentList.Message,
-				EnvironmentVariables:        environmentVariableList.Message,
-				DirectoryCreationParameters: mrc.directoryCreationParametersMessage,
-				FileCreationParameters:      mrc.fileCreationParametersMessage,
-				OutputPathPattern:           getPathPatternForChildren(outputPathPatternChildren, nil, nil, nil),
-				WorkingDirectory:            workingDirectory.GetUNIXString(),
-				NeedsStableInputRootPath:    true,
+	command, err := inlinedtree.Build(
+		inlinedtree.CandidateList[*model_command_pb.Command, dag.ObjectContentsWalker]{
+			// Fields that should always be inlined into the
+			// Command message.
+			{
+				ExternalMessage: model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker]((proto.Message)(nil)),
+				ParentAppender: func(
+					command model_core.PatchedMessage[*model_command_pb.Command, dag.ObjectContentsWalker],
+					externalObject *model_core.Decodable[model_core.CreatedObject[dag.ObjectContentsWalker]],
+				) {
+					command.Message.DirectoryCreationParameters = mrc.directoryCreationParametersMessage
+					command.Message.FileCreationParameters = mrc.fileCreationParametersMessage
+					command.Message.WorkingDirectory = workingDirectory.GetUNIXString()
+					command.Message.NeedsStableInputRootPath = true
+				},
 			},
-			commandPatcher,
-		),
+			// Fields that can be stored externally if needed.
+			{
+				ExternalMessage: model_core.NewPatchedMessage(
+					(proto.Message)(nil),
+					argumentList.Patcher,
+				),
+				ParentAppender: func(
+					command model_core.PatchedMessage[*model_command_pb.Command, dag.ObjectContentsWalker],
+					externalObject *model_core.Decodable[model_core.CreatedObject[dag.ObjectContentsWalker]],
+				) {
+					// TODO: This should push out the
+					// arguments if they get too big.
+					command.Message.Arguments = argumentList.Message
+				},
+			},
+			{
+				ExternalMessage: model_core.NewPatchedMessage(
+					(proto.Message)(nil),
+					environmentVariableList.Patcher,
+				),
+				ParentAppender: func(
+					command model_core.PatchedMessage[*model_command_pb.Command, dag.ObjectContentsWalker],
+					externalObject *model_core.Decodable[model_core.CreatedObject[dag.ObjectContentsWalker]],
+				) {
+					// TODO: This should push out the
+					// environment variables if they get
+					// too big.
+					command.Message.EnvironmentVariables = environmentVariableList.Message
+				},
+			},
+			{
+				ExternalMessage: model_core.NewPatchedMessage[proto.Message](
+					outputPathPatternChildren.Message,
+					outputPathPatternChildren.Patcher,
+				),
+				ParentAppender: func(
+					command model_core.PatchedMessage[*model_command_pb.Command, dag.ObjectContentsWalker],
+					externalObject *model_core.Decodable[model_core.CreatedObject[dag.ObjectContentsWalker]],
+				) {
+					command.Message.OutputPathPattern = getPathPatternForChildren(
+						outputPathPatternChildren,
+						externalObject,
+						command.Patcher,
+						model_core.WalkableCreatedObjectCapturer,
+					)
+				},
+			},
+		},
+		commandInlinedTreeOptions,
+	)
+	if err != nil {
+		return nil, err
+	}
+	createdCommand, err := model_core.MarshalAndEncodePatchedMessage(
+		command,
 		referenceFormat,
 		mrc.commandEncoder,
 	)

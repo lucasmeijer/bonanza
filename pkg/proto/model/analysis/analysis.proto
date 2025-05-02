@@ -536,6 +536,10 @@ message ConfiguredTarget {
         // Pattern of output paths that this action is expected to
         // generate when executed. Output paths are relative to the
         // output directory of the current configuration and package.
+        //
+        // As this pattern is intended to be directly embeddable into a
+        // Command, any objects contained in the pattern should be
+        // encoded using the command encoder.
         bonanza.model.command.PathPattern output_path_pattern = 6;
       }
 

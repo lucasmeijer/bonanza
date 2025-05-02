@@ -18,6 +18,7 @@ import (
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/model/core/btree"
 	"github.com/buildbarn/bonanza/pkg/model/core/inlinedtree"
+	model_encoding "github.com/buildbarn/bonanza/pkg/model/encoding"
 	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
 	model_starlark "github.com/buildbarn/bonanza/pkg/model/starlark"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
@@ -583,12 +584,13 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 		}
 
 		allBuiltinsModulesNames := e.GetBuiltinsModuleNamesValue(&model_analysis_pb.BuiltinsModuleNames_Key{})
+		commandEncoder, gotCommandEncoder := e.GetCommandEncoderObjectValue(&model_analysis_pb.CommandEncoderObject_Key{})
 		directoryCreationParameters, gotDirectoryCreationParameters := e.GetDirectoryCreationParametersObjectValue(&model_analysis_pb.DirectoryCreationParametersObject_Key{})
 		fileCreationParameters, gotFileCreationParameters := e.GetFileCreationParametersObjectValue(&model_analysis_pb.FileCreationParametersObject_Key{})
 		ruleValue := e.GetCompiledBzlFileGlobalValue(&model_analysis_pb.CompiledBzlFileGlobal_Key{
 			Identifier: ruleIdentifier.String(),
 		})
-		if !allBuiltinsModulesNames.IsSet() || !gotDirectoryCreationParameters || !gotFileCreationParameters || !ruleValue.IsSet() {
+		if !allBuiltinsModulesNames.IsSet() || !gotCommandEncoder || !gotDirectoryCreationParameters || !gotFileCreationParameters || !ruleValue.IsSet() {
 			return PatchedConfiguredTargetValue{}, evaluation.ErrMissingDependency
 		}
 		v, ok := ruleValue.Message.Global.GetKind().(*model_starlark_pb.Value_Rule)
@@ -1232,6 +1234,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 			execGroups:                  execGroups,
 			fragments:                   map[string]*model_starlark.Struct[TReference, TMetadata]{},
 			outputRegistrar:             &outputRegistrar,
+			commandEncoder:              commandEncoder,
 			directoryCreationParameters: directoryCreationParameters,
 			fileCreationParameters:      fileCreationParameters,
 		}
@@ -1684,6 +1687,7 @@ type ruleContext[TReference object.BasicReference, TMetadata BaseComputerReferen
 	varDict                     *starlark.Dict
 	fragments                   map[string]*model_starlark.Struct[TReference, TMetadata]
 	outputRegistrar             *targetOutputRegistrar[TReference, TMetadata]
+	commandEncoder              model_encoding.BinaryEncoder
 	directoryCreationParameters *model_filesystem.DirectoryCreationParameters
 	fileCreationParameters      *model_filesystem.FileCreationParameters
 	actions                     []model_core.PatchedMessage[*model_analysis_pb.ConfiguredTarget_Value_Action_Leaf, TMetadata]
@@ -2718,7 +2722,6 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunCommon(
 	if err != nil {
 		return err
 	}
-	patcher := argsList.Patcher
 
 	execGroups := rc.ruleDefinition.Message.ExecGroups
 	execGroupIndex, ok := sort.Find(
@@ -2749,11 +2752,13 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunCommon(
 		}
 		outputPathPatternSet.add(strings.SplitSeq(output.packageRelativePath.String(), "/"))
 	}
-	outputPathPatternChildren, err := outputPathPatternSet.toProto(rc.computer.getInlinedTreeOptions(), rc.environment)
+	outputPathPatternChildren, err := outputPathPatternSet.toProto(
+		rc.computer.getCommandInlinedTreeOptions(rc.commandEncoder),
+		rc.environment,
+	)
 	if err != nil {
 		return err
 	}
-	patcher.Merge(outputPathPatternChildren.Patcher)
 
 	// Gather inputs and tools.
 	//
@@ -2787,7 +2792,6 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunCommon(
 	if err != nil {
 		return err
 	}
-	patcher.Merge(encodedInputs.Patcher)
 
 	mergedTools, err := model_starlark.NewDepset[TReference, TMetadata](thread, toolsDirect, nil, model_starlark_pb.Depset_DEFAULT)
 	if err != nil {
@@ -2797,22 +2801,87 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunCommon(
 	if err != nil {
 		return err
 	}
-	patcher.Merge(encodedTools.Patcher)
 
-	// TODO: Use inlinedtree to construct this message, so that we
-	// can push out Arguments, Inputs, Tools, and OutputPathPattern
-	// if they become too big.
-	rc.actions = append(rc.actions, model_core.NewPatchedMessage(
-		&model_analysis_pb.ConfiguredTarget_Value_Action_Leaf{
-			Arguments:             argsList.Message,
-			Id:                    actionID,
-			Inputs:                encodedInputs.Message,
-			Tools:                 encodedTools.Message,
-			PlatformPkixPublicKey: rc.execGroups[execGroupIndex].platformPkixPublicKey,
-			OutputPathPattern:     getPathPatternForChildren(outputPathPatternChildren, nil, nil, nil),
+	action, err := inlinedtree.Build(
+		inlinedtree.CandidateList[*model_analysis_pb.ConfiguredTarget_Value_Action_Leaf, TMetadata]{
+			// Fields that should always be inlined into the action.
+			{
+				ExternalMessage: model_core.NewSimplePatchedMessage[TMetadata]((proto.Message)(nil)),
+				ParentAppender: func(
+					action model_core.PatchedMessage[*model_analysis_pb.ConfiguredTarget_Value_Action_Leaf, TMetadata],
+					externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
+				) {
+					action.Message.Id = actionID
+					action.Message.PlatformPkixPublicKey = rc.execGroups[execGroupIndex].platformPkixPublicKey
+				},
+			},
+			// Fields that can be stored externally if needed.
+			{
+				ExternalMessage: model_core.NewPatchedMessage(
+					(proto.Message)(nil),
+					argsList.Patcher,
+				),
+				ParentAppender: func(
+					action model_core.PatchedMessage[*model_analysis_pb.ConfiguredTarget_Value_Action_Leaf, TMetadata],
+					externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
+				) {
+					// TODO: This should push out the
+					// arguments if they get too big.
+					action.Message.Arguments = argsList.Message
+				},
+			},
+			{
+				ExternalMessage: model_core.NewPatchedMessage(
+					(proto.Message)(nil),
+					encodedInputs.Patcher,
+				),
+				ParentAppender: func(
+					action model_core.PatchedMessage[*model_analysis_pb.ConfiguredTarget_Value_Action_Leaf, TMetadata],
+					externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
+				) {
+					// TODO: This should push out the
+					// inputs if they get too big.
+					action.Message.Inputs = encodedInputs.Message
+				},
+			},
+			{
+				ExternalMessage: model_core.NewPatchedMessage(
+					(proto.Message)(nil),
+					encodedTools.Patcher,
+				),
+				ParentAppender: func(
+					action model_core.PatchedMessage[*model_analysis_pb.ConfiguredTarget_Value_Action_Leaf, TMetadata],
+					externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
+				) {
+					// TODO: This should push out the
+					// tools if they get too big.
+					action.Message.Tools = encodedTools.Message
+				},
+			},
+			{
+				ExternalMessage: model_core.NewPatchedMessage[proto.Message](
+					outputPathPatternChildren.Message,
+					outputPathPatternChildren.Patcher,
+				),
+				ParentAppender: func(
+					action model_core.PatchedMessage[*model_analysis_pb.ConfiguredTarget_Value_Action_Leaf, TMetadata],
+					externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
+				) {
+					action.Message.OutputPathPattern = getPathPatternForChildren(
+						outputPathPatternChildren,
+						externalObject,
+						action.Patcher,
+						rc.environment,
+					)
+				},
+			},
 		},
-		patcher,
-	))
+		rc.computer.getValueInlinedTreeOptions(),
+	)
+	if err != nil {
+		return err
+	}
+	rc.actions = append(rc.actions, action)
 	return nil
 }
 

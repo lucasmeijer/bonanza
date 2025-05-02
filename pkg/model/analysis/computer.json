@@ -112,6 +112,7 @@
          "dependsOn": [
             "BuiltinsModuleNames",
             "CanonicalRepoName",
+            "CommandEncoderObject",
             "CompiledBzlFileDecodedGlobals",
             "CompiledBzlFileFunctionFactory",
             "CompiledBzlFileGlobal",

@@ -116,7 +116,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputePackageValue(ctx context.Co
 			),
 		)
 
-		targetRegistrar := model_starlark.NewTargetRegistrar[TMetadata](c.getInlinedTreeOptions(), e, repoDefaultAttrs)
+		targetRegistrar := model_starlark.NewTargetRegistrar[TMetadata](c.getValueInlinedTreeOptions(), e, repoDefaultAttrs)
 		thread.SetLocal(model_starlark.TargetRegistrarKey, targetRegistrar)
 
 		thread.SetLocal(model_starlark.GlobalResolverKey, func(identifier label.CanonicalStarlarkIdentifier) (model_core.Message[*model_starlark_pb.Value, TReference], error) {
