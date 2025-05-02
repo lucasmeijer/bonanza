@@ -1756,25 +1756,27 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 	// any subsequent command and also become part of the repo's
 	// final contents. Construct a pattern for capturing the
 	// directory in the input root belonging to the repo.
-	//
-	// TODO: Should this used inlinedtree? Likely doesn't make
-	// sense, considering that the pattern is so simple.
-	outputPathPattern := &model_command_pb.PathPattern{}
+	outputPathPatternChildren := model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker]((*model_command_pb.PathPattern_Children)(nil))
+	inlinedTreeOptions := mrc.computer.getInlinedTreeOptions()
 	for i := len(mrc.subdirectoryComponents); i > 0; i-- {
-		outputPathPattern = &model_command_pb.PathPattern{
-			Children: &model_command_pb.PathPattern_ChildrenInline{
-				ChildrenInline: &model_command_pb.PathPattern_Children{
-					Children: []*model_command_pb.PathPattern_Child{{
-						Name:    mrc.subdirectoryComponents[i-1].String(),
-						Pattern: outputPathPattern,
-					}},
-				},
-			},
+		outputPathPatternChildren, err = prependDirectoryToPathPatternChildren(
+			mrc.subdirectoryComponents[i-1].String(),
+			outputPathPatternChildren,
+			inlinedTreeOptions,
+			model_core.WalkableCreatedObjectCapturer,
+		)
+		if err != nil {
+			return nil, err
 		}
 	}
 
+	// TODO: Use inlinedtree to construct this message, so that we
+	// can push out Arguments, EnvironmentVariables and
+	// OutputPathPattern if the resulting message ends up becoming
+	// too big.
 	commandPatcher := argumentList.Patcher
 	commandPatcher.Merge(environmentVariableList.Patcher)
+	commandPatcher.Merge(outputPathPatternChildren.Patcher)
 	createdCommand, err := model_core.MarshalAndEncodePatchedMessage(
 		model_core.NewPatchedMessage(
 			&model_command_pb.Command{
@@ -1782,7 +1784,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 				EnvironmentVariables:        environmentVariableList.Message,
 				DirectoryCreationParameters: mrc.directoryCreationParametersMessage,
 				FileCreationParameters:      mrc.fileCreationParametersMessage,
-				OutputPathPattern:           outputPathPattern,
+				OutputPathPattern:           getPathPatternForChildren(outputPathPatternChildren, nil, nil, nil),
 				WorkingDirectory:            workingDirectory.GetUNIXString(),
 				NeedsStableInputRootPath:    true,
 			},

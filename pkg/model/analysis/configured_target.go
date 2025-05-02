@@ -2799,6 +2799,9 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunCommon(
 	}
 	patcher.Merge(encodedTools.Patcher)
 
+	// TODO: Use inlinedtree to construct this message, so that we
+	// can push out Arguments, Inputs, Tools, and OutputPathPattern
+	// if they become too big.
 	rc.actions = append(rc.actions, model_core.NewPatchedMessage(
 		&model_analysis_pb.ConfiguredTarget_Value_Action_Leaf{
 			Arguments:             argsList.Message,
@@ -2806,15 +2809,61 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunCommon(
 			Inputs:                encodedInputs.Message,
 			Tools:                 encodedTools.Message,
 			PlatformPkixPublicKey: rc.execGroups[execGroupIndex].platformPkixPublicKey,
-			OutputPathPattern: &model_command_pb.PathPattern{
-				Children: &model_command_pb.PathPattern_ChildrenInline{
-					ChildrenInline: outputPathPatternChildren.Message,
-				},
-			},
+			OutputPathPattern:     getPathPatternForChildren(outputPathPatternChildren, nil, nil, nil),
 		},
 		patcher,
 	))
 	return nil
+}
+
+func getPathPatternForChildren[TMetadata model_core.ReferenceMetadata](
+	children model_core.PatchedMessage[*model_command_pb.PathPattern_Children, TMetadata],
+	externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
+	patcher *model_core.ReferenceMessagePatcher[TMetadata],
+	objectCapturer model_core.CreatedObjectCapturer[TMetadata],
+) *model_command_pb.PathPattern {
+	if children.Message == nil {
+		return &model_command_pb.PathPattern{}
+	}
+	if externalObject == nil {
+		return &model_command_pb.PathPattern{
+			Children: &model_command_pb.PathPattern_ChildrenInline{
+				ChildrenInline: children.Message,
+			},
+		}
+	}
+	return &model_command_pb.PathPattern{
+		Children: &model_command_pb.PathPattern_ChildrenExternal{
+			ChildrenExternal: patcher.CaptureAndAddDecodableReference(
+				*externalObject,
+				objectCapturer,
+			),
+		},
+	}
+}
+
+func getPathPatternInlineCandidate[TMetadata model_core.ReferenceMetadata](name string, grandChildren model_core.PatchedMessage[*model_command_pb.PathPattern_Children, TMetadata], objectCapturer model_core.CreatedObjectCapturer[TMetadata]) inlinedtree.Candidate[*model_command_pb.PathPattern_Children, TMetadata] {
+	return inlinedtree.Candidate[*model_command_pb.PathPattern_Children, TMetadata]{
+		ExternalMessage: model_core.NewPatchedMessage[proto.Message](grandChildren.Message, grandChildren.Patcher),
+		ParentAppender: func(
+			children model_core.PatchedMessage[*model_command_pb.PathPattern_Children, TMetadata],
+			externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
+		) {
+			children.Message.Children = append(children.Message.Children, &model_command_pb.PathPattern_Child{
+				Name:    name,
+				Pattern: getPathPatternForChildren(grandChildren, externalObject, children.Patcher, objectCapturer),
+			})
+		},
+	}
+}
+
+func prependDirectoryToPathPatternChildren[TMetadata model_core.ReferenceMetadata](name string, grandChildren model_core.PatchedMessage[*model_command_pb.PathPattern_Children, TMetadata], inlinedTreeOptions *inlinedtree.Options, objectCapturer model_core.CreatedObjectCapturer[TMetadata]) (model_core.PatchedMessage[*model_command_pb.PathPattern_Children, TMetadata], error) {
+	return inlinedtree.Build(
+		inlinedtree.CandidateList[*model_command_pb.PathPattern_Children, TMetadata]{
+			getPathPatternInlineCandidate(name, grandChildren, objectCapturer),
+		},
+		inlinedTreeOptions,
+	)
 }
 
 // pathPatternSet is a set of relative pathname strings that should be
@@ -2856,37 +2905,7 @@ func (s *pathPatternSet[TMetadata]) toProto(inlinedTreeOptions *inlinedtree.Opti
 		if err != nil {
 			return model_core.PatchedMessage[*model_command_pb.PathPattern_Children, TMetadata]{}, err
 		}
-		inlineCandidates = append(inlineCandidates, inlinedtree.Candidate[*model_command_pb.PathPattern_Children, TMetadata]{
-			ExternalMessage: model_core.NewPatchedMessage[proto.Message](grandChildren.Message, grandChildren.Patcher),
-			ParentAppender: func(
-				children model_core.PatchedMessage[*model_command_pb.PathPattern_Children, TMetadata],
-				externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
-			) {
-				var childPattern *model_command_pb.PathPattern
-				if grandChildren.Message != nil {
-					if externalObject == nil {
-						childPattern = &model_command_pb.PathPattern{
-							Children: &model_command_pb.PathPattern_ChildrenInline{
-								ChildrenInline: grandChildren.Message,
-							},
-						}
-					} else {
-						childPattern = &model_command_pb.PathPattern{
-							Children: &model_command_pb.PathPattern_ChildrenExternal{
-								ChildrenExternal: children.Patcher.CaptureAndAddDecodableReference(
-									*externalObject,
-									objectCapturer,
-								),
-							},
-						}
-					}
-				}
-				children.Message.Children = append(children.Message.Children, &model_command_pb.PathPattern_Child{
-					Name:    name,
-					Pattern: childPattern,
-				})
-			},
-		})
+		inlineCandidates = append(inlineCandidates, getPathPatternInlineCandidate(name, grandChildren, objectCapturer))
 	}
 	return inlinedtree.Build(inlineCandidates, inlinedTreeOptions)
 }
