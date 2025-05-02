@@ -505,17 +505,20 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 	}
 
 	// Construct the command of the action.
+	commandPatcher := argumentsList.Patcher
+	outputPathPattern := model_core.Patch(e, model_core.Nested(action, actionLeaf.OutputPathPattern))
+	commandPatcher.Merge(outputPathPattern.Patcher)
 	createdCommand, err := model_core.MarshalAndEncodePatchedMessage(
 		model_core.NewPatchedMessage(
 			&model_command_pb.Command{
 				Arguments: argumentsList.Message,
-				// EnvironmentVariables: enironmentVariables,
+				// EnvironmentVariables: environmentVariables,
 				DirectoryCreationParameters: directoryCreationParametersMessage.Message.DirectoryCreationParameters,
 				FileCreationParameters:      fileCreationParametersMessage.Message.FileCreationParameters,
-				// OutputPathPattern: outputPathPattern,
-				WorkingDirectory: (*path.Trace)(nil).GetUNIXString(),
+				OutputPathPattern:           outputPathPattern.Message,
+				WorkingDirectory:            (*path.Trace)(nil).GetUNIXString(),
 			},
-			argumentsList.Patcher,
+			commandPatcher,
 		),
 		referenceFormat,
 		commandEncoder,
