@@ -6,6 +6,7 @@ import (
 	pg_label "github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/model/core/inlinedtree"
+	model_encoding "github.com/buildbarn/bonanza/pkg/model/encoding"
 	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
 	"github.com/buildbarn/bonanza/pkg/starlark/unpack"
 
@@ -23,6 +24,7 @@ var DefaultInheritableAttrs = model_starlark_pb.InheritableAttrs{
 func ParseRepoDotBazel[TReference any, TMetadata model_core.CloneableReferenceMetadata](
 	contents string,
 	filename pg_label.CanonicalLabel,
+	encoder model_encoding.BinaryEncoder,
 	inlinedTreeOptions *inlinedtree.Options,
 	objectCapturer model_core.CreatedObjectCapturer[TMetadata],
 	labelResolver pg_label.Resolver,
@@ -52,6 +54,7 @@ func ParseRepoDotBazel[TReference any, TMetadata model_core.CloneableReferenceMe
 					args,
 					kwargs,
 					model_core.NewSimpleMessage[model_core.CloneableReference[TMetadata]](&DefaultInheritableAttrs),
+					encoder,
 					inlinedTreeOptions,
 					objectCapturer,
 				)
@@ -77,6 +80,7 @@ func getDefaultInheritableAttrs[TReference any, TMetadata model_core.CloneableRe
 	args starlark.Tuple,
 	kwargs []starlark.Tuple,
 	previousInheritableAttrs model_core.Message[*model_starlark_pb.InheritableAttrs, model_core.CloneableReference[TMetadata]],
+	encoder model_encoding.BinaryEncoder,
 	inlinedTreeOptions *inlinedtree.Options,
 	objectCapturer model_core.CreatedObjectCapturer[TMetadata],
 ) (model_core.PatchedMessage[*model_starlark_pb.InheritableAttrs, TMetadata], error) {
@@ -117,7 +121,7 @@ func getDefaultInheritableAttrs[TReference any, TMetadata model_core.CloneableRe
 	if len(visibility) > 0 {
 		// Explicit visibility provided. Construct a new package group.
 		var err error
-		visibilityPackageGroup, err = NewPackageGroupFromVisibility[TMetadata](visibility, inlinedTreeOptions, objectCapturer)
+		visibilityPackageGroup, err = NewPackageGroupFromVisibility[TMetadata](visibility, encoder, inlinedTreeOptions, objectCapturer)
 		if err != nil {
 			return model_core.PatchedMessage[*model_starlark_pb.InheritableAttrs, TMetadata]{}, err
 		}

@@ -23,14 +23,10 @@ func TestBuild(t *testing.T) {
 	t.Run("NoCandidates", func(t *testing.T) {
 		// If no candidates are provided, there is no data,
 		// meaning an empty message needs to be emitted.
-		encoder := NewMockBinaryEncoder(ctrl)
-		encoder.EXPECT().GetDecodingParametersSizeBytes().Return(4)
-
 		output, err := inlinedtree.Build(
 			inlinedtree.CandidateList[*model_filesystem_pb.Directory, model_core.ReferenceMetadata]{},
 			&inlinedtree.Options{
 				ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
-				Encoder:          encoder,
 				MaximumSizeBytes: 16 * 1024,
 			},
 		)
@@ -83,11 +79,11 @@ func TestBuild(t *testing.T) {
 		output, err := inlinedtree.Build(
 			inlinedtree.CandidateList[*model_filesystem_pb.Directory, model_core.ReferenceMetadata]{{
 				ExternalMessage: model_core.NewSimplePatchedMessage[model_core.ReferenceMetadata, proto.Message](leaves),
+				Encoder:         encoder,
 				ParentAppender:  parentAppender.Call,
 			}},
 			&inlinedtree.Options{
 				ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
-				Encoder:          encoder,
 				MaximumSizeBytes: 0,
 			},
 		)
@@ -144,11 +140,11 @@ func TestBuild(t *testing.T) {
 		output, err := inlinedtree.Build(
 			inlinedtree.CandidateList[*model_filesystem_pb.Directory, model_core.ReferenceMetadata]{{
 				ExternalMessage: model_core.NewSimplePatchedMessage[model_core.ReferenceMetadata, proto.Message](leaves),
+				Encoder:         encoder,
 				ParentAppender:  parentAppender.Call,
 			}},
 			&inlinedtree.Options{
 				ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
-				Encoder:          encoder,
 				MaximumSizeBytes: 0,
 			},
 		)
@@ -215,11 +211,11 @@ func TestBuild(t *testing.T) {
 		output, err := inlinedtree.Build(
 			inlinedtree.CandidateList[*model_filesystem_pb.Directory, model_core.ReferenceMetadata]{{
 				ExternalMessage: model_core.NewSimplePatchedMessage[model_core.ReferenceMetadata, proto.Message](leaves),
+				Encoder:         encoder,
 				ParentAppender:  parentAppender.Call,
 			}},
 			&inlinedtree.Options{
 				ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
-				Encoder:          encoder,
 				MaximumSizeBytes: 100,
 			},
 		)
@@ -238,9 +234,6 @@ func TestBuild(t *testing.T) {
 		// forces inlining to be performed. In this case there
 		// should be no need to invoke the ParentAppender to
 		// compute the size of the externally stored instance.
-		encoder := NewMockBinaryEncoder(ctrl)
-		encoder.EXPECT().GetDecodingParametersSizeBytes().Return(4)
-
 		leaves := &model_filesystem_pb.Leaves{
 			Symlinks: []*model_filesystem_pb.SymlinkNode{{
 				Name:   "This is a very long symbolic link name",
@@ -264,7 +257,6 @@ func TestBuild(t *testing.T) {
 			}},
 			&inlinedtree.Options{
 				ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
-				Encoder:          encoder,
 				MaximumSizeBytes: 100,
 			},
 		)

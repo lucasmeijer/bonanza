@@ -10,6 +10,7 @@ import (
 	"github.com/buildbarn/bb-storage/pkg/util"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/model/core/inlinedtree"
+	model_encoding "github.com/buildbarn/bonanza/pkg/model/encoding"
 	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
 	model_filesystem_pb "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
@@ -90,6 +91,7 @@ type directoryMerkleTreeBuilder[TDirectory, TFile model_core.ReferenceMetadata] 
 	context                     context.Context
 	concurrency                 *semaphore.Weighted
 	group                       *errgroup.Group
+	directoryEncoder            model_encoding.BinaryEncoder
 	directoryInlinedTreeOptions inlinedtree.Options
 	capturer                    DirectoryMerkleTreeCapturer[TDirectory, TFile]
 }
@@ -263,6 +265,7 @@ func (b *directoryMerkleTreeBuilder[TDirectory, TFile]) maybeFinalizeDirectory(u
 						},
 					),
 				),
+				Encoder: b.directoryEncoder,
 				ParentAppender: func(
 					directory model_core.PatchedMessage[*model_filesystem_pb.Directory, TDirectory],
 					externalObject *model_core.Decodable[model_core.CreatedObject[TDirectory]],
@@ -301,6 +304,7 @@ func (b *directoryMerkleTreeBuilder[TDirectory, TFile]) maybeFinalizeDirectory(u
 						createdDirectory.Message.Message,
 						createdDirectory.Message.Patcher,
 					),
+					Encoder: b.directoryEncoder,
 					ParentAppender: func(
 						directory model_core.PatchedMessage[*model_filesystem_pb.Directory, TDirectory],
 						externalObject *model_core.Decodable[model_core.CreatedObject[TDirectory]],
@@ -472,12 +476,12 @@ func CreateDirectoryMerkleTree[TDirectory, TFile model_core.ReferenceMetadata](
 	out *CreatedDirectory[TDirectory],
 ) error {
 	b := directoryMerkleTreeBuilder[TDirectory, TFile]{
-		context:     ctx,
-		concurrency: concurrency,
-		group:       group,
+		context:          ctx,
+		concurrency:      concurrency,
+		group:            group,
+		directoryEncoder: directoryParameters.encoder,
 		directoryInlinedTreeOptions: inlinedtree.Options{
 			ReferenceFormat:  directoryParameters.referenceFormat,
-			Encoder:          directoryParameters.encoder,
 			MaximumSizeBytes: directoryParameters.directoryMaximumSizeBytes,
 		},
 		capturer: capturer,

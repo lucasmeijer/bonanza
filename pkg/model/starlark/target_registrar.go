@@ -6,6 +6,7 @@ import (
 	pg_label "github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/model/core/inlinedtree"
+	model_encoding "github.com/buildbarn/bonanza/pkg/model/encoding"
 	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
 )
 
@@ -14,6 +15,7 @@ import (
 // invocations of rules to register any targets in the current package.
 type TargetRegistrar[TMetadata model_core.CloneableReferenceMetadata] struct {
 	// Immutable fields.
+	encoder            model_encoding.BinaryEncoder
 	inlinedTreeOptions *inlinedtree.Options
 	objectCapturer     model_core.CreatedObjectCapturer[TMetadata]
 
@@ -27,8 +29,9 @@ type TargetRegistrar[TMetadata model_core.CloneableReferenceMetadata] struct {
 // creation contains no targets. The caller needs to provide default
 // values for attributes that are provided to calls to repo() in
 // REPO.bazel, so that they can be inherited by registered targets.
-func NewTargetRegistrar[TMetadata model_core.CloneableReferenceMetadata](inlinedTreeOptions *inlinedtree.Options, objectCapturer model_core.CreatedObjectCapturer[TMetadata], defaultInheritableAttrs model_core.Message[*model_starlark_pb.InheritableAttrs, model_core.CloneableReference[TMetadata]]) *TargetRegistrar[TMetadata] {
+func NewTargetRegistrar[TMetadata model_core.CloneableReferenceMetadata](encoder model_encoding.BinaryEncoder, inlinedTreeOptions *inlinedtree.Options, objectCapturer model_core.CreatedObjectCapturer[TMetadata], defaultInheritableAttrs model_core.Message[*model_starlark_pb.InheritableAttrs, model_core.CloneableReference[TMetadata]]) *TargetRegistrar[TMetadata] {
 	return &TargetRegistrar[TMetadata]{
+		encoder:                 encoder,
 		inlinedTreeOptions:      inlinedTreeOptions,
 		objectCapturer:          objectCapturer,
 		defaultInheritableAttrs: defaultInheritableAttrs,
@@ -52,7 +55,7 @@ func (tr *TargetRegistrar[TMetadata]) GetTargets() map[string]model_core.Patched
 func (tr *TargetRegistrar[TMetadata]) getVisibilityPackageGroup(visibility []pg_label.ResolvedLabel) (model_core.PatchedMessage[*model_starlark_pb.PackageGroup, TMetadata], error) {
 	if len(visibility) > 0 {
 		// Explicit visibility provided. Construct new package group.
-		return NewPackageGroupFromVisibility[TMetadata](visibility, tr.inlinedTreeOptions, tr.objectCapturer)
+		return NewPackageGroupFromVisibility[TMetadata](visibility, tr.encoder, tr.inlinedTreeOptions, tr.objectCapturer)
 	}
 
 	// Inherit visibility from repo() in the REPO.bazel file

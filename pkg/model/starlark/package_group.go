@@ -10,6 +10,7 @@ import (
 	pg_label "github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/model/core/inlinedtree"
+	model_encoding "github.com/buildbarn/bonanza/pkg/model/encoding"
 	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
 
 	"google.golang.org/protobuf/proto"
@@ -62,7 +63,7 @@ func (n *packageGroupNode) lookupPackage(canonicalPackage pg_label.CanonicalPack
 
 // toProto converts the data contained in a tree of packageGroupNode to
 // its Protobuf message counterpart.
-func packageGroupNodeToProto[TMetadata model_core.ReferenceMetadata](n *packageGroupNode, inlinedTreeOptions *inlinedtree.Options, objectCapturer model_core.CreatedObjectCapturer[TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.PackageGroup_Subpackages, TMetadata], error) {
+func packageGroupNodeToProto[TMetadata model_core.ReferenceMetadata](n *packageGroupNode, encoder model_encoding.BinaryEncoder, inlinedTreeOptions *inlinedtree.Options, objectCapturer model_core.CreatedObjectCapturer[TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.PackageGroup_Subpackages, TMetadata], error) {
 	inlineCandidates := make(inlinedtree.CandidateList[*model_starlark_pb.PackageGroup_Subpackages, TMetadata], 0, 2)
 	defer inlineCandidates.Discard()
 
@@ -85,7 +86,7 @@ func packageGroupNodeToProto[TMetadata model_core.ReferenceMetadata](n *packageG
 		patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
 		for _, component := range slices.Sorted(maps.Keys(n.subpackages)) {
 			nChild := n.subpackages[component]
-			subpackages, err := packageGroupNodeToProto[TMetadata](nChild, inlinedTreeOptions, objectCapturer)
+			subpackages, err := packageGroupNodeToProto[TMetadata](nChild, encoder, inlinedTreeOptions, objectCapturer)
 			if err != nil {
 				return model_core.PatchedMessage[*model_starlark_pb.PackageGroup_Subpackages, TMetadata]{}, err
 			}
@@ -99,6 +100,7 @@ func packageGroupNodeToProto[TMetadata model_core.ReferenceMetadata](n *packageG
 
 		inlineCandidates = append(inlineCandidates, inlinedtree.Candidate[*model_starlark_pb.PackageGroup_Subpackages, TMetadata]{
 			ExternalMessage: model_core.NewPatchedMessage[proto.Message](&overrides, patcher),
+			Encoder:         encoder,
 			ParentAppender: func(
 				subpackages model_core.PatchedMessage[*model_starlark_pb.PackageGroup_Subpackages, TMetadata],
 				externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
@@ -125,7 +127,7 @@ func packageGroupNodeToProto[TMetadata model_core.ReferenceMetadata](n *packageG
 // NewPackageGroupFromVisibility generates a PackageGroup message based
 // on a sequence of "visibility" labels provided to repo(), package(),
 // or rule targets.
-func NewPackageGroupFromVisibility[TMetadata model_core.ReferenceMetadata](visibility []pg_label.ResolvedLabel, inlinedTreeOptions *inlinedtree.Options, objectCapturer model_core.CreatedObjectCapturer[TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.PackageGroup, TMetadata], error) {
+func NewPackageGroupFromVisibility[TMetadata model_core.ReferenceMetadata](visibility []pg_label.ResolvedLabel, encoder model_encoding.BinaryEncoder, inlinedTreeOptions *inlinedtree.Options, objectCapturer model_core.CreatedObjectCapturer[TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.PackageGroup, TMetadata], error) {
 	tree := packageGroupNode{
 		subpackages: map[string]*packageGroupNode{},
 	}
@@ -191,7 +193,7 @@ func NewPackageGroupFromVisibility[TMetadata model_core.ReferenceMetadata](visib
 		}
 	}
 
-	treeProto, err := packageGroupNodeToProto[TMetadata](&tree, inlinedTreeOptions, objectCapturer)
+	treeProto, err := packageGroupNodeToProto[TMetadata](&tree, encoder, inlinedTreeOptions, objectCapturer)
 	if err != nil {
 		return model_core.PatchedMessage[*model_starlark_pb.PackageGroup, TMetadata]{}, err
 	}

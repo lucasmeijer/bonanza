@@ -31,9 +31,9 @@ func TestParseModuleDotBazel(t *testing.T) {
 		defaultAttrs, err := model_starlark.ParseRepoDotBazel[object.LocalReference](
 			"",
 			label.MustNewCanonicalLabel("@@foo+//:REPO.bazel"),
+			encoder,
 			&inlinedtree.Options{
 				ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
-				Encoder:          encoder,
 				MaximumSizeBytes: 0,
 			},
 			model_core.CreatedObjectCapturer[model_core.CloneableReferenceMetadata](nil),
@@ -52,9 +52,9 @@ func TestParseModuleDotBazel(t *testing.T) {
 		defaultAttrs, err := model_starlark.ParseRepoDotBazel[object.LocalReference](
 			"repo()",
 			label.MustNewCanonicalLabel("@@foo+//:REPO.bazel"),
+			encoder,
 			&inlinedtree.Options{
 				ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
-				Encoder:          encoder,
 				MaximumSizeBytes: 0,
 			},
 			model_core.CreatedObjectCapturer[model_core.CloneableReferenceMetadata](nil),
@@ -71,9 +71,9 @@ func TestParseModuleDotBazel(t *testing.T) {
 		_, err := model_starlark.ParseRepoDotBazel[object.LocalReference](
 			"repo()\nrepo()",
 			label.MustNewCanonicalLabel("@@foo+//:REPO.bazel"),
+			encoder,
 			&inlinedtree.Options{
 				ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
-				Encoder:          encoder,
 				MaximumSizeBytes: 0,
 			},
 			model_core.CreatedObjectCapturer[model_core.CloneableReferenceMetadata](nil),
@@ -94,9 +94,9 @@ func TestParseModuleDotBazel(t *testing.T) {
 				default_package_metadata = ["//:metadata"],
 			)`,
 			label.MustNewCanonicalLabel("@@foo+//:REPO.bazel"),
+			encoder,
 			&inlinedtree.Options{
 				ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
-				Encoder:          encoder,
 				MaximumSizeBytes: 0,
 			},
 			model_core.CreatedObjectCapturer[model_core.CloneableReferenceMetadata](nil),
@@ -122,9 +122,9 @@ func TestParseModuleDotBazel(t *testing.T) {
 				],
 			)`,
 			label.MustNewCanonicalLabel("@@foo+//:REPO.bazel"),
+			encoder,
 			&inlinedtree.Options{
 				ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
-				Encoder:          encoder,
 				MaximumSizeBytes: 0,
 			},
 			objectCapturer,

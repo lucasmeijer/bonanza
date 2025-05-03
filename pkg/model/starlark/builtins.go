@@ -1422,6 +1422,7 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 					args,
 					kwargs,
 					targetRegistrar.defaultInheritableAttrs,
+					targetRegistrar.encoder,
 					targetRegistrar.inlinedTreeOptions,
 					targetRegistrar.objectCapturer,
 				)

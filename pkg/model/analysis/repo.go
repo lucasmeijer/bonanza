@@ -1760,12 +1760,13 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 	// final contents. Construct a pattern for capturing the
 	// directory in the input root belonging to the repo.
 	outputPathPatternChildren := model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker]((*model_command_pb.PathPattern_Children)(nil))
-	commandInlinedTreeOptions := mrc.computer.getCommandInlinedTreeOptions(mrc.commandEncoder)
+	inlinedTreeOptions := mrc.computer.getInlinedTreeOptions()
 	for i := len(mrc.subdirectoryComponents); i > 0; i-- {
 		outputPathPatternChildren, err = model_command.PrependDirectoryToPathPatternChildren(
 			mrc.subdirectoryComponents[i-1].String(),
 			outputPathPatternChildren,
-			commandInlinedTreeOptions,
+			mrc.commandEncoder,
+			inlinedTreeOptions,
 			model_core.WalkableCreatedObjectCapturer,
 		)
 		if err != nil {
@@ -1824,6 +1825,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 					outputPathPatternChildren.Message,
 					outputPathPatternChildren.Patcher,
 				),
+				Encoder: mrc.commandEncoder,
 				ParentAppender: func(
 					command model_core.PatchedMessage[*model_command_pb.Command, dag.ObjectContentsWalker],
 					externalObject *model_core.Decodable[model_core.CreatedObject[dag.ObjectContentsWalker]],
@@ -1837,7 +1839,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 				},
 			},
 		},
-		commandInlinedTreeOptions,
+		inlinedTreeOptions,
 	)
 	if err != nil {
 		return nil, err

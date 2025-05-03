@@ -32,6 +32,8 @@ type Candidate[TParentMessage any, TMetadata model_core.ReferenceMetadata] struc
 	// Message to store in a child object if no space is present to
 	// inline it into the parent object.
 	ExternalMessage model_core.PatchedMessage[proto.Message, TMetadata]
+	// Encoder to use when storing ExternalMessage in a child object.
+	Encoder encoding.BinaryEncoder
 	// Function to invoke to either inline the message into the
 	// output, or create a reference to the child object.
 	ParentAppender ParentAppender[TParentMessage, TMetadata]
@@ -69,7 +71,6 @@ func (cl *CandidateList[TParentMessage, TMetadata]) Discard() {
 // Options used by the Build function.
 type Options struct {
 	ReferenceFormat  object.ReferenceFormat
-	Encoder          encoding.BinaryEncoder
 	MaximumSizeBytes int
 }
 
@@ -114,12 +115,9 @@ func Build[
 	if err != nil {
 		panic(err)
 	}
-	bogusCreatedObject := model_core.NewDecodable(
-		model_core.CreatedObject[TMetadata]{
-			Contents: bogusContents,
-		},
-		make([]byte, options.Encoder.GetDecodingParametersSizeBytes()),
-	)
+	bogusCreatedObject := model_core.CreatedObject[TMetadata]{
+		Contents: bogusContents,
+	}
 
 	candidatesToInline := make([]bool, len(candidates))
 	queuedCandidates := queuedCandidates{
@@ -140,7 +138,11 @@ func Build[
 		// be skipped.
 		if candidate.ExternalMessage.Message != nil {
 			parentExternal := model_core.NewSimplePatchedMessage[TMetadata](TParentMessagePtr(new(TParentMessage)))
-			candidate.ParentAppender(parentExternal, &bogusCreatedObject)
+			decodableBogusCreatedObject := model_core.NewDecodable(
+				bogusCreatedObject,
+				make([]byte, candidate.Encoder.GetDecodingParametersSizeBytes()),
+			)
+			candidate.ParentAppender(parentExternal, &decodableBogusCreatedObject)
 			externalSizeBytes := parentExternal.Patcher.GetReferencesSizeBytes() + marshalOptions.Size(parentExternal.Message)
 			parentExternal.Discard()
 
@@ -239,7 +241,7 @@ func Build[
 		} else {
 			// Store the message separately, and store a
 			// reference in the parent.
-			createdObject, err := model_core.MarshalAndEncodePatchedMessage(candidate.ExternalMessage, options.ReferenceFormat, options.Encoder)
+			createdObject, err := model_core.MarshalAndEncodePatchedMessage(candidate.ExternalMessage, options.ReferenceFormat, candidate.Encoder)
 			if err != nil {
 				output.Discard()
 				return model_core.PatchedMessage[TParentMessagePtr, TMetadata]{}, util.StatusWrapf(err, "Failed to create object contents for candidate at index %d", i)

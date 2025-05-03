@@ -2752,7 +2752,8 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunCommon(
 		outputPathPatternSet.Add(strings.SplitSeq(output.packageRelativePath.String(), "/"))
 	}
 	outputPathPatternChildren, err := outputPathPatternSet.ToProto(
-		rc.computer.getCommandInlinedTreeOptions(rc.commandEncoder),
+		rc.commandEncoder,
+		rc.computer.getInlinedTreeOptions(),
 		rc.environment,
 	)
 	if err != nil {
@@ -2862,6 +2863,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunCommon(
 					outputPathPatternChildren.Message,
 					outputPathPatternChildren.Patcher,
 				),
+				Encoder: rc.commandEncoder,
 				ParentAppender: func(
 					action model_core.PatchedMessage[*model_analysis_pb.ConfiguredTarget_Value_Action_Leaf, TMetadata],
 					externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
@@ -2875,7 +2877,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunCommon(
 				},
 			},
 		},
-		rc.computer.getValueInlinedTreeOptions(),
+		rc.computer.getInlinedTreeOptions(),
 	)
 	if err != nil {
 		return err

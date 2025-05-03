@@ -27,9 +27,9 @@ func TestNewPackageGroupFromVisibility(t *testing.T) {
 				[]label.ResolvedLabel{
 					label.MustNewResolvedLabel("@@foo+//visibility:private"),
 				},
+				encoder,
 				&inlinedtree.Options{
 					ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
-					Encoder:          encoder,
 					MaximumSizeBytes: 0,
 				},
 				NewMockCreatedObjectCapturerForTesting(ctrl),
@@ -46,9 +46,9 @@ func TestNewPackageGroupFromVisibility(t *testing.T) {
 					label.MustNewResolvedLabel("@@foo+//visibility:private"),
 					label.MustNewResolvedLabel("@@foo+//visibility:private"),
 				},
+				encoder,
 				&inlinedtree.Options{
 					ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
-					Encoder:          encoder,
 					MaximumSizeBytes: 0,
 				},
 				NewMockCreatedObjectCapturerForTesting(ctrl),
@@ -63,9 +63,9 @@ func TestNewPackageGroupFromVisibility(t *testing.T) {
 				[]label.ResolvedLabel{
 					label.MustNewResolvedLabel("@@foo+//visibility:public"),
 				},
+				encoder,
 				&inlinedtree.Options{
 					ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
-					Encoder:          encoder,
 					MaximumSizeBytes: 0,
 				},
 				NewMockCreatedObjectCapturerForTesting(ctrl),
@@ -84,9 +84,9 @@ func TestNewPackageGroupFromVisibility(t *testing.T) {
 					label.MustNewResolvedLabel("@@foo+//visibility:public"),
 					label.MustNewResolvedLabel("@@foo+//visibility:public"),
 				},
+				encoder,
 				&inlinedtree.Options{
 					ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
-					Encoder:          encoder,
 					MaximumSizeBytes: 0,
 				},
 				NewMockCreatedObjectCapturerForTesting(ctrl),
@@ -130,9 +130,9 @@ func TestNewPackageGroupFromVisibility(t *testing.T) {
 				label.MustNewResolvedLabel("@@packagegroups+//:group4"),
 				label.MustNewResolvedLabel("@@packagegroups+//:group4"),
 			},
+			encoder,
 			&inlinedtree.Options{
 				ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
-				Encoder:          encoder,
 				MaximumSizeBytes: 1 << 20,
 			},
 			objectCapturer,

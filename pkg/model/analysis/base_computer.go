@@ -170,18 +170,9 @@ func (c *baseComputer[TReference, TMetadata]) getValueDecodingOptions(ctx contex
 	}
 }
 
-func (c *baseComputer[TReference, TMetadata]) getValueInlinedTreeOptions() *inlinedtree.Options {
+func (c *baseComputer[TReference, TMetadata]) getInlinedTreeOptions() *inlinedtree.Options {
 	return &inlinedtree.Options{
 		ReferenceFormat:  c.getReferenceFormat(),
-		Encoder:          c.getValueObjectEncoder(),
-		MaximumSizeBytes: 32 * 1024,
-	}
-}
-
-func (c *baseComputer[TReference, TMetadata]) getCommandInlinedTreeOptions(commandEncoder model_encoding.BinaryEncoder) *inlinedtree.Options {
-	return &inlinedtree.Options{
-		ReferenceFormat:  c.getReferenceFormat(),
-		Encoder:          commandEncoder,
 		MaximumSizeBytes: 32 * 1024,
 	}
 }
@@ -459,7 +450,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRepoDefaultAttrsValue(ctx c
 	defaultAttrs, err := model_starlark.ParseRepoDotBazel[TReference](
 		string(repoFileData),
 		canonicalRepo.GetRootPackage().AppendTargetName(repoFileName),
-		c.getValueInlinedTreeOptions(),
+		c.getValueObjectEncoder(),
+		c.getInlinedTreeOptions(),
 		e,
 		newLabelResolver(e),
 	)
