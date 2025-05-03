@@ -180,6 +180,18 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 			if !targetActionResult.IsSet() {
 				return PatchedFileRootValue{}, evaluation.ErrMissingDependency
 			}
+
+			// TODO: We currently return the entire output
+			// root of the action. We should trim it to only
+			// contain the file or directory that was
+			// requested.
+			patchedOutputRoot := model_core.Patch(e, model_core.Nested(targetActionResult, targetActionResult.Message.OutputRoot))
+			return model_core.NewPatchedMessage(
+				&model_analysis_pb.FileRoot_Value{
+					RootDirectory: patchedOutputRoot.Message,
+				},
+				model_core.MapReferenceMetadataToWalkers(patchedOutputRoot.Patcher),
+			), nil
 		case *model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_ExpandTemplate_:
 			directoryCreationParameters, gotDirectoryCreationParameters := e.GetDirectoryCreationParametersObjectValue(&model_analysis_pb.DirectoryCreationParametersObject_Key{})
 			fileCreationParameters, gotFileCreationParameters := e.GetFileCreationParametersObjectValue(&model_analysis_pb.FileCreationParametersObject_Key{})
