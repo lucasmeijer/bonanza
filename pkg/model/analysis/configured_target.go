@@ -3633,7 +3633,7 @@ func (a *args[TReference, TMetadata]) doAddJoined(thread *starlark.Thread, b *st
 	var joinWith string
 	var mapEach *model_starlark.NamedFunction[TReference, TMetadata]
 	formatEach := "%s"
-	formatJoined := "%"
+	formatJoined := "%s"
 	omitIfEmpty := true
 	uniquify := true
 	expandDirectories := true
