@@ -121,14 +121,20 @@ func (c *baseComputer[TReference, TMetadata]) expandFileIfDirectory(e expandFile
 }
 
 func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx context.Context, key model_core.Message[*model_analysis_pb.TargetActionResult_Key, TReference], e TargetActionResultEnvironment[TReference, TMetadata]) (PatchedTargetActionResultValue, error) {
+	targetLabel, err := label.NewCanonicalLabel(key.Message.Label)
+	if err != nil {
+		return PatchedTargetActionResultValue{}, fmt.Errorf("invalid target label: %w", err)
+	}
+
 	commandEncoder, gotCommandEncoder := e.GetCommandEncoderObjectValue(&model_analysis_pb.CommandEncoderObject_Key{})
 	commandReaders, gotCommandReaders := e.GetCommandReadersValue(&model_analysis_pb.CommandReaders_Key{})
 	allBuiltinsModulesNames := e.GetBuiltinsModuleNamesValue(&model_analysis_pb.BuiltinsModuleNames_Key{})
-	patchedConfigurationReference := model_core.Patch(e, model_core.Nested(key, key.Message.ConfigurationReference))
+	configurationReference := model_core.Nested(key, key.Message.ConfigurationReference)
+	patchedConfigurationReference := model_core.Patch(e, configurationReference)
 	configuredTarget := e.GetConfiguredTargetValue(
 		model_core.NewPatchedMessage(
 			&model_analysis_pb.ConfiguredTarget_Key{
-				Label:                  key.Message.Label,
+				Label:                  targetLabel.String(),
 				ConfigurationReference: patchedConfigurationReference.Message,
 			},
 			model_core.MapReferenceMetadataToWalkers(patchedConfigurationReference.Patcher),
@@ -509,6 +515,9 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 		return PatchedTargetActionResultValue{}, err
 	}
 
+	// The provided output path pattern is relative to the output
+	// directory of the current configuration and package. Prepend
+	// pathname components to make it relative to the input root.
 	packageRelativeOutputPathPatternChildren, err := model_command.PathPatternGetChildren(
 		ctx,
 		commandReaders.PathPatternChildren,
@@ -518,9 +527,45 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 		return PatchedTargetActionResultValue{}, err
 	}
 	outputPathPatternChildren := model_core.Patch(e, packageRelativeOutputPathPatternChildren)
+	inlinedTreeOptions := c.getInlinedTreeOptions()
+	targetPackage := targetLabel.GetCanonicalPackage()
+	packageComponents := strings.FieldsFunc(targetPackage.GetPackagePath(), func(r rune) bool { return r == '/' })
+	for i := len(packageComponents) - 1; i >= 0; i-- {
+		outputPathPatternChildren, err = model_command.PrependDirectoryToPathPatternChildren(
+			packageComponents[i],
+			outputPathPatternChildren,
+			commandEncoder,
+			inlinedTreeOptions,
+			e,
+		)
+		if err != nil {
+			return PatchedTargetActionResultValue{}, err
+		}
+	}
+	configurationReferenceComponent, err := model_starlark.ConfigurationReferenceToComponent(configurationReference)
+	if err != nil {
+		return PatchedTargetActionResultValue{}, err
+	}
+	for _, component := range []string{
+		targetPackage.GetCanonicalRepo().String(),
+		model_starlark.ComponentStrExternal,
+		model_starlark.ComponentStrBin,
+		configurationReferenceComponent,
+		model_starlark.ComponentStrBazelOut,
+	} {
+		outputPathPatternChildren, err = model_command.PrependDirectoryToPathPatternChildren(
+			component,
+			outputPathPatternChildren,
+			commandEncoder,
+			inlinedTreeOptions,
+			e,
+		)
+		if err != nil {
+			return PatchedTargetActionResultValue{}, err
+		}
+	}
 
 	// Construct the command of the action.
-	inlinedTreeOptions := c.getInlinedTreeOptions()
 	command, err := inlinedtree.Build(
 		inlinedtree.CandidateList[*model_command_pb.Command, TMetadata]{
 			// Fields that should always be inlined into the
