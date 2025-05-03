@@ -115,6 +115,10 @@ message CommandEncoders {
   }
 }
 
+message CommandReaders {
+  message Key {}
+}
+
 message CompatibleExecutionPlatforms {
   message Key {
     // The constraints that must be present on the execution platform

@@ -12,8 +12,10 @@ import (
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
 	"github.com/buildbarn/bonanza/pkg/evaluation"
 	"github.com/buildbarn/bonanza/pkg/label"
+	model_command "github.com/buildbarn/bonanza/pkg/model/command"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/model/core/btree"
+	"github.com/buildbarn/bonanza/pkg/model/core/inlinedtree"
 	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
 	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
 	model_starlark "github.com/buildbarn/bonanza/pkg/model/starlark"
@@ -27,6 +29,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"go.starlark.net/starlark"
@@ -119,6 +122,7 @@ func (c *baseComputer[TReference, TMetadata]) expandFileIfDirectory(e expandFile
 
 func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx context.Context, key model_core.Message[*model_analysis_pb.TargetActionResult_Key, TReference], e TargetActionResultEnvironment[TReference, TMetadata]) (PatchedTargetActionResultValue, error) {
 	commandEncoder, gotCommandEncoder := e.GetCommandEncoderObjectValue(&model_analysis_pb.CommandEncoderObject_Key{})
+	commandReaders, gotCommandReaders := e.GetCommandReadersValue(&model_analysis_pb.CommandReaders_Key{})
 	allBuiltinsModulesNames := e.GetBuiltinsModuleNamesValue(&model_analysis_pb.BuiltinsModuleNames_Key{})
 	patchedConfigurationReference := model_core.Patch(e, model_core.Nested(key, key.Message.ConfigurationReference))
 	configuredTarget := e.GetConfiguredTargetValue(
@@ -136,6 +140,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 	fileCreationParametersMessage := e.GetFileCreationParametersValue(&model_analysis_pb.FileCreationParameters_Key{})
 	if !allBuiltinsModulesNames.IsSet() ||
 		!gotCommandEncoder ||
+		!gotCommandReaders ||
 		!configuredTarget.IsSet() ||
 		!gotDirectoryCreationParameters ||
 		!gotDirectoryReaders ||
@@ -504,22 +509,74 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 		return PatchedTargetActionResultValue{}, err
 	}
 
+	packageRelativeOutputPathPatternChildren, err := model_command.PathPatternGetChildren(
+		ctx,
+		commandReaders.PathPatternChildren,
+		model_core.Nested(action, actionLeaf.OutputPathPattern),
+	)
+	if err != nil {
+		return PatchedTargetActionResultValue{}, err
+	}
+	outputPathPatternChildren := model_core.Patch(e, packageRelativeOutputPathPatternChildren)
+
 	// Construct the command of the action.
-	commandPatcher := argumentsList.Patcher
-	outputPathPattern := model_core.Patch(e, model_core.Nested(action, actionLeaf.OutputPathPattern))
-	commandPatcher.Merge(outputPathPattern.Patcher)
-	createdCommand, err := model_core.MarshalAndEncodePatchedMessage(
-		model_core.NewPatchedMessage(
-			&model_command_pb.Command{
-				Arguments: argumentsList.Message,
-				// EnvironmentVariables: environmentVariables,
-				DirectoryCreationParameters: directoryCreationParametersMessage.Message.DirectoryCreationParameters,
-				FileCreationParameters:      fileCreationParametersMessage.Message.FileCreationParameters,
-				OutputPathPattern:           outputPathPattern.Message,
-				WorkingDirectory:            (*path.Trace)(nil).GetUNIXString(),
+	inlinedTreeOptions := c.getInlinedTreeOptions()
+	command, err := inlinedtree.Build(
+		inlinedtree.CandidateList[*model_command_pb.Command, TMetadata]{
+			// Fields that should always be inlined into the
+			// Command message.
+			{
+				ExternalMessage: model_core.NewSimplePatchedMessage[TMetadata]((proto.Message)(nil)),
+				ParentAppender: func(
+					command model_core.PatchedMessage[*model_command_pb.Command, TMetadata],
+					externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
+				) {
+					command.Message.DirectoryCreationParameters = directoryCreationParametersMessage.Message.DirectoryCreationParameters
+					command.Message.FileCreationParameters = fileCreationParametersMessage.Message.FileCreationParameters
+					command.Message.WorkingDirectory = (*path.Trace)(nil).GetUNIXString()
+				},
 			},
-			commandPatcher,
-		),
+			// Fields that can be stored externally if needed.
+			{
+				ExternalMessage: model_core.NewPatchedMessage(
+					(proto.Message)(nil),
+					argumentsList.Patcher,
+				),
+				ParentAppender: func(
+					command model_core.PatchedMessage[*model_command_pb.Command, TMetadata],
+					externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
+				) {
+					// TODO: This should push out the
+					// arguments if they get too big.
+					command.Message.Arguments = argumentsList.Message
+				},
+			},
+			{
+				ExternalMessage: model_core.NewPatchedMessage[proto.Message](
+					outputPathPatternChildren.Message,
+					outputPathPatternChildren.Patcher,
+				),
+				Encoder: commandEncoder,
+				ParentAppender: func(
+					command model_core.PatchedMessage[*model_command_pb.Command, TMetadata],
+					externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
+				) {
+					command.Message.OutputPathPattern = model_command.GetPathPatternWithChildren(
+						outputPathPatternChildren,
+						externalObject,
+						command.Patcher,
+						e,
+					)
+				},
+			},
+		},
+		inlinedTreeOptions,
+	)
+	if err != nil {
+		return PatchedTargetActionResultValue{}, err
+	}
+	createdCommand, err := model_core.MarshalAndEncodePatchedMessage(
+		command,
 		referenceFormat,
 		commandEncoder,
 	)

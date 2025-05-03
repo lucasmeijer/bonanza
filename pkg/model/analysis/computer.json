@@ -49,6 +49,14 @@
             "BuildSpecification"
          ]
       },
+      "CommandReaders": {
+         "dependsOn": [
+            "CommandEncoderObject"
+         ],
+         "nativeValueType": {
+            "type": "*CommandReaders[TReference]"
+         }
+      },
       "CompatibleExecutionPlatforms": {
          "dependsOn": [
             "RegisteredExecutionPlatforms"
@@ -548,6 +556,7 @@
             "BuiltinsModuleNames",
             "CanonicalRepoName",
             "CommandEncoderObject",
+            "CommandReaders",
             "CompiledBzlFileDecodedGlobals",
             "CompiledBzlFileFunctionFactory",
             "ConfiguredTarget",
