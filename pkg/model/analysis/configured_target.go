@@ -2956,7 +2956,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doSymlink(thread *starlark
 				&model_analysis_pb.ConfiguredTarget_Value_Output_Leaf{
 					PackageRelativePath: output.packageRelativePath.String(),
 					Source: &model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_Symlink{
-						Symlink: targetFileDefinition.Message,
+						Symlink: patchedTargetFileDefinition.Message,
 					},
 				},
 				patchedTargetFileDefinition.Patcher,
