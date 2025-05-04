@@ -3062,9 +3062,6 @@ func (c *baseComputer[TReference, TMetadata]) fetchRepo(ctx context.Context, can
 
 				// Create symbolic link node.
 				d := r.stack.Peek()
-				if err := d.maybeLoadContents(repositoryContext.directoryLoadOptions); err != nil {
-					return nil, err
-				}
 				if err := d.setSymlink(repositoryContext.directoryLoadOptions, *r.TerminalName, target); err != nil {
 					return nil, err
 				}
