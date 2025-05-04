@@ -351,6 +351,10 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 				model_core.MapReferenceMetadataToWalkers(createdDirectory.Message.Patcher),
 			), nil
 		case *model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_Symlink:
+			// Symlink to another file. Obtain the root of
+			// the target and add a symlink to it.
+			directoryCreationParameters, gotDirectoryCreationParameters := e.GetDirectoryCreationParametersObjectValue(&model_analysis_pb.DirectoryCreationParametersObject_Key{})
+			directoryReaders, gotDirectoryReaders := e.GetDirectoryReadersValue(&model_analysis_pb.DirectoryReaders_Key{})
 			patchedSymlinkTargetFile := model_core.Patch(e, model_core.Nested(output, source.Symlink))
 			symlinkTarget := e.GetFileRootValue(
 				model_core.NewPatchedMessage(
@@ -360,10 +364,48 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 					model_core.MapReferenceMetadataToWalkers(patchedSymlinkTargetFile.Patcher),
 				),
 			)
-			if !symlinkTarget.IsSet() {
+			if !gotDirectoryCreationParameters || !gotDirectoryReaders || !symlinkTarget.IsSet() {
 				return PatchedFileRootValue{}, evaluation.ErrMissingDependency
 			}
-			return PatchedFileRootValue{}, errors.New("TODO: symlink")
+
+			var rootDirectory changeTrackingDirectory[TReference, TMetadata]
+			loadOptions := &changeTrackingDirectoryLoadOptions[TReference]{
+				context:         ctx,
+				directoryReader: directoryReaders.Directory,
+				leavesReader:    directoryReaders.Leaves,
+			}
+			if err := rootDirectory.setContents(
+				model_core.Nested(symlinkTarget, symlinkTarget.Message.RootDirectory),
+				loadOptions,
+			); err != nil {
+				return PatchedFileRootValue{}, err
+			}
+
+			symlinkPath, err := model_starlark.FileGetPath(f)
+			if err != nil {
+				return PatchedFileRootValue{}, err
+			}
+			r := &changeTrackingDirectoryNewFileResolver[TReference, TMetadata]{
+				loadOptions: loadOptions,
+				stack:       util.NewNonEmptyStack(&rootDirectory),
+			}
+			if err := path.Resolve(path.UNIXFormat.NewParser(symlinkPath), r); err != nil {
+				return PatchedFileRootValue{}, fmt.Errorf("cannot resolve %#v: %w", symlinkPath, err)
+			}
+			if r.TerminalName == nil {
+				return PatchedFileRootValue{}, fmt.Errorf("%#v does not resolve to a file", symlinkPath)
+			}
+			d := r.stack.Peek()
+			if err := d.setSymlink(loadOptions, *r.TerminalName, path.UNIXFormat.NewParser("TODO_SYMLINK_TARGET")); err != nil {
+				return PatchedFileRootValue{}, fmt.Errorf("failed to create symlink at %#v: %w", symlinkPath, err)
+			}
+
+			return createFileRootFromChangeTrackingDirectory(
+				ctx,
+				e,
+				directoryCreationParameters,
+				&rootDirectory,
+			)
 		default:
 			return PatchedFileRootValue{}, errors.New("unknown output source type")
 		}
@@ -419,6 +461,24 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 		return PatchedFileRootValue{}, err
 	}
 
+	return createFileRootFromChangeTrackingDirectory(
+		ctx,
+		e,
+		directoryCreationParameters,
+		&changeTrackingDirectory[TReference, TMetadata]{
+			directories: map[path.Component]*changeTrackingDirectory[TReference, TMetadata]{
+				model_starlark.ComponentExternal: &externalDirectory,
+			},
+		},
+	)
+}
+
+func createFileRootFromChangeTrackingDirectory[TReference object.BasicReference, TMetadata model_core.WalkableReferenceMetadata](
+	ctx context.Context,
+	e FileRootEnvironment[TReference, TMetadata],
+	directoryCreationParameters *model_filesystem.DirectoryCreationParameters,
+	rootDirectory *changeTrackingDirectory[TReference, TMetadata],
+) (PatchedFileRootValue, error) {
 	group, groupCtx := errgroup.WithContext(ctx)
 	var createdRootDirectory model_filesystem.CreatedDirectory[TMetadata]
 	group.Go(func() error {
@@ -431,11 +491,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 				options: &capturableChangeTrackingDirectoryOptions[TReference, TMetadata]{
 					objectCapturer: e,
 				},
-				directory: &changeTrackingDirectory[TReference, TMetadata]{
-					directories: map[path.Component]*changeTrackingDirectory[TReference, TMetadata]{
-						model_starlark.ComponentExternal: &externalDirectory,
-					},
-				},
+				directory: rootDirectory,
 			},
 			model_filesystem.NewSimpleDirectoryMerkleTreeCapturer[TMetadata](e),
 			&createdRootDirectory,
