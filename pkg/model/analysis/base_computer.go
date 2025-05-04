@@ -126,6 +126,10 @@ func NewBaseComputer[TReference object.BasicReference, TMetadata BaseComputerRef
 			parsedObjectPoolIngester,
 			model_parser.NewMessageObjectParser[TReference, model_command_pb.Outputs](),
 		),
+		configuredTargetActionReader: model_parser.LookupParsedObjectReader(
+			parsedObjectPoolIngester,
+			model_parser.NewMessageListObjectParser[TReference, model_analysis_pb.ConfiguredTarget_Value_Action](),
+		),
 		moduleExtensionReposValueRepoReader: model_parser.LookupParsedObjectReader(
 			parsedObjectPoolIngester,
 			model_parser.NewMessageListObjectParser[TReference, model_analysis_pb.ModuleExtensionRepos_Value_Repo](),
