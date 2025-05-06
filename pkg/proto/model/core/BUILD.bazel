@@ -7,6 +7,7 @@ proto_library(
     srcs = ["core.proto"],
     visibility = ["//visibility:public"],
     deps = [
+        "@protobuf//:any_proto",
         "@protobuf//:descriptor_proto",
         "@protobuf//:empty_proto",
     ],

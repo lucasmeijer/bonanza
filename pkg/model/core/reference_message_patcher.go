@@ -71,7 +71,7 @@ func (p *ReferenceMessagePatcher[TMetadata]) AddReference(reference object.Local
 	message := &core.Reference{
 		Index: math.MaxUint32,
 	}
-	p.addReferenceMessage(message, reference, metadata)
+	p.addIndex(&message.Index, reference, metadata)
 	return message
 }
 
@@ -91,7 +91,7 @@ func (p *ReferenceMessagePatcher[TMetadata]) CaptureAndAddDecodableReference(
 	}
 }
 
-func (p *ReferenceMessagePatcher[TMetadata]) addReferenceMessage(message *core.Reference, reference object.LocalReference, metadata TMetadata) {
+func (p *ReferenceMessagePatcher[TMetadata]) addIndex(index *uint32, reference object.LocalReference, metadata TMetadata) {
 	if p.messagesByReference == nil {
 		p.messagesByReference = map[object.LocalReference]referenceMessages[TMetadata]{}
 	}
@@ -99,12 +99,12 @@ func (p *ReferenceMessagePatcher[TMetadata]) addReferenceMessage(message *core.R
 		metadata.Discard()
 		p.messagesByReference[reference] = referenceMessages[TMetadata]{
 			metadata: existingMessages.metadata,
-			indices:  append(p.messagesByReference[reference].indices, &message.Index),
+			indices:  append(p.messagesByReference[reference].indices, index),
 		}
 	} else {
 		p.messagesByReference[reference] = referenceMessages[TMetadata]{
 			metadata: metadata,
-			indices:  []*uint32{&message.Index},
+			indices:  []*uint32{index},
 		}
 		p.maybeIncreaseHeight(reference.GetHeight() + 1)
 	}
@@ -117,17 +117,38 @@ type referenceMessageAdder[TMetadata ReferenceMetadata, TReference object.BasicR
 }
 
 func (a *referenceMessageAdder[TMetadata, TReference]) addReferenceMessagesRecursively(message protoreflect.Message) {
-	if m, ok := message.Interface().(*core.Reference); ok {
+	switch m := message.Interface().(type) {
+	case *core.Reference:
 		// If the reference message refers to a valid object,
 		// let it be managed by the patcher. If it is invalid,
 		// we at least change the index to MaxUint32, so that
 		// any future attempts to resolve it will fail.
 		if index, err := GetIndexFromReferenceMessage(m, a.outgoingReferences.GetDegree()); err == nil {
 			reference := a.outgoingReferences.GetOutgoingReference(index).GetLocalReference()
-			a.patcher.addReferenceMessage(m, reference, a.createMetadata(index))
+			a.patcher.addIndex(&m.Index, reference, a.createMetadata(index))
 		}
 		m.Index = math.MaxUint32
-	} else {
+	case *core.ReferenceSet:
+		// Similarly, let all entries in a reference set message
+		// be managed by the patcher.
+		previousRawIndex := uint32(0)
+		degree := a.outgoingReferences.GetDegree()
+		for i, rawIndex := range m.Indices {
+			if rawIndex <= previousRawIndex || int64(rawIndex) > int64(degree) {
+				// Set is not sorted or contains indices
+				// that are out of bounds. Truncate the
+				// set, so that at least the leading
+				// references remain functional.
+				m.Indices = m.Indices[:i]
+				break
+			}
+			index := int(rawIndex - 1)
+			reference := a.outgoingReferences.GetOutgoingReference(index).GetLocalReference()
+			a.patcher.addIndex(&m.Indices[i], reference, a.createMetadata(index))
+			m.Indices[i] = math.MaxUint32
+			previousRawIndex = rawIndex
+		}
+	default:
 		message.Range(func(fieldDescriptor protoreflect.FieldDescriptor, value protoreflect.Value) bool {
 			if k := fieldDescriptor.Kind(); k == protoreflect.MessageKind || k == protoreflect.GroupKind {
 				if fieldDescriptor.IsList() {

@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package bonanza.model.core;
 
+import "google/protobuf/any.proto";
 import "google/protobuf/descriptor.proto";
 import "google/protobuf/empty.proto";
 
@@ -90,4 +91,25 @@ message WeakDecodableReference {
   // Parameters to provide to the binary encoders to facilitate decoding
   // of the object.
   bytes decoding_parameters = 2;
+}
+
+// ReferenceSet is similar to Reference, except that it holds a set of
+// outgoing references. Its use over 'repeated Reference' is preferred,
+// as its representation is far more dense.
+message ReferenceSet {
+  // Set of indices of references contained in the set. Indices need to
+  // be listed in strictly increasing order.
+  repeated fixed32 indices = 1;
+}
+
+// Any is a wrapper around google.protobuf.Any that is capable of
+// holding messages containing outgoing references.
+message Any {
+  // The message to store.
+  google.protobuf.Any value = 1;
+
+  // Table of outgoing references contained in the inner message,
+  // mapping each index to the corresponding outgoing reference of the
+  // outer message.
+  ReferenceSet references = 2;
 }

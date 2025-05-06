@@ -82,6 +82,65 @@ func FlattenDecodableReference[TReference any](m Message[*model_core_pb.Decodabl
 	return NewDecodable[TReference](reference, m.Message.DecodingParameters), nil
 }
 
+// FlattenReferenceSet returns the actual references that are contained
+// in a given ReferenceSet Protobuf message.
+func FlattenReferenceSet[TReference any](m Message[*model_core_pb.ReferenceSet, TReference]) (object.OutgoingReferences[TReference], error) {
+	if m.Message == nil {
+		return nil, status.Error(codes.InvalidArgument, "No reference set message provided")
+	}
+
+	// Messages without outgoing references can be fully detached
+	// from their parent.
+	indices := m.Message.Indices
+	if len(indices) == 0 {
+		return object.OutgoingReferencesList[TReference]{}, nil
+	}
+
+	// Check that all indices are in bounds. Instead of validating
+	// each index separately, require that they are provided in
+	// sorted order and that the first and last index are in range.
+	// This is more strict and equally expensive to check.
+	for i := 1; i < len(indices); i++ {
+		if indices[i-1] >= indices[i] {
+			return object.OutgoingReferencesList[TReference]{}, status.Errorf(codes.InvalidArgument, "References at indices %d and %d are not properly sorted", i-1, i)
+		}
+	}
+	degree := m.OutgoingReferences.GetDegree()
+	if firstIndex, lastIndex := indices[0], indices[len(indices)-1]; firstIndex <= 0 || int64(lastIndex) > int64(degree) {
+		return object.OutgoingReferencesList[TReference]{}, status.Errorf(codes.InvalidArgument, "Reference message set contains indices in range [%d, %d], which is outside expected range [1, %d]", firstIndex, lastIndex, degree)
+	}
+
+	// Instead of eagerly remapping all references, return a
+	// decorator that only remaps references when requested.
+	return &remappingOutgoingReferences[TReference]{
+		indices: indices,
+		outer:   m.OutgoingReferences,
+	}, nil
+}
+
+// remappingOutgoingReferences is a wrapper for OutgoingReferences that
+// limits access to references contained in a ReferenceSet.
+type remappingOutgoingReferences[TReference any] struct {
+	indices []uint32
+	outer   object.OutgoingReferences[TReference]
+}
+
+func (or *remappingOutgoingReferences[TReference]) GetDegree() int {
+	return len(or.indices)
+}
+
+func (or *remappingOutgoingReferences[TReference]) GetOutgoingReference(index int) TReference {
+	return or.outer.GetOutgoingReference(int(or.indices[index] - 1))
+}
+
+func (or *remappingOutgoingReferences[TReference]) DetachOutgoingReferences() object.OutgoingReferences[TReference] {
+	list := make(object.OutgoingReferencesList[TReference], len(or.indices))
+	for _, index := range or.indices {
+		list = append(list, or.outer.GetOutgoingReference(int(or.indices[index]-1)))
+	}
+	return list
+}
+
 func MessagesEqual[
 	TMessage proto.Message,
 	TReference1, TReference2 object.BasicReference,
