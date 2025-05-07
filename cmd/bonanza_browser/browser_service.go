@@ -846,35 +846,46 @@ func (textPayloadRenderer) render(r *http.Request, o model_core.Decodable[*objec
 // with syntax highlighting applied. Any references to other objects
 // contained in these messages are rendered as clickable links.
 type messageJSONRenderer struct {
-	now                time.Time
-	outgoingReferences object.OutgoingReferences[object.LocalReference]
+	now time.Time
 
 	observedEncoders []*browser_pb.RecentlyObservedEncoder
 }
 
-func (d *messageJSONRenderer) renderValue(fieldDescriptor protoreflect.FieldDescriptor, value protoreflect.Value) []g.Node {
+func (d *messageJSONRenderer) renderValue(fieldDescriptor protoreflect.FieldDescriptor, value model_core.Message[protoreflect.Value, object.LocalReference]) []g.Node {
 	var v any
 	switch fieldDescriptor.Kind() {
 	// Simple scalar types for which we can just call json.Marshal().
 	case protoreflect.BoolKind:
-		v = value.Bool()
+		v = value.Message.Bool()
 	case protoreflect.Int32Kind, protoreflect.Int64Kind,
 		protoreflect.Sint32Kind, protoreflect.Sint64Kind,
 		protoreflect.Sfixed32Kind, protoreflect.Sfixed64Kind:
-		v = value.Int()
+		v = value.Message.Int()
 	case protoreflect.Uint32Kind, protoreflect.Uint64Kind,
 		protoreflect.Fixed32Kind, protoreflect.Fixed64Kind:
-		v = value.Uint()
+		v = value.Message.Uint()
 	case protoreflect.FloatKind, protoreflect.DoubleKind:
-		v = value.Float()
+		v = value.Message.Float()
 	case protoreflect.StringKind:
-		v = value.String()
+		v = value.Message.String()
 	case protoreflect.BytesKind:
-		v = value.Bytes()
+		v = value.Message.Bytes()
 
 	case protoreflect.GroupKind, protoreflect.MessageKind:
-		if r, ok := value.Message().Interface().(*model_core_pb.DecodableReference); ok {
-			if reference, err := model_core.FlattenDecodableReference(model_core.NewMessage(r, d.outgoingReferences)); err == nil {
+		switch r := value.Message.Message().Interface().(type) {
+		case *model_core_pb.Any:
+			anyValue, err := model_core.UnmarshalAnyNew(model_core.Nested(value, r))
+			if err != nil {
+				return []g.Node{
+					h.Span(
+						h.Class("text-red-600"),
+						g.Textf("[ %s ]", err),
+					),
+				}
+			}
+			return d.renderMessage(model_core.Nested(anyValue, anyValue.Message.ProtoReflect()), r.Value.TypeUrl)
+		case *model_core_pb.DecodableReference:
+			if reference, err := model_core.FlattenDecodableReference(model_core.Nested(value, r)); err == nil {
 				rawReference := model_core.DecodableLocalReferenceToString(reference)
 				if fieldOptions, ok := fieldDescriptor.Options().(*descriptorpb.FieldOptions); ok {
 					// Field is a valid reference for
@@ -905,12 +916,12 @@ func (d *messageJSONRenderer) renderValue(fieldDescriptor protoreflect.FieldDesc
 		}
 
 		// Recurse into message.
-		return d.renderMessage(value.Message())
+		return d.renderMessage(model_core.Nested(value, value.Message.Message()), "")
 
 	case protoreflect.EnumKind:
 		// Render an enum value as a string or integer,
 		// depending on whether it corresponds to a known value.
-		number := value.Enum()
+		number := value.Message.Enum()
 		if enumValueDescriptor := fieldDescriptor.Enum().Values().ByNumber(number); enumValueDescriptor != nil {
 			v = string(enumValueDescriptor.Name())
 		} else {
@@ -926,6 +937,10 @@ func (d *messageJSONRenderer) renderValue(fieldDescriptor protoreflect.FieldDesc
 		}
 	}
 
+	return renderJSONValue(v)
+}
+
+func renderJSONValue(v any) []g.Node {
 	jsonValue, err := json.Marshal(v)
 	if err != nil {
 		return []g.Node{
@@ -945,10 +960,14 @@ func (d *messageJSONRenderer) renderValue(fieldDescriptor protoreflect.FieldDesc
 
 var binaryEncoderDescriptor = (&model_encoding_pb.BinaryEncoder{}).ProtoReflect().Descriptor()
 
-func (d *messageJSONRenderer) renderMessage(m protoreflect.Message) []g.Node {
-	// Iterate over all message fields and render their values.
+func (d *messageJSONRenderer) renderMessage(m model_core.Message[protoreflect.Message, object.LocalReference], typeURL string) []g.Node {
 	fields := map[string][]g.Node{}
-	m.Range(func(fieldDescriptor protoreflect.FieldDescriptor, value protoreflect.Value) bool {
+	if typeURL != "" {
+		fields["@type"] = renderJSONValue(typeURL)
+	}
+
+	// Iterate over all message fields and render their values.
+	m.Message.Range(func(fieldDescriptor protoreflect.FieldDescriptor, value protoreflect.Value) bool {
 		var valueNodes []g.Node
 		if fieldDescriptor.IsList() {
 			// Repeated fields should be rendered as JSON lists.
@@ -961,7 +980,7 @@ func (d *messageJSONRenderer) renderMessage(m protoreflect.Message) []g.Node {
 			} else {
 				listParts := make([]g.Node, 0, listLength)
 				for i := 0; i < listLength; i++ {
-					elementNodes := d.renderValue(fieldDescriptor, list.Get(i))
+					elementNodes := d.renderValue(fieldDescriptor, model_core.Nested(m, list.Get(i)))
 					if i != listLength-1 {
 						elementNodes = append(elementNodes, g.Text(","))
 					}
@@ -988,14 +1007,14 @@ func (d *messageJSONRenderer) renderMessage(m protoreflect.Message) []g.Node {
 						Configuration: configuration,
 						LastObservation: &browser_pb.RecentlyObservedEncoder_LastObservation{
 							Time:        timestamppb.New(d.now),
-							MessageType: string(m.Descriptor().Name()),
+							MessageType: string(m.Message.Descriptor().Name()),
 							FieldName:   fieldDescriptor.TextName(),
 						},
 					},
 				)
 			}
 		} else {
-			valueNodes = d.renderValue(fieldDescriptor, value)
+			valueNodes = d.renderValue(fieldDescriptor, model_core.Nested(m, value))
 		}
 		name := fieldDescriptor.JSONName()
 		fields[name] = valueNodes
@@ -1030,8 +1049,8 @@ func (d *messageJSONRenderer) renderMessage(m protoreflect.Message) []g.Node {
 	}
 }
 
-func (d *messageJSONRenderer) renderMessageList(list []protoreflect.Message) []g.Node {
-	listLength := len(list)
+func (d *messageJSONRenderer) renderMessageList(list model_core.Message[[]protoreflect.Message, object.LocalReference]) []g.Node {
+	listLength := len(list.Message)
 	if listLength == 0 {
 		return []g.Node{
 			g.Text("[]"),
@@ -1039,8 +1058,8 @@ func (d *messageJSONRenderer) renderMessageList(list []protoreflect.Message) []g
 	}
 
 	listParts := make([]g.Node, 0, listLength)
-	for i, element := range list {
-		elementNodes := d.renderMessage(element)
+	for i, element := range list.Message {
+		elementNodes := d.renderMessage(model_core.Nested(list, element), "")
 		if i != listLength-1 {
 			elementNodes = append(elementNodes, g.Text(","))
 		}
@@ -1080,10 +1099,9 @@ func (messageJSONPayloadRenderer) render(r *http.Request, o model_core.Decodable
 		return renderErrorAlert(fmt.Errorf("failed to unmarshal message: %w", err)), nil
 	}
 	d := messageJSONRenderer{
-		now:                time.Now(),
-		outgoingReferences: o.Value,
+		now: time.Now(),
 	}
-	rendered := d.renderMessage(message)
+	rendered := d.renderMessage(model_core.NewMessage(message, o.Value), "")
 	return rendered, d.observedEncoders
 }
 
@@ -1135,9 +1153,8 @@ func (messageListJSONPayloadRenderer) render(r *http.Request, o model_core.Decod
 	}
 
 	d := messageJSONRenderer{
-		now:                time.Now(),
-		outgoingReferences: o.Value,
+		now: time.Now(),
 	}
-	rendered := d.renderMessageList(elements)
+	rendered := d.renderMessageList(model_core.NewMessage(elements, o.Value))
 	return rendered, d.observedEncoders
 }
