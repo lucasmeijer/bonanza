@@ -1733,8 +1733,8 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 				rc.context,
 				rc.computer.buildSettingOverrideReader,
 				getBuildSettingOverridesFromReference(rc.configurationReference),
-				func(entry *model_analysis_pb.BuildSettingOverride) (int, *model_core_pb.DecodableReference) {
-					switch level := entry.Level.(type) {
+				func(entry model_core.Message[*model_analysis_pb.BuildSettingOverride, TReference]) (int, *model_core_pb.DecodableReference) {
+					switch level := entry.Message.Level.(type) {
 					case *model_analysis_pb.BuildSettingOverride_Leaf_:
 						return strings.Compare(targetLabelStr, level.Leaf.Label), nil
 					case *model_analysis_pb.BuildSettingOverride_Parent_:

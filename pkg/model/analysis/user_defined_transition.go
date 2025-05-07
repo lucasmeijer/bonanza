@@ -348,8 +348,8 @@ func (c *baseComputer[TReference, TMetadata]) getBuildSettingValue(ctx context.C
 		ctx,
 		c.buildSettingOverrideReader,
 		getBuildSettingOverridesFromReference(configurationReference),
-		func(entry *model_analysis_pb.BuildSettingOverride) (int, *model_core_pb.DecodableReference) {
-			switch level := entry.Level.(type) {
+		func(entry model_core.Message[*model_analysis_pb.BuildSettingOverride, TReference]) (int, *model_core_pb.DecodableReference) {
+			switch level := entry.Message.Level.(type) {
 			case *model_analysis_pb.BuildSettingOverride_Leaf_:
 				return strings.Compare(visibleBuildSettingLabel, level.Leaf.Label), nil
 			case *model_analysis_pb.BuildSettingOverride_Parent_:

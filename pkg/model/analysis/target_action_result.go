@@ -164,8 +164,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 		ctx,
 		c.configuredTargetActionReader,
 		model_core.Nested(configuredTarget, configuredTarget.Message.Actions),
-		func(entry *model_analysis_pb.ConfiguredTarget_Value_Action) (int, *model_core_pb.DecodableReference) {
-			switch level := entry.Level.(type) {
+		func(entry model_core.Message[*model_analysis_pb.ConfiguredTarget_Value_Action, TReference]) (int, *model_core_pb.DecodableReference) {
+			switch level := entry.Message.Level.(type) {
 			case *model_analysis_pb.ConfiguredTarget_Value_Action_Leaf_:
 				return bytes.Compare(actionID, level.Leaf.Id), nil
 			case *model_analysis_pb.ConfiguredTarget_Value_Action_Parent_:

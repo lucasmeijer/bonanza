@@ -21,8 +21,8 @@ func (c *baseComputer[TReference, TMetadata]) lookupTargetDefinitionInTargetList
 		ctx,
 		c.packageValueTargetReader,
 		targetList,
-		func(entry *model_analysis_pb.Package_Value_Target) (int, *model_core_pb.DecodableReference) {
-			switch level := entry.Level.(type) {
+		func(entry model_core.Message[*model_analysis_pb.Package_Value_Target, TReference]) (int, *model_core_pb.DecodableReference) {
+			switch level := entry.Message.Level.(type) {
 			case *model_analysis_pb.Package_Value_Target_Leaf:
 				return strings.Compare(targetNameStr, level.Leaf.Name), nil
 			case *model_analysis_pb.Package_Value_Target_Parent_:

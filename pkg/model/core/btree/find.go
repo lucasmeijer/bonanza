@@ -22,14 +22,14 @@ func Find[
 	ctx context.Context,
 	reader model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[[]TMessagePtr, TReference]],
 	list model_core.Message[[]TMessagePtr, TReference],
-	cmp func(TMessagePtr) (int, *model_core_pb.DecodableReference),
+	cmp func(model_core.Message[TMessagePtr, TReference]) (int, *model_core_pb.DecodableReference),
 ) (model_core.Message[TMessagePtr, TReference], error) {
 	for {
 		low, high := 0, len(list.Message)
 		var childReference *model_core_pb.DecodableReference
 		for low < high {
 			index := int(uint(low+high) >> 1)
-			r, reference := cmp(list.Message[index])
+			r, reference := cmp(model_core.Nested(list, list.Message[index]))
 			if r < 0 {
 				// Entry should be closer to the start
 				// of the list.

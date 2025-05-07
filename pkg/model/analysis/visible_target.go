@@ -277,8 +277,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeVisibleTargetValue(ctx cont
 			ctx,
 			c.buildSettingOverrideReader,
 			getBuildSettingOverridesFromReference(model_core.Nested(key, key.Message.ConfigurationReference)),
-			func(entry *model_analysis_pb.BuildSettingOverride) (int, *model_core_pb.DecodableReference) {
-				switch level := entry.Level.(type) {
+			func(entry model_core.Message[*model_analysis_pb.BuildSettingOverride, TReference]) (int, *model_core_pb.DecodableReference) {
+				switch level := entry.Message.Level.(type) {
 				case *model_analysis_pb.BuildSettingOverride_Leaf_:
 					return strings.Compare(toLabelStr, level.Leaf.Label), nil
 				case *model_analysis_pb.BuildSettingOverride_Parent_:

@@ -35,8 +35,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeModuleExtensionRepoValue(ct
 		ctx,
 		c.moduleExtensionReposValueRepoReader,
 		model_core.Nested(moduleExtensionReposValue, moduleExtensionReposValue.Message.Repos),
-		func(entry *model_analysis_pb.ModuleExtensionRepos_Value_Repo) (int, *model_core_pb.DecodableReference) {
-			switch level := entry.Level.(type) {
+		func(entry model_core.Message[*model_analysis_pb.ModuleExtensionRepos_Value_Repo, TReference]) (int, *model_core_pb.DecodableReference) {
+			switch level := entry.Message.Level.(type) {
 			case *model_analysis_pb.ModuleExtensionRepos_Value_Repo_Leaf:
 				return strings.Compare(repoName, level.Leaf.Name), nil
 			case *model_analysis_pb.ModuleExtensionRepos_Value_Repo_Parent_:

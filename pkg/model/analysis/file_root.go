@@ -142,8 +142,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 			ctx,
 			c.configuredTargetOutputReader,
 			model_core.Nested(configuredTarget, configuredTarget.Message.Outputs),
-			func(entry *model_analysis_pb.ConfiguredTarget_Value_Output) (int, *model_core_pb.DecodableReference) {
-				switch level := entry.Level.(type) {
+			func(entry model_core.Message[*model_analysis_pb.ConfiguredTarget_Value_Output, TReference]) (int, *model_core_pb.DecodableReference) {
+				switch level := entry.Message.Level.(type) {
 				case *model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_:
 					return strings.Compare(packageRelativePathStr, level.Leaf.PackageRelativePath), nil
 				case *model_analysis_pb.ConfiguredTarget_Value_Output_Parent_:
