@@ -7,6 +7,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 // Message is a piece of data, typically a Protobuf message, that has
@@ -141,12 +142,23 @@ func (or *remappingOutgoingReferences[TReference]) DetachOutgoingReferences() ob
 	return list
 }
 
+// FlattenAny extracts the anypb.Any message that's embedded in a
+// model_core_pb.Any message. The resulting message only has access to
+// the outgoing references of the inner message.
+func FlattenAny[TReference any](m Message[*model_core_pb.Any, TReference]) (TopLevelMessage[*anypb.Any, TReference], error) {
+	outgoingReferences, err := FlattenReferenceSet(Nested(m, m.Message.GetReferences()))
+	if err != nil {
+		return TopLevelMessage[*anypb.Any, TReference]{}, err
+	}
+	return NewTopLevelMessage(m.Message.Value, outgoingReferences), nil
+}
+
 // UnmarshalAnyNew extracts the message contained in a model_core.Any,
 // and ensures that any references contained within are accessible.
 func UnmarshalAnyNew[TReference any](m Message[*model_core_pb.Any, TReference]) (TopLevelMessage[proto.Message, TReference], error) {
-	outgoingReferences, err := FlattenReferenceSet(Nested(m, m.Message.GetReferences()))
+	flattened, err := FlattenAny(m)
 	if err != nil {
 		return TopLevelMessage[proto.Message, TReference]{}, err
 	}
-	return UnmarshalTopLevelAnyNew(NewTopLevelMessage(m.Message.Value, outgoingReferences))
+	return UnmarshalTopLevelAnyNew(flattened)
 }

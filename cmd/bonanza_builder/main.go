@@ -370,18 +370,28 @@ func (e *builderExecutor) Execute(ctx context.Context, action *model_build_pb.Ac
 			evaluationTreeEncoder,
 			namespace.ReferenceFormat,
 			/* parentNodeComputer = */ func(createdObject model_core.Decodable[model_core.CreatedObject[dag.ObjectContentsWalker]], childNodes []*model_evaluation_pb.Evaluation) (model_core.PatchedMessage[*model_evaluation_pb.Evaluation, dag.ObjectContentsWalker], error) {
+				var firstKey []byte
+				switch firstEntry := childNodes[0].Level.(type) {
+				case *model_evaluation_pb.Evaluation_Leaf_:
+					flattenedAny, err := model_core.FlattenAny(model_core.NewMessage(firstEntry.Leaf.Key, createdObject.Value.Contents))
+					if err != nil {
+						return model_core.PatchedMessage[*model_evaluation_pb.Evaluation, dag.ObjectContentsWalker]{}, err
+					}
+					firstKey, err = model_core.MarshalTopLevelMessage(flattenedAny)
+					if err != nil {
+						return model_core.PatchedMessage[*model_evaluation_pb.Evaluation, dag.ObjectContentsWalker]{}, err
+					}
+				case *model_evaluation_pb.Evaluation_Parent_:
+					firstKey = firstEntry.Parent.FirstKey
+				}
 				patcher := model_core.NewReferenceMessagePatcher[dag.ObjectContentsWalker]()
 				return model_core.NewPatchedMessage(
 					&model_evaluation_pb.Evaluation{
 						Level: &model_evaluation_pb.Evaluation_Parent_{
 							Parent: &model_evaluation_pb.Evaluation_Parent{
 								Reference: patcher.CaptureAndAddDecodableReference(createdObject, model_core.WalkableCreatedObjectCapturer),
+								FirstKey:  firstKey,
 							},
-							// TODO: Setting this requires us to
-							// somehow clone the metadata, which
-							// dag.ObjectContentsWalker does not
-							// support.
-							// FirstKey: ...
 						},
 					},
 					patcher,

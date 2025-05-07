@@ -38,7 +38,7 @@ message Evaluation {
     // for which a byte sequence is obtained by calling
     // model_core.MarshalTopLevelMessage() against the anypb.Any
     // message.
-    bonanza.model.core.Any first_key = 2;
+    bytes first_key = 2;
   }
 
   message Leaf {
