@@ -141,6 +141,20 @@ func (or *remappingOutgoingReferences[TReference]) DetachOutgoingReferences() ob
 	return list
 }
 
+// UnmarshalAnyNew extracts the message contained in an anypb.Any, and
+// ensures that any references contained within are accessible.
+func UnmarshalAnyNew[TReference any](m Message[*model_core_pb.Any, TReference]) (Message[proto.Message, TReference], error) {
+	message, err := m.Message.Value.UnmarshalNew()
+	if err != nil {
+		return Message[proto.Message, TReference]{}, err
+	}
+	outgoingReferences, err := FlattenReferenceSet(Nested(m, m.Message.References))
+	if err != nil {
+		return Message[proto.Message, TReference]{}, err
+	}
+	return NewMessage(message, outgoingReferences), nil
+}
+
 func MessagesEqual[
 	TMessage proto.Message,
 	TReference1, TReference2 object.BasicReference,

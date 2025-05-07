@@ -1,11 +1,15 @@
 package core
 
 import (
+	"math"
+
 	"github.com/buildbarn/bonanza/pkg/encoding/varint"
 	model_encoding "github.com/buildbarn/bonanza/pkg/model/encoding"
+	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 // PatchedMessage is a tuple for storing a Protobuf message that
@@ -157,4 +161,46 @@ func MarshalAndEncodePatchedListMessage[TMessage proto.Message, TMetadata Refere
 		}
 	}
 	return encode(data, references, metadata, referenceFormat, encoder)
+}
+
+// MarshalAny wraps a provided message into an anypb.Any message.
+// References stored in the original message are kept intact.
+func MarshalAny[TMessage proto.Message, TMetadata ReferenceMetadata](m PatchedMessage[TMessage, TMetadata]) (PatchedMessage[*model_core_pb.Any, TMetadata], error) {
+	references, metadata := m.Patcher.SortAndSetReferences()
+	var value anypb.Any
+	if err := anypb.MarshalFrom(&value, m.Message, marshalOptions); err != nil {
+		return PatchedMessage[*model_core_pb.Any, TMetadata]{}, err
+	}
+
+	// Construct a table for remapping references contained in the
+	// message to indices on the other message.
+	degree := len(references)
+	indices := make([]uint32, 0, degree)
+	for i := 0; i < degree; i++ {
+		indices = append(indices, math.MaxUint32)
+	}
+
+	// Create a new reference message patcher that contains the same
+	// references and metadata as the original message, but instead
+	// managing the table used for remapping.
+	newPatcher := &ReferenceMessagePatcher[TMetadata]{
+		messagesByReference: make(map[object.LocalReference]referenceMessages[TMetadata], degree),
+		height:              m.Patcher.height,
+	}
+	for i, reference := range references {
+		newPatcher.messagesByReference[reference] = referenceMessages[TMetadata]{
+			metadata: metadata[i],
+			indices:  []*uint32{&indices[i]},
+		}
+	}
+
+	return NewPatchedMessage(
+		&model_core_pb.Any{
+			Value: &value,
+			References: &model_core_pb.ReferenceSet{
+				Indices: indices,
+			},
+		},
+		newPatcher,
+	), nil
 }
