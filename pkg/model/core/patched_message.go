@@ -90,9 +90,9 @@ func (m *PatchedMessage[T, TMetadata]) Discard() {
 }
 
 // SortAndSetReferences assigns indices to outgoing references.
-func (m PatchedMessage[T, TMetadata]) SortAndSetReferences() (Message[T, object.LocalReference], []TMetadata) {
+func (m PatchedMessage[T, TMetadata]) SortAndSetReferences() (TopLevelMessage[T, object.LocalReference], []TMetadata) {
 	references, metadata := m.Patcher.SortAndSetReferences()
-	return Message[T, object.LocalReference]{
+	return TopLevelMessage[T, object.LocalReference]{
 		Message:            m.Message,
 		OutgoingReferences: references,
 	}, metadata

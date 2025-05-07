@@ -74,7 +74,10 @@ func (f *File[TReference, TMetadata]) Hash(thread *starlark.Thread) (uint32, err
 
 func (f *File[TReference, TMetadata]) equals(other *File[TReference, TMetadata]) bool {
 	if f != other {
-		if !model_core.MessagesEqual(f.definition, other.definition) {
+		capturer := model_core.NewDiscardingObjectCapturer[TReference]()
+		f1, _ := model_core.Patch(capturer, f.definition).SortAndSetReferences()
+		f2, _ := model_core.Patch(capturer, other.definition).SortAndSetReferences()
+		if !model_core.MessagesEqual(f1, f2) {
 			return false
 		}
 	}

@@ -45,6 +45,7 @@ type baseComputer[TReference object.BasicReference, TMetadata BaseComputerRefere
 	executionNamespace          *object_pb.Namespace
 	bzlFileBuiltins             starlark.StringDict
 	buildFileBuiltins           starlark.StringDict
+	discardingObjectCapturer    model_core.ObjectCapturer[TReference, model_core.NoopReferenceMetadata]
 
 	// Readers for various message types.
 	// TODO: These should likely be removed and instantiated later
@@ -85,8 +86,9 @@ func NewBaseComputer[TReference object.BasicReference, TMetadata BaseComputerRef
 			InstanceName:    executionInstanceName,
 			ReferenceFormat: buildSpecificationReference.Value.GetReferenceFormat(),
 		}.ToProto(),
-		bzlFileBuiltins:   bzlFileBuiltins,
-		buildFileBuiltins: buildFileBuiltins,
+		bzlFileBuiltins:          bzlFileBuiltins,
+		buildFileBuiltins:        buildFileBuiltins,
+		discardingObjectCapturer: model_core.NewDiscardingObjectCapturer[TReference](),
 
 		// TODO: Set up encoding!
 		valueReaders: model_starlark.ValueReaders[TReference]{

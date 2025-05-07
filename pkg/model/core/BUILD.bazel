@@ -14,6 +14,7 @@ go_library(
         "object_capturer.go",
         "patched_message.go",
         "reference_message_patcher.go",
+        "top_level_message.go",
         "walkable_reference_metadata.go",
     ],
     importpath = "github.com/buildbarn/bonanza/pkg/model/core",

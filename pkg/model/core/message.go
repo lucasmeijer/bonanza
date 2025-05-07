@@ -154,19 +154,3 @@ func UnmarshalAnyNew[TReference any](m Message[*model_core_pb.Any, TReference]) 
 	}
 	return NewMessage(message, outgoingReferences), nil
 }
-
-func MessagesEqual[
-	TMessage proto.Message,
-	TReference1, TReference2 object.BasicReference,
-](m1 Message[TMessage, TReference1], m2 Message[TMessage, TReference2]) bool {
-	degree1, degree2 := m1.OutgoingReferences.GetDegree(), m2.OutgoingReferences.GetDegree()
-	if degree1 != degree2 {
-		return false
-	}
-	for i := 0; i < degree1; i++ {
-		if m1.OutgoingReferences.GetOutgoingReference(i).GetLocalReference() != m2.OutgoingReferences.GetOutgoingReference(i).GetLocalReference() {
-			return false
-		}
-	}
-	return proto.Equal(m1.Message, m2.Message)
-}

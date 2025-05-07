@@ -22,3 +22,20 @@ var DiscardingCreatedObjectCapturer CreatedObjectCapturer[NoopReferenceMetadata]
 func (discardingCreatedObjectCapturer) CaptureCreatedObject(CreatedObject[NoopReferenceMetadata]) NoopReferenceMetadata {
 	return NoopReferenceMetadata{}
 }
+
+type discardingObjectCapturer[TReference any] struct {
+	discardingCreatedObjectCapturer
+}
+
+// NewDiscardingObjectCapturer creates is an implementation of
+// ObjectCapturer that discards any created objects, and stores no
+// metadata for any existing objects. This can be used if the goal is to
+// simply compute the root node of the Merkle tree, discarding any
+// children that were created in the process.
+func NewDiscardingObjectCapturer[TReference any]() ObjectCapturer[TReference, NoopReferenceMetadata] {
+	return discardingObjectCapturer[TReference]{}
+}
+
+func (discardingObjectCapturer[TReference]) CaptureExistingObject(TReference) NoopReferenceMetadata {
+	return NoopReferenceMetadata{}
+}

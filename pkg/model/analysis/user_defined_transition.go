@@ -265,7 +265,12 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 			// value differs from the default value. This
 			// ensures that the configuration remains
 			// canonical.
-			if sortedEncodedValue, _ := encodedValue.SortAndSetReferences(); !model_core.MessagesEqual(sortedEncodedValue, expectedOutput.defaultValue) {
+			sortedEncodedValue, _ := encodedValue.SortAndSetReferences()
+			sortedDefaultValue, _ := model_core.Patch(
+				c.discardingObjectCapturer,
+				expectedOutput.defaultValue,
+			).SortAndSetReferences()
+			if !model_core.MessagesEqual(sortedEncodedValue, sortedDefaultValue) {
 				treeBuilder.PushChild(
 					model_core.NewPatchedMessage(
 						&model_analysis_pb.BuildSettingOverride{
