@@ -57,10 +57,10 @@ func TestFullyComputeValue(t *testing.T) {
 			AnyTimes()
 		valueChildrenStorer := NewMockValueChildrenStorerForTesting(ctrl)
 
-		m, err := evaluation.FullyComputeValue(
+		m, _, err := evaluation.FullyComputeValue(
 			ctx,
 			computer,
-			model_core.NewSimpleMessage[object.LocalReference, proto.Message](
+			model_core.NewSimpleTopLevelMessage[object.LocalReference, proto.Message](
 				&wrapperspb.UInt32Value{
 					Value: 93,
 				},

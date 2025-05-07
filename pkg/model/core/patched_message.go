@@ -9,7 +9,6 @@ import (
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 // PatchedMessage is a tuple for storing a Protobuf message that
@@ -92,10 +91,7 @@ func (m *PatchedMessage[T, TMetadata]) Discard() {
 // SortAndSetReferences assigns indices to outgoing references.
 func (m PatchedMessage[T, TMetadata]) SortAndSetReferences() (TopLevelMessage[T, object.LocalReference], []TMetadata) {
 	references, metadata := m.Patcher.SortAndSetReferences()
-	return TopLevelMessage[T, object.LocalReference]{
-		Message:            m.Message,
-		OutgoingReferences: references,
-	}, metadata
+	return NewTopLevelMessage(m.Message, references), metadata
 }
 
 func encode[TMetadata ReferenceMetadata](
@@ -163,18 +159,18 @@ func MarshalAndEncodePatchedListMessage[TMessage proto.Message, TMetadata Refere
 	return encode(data, references, metadata, referenceFormat, encoder)
 }
 
-// MarshalAny wraps a provided message into an anypb.Any message.
+// MarshalAny wraps a patched message into a model_core_pb.Any message.
 // References stored in the original message are kept intact.
 func MarshalAny[TMessage proto.Message, TMetadata ReferenceMetadata](m PatchedMessage[TMessage, TMetadata]) (PatchedMessage[*model_core_pb.Any, TMetadata], error) {
-	references, metadata := m.Patcher.SortAndSetReferences()
-	var value anypb.Any
-	if err := anypb.MarshalFrom(&value, m.Message, marshalOptions); err != nil {
+	topLevelMessage, metadata := m.SortAndSetReferences()
+	anyMessage, err := MarshalTopLevelAny(topLevelMessage)
+	if err != nil {
 		return PatchedMessage[*model_core_pb.Any, TMetadata]{}, err
 	}
 
 	// Construct a table for remapping references contained in the
 	// message to indices on the other message.
-	degree := len(references)
+	degree := anyMessage.OutgoingReferences.GetDegree()
 	indices := make([]uint32, 0, degree)
 	for i := 0; i < degree; i++ {
 		indices = append(indices, math.MaxUint32)
@@ -187,8 +183,8 @@ func MarshalAny[TMessage proto.Message, TMetadata ReferenceMetadata](m PatchedMe
 		messagesByReference: make(map[object.LocalReference]referenceMessages[TMetadata], degree),
 		height:              m.Patcher.height,
 	}
-	for i, reference := range references {
-		newPatcher.messagesByReference[reference] = referenceMessages[TMetadata]{
+	for i := 0; i < degree; i++ {
+		newPatcher.messagesByReference[anyMessage.OutgoingReferences.GetOutgoingReference(i)] = referenceMessages[TMetadata]{
 			metadata: metadata[i],
 			indices:  []*uint32{&indices[i]},
 		}
@@ -196,7 +192,7 @@ func MarshalAny[TMessage proto.Message, TMetadata ReferenceMetadata](m PatchedMe
 
 	return NewPatchedMessage(
 		&model_core_pb.Any{
-			Value: &value,
+			Value: anyMessage.Message,
 			References: &model_core_pb.ReferenceSet{
 				Indices: indices,
 			},

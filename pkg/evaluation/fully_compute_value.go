@@ -5,35 +5,25 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"iter"
+	"maps"
+	"slices"
 
-	"github.com/buildbarn/bonanza/pkg/encoding/varint"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/storage/dag"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
-func getKeyString[TReference object.BasicReference](key model_core.Message[proto.Message, TReference]) (string, error) {
-	// Marshal the outgoing references of the key.
-	degree := key.OutgoingReferences.GetDegree()
-	marshaledKey := varint.AppendForward(nil, degree)
-	for i := 0; i < degree; i++ {
-		marshaledKey = append(marshaledKey, key.OutgoingReferences.GetOutgoingReference(i).GetRawReference()...)
-	}
-
-	// Append the message of the key.
-	anyKey, err := anypb.New(key.Message)
+func getKeyString[TReference object.BasicReference](key model_core.TopLevelMessage[proto.Message, TReference]) (string, error) {
+	anyKey, err := model_core.MarshalTopLevelAny(key)
 	if err != nil {
 		return "", err
 	}
-	marshaledKey, err = proto.MarshalOptions{Deterministic: true}.MarshalAppend(marshaledKey, anyKey)
-	if err != nil {
-		return "", err
-	}
-	return string(marshaledKey), nil
+	marshaledKey, err := model_core.MarshalTopLevelMessage(anyKey)
+	return string(marshaledKey), err
 }
 
 func appendFormattedKey[TReference object.BasicReference](out []byte, key model_core.Message[proto.Message, TReference]) []byte {
@@ -58,6 +48,7 @@ type keyState[TReference object.BasicReference, TMetadata any] struct {
 	value        valueState[TReference, TMetadata]
 	blockedCount int
 	blocking     map[*keyState[TReference, TMetadata]]struct{}
+	dependencies []string
 }
 
 func (ks *keyState[TReference, TMetadata]) markBlocked(ksBlocker *keyState[TReference, TMetadata]) {
@@ -96,6 +87,7 @@ func (ks *keyState[TReference, TMetadata]) getDependencyCycle(
 
 type valueState[TReference object.BasicReference, TMetadata any] interface {
 	compute(ctx context.Context, c Computer[TReference, TMetadata], e *fullyComputingEnvironment[TReference, TMetadata]) error
+	getMessageValue() model_core.Message[proto.Message, TReference]
 }
 
 type messageValueState[TReference object.BasicReference, TMetadata any] struct {
@@ -124,6 +116,10 @@ func (vs *messageValueState[TReference, TMetadata]) compute(ctx context.Context,
 	return nil
 }
 
+func (vs *messageValueState[TReference, TMetadata]) getMessageValue() model_core.Message[proto.Message, TReference] {
+	return vs.value
+}
+
 type nativeValueState[TReference object.BasicReference, TMetadata any] struct {
 	value any
 	isSet bool
@@ -137,6 +133,10 @@ func (vs *nativeValueState[TReference, TMetadata]) compute(ctx context.Context, 
 	vs.value = value
 	vs.isSet = true
 	return nil
+}
+
+func (vs *nativeValueState[TReference, TMetadata]) getMessageValue() model_core.Message[proto.Message, TReference] {
+	return model_core.Message[proto.Message, TReference]{}
 }
 
 type fullyComputingKeyPool[TReference object.BasicReference, TMetadata any] struct {
@@ -165,36 +165,38 @@ func (p *fullyComputingKeyPool[TReference, TMetadata]) enqueue(ks *keyState[TRef
 type fullyComputingEnvironment[TReference object.BasicReference, TMetadata any] struct {
 	model_core.ObjectManager[TReference, TMetadata]
 
-	pool     *fullyComputingKeyPool[TReference, TMetadata]
-	keyState *keyState[TReference, TMetadata]
+	pool         *fullyComputingKeyPool[TReference, TMetadata]
+	keyState     *keyState[TReference, TMetadata]
+	dependencies map[string]struct{}
 }
 
 func (e *fullyComputingEnvironment[TReference, TMetadata]) getKeyState(patchedKey model_core.PatchedMessage[proto.Message, dag.ObjectContentsWalker], vs valueState[TReference, TMetadata]) *keyState[TReference, TMetadata] {
 	// If the key contains outgoing references, ensure children are
 	// written, so that they can be reloaded during evaluation.
 	p := e.pool
-	localReferences, objectContentsWalkers := patchedKey.Patcher.SortAndSetReferences()
+	topLevelKey, objectContentsWalkers := patchedKey.SortAndSetReferences()
 	var storedReferences []TReference
-	if len(localReferences) > 0 {
+	if outgoingReferences := topLevelKey.OutgoingReferences; outgoingReferences.GetDegree() > 0 {
 		var err error
-		storedReferences, err = e.pool.storeValueChildren(localReferences, objectContentsWalkers)
+		storedReferences, err = e.pool.storeValueChildren(outgoingReferences, objectContentsWalkers)
 		if err != nil {
 			p.setError(err)
 			return nil
 		}
 	}
 
-	key := model_core.NewMessage(patchedKey.Message, object.OutgoingReferencesList[TReference](storedReferences))
+	key := model_core.NewTopLevelMessage(patchedKey.Message, object.OutgoingReferencesList[TReference](storedReferences))
 	keyStr, err := getKeyString(key)
 	if err != nil {
 		p.setError(err)
 		return nil
 	}
+	e.dependencies[keyStr] = struct{}{}
 	ks, ok := p.keys[keyStr]
 	if !ok {
 		ks = &keyState[TReference, TMetadata]{
 			parent:   e.keyState,
-			key:      key,
+			key:      key.Decay(),
 			value:    vs,
 			blocking: map[*keyState[TReference, TMetadata]]struct{}{},
 		}
@@ -233,33 +235,70 @@ func (e *fullyComputingEnvironment[TReference, TMetadata]) Store(references []ob
 	panic("TODO")
 }
 
-type ValueChildrenStorer[TReference any] func(localReferences []object.LocalReference, objectContentsWalkers []dag.ObjectContentsWalker) ([]TReference, error)
+type ValueChildrenStorer[TReference any] func(localReferences object.OutgoingReferences[object.LocalReference], objectContentsWalkers []dag.ObjectContentsWalker) ([]TReference, error)
+
+type Evaluation[TReference any] struct {
+	Key          model_core.Message[proto.Message, TReference]
+	Value        model_core.Message[proto.Message, TReference]
+	Dependencies []model_core.Message[proto.Message, TReference]
+}
 
 func FullyComputeValue[TReference object.BasicReference, TMetadata any](
 	ctx context.Context,
 	c Computer[TReference, TMetadata],
-	requestedKey model_core.Message[proto.Message, TReference],
+	requestedKey model_core.TopLevelMessage[proto.Message, TReference],
 	objectManager model_core.ObjectManager[TReference, TMetadata],
 	storeValueChildren ValueChildrenStorer[TReference],
-) (model_core.Message[proto.Message, TReference], error) {
+) (
+	model_core.Message[proto.Message, TReference],
+	iter.Seq[Evaluation[TReference]],
+	error,
+) {
+	keys := map[string]*keyState[TReference, TMetadata]{}
+	resultsIterator := func(yield func(Evaluation[TReference]) bool) {
+		for _, key := range slices.Sorted(maps.Keys(keys)) {
+			ks := keys[key]
+
+			value := ks.value.getMessageValue()
+			dependencies := make([]model_core.Message[proto.Message, TReference], 0, len(ks.dependencies))
+			for _, dependency := range ks.dependencies {
+				dependencies = append(dependencies, keys[dependency].key)
+			}
+
+			// Omit keys for which there's nothing
+			// meaningful to report. Those only blow up the
+			// size of the data.
+			if !value.IsSet() || len(dependencies) == 0 {
+				continue
+			}
+
+			if !yield(Evaluation[TReference]{
+				Key:          ks.key,
+				Value:        value,
+				Dependencies: dependencies,
+			}) {
+				break
+			}
+		}
+	}
+
 	requestedKeyStr, err := getKeyString(requestedKey)
 	if err != nil {
-		return model_core.Message[proto.Message, TReference]{}, err
+		return model_core.Message[proto.Message, TReference]{}, resultsIterator, err
 	}
 	requestedValueState := &messageValueState[TReference, TMetadata]{}
 	requestedKeyState := &keyState[TReference, TMetadata]{
-		key:   requestedKey,
+		key:   requestedKey.Decay(),
 		value: requestedValueState,
 	}
+	keys[requestedKeyStr] = requestedKeyState
 	p := fullyComputingKeyPool[TReference, TMetadata]{
 		storeValueChildren: storeValueChildren,
-
-		keys: map[string]*keyState[TReference, TMetadata]{
-			requestedKeyStr: requestedKeyState,
-		},
-		firstPendingKey: requestedKeyState,
-		lastPendingKey:  &requestedKeyState.next,
+		keys:               keys,
+		firstPendingKey:    requestedKeyState,
+		lastPendingKey:     &requestedKeyState.next,
 	}
+
 	longestKeyType := 0
 	for !requestedValueState.value.IsSet() {
 		ks := p.firstPendingKey
@@ -269,7 +308,7 @@ func FullyComputeValue[TReference object.BasicReference, TMetadata any](
 				requestedKeyState: 0,
 			}
 			missingDependencies := map[*keyState[TReference, TMetadata]][]*keyState[TReference, TMetadata]{}
-			for _, ks := range p.keys {
+			for _, ks := range keys {
 				for ksBlocked := range ks.blocking {
 					missingDependencies[ksBlocked] = append(missingDependencies[ksBlocked], ks)
 				}
@@ -297,7 +336,7 @@ func FullyComputeValue[TReference object.BasicReference, TMetadata any](
 				}
 				cycleStr = appendFormattedKey(cycleStr, ksIter.key)
 			}
-			return model_core.Message[proto.Message, TReference]{}, fmt.Errorf("Traceback (most recent key last):%s\nCyclic evaluation dependency detected", string(cycleStr))
+			return model_core.Message[proto.Message, TReference]{}, resultsIterator, fmt.Errorf("Traceback (most recent key last):%s\nCyclic evaluation dependency detected", string(cycleStr))
 		}
 
 		p.firstPendingKey = ks.next
@@ -318,6 +357,7 @@ func FullyComputeValue[TReference object.BasicReference, TMetadata any](
 			ObjectManager: objectManager,
 			pool:          &p,
 			keyState:      ks,
+			dependencies:  map[string]struct{}{},
 		}
 		err = ks.value.compute(ctx, c, &e)
 		if err != nil {
@@ -326,6 +366,7 @@ func FullyComputeValue[TReference object.BasicReference, TMetadata any](
 			}
 			if !errors.Is(err, ErrMissingDependency) {
 				fmt.Printf("\n")
+				ks.dependencies = slices.Sorted(maps.Keys(e.dependencies))
 
 				var stack []*keyState[TReference, TMetadata]
 				traceLongestKeyType := 0
@@ -346,7 +387,7 @@ func FullyComputeValue[TReference object.BasicReference, TMetadata any](
 					}
 					stackStr = appendFormattedKey(stackStr, ksIter.key)
 				}
-				return model_core.Message[proto.Message, TReference]{}, fmt.Errorf("Traceback (most recent key last):%s\n%w", string(stackStr), err)
+				return model_core.Message[proto.Message, TReference]{}, resultsIterator, fmt.Errorf("Traceback (most recent key last):%s\n%w", string(stackStr), err)
 			}
 			// Value could not be computed, because one of
 			// its dependencies hasn't been computed yet.
@@ -358,6 +399,7 @@ func FullyComputeValue[TReference object.BasicReference, TMetadata any](
 			// Successfully computed value. Unblock any keys
 			// that were waiting on us and enqueue them if
 			// they no longer have any blockers.
+			ks.dependencies = slices.Sorted(maps.Keys(e.dependencies))
 			for ksBlocked := range ks.blocking {
 				ksBlocked.blockedCount--
 				if ksBlocked.blockedCount == 0 {
@@ -369,7 +411,8 @@ func FullyComputeValue[TReference object.BasicReference, TMetadata any](
 			fmt.Printf("\n")
 		}
 	}
-	return requestedValueState.value, nil
+
+	return requestedValueState.value, resultsIterator, nil
 }
 
 type ValueChildrenStorerForTesting ValueChildrenStorer[object.LocalReference]

@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package bonanza.model.evaluation;
+
+import "pkg/proto/model/core/core.proto";
+
+option go_package = "github.com/buildbarn/bonanza/pkg/proto/model/evaluation";
+
+message Dependency {
+  message Parent {
+    bonanza.model.core.DecodableReference reference = 1
+        [(bonanza.model.core.object_format) = {
+          message_list_type_name:
+            "bonanza.model.evaluation.Dependency";
+        }];
+  }
+
+  oneof level {
+    // The key of a single direct dependency of the current evaluation.
+    bonanza.model.core.Any leaf_key = 1;
+
+    // B-tree node containing additional dependencies.
+    Parent parent = 2;
+  }
+}
+
+message Evaluation {
+  message Parent {
+    // Reference of the object containing additional Evaluation objects.
+    bonanza.model.core.DecodableReference reference = 1
+        [(bonanza.model.core.object_format) = {
+          message_list_type_name:
+            "bonanza.model.evaluation.Evaluation";
+        }];
+
+    // The key of the first leaf Evaluation object contained in this
+    // tree to aid lookups. All Evaluation objects are sorted by key,
+    // for which a byte sequence is obtained by calling
+    // model_core.MarshalTopLevelMessage() against the anypb.Any
+    // message.
+    bonanza.model.core.Any first_key = 2;
+  }
+
+  message Leaf {
+    // The key that was provided to the computer.
+    bonanza.model.core.Any key = 1;
+
+    // The value that was emitted by the computer for the given key.
+    //
+    // This field may be left unset if the computer yielded a native
+    // (non-message) value.
+    bonanza.model.core.Any value = 2;
+
+    // Keys of dependencies that were accessed by the computer while
+    // processing the current key.
+    repeated Dependency dependencies = 3;
+  }
+
+  oneof level {
+    // A single Evaluation object.
+    Leaf leaf = 1;
+
+    // B-tree node containing additional Evaluation objects.
+    Parent parent = 2;
+  }
+}

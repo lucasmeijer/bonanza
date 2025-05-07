@@ -1,9 +1,11 @@
 package core
 
 import (
+	"github.com/buildbarn/bonanza/pkg/encoding/varint"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 // TopLevelMessage is identical to Message, except that it may only
@@ -17,6 +19,44 @@ import (
 type TopLevelMessage[TMessage any, TReference any] struct {
 	Message            TMessage
 	OutgoingReferences object.OutgoingReferences[TReference]
+}
+
+// NewTopLevelMessage creates a TopLevelMessage that corresponds to an
+// already existing Protobuf message.
+func NewTopLevelMessage[TMessage, TReference any](
+	m TMessage,
+	outgoingReferences object.OutgoingReferences[TReference],
+) TopLevelMessage[TMessage, TReference] {
+	return TopLevelMessage[TMessage, TReference]{
+		Message:            m,
+		OutgoingReferences: outgoingReferences,
+	}
+}
+
+// NewSimpleTopLevelMessage creates a TopLevelMessage that has no
+// outgoing references.
+func NewSimpleTopLevelMessage[TReference, TMessage any](m TMessage) TopLevelMessage[TMessage, TReference] {
+	return TopLevelMessage[TMessage, TReference]{
+		Message:            m,
+		OutgoingReferences: object.OutgoingReferences[TReference](object.OutgoingReferencesList[TReference]{}),
+	}
+}
+
+// Decay a top-level message to a plain message.
+func (m TopLevelMessage[TMessage, TReference]) Decay() Message[TMessage, TReference] {
+	return NewMessage(m.Message, m.OutgoingReferences)
+}
+
+// MarshalTopLevelMessage converts the contents of a top-level message
+// to a byte sequence. This byte sequence can be used to sort messages
+// along a total order, or to act as a map key.
+func MarshalTopLevelMessage[TMessage proto.Message, TReference object.BasicReference](m TopLevelMessage[TMessage, TReference]) ([]byte, error) {
+	degree := m.OutgoingReferences.GetDegree()
+	key := varint.AppendForward(nil, degree)
+	for i := 0; i < degree; i++ {
+		key = append(key, m.OutgoingReferences.GetOutgoingReference(i).GetRawReference()...)
+	}
+	return marshalOptions.MarshalAppend(key, m.Message)
 }
 
 // MessagesEqual returns true if two top-level messages contain the same
@@ -36,4 +76,33 @@ func MessagesEqual[
 		}
 	}
 	return proto.Equal(m1.Message, m2.Message)
+}
+
+// MarshalTopLevelAny wraps a message in an anypb.Any.
+//
+// This function assumes that the provided message is a top-level
+// message. Only top-level messages are permitted to be wrapped in an
+// anypb.Any, as it's impossible to create a model_core_pb.Any for
+// messages having outgoing references with sparse indices.
+func MarshalTopLevelAny[TMessage proto.Message, TReference any](m TopLevelMessage[TMessage, TReference]) (TopLevelMessage[*anypb.Any, TReference], error) {
+	var value anypb.Any
+	if err := anypb.MarshalFrom(&value, m.Message, marshalOptions); err != nil {
+		return TopLevelMessage[*anypb.Any, TReference]{}, err
+	}
+	return NewTopLevelMessage(&value, m.OutgoingReferences), nil
+}
+
+// UnmarshalTopLevelAnyNew extracts the message contained in an
+// anypb.Any, and ensures that any references contained within are
+// accessible.
+//
+// This function assumes that the anypb.Any is a top-level message,
+// meaning that the inner message has access to the same set of
+// references as the outer message.
+func UnmarshalTopLevelAnyNew[TReference any](m TopLevelMessage[*anypb.Any, TReference]) (TopLevelMessage[proto.Message, TReference], error) {
+	message, err := m.Message.UnmarshalNew()
+	if err != nil {
+		return TopLevelMessage[proto.Message, TReference]{}, err
+	}
+	return NewTopLevelMessage(message, m.OutgoingReferences), nil
 }

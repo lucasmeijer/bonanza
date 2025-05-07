@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"runtime"
@@ -21,13 +22,17 @@ import (
 	"github.com/buildbarn/bonanza/pkg/evaluation"
 	model_analysis "github.com/buildbarn/bonanza/pkg/model/analysis"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
+	"github.com/buildbarn/bonanza/pkg/model/core/btree"
 	"github.com/buildbarn/bonanza/pkg/model/encoding"
+	model_encoding "github.com/buildbarn/bonanza/pkg/model/encoding"
 	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
 	model_starlark "github.com/buildbarn/bonanza/pkg/model/starlark"
 	"github.com/buildbarn/bonanza/pkg/proto/configuration/bonanza_builder"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
 	model_build_pb "github.com/buildbarn/bonanza/pkg/proto/model/build"
 	model_command_pb "github.com/buildbarn/bonanza/pkg/proto/model/command"
+	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
+	model_evaluation_pb "github.com/buildbarn/bonanza/pkg/proto/model/evaluation"
 	remoteexecution_pb "github.com/buildbarn/bonanza/pkg/proto/remoteexecution"
 	remoteworker_pb "github.com/buildbarn/bonanza/pkg/proto/remoteworker"
 	dag_pb "github.com/buildbarn/bonanza/pkg/proto/storage/dag"
@@ -297,7 +302,9 @@ func (e *builderExecutor) Execute(ctx context.Context, action *model_build_pb.Ac
 			Status: status.Convert(util.StatusWrap(err, "Invalid build specification encoder")).Proto(),
 		}, 0, remoteworker_pb.CurrentState_Completed_FAILED
 	}
-	value, err := evaluation.FullyComputeValue(
+
+	// Perform the build.
+	value, resultsIterator, errCompute := evaluation.FullyComputeValue(
 		ctx,
 		model_analysis.NewTypedComputer(model_analysis.NewBaseComputer[builderReference, builderReferenceMetadata](
 			model_parser.NewParsedObjectPoolIngester[builderReference](
@@ -323,11 +330,13 @@ func (e *builderExecutor) Execute(ctx context.Context, action *model_build_pb.Ac
 			e.bzlFileBuiltins,
 			e.buildFileBuiltins,
 		)),
-		model_core.NewMessage[proto.Message, builderReference](&model_analysis_pb.BuildResult_Key{}, object.OutgoingReferencesList[builderReference]{}),
+		model_core.NewSimpleTopLevelMessage[builderReference](proto.Message(&model_analysis_pb.BuildResult_Key{})),
 		builderObjectCapturer{},
-		func(localReferences []object.LocalReference, objectContentsWalkers []dag.ObjectContentsWalker) ([]builderReference, error) {
-			storedReferences := make(object.OutgoingReferencesList[builderReference], 0, len(localReferences))
-			for i, localReference := range localReferences {
+		func(localReferences object.OutgoingReferences[object.LocalReference], objectContentsWalkers []dag.ObjectContentsWalker) ([]builderReference, error) {
+			degree := localReferences.GetDegree()
+			storedReferences := make(object.OutgoingReferencesList[builderReference], 0, degree)
+			for i := 0; i < degree; i++ {
+				localReference := localReferences.GetOutgoingReference(i)
 				if err := dag.UploadDAG(
 					ctx,
 					e.dagUploaderClient,
@@ -350,9 +359,199 @@ func (e *builderExecutor) Execute(ctx context.Context, action *model_build_pb.Ac
 			return storedReferences, nil
 		},
 	)
+
+	// Store all evaluation results to permit debugging of the build.
+	// TODO: Use a proper configuration.
+	evaluationTreeEncoder := model_encoding.NewChainedBinaryEncoder(nil)
+	evaluationTreeBuilder := btree.NewSplitProllyBuilder(
+		1<<16,
+		1<<18,
+		btree.NewObjectCreatingNodeMerger(
+			evaluationTreeEncoder,
+			namespace.ReferenceFormat,
+			/* parentNodeComputer = */ func(createdObject model_core.Decodable[model_core.CreatedObject[dag.ObjectContentsWalker]], childNodes []*model_evaluation_pb.Evaluation) (model_core.PatchedMessage[*model_evaluation_pb.Evaluation, dag.ObjectContentsWalker], error) {
+				patcher := model_core.NewReferenceMessagePatcher[dag.ObjectContentsWalker]()
+				return model_core.NewPatchedMessage(
+					&model_evaluation_pb.Evaluation{
+						Level: &model_evaluation_pb.Evaluation_Parent_{
+							Parent: &model_evaluation_pb.Evaluation_Parent{
+								Reference: patcher.CaptureAndAddDecodableReference(createdObject, model_core.WalkableCreatedObjectCapturer),
+							},
+							// TODO: Setting this requires us to
+							// somehow clone the metadata, which
+							// dag.ObjectContentsWalker does not
+							// support.
+							// FirstKey: ...
+						},
+					},
+					patcher,
+				), nil
+			},
+		),
+	)
+	for evaluation := range resultsIterator {
+		key, err := model_core.MarshalAny(
+			model_core.NewPatchedMessageFromExisting(
+				evaluation.Key,
+				func(index int) dag.ObjectContentsWalker {
+					return dag.ExistingObjectContentsWalker
+				},
+			),
+		)
+		if err != nil {
+			return &model_build_pb.Result{
+				Status: status.Convert(err).Proto(),
+			}, 0, remoteworker_pb.CurrentState_Completed_FAILED
+		}
+		patcher := key.Patcher
+
+		var value model_core.PatchedMessage[*model_core_pb.Any, dag.ObjectContentsWalker]
+		if evaluation.Value.IsSet() {
+			value, err = model_core.MarshalAny(
+				model_core.NewPatchedMessageFromExisting(
+					evaluation.Value,
+					func(index int) dag.ObjectContentsWalker {
+						return dag.ExistingObjectContentsWalker
+					},
+				),
+			)
+			if err != nil {
+				return &model_build_pb.Result{
+					Status: status.Convert(err).Proto(),
+				}, 0, remoteworker_pb.CurrentState_Completed_FAILED
+			}
+			patcher.Merge(value.Patcher)
+		}
+
+		dependencyTreeBuilder := btree.NewSplitProllyBuilder(
+			1<<16,
+			1<<18,
+			btree.NewObjectCreatingNodeMerger(
+				evaluationTreeEncoder,
+				namespace.ReferenceFormat,
+				/* parentNodeComputer = */ func(createdObject model_core.Decodable[model_core.CreatedObject[dag.ObjectContentsWalker]], childNodes []*model_evaluation_pb.Dependency) (model_core.PatchedMessage[*model_evaluation_pb.Dependency, dag.ObjectContentsWalker], error) {
+					patcher := model_core.NewReferenceMessagePatcher[dag.ObjectContentsWalker]()
+					return model_core.NewPatchedMessage(
+						&model_evaluation_pb.Dependency{
+							Level: &model_evaluation_pb.Dependency_Parent_{
+								Parent: &model_evaluation_pb.Dependency_Parent{
+									Reference: patcher.CaptureAndAddDecodableReference(createdObject, model_core.WalkableCreatedObjectCapturer),
+								},
+							},
+						},
+						patcher,
+					), nil
+				},
+			),
+		)
+		for _, dependency := range evaluation.Dependencies {
+			dependencyAny, err := model_core.MarshalAny(
+				model_core.NewPatchedMessageFromExisting(
+					dependency,
+					func(index int) dag.ObjectContentsWalker {
+						return dag.ExistingObjectContentsWalker
+					},
+				),
+			)
+			if err != nil {
+				return &model_build_pb.Result{
+					Status: status.Convert(err).Proto(),
+				}, 0, remoteworker_pb.CurrentState_Completed_FAILED
+			}
+			if err := dependencyTreeBuilder.PushChild(
+				model_core.NewPatchedMessage(
+					&model_evaluation_pb.Dependency{
+						Level: &model_evaluation_pb.Dependency_LeafKey{
+							LeafKey: dependencyAny.Message,
+						},
+					},
+					dependencyAny.Patcher,
+				),
+			); err != nil {
+				return &model_build_pb.Result{
+					Status: status.Convert(err).Proto(),
+				}, 0, remoteworker_pb.CurrentState_Completed_FAILED
+			}
+		}
+		dependencies, err := dependencyTreeBuilder.FinalizeList()
+		if err != nil {
+			return &model_build_pb.Result{
+				Status: status.Convert(err).Proto(),
+			}, 0, remoteworker_pb.CurrentState_Completed_FAILED
+		}
+		patcher.Merge(dependencies.Patcher)
+
+		if err := evaluationTreeBuilder.PushChild(
+			model_core.NewPatchedMessage(
+				&model_evaluation_pb.Evaluation{
+					Level: &model_evaluation_pb.Evaluation_Leaf_{
+						Leaf: &model_evaluation_pb.Evaluation_Leaf{
+							Key:          key.Message,
+							Value:        value.Message,
+							Dependencies: dependencies.Message,
+						},
+					},
+				},
+				patcher,
+			),
+		); err != nil {
+			return &model_build_pb.Result{
+				Status: status.Convert(err).Proto(),
+			}, 0, remoteworker_pb.CurrentState_Completed_FAILED
+		}
+	}
+	evaluations, err := evaluationTreeBuilder.FinalizeList()
 	if err != nil {
 		return &model_build_pb.Result{
 			Status: status.Convert(err).Proto(),
+		}, 0, remoteworker_pb.CurrentState_Completed_FAILED
+	}
+	if len(evaluations.Message) > 0 {
+		createdEvaluations, err := model_core.MarshalAndEncodePatchedListMessage(
+			evaluations,
+			namespace.ReferenceFormat,
+			evaluationTreeEncoder,
+		)
+		if err != nil {
+			return &model_build_pb.Result{
+				Status: status.Convert(err).Proto(),
+			}, 0, remoteworker_pb.CurrentState_Completed_FAILED
+		}
+		createdEvaluationsReference := createdEvaluations.Value.Contents.GetReference()
+		if err := dag.UploadDAG(
+			ctx,
+			e.dagUploaderClient,
+			object.GlobalReference{
+				InstanceName:   instanceName,
+				LocalReference: createdEvaluationsReference,
+			},
+			model_core.WalkableCreatedObjectCapturer.CaptureCreatedObject(createdEvaluations.Value),
+			e.objectContentsWalkerSemaphore,
+			// Assume everything we attempt
+			// to upload is memory backed.
+			object.Unlimited,
+		); err != nil {
+			return &model_build_pb.Result{
+				Status: status.Convert(errCompute).Proto(),
+			}, 0, remoteworker_pb.CurrentState_Completed_FAILED
+		}
+
+		// TODO: This reference should be embedded in the
+		// response that is sent back to the client.
+		log.Print(
+			"Evaluations: ",
+			model_core.DecodableLocalReferenceToString(
+				model_core.CopyDecodable(
+					createdEvaluations,
+					createdEvaluationsReference,
+				),
+			),
+		)
+	}
+
+	if errCompute != nil {
+		return &model_build_pb.Result{
+			Status: status.Convert(errCompute).Proto(),
 		}, 0, remoteworker_pb.CurrentState_Completed_FAILED
 	}
 	return &model_build_pb.Result{

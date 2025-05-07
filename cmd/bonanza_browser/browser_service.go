@@ -883,7 +883,7 @@ func (d *messageJSONRenderer) renderValue(fieldDescriptor protoreflect.FieldDesc
 					),
 				}
 			}
-			return d.renderMessage(model_core.Nested(anyValue, anyValue.Message.ProtoReflect()), r.Value.TypeUrl)
+			return d.renderMessage(model_core.Nested(anyValue.Decay(), anyValue.Message.ProtoReflect()), r.Value.TypeUrl)
 		case *model_core_pb.DecodableReference:
 			if reference, err := model_core.FlattenDecodableReference(model_core.Nested(value, r)); err == nil {
 				rawReference := model_core.DecodableLocalReferenceToString(reference)

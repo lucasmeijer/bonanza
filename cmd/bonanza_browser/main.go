@@ -17,6 +17,7 @@ import (
 	_ "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
 	_ "github.com/buildbarn/bonanza/pkg/proto/model/command"
 	_ "github.com/buildbarn/bonanza/pkg/proto/model/core"
+	_ "github.com/buildbarn/bonanza/pkg/proto/model/evaluation"
 	_ "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
 
 	"google.golang.org/grpc/codes"
