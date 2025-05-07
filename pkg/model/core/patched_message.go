@@ -34,19 +34,15 @@ func NewPatchedMessage[TMessage any, TMetadata ReferenceMetadata](
 // other objects. For each reference that is found, a callback is
 // invoked to create metadata to associate with the reference.
 func NewPatchedMessageFromExisting[
-	TMessage any,
+	TMessage proto.Message,
 	TMetadata ReferenceMetadata,
-	TMessagePtr interface {
-		*TMessage
-		proto.Message
-	},
 	TReference object.BasicReference,
 ](
-	existing Message[TMessagePtr, TReference],
+	existing Message[TMessage, TReference],
 	createMetadata ReferenceMetadataCreator[TMetadata],
-) PatchedMessage[TMessagePtr, TMetadata] {
+) PatchedMessage[TMessage, TMetadata] {
 	patcher := NewReferenceMessagePatcher[TMetadata]()
-	if existing.Message == nil || existing.OutgoingReferences.GetDegree() == 0 {
+	if existing.OutgoingReferences.GetDegree() == 0 {
 		return NewPatchedMessage(existing.Message, patcher)
 	}
 
@@ -57,7 +53,7 @@ func NewPatchedMessageFromExisting[
 		createMetadata:     createMetadata,
 	}
 	a.addReferenceMessagesRecursively(clonedMessage.ProtoReflect())
-	return NewPatchedMessage(clonedMessage.(TMessagePtr), patcher)
+	return NewPatchedMessage[TMessage, TMetadata](clonedMessage.(TMessage), patcher)
 }
 
 // NewSimplePatchedMessage is a helper function for creating instances

@@ -17,6 +17,27 @@ import (
 func TestNewPatchedMessageFromExisting(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
+	t.Run("Nil", func(t *testing.T) {
+		metadataCreator := NewMockReferenceMetadataCreatorForTesting(ctrl)
+		m1 := model_core.NewPatchedMessageFromExisting(
+			model_core.NewMessage(
+				(*model_filesystem_pb.FileNode)(nil),
+				object.OutgoingReferencesList[object.LocalReference]{
+					object.MustNewSHA256V1LocalReference("31233528b0ccc08d56724b2f132154967a89c4fb79de65fc65e3eeb42d9f89e4", 4828, 0, 0, 0),
+					object.MustNewSHA256V1LocalReference("46d71098267fa33992257c061ba8fc48017e2bcac8f9ac3be8853c8337ec896e", 58511, 0, 0, 0),
+					object.MustNewSHA256V1LocalReference("e1d1549332e44eddf28662dda4ca1aae36c3dcd597cd63b3c69737f88afd75d5", 213, 0, 0, 0),
+				},
+			),
+			metadataCreator.Call,
+		)
+
+		references, metadata := m1.Patcher.SortAndSetReferences()
+		require.Empty(t, references)
+		require.Empty(t, metadata)
+
+		require.Nil(t, m1.Message)
+	})
+
 	t.Run("ValidReference", func(t *testing.T) {
 		metadataCreator := NewMockReferenceMetadataCreatorForTesting(ctrl)
 		metadata1 := NewMockReferenceMetadata(ctrl)

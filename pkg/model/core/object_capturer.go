@@ -56,17 +56,13 @@ type ObjectCapturer[TReference, TMetadata any] interface {
 // each references contained within, metadata is created by calling into
 // an ExistingObjectCapturer.
 func Patch[
-	TMessage any,
+	TMessage proto.Message,
 	TMetadata ReferenceMetadata,
-	TMessagePtr interface {
-		*TMessage
-		proto.Message
-	},
 	TReference object.BasicReference,
 ](
 	capturer ExistingObjectCapturer[TReference, TMetadata],
-	m Message[TMessagePtr, TReference],
-) PatchedMessage[TMessagePtr, TMetadata] {
+	m Message[TMessage, TReference],
+) PatchedMessage[TMessage, TMetadata] {
 	return NewPatchedMessageFromExisting(
 		m,
 		func(index int) TMetadata {
