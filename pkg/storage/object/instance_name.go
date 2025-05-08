@@ -26,3 +26,7 @@ func (in InstanceName) WithLocalReference(localReference LocalReference) GlobalR
 		LocalReference: localReference,
 	}
 }
+
+func (in InstanceName) String() string {
+	return in.value
+}

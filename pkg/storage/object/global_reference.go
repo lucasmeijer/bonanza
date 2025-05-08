@@ -65,3 +65,8 @@ func (r GlobalReference) CompareByHeight(other GlobalReference) int {
 func (r GlobalReference) WithLocalReference(localReference LocalReference) GlobalReference {
 	return r.InstanceName.WithLocalReference(localReference)
 }
+
+func (r GlobalReference) String() string {
+	// TODO: Should this return both the instance name and local reference?
+	return r.LocalReference.String()
+}
