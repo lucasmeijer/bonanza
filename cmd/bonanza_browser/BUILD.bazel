@@ -16,7 +16,9 @@ go_library(
     deps = [
         "//pkg/encoding/varint",
         "//pkg/model/core",
+        "//pkg/model/core/btree",
         "//pkg/model/encoding",
+        "//pkg/model/parser",
         "//pkg/proto/browser",
         "//pkg/proto/configuration/bonanza_browser",
         "//pkg/proto/model/analysis",
@@ -28,6 +30,7 @@ go_library(
         "//pkg/proto/storage/object",
         "//pkg/storage/object",
         "//pkg/storage/object/grpc",
+        "//pkg/storage/object/namespacemapping",
         "@com_github_buildbarn_bb_storage//pkg/global",
         "@com_github_buildbarn_bb_storage//pkg/http",
         "@com_github_buildbarn_bb_storage//pkg/program",

@@ -9,6 +9,7 @@ import (
 	bb_http "github.com/buildbarn/bb-storage/pkg/http"
 	"github.com/buildbarn/bb-storage/pkg/program"
 	"github.com/buildbarn/bb-storage/pkg/util"
+	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
 	"github.com/buildbarn/bonanza/pkg/proto/configuration/bonanza_browser"
 	object_pb "github.com/buildbarn/bonanza/pkg/proto/storage/object"
 	object_grpc "github.com/buildbarn/bonanza/pkg/storage/object/grpc"
@@ -45,9 +46,13 @@ func main() {
 		objectDownloader := object_grpc.NewGRPCDownloader(
 			object_pb.NewDownloaderClient(storageGRPCClient),
 		)
+		parsedObjectPool, err := model_parser.NewParsedObjectPoolFromConfiguration(configuration.ParsedObjectPool)
+		if err != nil {
+			return util.StatusWrap(err, "Failed to create parsed object pool")
+		}
 
 		mux := http.NewServeMux()
-		browserService := NewBrowserService(objectDownloader)
+		browserService := NewBrowserService(objectDownloader, parsedObjectPool)
 		browserService.RegisterHandlers(mux)
 		bb_http.NewServersFromConfigurationAndServe(
 			configuration.HttpServers,

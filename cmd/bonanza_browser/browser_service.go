@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"maps"
 	"net/http"
+	"net/url"
 	"path"
 	"slices"
 	"strings"
@@ -20,12 +21,16 @@ import (
 	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bonanza/pkg/encoding/varint"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
+	"github.com/buildbarn/bonanza/pkg/model/core/btree"
 	model_encoding "github.com/buildbarn/bonanza/pkg/model/encoding"
+	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
 	browser_pb "github.com/buildbarn/bonanza/pkg/proto/browser"
 	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
 	model_encoding_pb "github.com/buildbarn/bonanza/pkg/proto/model/encoding"
+	model_evaluation_pb "github.com/buildbarn/bonanza/pkg/proto/model/evaluation"
 	object_pb "github.com/buildbarn/bonanza/pkg/proto/storage/object"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
+	object_namespacemapping "github.com/buildbarn/bonanza/pkg/storage/object/namespacemapping"
 
 	g "maragu.dev/gomponents"
 	c "maragu.dev/gomponents/components"
@@ -48,13 +53,15 @@ var stylesheet string
 // contents of objects in storage.
 type BrowserService struct {
 	objectDownloader object.Downloader[object.GlobalReference]
+	parsedObjectPool *model_parser.ParsedObjectPool
 }
 
 // NewBrowserService creates a new BrowserService that serves pages,
 // displaying the contents contained in a given storage backend.
-func NewBrowserService(objectDownloader object.Downloader[object.GlobalReference]) *BrowserService {
+func NewBrowserService(objectDownloader object.Downloader[object.GlobalReference], parsedObjectPool *model_parser.ParsedObjectPool) *BrowserService {
 	return &BrowserService{
 		objectDownloader: objectDownloader,
+		parsedObjectPool: parsedObjectPool,
 	}
 }
 
@@ -76,6 +83,10 @@ func wrapHandler(handler func(http.ResponseWriter, *http.Request) (g.Node, error
 // RegisterHandlers registers handlers for serving web pages in a mux.
 func (s *BrowserService) RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/", wrapHandler(s.doWelcome))
+	mux.HandleFunc(
+		"/evaluation/{instance_name}/{reference_format}/{reference}/{key}",
+		wrapHandler(s.doEvaluation),
+	)
 	mux.HandleFunc(
 		"/object/{instance_name}/{reference_format}/{reference}/message/{message_type}",
 		wrapHandler(s.doMessageObject),
@@ -297,24 +308,7 @@ func renderTabsLiftWithNeutralContent(tabs [][]g.Node, selectedTabIndex int, con
 	return h.Div(nodes...)
 }
 
-// renderObjectPage renders a HTML page for displaying the contents of
-// an object.
-func renderObjectPage(
-	decodableReference model_core.Decodable[object.GlobalReference],
-	payloadRenderers []payloadRenderer,
-	currentPayloadRendererIndex int,
-	currentEncoderConfiguration string,
-	recentlyObservedEncoders []*browser_pb.RecentlyObservedEncoder,
-	payload []g.Node,
-) g.Node {
-	formatTabs := make([][]g.Node, 0, len(payloadRenderers))
-	for _, payloadRenderer := range payloadRenderers {
-		formatTabs = append(formatTabs, []g.Node{
-			h.Href("?format=" + payloadRenderer.queryParameter()),
-			g.Text(payloadRenderer.name()),
-		})
-	}
-
+func renderEncoderSelector(recentlyObservedEncoders []*browser_pb.RecentlyObservedEncoder, currentEncoderConfiguration string) []g.Node {
 	recentlyObservedEncodersNodes := []g.Node{
 		h.Class("card bg-base-200 w-full p-4 shadow"),
 		h.H1(
@@ -389,115 +383,21 @@ func renderObjectPage(
 		)
 	}
 
-	rawReference := base64.RawURLEncoding.EncodeToString(decodableReference.Value.GetRawReference())
-	return renderPage(rawReference, []g.Node{
+	return []g.Node{
 		h.Div(
-			h.Class("flex w-full space-x-4 p-4"),
+			h.Class("card bg-base-200 w-full p-4 shadow"),
+			h.H1(
+				h.Class("card-title text-2xl mb-4"),
+				g.Text("Current encoder configuration"),
+			),
 
-			h.Div(
-				h.Class("flex flex-col w-1/3 space-y-4"),
-
-				h.Div(
-					h.Class("card bg-base-200 p-4 shadow"),
-					h.H1(
-						h.Class("card-title text-2xl mb-4"),
-						g.Text("Reference"),
-					),
-					h.Table(
-						h.Class("table"),
-
-						h.Tr(
-							h.Th(
-								h.Class("whitespace-nowrap"),
-								g.Text("Object:"),
-							),
-							h.Td(
-								h.Class("break-all"),
-								h.Span(
-									h.Class("font-mono"),
-									g.Text(rawReference),
-								),
-							),
-						),
-						h.Tr(
-							h.Th(
-								h.Class("whitespace-nowrap"),
-								g.Text("Decoding parameters:"),
-							),
-							h.Td(
-								h.Class("break-all"),
-								h.Span(
-									h.Class("font-mono"),
-									g.Text(base64.RawURLEncoding.EncodeToString(decodableReference.GetDecodingParameters())),
-								),
-							),
-						),
-						h.Tr(
-							h.Th(
-								h.Class("whitespace-nowrap"),
-								g.Text("SHA-256 hash:"),
-							),
-							h.Td(
-								h.Class("break-all"),
-								h.Span(
-									h.Class("font-mono"),
-									g.Text(hex.EncodeToString(decodableReference.Value.GetHash())),
-								),
-							),
-						),
-						h.Tr(
-							h.Th(
-								h.Class("whitespace-nowrap"),
-								g.Text("Size:"),
-							),
-							h.Td(
-								g.Textf("%d byte(s)", decodableReference.Value.GetSizeBytes()),
-							),
-						),
-						h.Tr(
-							h.Th(
-								h.Class("whitespace-nowrap"),
-								g.Text("Height:"),
-							),
-							h.Td(
-								g.Textf("%d", decodableReference.Value.GetHeight()),
-							),
-						),
-						h.Tr(
-							h.Th(
-								h.Class("whitespace-nowrap"),
-								g.Text("Degree:"),
-							),
-							h.Td(
-								g.Textf("%d outgoing reference(s)", decodableReference.Value.GetDegree()),
-							),
-						),
-						h.Tr(
-							h.Th(
-								h.Class("whitespace-nowrap"),
-								g.Text("Maximum total parents size:"),
-							),
-							h.Td(
-								g.Textf("%d byte(s)", decodableReference.Value.GetMaximumTotalParentsSizeBytes(false)),
-							),
-						),
-					),
-				),
-
-				h.Div(
-					h.Class("card bg-base-200 w-full p-4 shadow"),
-					h.H1(
-						h.Class("card-title text-2xl mb-4"),
-						g.Text("Current encoder configuration"),
-					),
-
-					h.Form(
-						h.Method("post"),
-						h.Textarea(
-							h.Class("font-mono textarea w-full"),
-							h.Name("encoder_configuration"),
-							h.Rows("10"),
-							h.Placeholder(`[
+			h.Form(
+				h.Method("post"),
+				h.Textarea(
+					h.Class("font-mono textarea w-full"),
+					h.Name("encoder_configuration"),
+					h.Rows("10"),
+					h.Placeholder(`[
   {
     "lzwCompressing": {}
   },
@@ -507,19 +407,354 @@ func renderObjectPage(
     }
   }
 ]`),
-							g.Text(currentEncoderConfiguration),
-						),
-						h.Div(
-							h.Class("card-actions justify-end mt-4"),
-							h.Button(
-								h.Class("btn btn-primary"),
-								g.Text("Update"),
-							),
-						),
+					g.Text(currentEncoderConfiguration),
+				),
+				h.Div(
+					h.Class("card-actions justify-end mt-4"),
+					h.Button(
+						h.Class("btn btn-primary"),
+						g.Text("Update"),
 					),
 				),
+			),
+		),
 
-				h.Div(recentlyObservedEncodersNodes...),
+		h.Div(recentlyObservedEncodersNodes...),
+	}
+}
+
+func (s *BrowserService) doEvaluation(w http.ResponseWriter, r *http.Request) (g.Node, error) {
+	evaluationListReference, err := getReferenceFromRequest(r)
+	if err != nil {
+		return nil, err
+	}
+
+	recentlyObservedEncoders, currentEncoderConfigurationStr, err := getEncodersFromRequest(r)
+	if err != nil {
+		// TODO: Render page!
+		return nil, err
+	}
+
+	referenceFormat := evaluationListReference.Value.GetReferenceFormat()
+	binaryEncoder, err := model_encoding.NewBinaryEncoderFromProto(
+		recentlyObservedEncoders[0].Configuration,
+		uint32(referenceFormat.GetMaximumObjectSizeBytes()),
+	)
+	if err != nil {
+		// TODO: Render page!
+		return nil, err
+	}
+
+	parsedObjectPoolIngester := model_parser.NewParsedObjectPoolIngester(
+		s.parsedObjectPool,
+		model_parser.NewDownloadingParsedObjectReader(
+			object_namespacemapping.NewNamespaceAddingDownloader(s.objectDownloader, evaluationListReference.Value.InstanceName),
+		),
+	)
+
+	evaluationListReader := model_parser.LookupParsedObjectReader(
+		parsedObjectPoolIngester,
+		model_parser.NewChainedObjectParser(
+			model_parser.NewEncodedObjectParser[object.LocalReference](binaryEncoder),
+			model_parser.NewMessageListObjectParser[object.LocalReference, model_evaluation_pb.Evaluation](),
+		),
+	)
+	ctx := r.Context()
+	evaluationList, err := evaluationListReader.ReadParsedObject(
+		ctx,
+		model_core.CopyDecodable(evaluationListReference, evaluationListReference.Value.LocalReference),
+	)
+	if err != nil {
+		// TODO: Render page!
+		return nil, err
+	}
+
+	key, err := base64.RawURLEncoding.DecodeString(r.PathValue("key"))
+	if err != nil {
+		return nil, err
+	}
+	evaluation, err := btree.Find(
+		ctx,
+		evaluationListReader,
+		evaluationList,
+		func(entry model_core.Message[*model_evaluation_pb.Evaluation, object.LocalReference]) (int, *model_core_pb.DecodableReference) {
+			switch level := entry.Message.Level.(type) {
+			case *model_evaluation_pb.Evaluation_Leaf_:
+				flattenedKey, err := model_core.FlattenAny(model_core.Nested(entry, level.Leaf.Key))
+				if err != nil {
+					return -1, nil
+				}
+				marshaledKey, err := model_core.MarshalTopLevelMessage(flattenedKey)
+				if err != nil {
+					return -1, nil
+				}
+				return bytes.Compare(key, marshaledKey), nil
+			case *model_evaluation_pb.Evaluation_Parent_:
+				return bytes.Compare(key, level.Parent.FirstKey), level.Parent.Reference
+			default:
+				return 0, nil
+			}
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	if !evaluation.IsSet() {
+		// TODO: Render page!
+		return nil, errors.New("key not found")
+	}
+	evaluationLeaf, ok := evaluation.Message.Level.(*model_evaluation_pb.Evaluation_Leaf_)
+	if !ok {
+		// TODO: Render page!
+		return nil, errors.New("key is not a valid leaf")
+	}
+
+	jsonRenderer := messageJSONRenderer{
+		basePath: path.Join(
+			"../../../../object",
+			url.PathEscape(evaluationListReference.Value.InstanceName.String()),
+			referenceFormat.ToProto().String(),
+		),
+		now: time.Now(),
+	}
+
+	evaluationCard := []g.Node{
+		h.Class("card bg-base-200 message-contents w-2/3 p-4 shadow"),
+		h.H1(
+			h.Class("card-title text-2xl mb-4"),
+			g.Text("Evaluation"),
+		),
+
+		h.H2(
+			h.Class("text-xl my-2"),
+			g.Text("Key"),
+		),
+		h.Div(
+			append(
+				[]g.Node{
+					h.Class("card my-2 p-4 bg-neutral text-neutral-content font-mono h-auto! overflow-x-auto"),
+				},
+				jsonRenderer.renderMessage(model_core.Nested(evaluation, evaluationLeaf.Leaf.Key.ProtoReflect()))...,
+			)...,
+		),
+
+		h.H2(
+			h.Class("text-xl my-2"),
+			g.Text("Value"),
+		),
+	}
+	if v := evaluationLeaf.Leaf.Value; v != nil {
+		evaluationCard = append(
+			evaluationCard,
+			h.Div(
+				append(
+					[]g.Node{
+						h.Class("card my-2 p-4 bg-neutral text-neutral-content font-mono h-auto! overflow-x-auto"),
+					},
+					jsonRenderer.renderMessage(model_core.Nested(evaluation, v.ProtoReflect()))...,
+				)...,
+			),
+		)
+	} else {
+		evaluationCard = append(evaluationCard, g.Text("This key yields a native value that cannot be represented as JSON, or evaluation failed to yield a value."))
+	}
+
+	evaluationCard = append(
+		evaluationCard,
+		h.H2(
+			h.Class("text-xl my-2"),
+			g.Text("Dependencies"),
+		),
+	)
+	if dependencies := evaluationLeaf.Leaf.Dependencies; len(dependencies) > 0 {
+		dependencyListReader := model_parser.LookupParsedObjectReader(
+			parsedObjectPoolIngester,
+			model_parser.NewChainedObjectParser(
+				model_parser.NewEncodedObjectParser[object.LocalReference](binaryEncoder),
+				model_parser.NewMessageListObjectParser[object.LocalReference, model_evaluation_pb.Dependency](),
+			),
+		)
+		var errIter error
+		for dependency := range btree.AllLeaves(
+			ctx,
+			dependencyListReader,
+			model_core.Nested(evaluation, dependencies),
+			func(element model_core.Message[*model_evaluation_pb.Dependency, object.LocalReference]) (*model_core_pb.DecodableReference, error) {
+				if level, ok := element.Message.Level.(*model_evaluation_pb.Dependency_Parent_); ok {
+					return level.Parent.Reference, nil
+				}
+				return nil, nil
+			},
+			&errIter,
+		) {
+			if dependencyLeaf, ok := dependency.Message.Level.(*model_evaluation_pb.Dependency_LeafKey); ok {
+				cardNodes := []g.Node{
+					h.Class("block card my-2 p-4 bg-neutral text-neutral-content font-mono h-auto! overflow-x-auto"),
+				}
+				if dependencyKey, err := model_core.FlattenAny(model_core.Nested(dependency, dependencyLeaf.LeafKey)); err == nil {
+					if marshaledDependencyKey, err := model_core.MarshalTopLevelMessage(dependencyKey); err == nil {
+						cardNodes = append(cardNodes, h.Form(
+							h.Action(base64.RawURLEncoding.EncodeToString(marshaledDependencyKey)),
+							h.Button(
+								h.Class("btn btn-primary btn-square float-right inline-block"),
+								g.Text("↗"),
+							),
+						))
+					}
+				}
+				cardNodes = append(
+					cardNodes,
+					jsonRenderer.renderMessage(model_core.Nested(dependency, dependencyLeaf.LeafKey.ProtoReflect()))...,
+				)
+				evaluationCard = append(
+					evaluationCard,
+					h.Div(cardNodes...),
+				)
+			}
+		}
+		if errIter != nil {
+			evaluationCard = append(evaluationCard, g.Text("TODO: ERROR"))
+		}
+	} else {
+		evaluationCard = append(evaluationCard, g.Text("This key has no dependencies, or evaluation failed to yield a list of dependencies."))
+	}
+
+	return renderPage("TODO: Pick title", []g.Node{
+		h.Div(
+			h.Class("flex w-full space-x-4 p-4"),
+
+			h.Div(
+				append(
+					[]g.Node{
+						h.Class("flex flex-col w-1/3 space-y-4"),
+					},
+
+					renderEncoderSelector(recentlyObservedEncoders, currentEncoderConfigurationStr)...,
+				)...,
+			),
+
+			h.Div(evaluationCard...),
+		),
+	}), nil
+}
+
+// renderObjectPage renders a HTML page for displaying the contents of
+// an object.
+func renderObjectPage(
+	decodableReference model_core.Decodable[object.GlobalReference],
+	payloadRenderers []payloadRenderer,
+	currentPayloadRendererIndex int,
+	currentEncoderConfiguration string,
+	recentlyObservedEncoders []*browser_pb.RecentlyObservedEncoder,
+	payload []g.Node,
+) g.Node {
+	formatTabs := make([][]g.Node, 0, len(payloadRenderers))
+	for _, payloadRenderer := range payloadRenderers {
+		formatTabs = append(formatTabs, []g.Node{
+			h.Href("?format=" + payloadRenderer.queryParameter()),
+			g.Text(payloadRenderer.name()),
+		})
+	}
+
+	rawReference := base64.RawURLEncoding.EncodeToString(decodableReference.Value.GetRawReference())
+	return renderPage(rawReference, []g.Node{
+		h.Div(
+			h.Class("flex w-full space-x-4 p-4"),
+
+			h.Div(
+				h.Class("flex flex-col w-1/3 space-y-4"),
+
+				h.Div(
+					append(
+						[]g.Node{
+							h.Class("card bg-base-200 p-4 shadow"),
+							h.H1(
+								h.Class("card-title text-2xl mb-4"),
+								g.Text("Reference"),
+							),
+							h.Table(
+								h.Class("table"),
+
+								h.Tr(
+									h.Th(
+										h.Class("whitespace-nowrap"),
+										g.Text("Object:"),
+									),
+									h.Td(
+										h.Class("break-all"),
+										h.Span(
+											h.Class("font-mono"),
+											g.Text(rawReference),
+										),
+									),
+								),
+								h.Tr(
+									h.Th(
+										h.Class("whitespace-nowrap"),
+										g.Text("Decoding parameters:"),
+									),
+									h.Td(
+										h.Class("break-all"),
+										h.Span(
+											h.Class("font-mono"),
+											g.Text(base64.RawURLEncoding.EncodeToString(decodableReference.GetDecodingParameters())),
+										),
+									),
+								),
+								h.Tr(
+									h.Th(
+										h.Class("whitespace-nowrap"),
+										g.Text("SHA-256 hash:"),
+									),
+									h.Td(
+										h.Class("break-all"),
+										h.Span(
+											h.Class("font-mono"),
+											g.Text(hex.EncodeToString(decodableReference.Value.GetHash())),
+										),
+									),
+								),
+								h.Tr(
+									h.Th(
+										h.Class("whitespace-nowrap"),
+										g.Text("Size:"),
+									),
+									h.Td(
+										g.Textf("%d byte(s)", decodableReference.Value.GetSizeBytes()),
+									),
+								),
+								h.Tr(
+									h.Th(
+										h.Class("whitespace-nowrap"),
+										g.Text("Height:"),
+									),
+									h.Td(
+										g.Textf("%d", decodableReference.Value.GetHeight()),
+									),
+								),
+								h.Tr(
+									h.Th(
+										h.Class("whitespace-nowrap"),
+										g.Text("Degree:"),
+									),
+									h.Td(
+										g.Textf("%d outgoing reference(s)", decodableReference.Value.GetDegree()),
+									),
+								),
+								h.Tr(
+									h.Th(
+										h.Class("whitespace-nowrap"),
+										g.Text("Maximum total parents size:"),
+									),
+									h.Td(
+										g.Textf("%d byte(s)", decodableReference.Value.GetMaximumTotalParentsSizeBytes(false)),
+									),
+								),
+							),
+						},
+						renderEncoderSelector(recentlyObservedEncoders, currentEncoderConfiguration)...,
+					)...,
+				),
 			),
 
 			h.Div(
@@ -846,12 +1081,13 @@ func (textPayloadRenderer) render(r *http.Request, o model_core.Decodable[*objec
 // with syntax highlighting applied. Any references to other objects
 // contained in these messages are rendered as clickable links.
 type messageJSONRenderer struct {
-	now time.Time
+	basePath string
+	now      time.Time
 
 	observedEncoders []*browser_pb.RecentlyObservedEncoder
 }
 
-func (d *messageJSONRenderer) renderValue(fieldDescriptor protoreflect.FieldDescriptor, value model_core.Message[protoreflect.Value, object.LocalReference]) []g.Node {
+func (d *messageJSONRenderer) renderField(fieldDescriptor protoreflect.FieldDescriptor, value model_core.Message[protoreflect.Value, object.LocalReference]) []g.Node {
 	var v any
 	switch fieldDescriptor.Kind() {
 	// Simple scalar types for which we can just call json.Marshal().
@@ -872,19 +1108,7 @@ func (d *messageJSONRenderer) renderValue(fieldDescriptor protoreflect.FieldDesc
 		v = value.Message.Bytes()
 
 	case protoreflect.GroupKind, protoreflect.MessageKind:
-		switch r := value.Message.Message().Interface().(type) {
-		case *model_core_pb.Any:
-			anyValue, err := model_core.UnmarshalAnyNew(model_core.Nested(value, r))
-			if err != nil {
-				return []g.Node{
-					h.Span(
-						h.Class("text-red-600"),
-						g.Textf("[ %s ]", err),
-					),
-				}
-			}
-			return d.renderMessage(model_core.Nested(anyValue.Decay(), anyValue.Message.ProtoReflect()), r.Value.TypeUrl)
-		case *model_core_pb.DecodableReference:
+		if r, ok := value.Message.Message().Interface().(*model_core_pb.DecodableReference); ok {
 			if reference, err := model_core.FlattenDecodableReference(model_core.Nested(value, r)); err == nil {
 				rawReference := model_core.DecodableLocalReferenceToString(reference)
 				if fieldOptions, ok := fieldDescriptor.Options().(*descriptorpb.FieldOptions); ok {
@@ -896,11 +1120,11 @@ func (d *messageJSONRenderer) renderValue(fieldDescriptor protoreflect.FieldDesc
 					var link string
 					switch format := objectFormat.GetFormat().(type) {
 					case *model_core_pb.ObjectFormat_Raw:
-						link = path.Join("../..", rawReference, "raw")
+						link = path.Join(d.basePath, rawReference, "raw")
 					case *model_core_pb.ObjectFormat_MessageTypeName:
-						link = path.Join("../..", rawReference, "message", format.MessageTypeName)
+						link = path.Join(d.basePath, rawReference, "message", format.MessageTypeName)
 					case *model_core_pb.ObjectFormat_MessageListTypeName:
-						link = path.Join("../..", rawReference, "message_list", format.MessageListTypeName)
+						link = path.Join(d.basePath, rawReference, "message_list", format.MessageListTypeName)
 					default:
 						return []g.Node{g.Text("Reference field with unknown object format")}
 					}
@@ -916,7 +1140,7 @@ func (d *messageJSONRenderer) renderValue(fieldDescriptor protoreflect.FieldDesc
 		}
 
 		// Recurse into message.
-		return d.renderMessage(model_core.Nested(value, value.Message.Message()), "")
+		return d.renderMessage(model_core.Nested(value, value.Message.Message()))
 
 	case protoreflect.EnumKind:
 		// Render an enum value as a string or integer,
@@ -960,10 +1184,24 @@ func renderJSONValue(v any) []g.Node {
 
 var binaryEncoderDescriptor = (&model_encoding_pb.BinaryEncoder{}).ProtoReflect().Descriptor()
 
-func (d *messageJSONRenderer) renderMessage(m model_core.Message[protoreflect.Message, object.LocalReference], typeURL string) []g.Node {
+func (d *messageJSONRenderer) renderMessage(m model_core.Message[protoreflect.Message, object.LocalReference]) []g.Node {
+	// If the provided message is a model_core_pb.Any, render it
+	// similar to how protojson renders an anypb.Any. Namely, render
+	// the payload message with an added "@type" field containing
+	// the type URL.
 	fields := map[string][]g.Node{}
-	if typeURL != "" {
-		fields["@type"] = renderJSONValue(typeURL)
+	if anyMessage, ok := m.Message.Interface().(*model_core_pb.Any); ok {
+		anyValue, err := model_core.UnmarshalAnyNew(model_core.Nested(m, anyMessage))
+		if err != nil {
+			return []g.Node{
+				h.Span(
+					h.Class("text-red-600"),
+					g.Textf("[ %s ]", err),
+				),
+			}
+		}
+		m = model_core.Nested(anyValue.Decay(), anyValue.Message.ProtoReflect())
+		fields["@type"] = renderJSONValue(anyMessage.Value.TypeUrl)
 	}
 
 	// Iterate over all message fields and render their values.
@@ -980,7 +1218,7 @@ func (d *messageJSONRenderer) renderMessage(m model_core.Message[protoreflect.Me
 			} else {
 				listParts := make([]g.Node, 0, listLength)
 				for i := 0; i < listLength; i++ {
-					elementNodes := d.renderValue(fieldDescriptor, model_core.Nested(m, list.Get(i)))
+					elementNodes := d.renderField(fieldDescriptor, model_core.Nested(m, list.Get(i)))
 					if i != listLength-1 {
 						elementNodes = append(elementNodes, g.Text(","))
 					}
@@ -1014,7 +1252,7 @@ func (d *messageJSONRenderer) renderMessage(m model_core.Message[protoreflect.Me
 				)
 			}
 		} else {
-			valueNodes = d.renderValue(fieldDescriptor, model_core.Nested(m, value))
+			valueNodes = d.renderField(fieldDescriptor, model_core.Nested(m, value))
 		}
 		name := fieldDescriptor.JSONName()
 		fields[name] = valueNodes
@@ -1059,7 +1297,7 @@ func (d *messageJSONRenderer) renderMessageList(list model_core.Message[[]protor
 
 	listParts := make([]g.Node, 0, listLength)
 	for i, element := range list.Message {
-		elementNodes := d.renderMessage(model_core.Nested(list, element), "")
+		elementNodes := d.renderMessage(model_core.Nested(list, element))
 		if i != listLength-1 {
 			elementNodes = append(elementNodes, g.Text(","))
 		}
@@ -1099,9 +1337,10 @@ func (messageJSONPayloadRenderer) render(r *http.Request, o model_core.Decodable
 		return renderErrorAlert(fmt.Errorf("failed to unmarshal message: %w", err)), nil
 	}
 	d := messageJSONRenderer{
-		now: time.Now(),
+		basePath: "../..",
+		now:      time.Now(),
 	}
-	rendered := d.renderMessage(model_core.NewMessage(message, o.Value), "")
+	rendered := d.renderMessage(model_core.NewMessage(message, o.Value))
 	return rendered, d.observedEncoders
 }
 
@@ -1153,7 +1392,8 @@ func (messageListJSONPayloadRenderer) render(r *http.Request, o model_core.Decod
 	}
 
 	d := messageJSONRenderer{
-		now: time.Now(),
+		basePath: "../..",
+		now:      time.Now(),
 	}
 	rendered := d.renderMessageList(model_core.NewMessage(elements, o.Value))
 	return rendered, d.observedEncoders
