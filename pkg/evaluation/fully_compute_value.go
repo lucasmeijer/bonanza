@@ -268,7 +268,7 @@ func FullyComputeValue[TReference object.BasicReference, TMetadata any](
 			// Omit keys for which there's nothing
 			// meaningful to report. Those only blow up the
 			// size of the data.
-			if !value.IsSet() || len(dependencies) == 0 {
+			if !value.IsSet() && len(dependencies) == 0 {
 				continue
 			}
 
