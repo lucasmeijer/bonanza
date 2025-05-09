@@ -20,7 +20,7 @@ func NewEncodedObjectParser[
 func (p *encodedObjectParser[TReference]) ParseObject(in model_core.Message[[]byte, TReference], decodingParameters []byte) (model_core.Message[[]byte, TReference], int, error) {
 	decoded, err := p.encoder.DecodeBinary(in.Message, decodingParameters)
 	if err != nil {
-		return model_core.Message[[]byte, TReference]{}, 0, nil
+		return model_core.Message[[]byte, TReference]{}, 0, err
 	}
 	return model_core.NewMessage(decoded, in.OutgoingReferences), len(decoded), nil
 }
