@@ -2,79 +2,53 @@ package logging
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"os"
+
+	"github.com/buildbarn/bonanza/pkg/bazelclient/formatted"
 )
 
+type FormattedNodeWriter func(message formatted.Node, w io.StringWriter) (int, error)
+
 type consoleLogger struct {
-	w               io.Writer
-	escapeSequences *EscapeSequences
+	w              io.Writer
+	writeFormatted FormattedNodeWriter
 }
 
-func NewConsoleLogger(w io.Writer, escapeSequences *EscapeSequences) Logger {
+func NewConsoleLogger(w io.Writer, writeFormatted FormattedNodeWriter) Logger {
 	return &consoleLogger{
-		w:               w,
-		escapeSequences: escapeSequences,
+		w:              w,
+		writeFormatted: writeFormatted,
 	}
 }
 
-func (l *consoleLogger) Error(v ...any) {
+func (l *consoleLogger) Error(message formatted.Node) {
 	var b bytes.Buffer
-
-	b.Write(l.escapeSequences.Bold)
-	b.Write(l.escapeSequences.Red)
-	b.WriteString("ERROR: ")
-	b.Write(l.escapeSequences.Reset)
-	fmt.Fprint(&b, v...)
-	b.Write([]byte{'\n'})
-
+	l.writeFormatted(
+		formatted.Join(
+			formatted.Bold(formatted.Red(formatted.Text("ERROR: "))),
+			message,
+			formatted.Text("\n"),
+		),
+		&b,
+	)
 	l.w.Write(b.Bytes())
 }
 
-func (l *consoleLogger) Errorf(format string, v ...any) {
-	var b bytes.Buffer
-
-	b.Write(l.escapeSequences.Bold)
-	b.Write(l.escapeSequences.Red)
-	b.WriteString("ERROR: ")
-	b.Write(l.escapeSequences.Reset)
-	fmt.Fprintf(&b, format, v...)
-	b.Write([]byte{'\n'})
-
-	l.w.Write(b.Bytes())
-}
-
-func (l *consoleLogger) Fatal(v ...any) {
-	l.Error(v...)
+func (l *consoleLogger) Fatal(message formatted.Node) {
+	l.Error(message)
 	os.Exit(1)
 }
 
-func (l *consoleLogger) Fatalf(format string, v ...any) {
-	l.Errorf(format, v...)
-	os.Exit(1)
-}
-
-func (l *consoleLogger) Info(v ...any) {
+func (l *consoleLogger) Info(message formatted.Node) {
 	var b bytes.Buffer
-
-	b.Write(l.escapeSequences.Green)
-	b.WriteString("INFO: ")
-	b.Write(l.escapeSequences.Reset)
-	fmt.Fprint(&b, v...)
-	b.Write([]byte{'\n'})
-
-	l.w.Write(b.Bytes())
-}
-
-func (l *consoleLogger) Infof(format string, v ...any) {
-	var b bytes.Buffer
-
-	b.Write(l.escapeSequences.Green)
-	b.WriteString("INFO: ")
-	b.Write(l.escapeSequences.Reset)
-	fmt.Fprintf(&b, format, v...)
-	b.Write([]byte{'\n'})
-
+	l.writeFormatted(
+		formatted.Join(
+			formatted.Green(formatted.Text("INFO: ")),
+			message,
+			formatted.Text("\n"),
+		),
+		&b,
+	)
 	l.w.Write(b.Bytes())
 }

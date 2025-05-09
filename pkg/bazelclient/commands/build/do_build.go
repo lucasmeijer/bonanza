@@ -21,6 +21,7 @@ import (
 	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bonanza/pkg/bazelclient/arguments"
 	"github.com/buildbarn/bonanza/pkg/bazelclient/commands"
+	"github.com/buildbarn/bonanza/pkg/bazelclient/formatted"
 	"github.com/buildbarn/bonanza/pkg/bazelclient/logging"
 	"github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
@@ -45,8 +46,12 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/emptypb"
+
+	// Needed to display proper stack traces.
+	_ "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
 )
 
 func newGRPCClient(endpoint string, commonFlags *arguments.CommonFlags) (*grpc.ClientConn, error) {
@@ -146,7 +151,7 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 
 	remoteCacheClient, err := newGRPCClient(args.CommonFlags.RemoteCache, &args.CommonFlags)
 	if err != nil {
-		logger.Fatalf("Failed to create gRPC client for --remote_cache=%#v: %s", args.CommonFlags.RemoteCache, err)
+		logger.Fatal(formatted.Textf("Failed to create gRPC client for --remote_cache=%#v: %s", args.CommonFlags.RemoteCache, err))
 	}
 
 	// Determine the names and paths of all modules that are present
@@ -155,17 +160,17 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 	// MODULE.bazel.
 	workspaceDirectory, err := filesystem.NewLocalDirectory(workspacePath)
 	if err != nil {
-		logger.Fatal("Failed to open workspace directory: ", err)
+		logger.Fatal(formatted.Textf("Failed to open workspace directory: %s", err))
 	}
 	moduleDotBazelFile, err := workspaceDirectory.OpenRead(path.MustNewComponent("MODULE.bazel"))
 	workspaceDirectory.Close()
 	if err != nil {
-		logger.Fatal("Failed to open MODULE.bazel: ", err)
+		logger.Fatal(formatted.Textf("Failed to open MODULE.bazel: %s", err))
 	}
 	moduleDotBazelContents, err := io.ReadAll(io.NewSectionReader(moduleDotBazelFile, 0, math.MaxInt64))
 	moduleDotBazelFile.Close()
 	if err != nil {
-		logger.Fatal("Failed to read MODULE.bazel: ", err)
+		logger.Fatal(formatted.Textf("Failed to read MODULE.bazel: %s", err))
 	}
 	modulePaths := map[label.Module]path.Parser{}
 	moduleDotBazelHandler := NewLocalPathExtractingModuleDotBazelHandler(modulePaths, workspacePath)
@@ -175,22 +180,22 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 		path.LocalFormat,
 		moduleDotBazelHandler,
 	); err != nil {
-		logger.Fatal("Failed to parse MODULE.bazel: ", err)
+		logger.Fatal(formatted.Textf("Failed to parse MODULE.bazel: %s", err))
 	}
 	rootModuleName, err := moduleDotBazelHandler.GetRootModuleName()
 	if err != nil {
-		logger.Fatal(err)
+		logger.Fatal(formatted.Text(err.Error()))
 	}
 
 	// Augment results with modules provided to --override_module.
 	for _, overrideModule := range args.CommonFlags.OverrideModule {
 		fields := strings.SplitN(overrideModule, "=", 2)
 		if len(fields) != 2 {
-			logger.Fatal("Module overrides must use the format ${module_name}=${path}")
+			logger.Fatal(formatted.Text("Module overrides must use the format ${module_name}=${path}"))
 		}
 		moduleName, err := label.NewModule(fields[0])
 		if err != nil {
-			logger.Fatalf("Invalid module name %#v: %s", fields[0], err)
+			logger.Fatal(formatted.Textf("Invalid module name %#v: %s", fields[0], err))
 		}
 		modulePaths[moduleName] = path.LocalFormat.NewParser(fields[1])
 	}
@@ -207,7 +212,7 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 	referenceFormat := object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1)
 	encryptionKeyBytes, err := base64.StdEncoding.DecodeString(args.CommonFlags.RemoteEncryptionKey)
 	if err != nil {
-		logger.Fatalf("Failed to base64 decode value of --remote_encryption_key: %s", err)
+		logger.Fatal(formatted.Textf("Failed to base64 decode value of --remote_encryption_key: %s", err))
 	}
 	defaultEncoders := []*model_encoding_pb.BinaryEncoder{{
 		Encoder: &model_encoding_pb.BinaryEncoder_DeterministicEncrypting{
@@ -234,7 +239,7 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 	}
 	directoryParameters, err := model_filesystem.NewDirectoryCreationParametersFromProto(directoryParametersMessage, referenceFormat)
 	if err != nil {
-		logger.Fatal("Invalid directory creation parameters: ", err)
+		logger.Fatal(formatted.Textf("Invalid directory creation parameters: %s", err))
 	}
 	fileParametersMessage := &model_filesystem_pb.FileCreationParameters{
 		Access: &model_filesystem_pb.FileAccessParameters{
@@ -248,12 +253,12 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 	}
 	fileParameters, err := model_filesystem.NewFileCreationParametersFromProto(fileParametersMessage, referenceFormat)
 	if err != nil {
-		logger.Fatal("Invalid file creation parameters: ", err)
+		logger.Fatal(formatted.Textf("Invalid file creation parameters: %s", err))
 	}
 
 	// Construct Merkle trees for all modules that need to be
 	// uploaded to storage.
-	logger.Info("Scanning module sources")
+	logger.Info(formatted.Text("Scanning module sources"))
 	group, groupCtx := errgroup.WithContext(context.Background())
 	moduleRootDirectories := make([]model_filesystem.CapturedDirectory, 0, len(moduleNames))
 	createdModuleRootDirectories := make([]model_filesystem.CreatedDirectory[model_core.CreatedObjectTree], len(moduleNames))
@@ -289,7 +294,7 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 		return nil
 	})
 	if err := group.Wait(); err != nil {
-		logger.Fatal(err)
+		logger.Fatal(formatted.Text(err.Error()))
 	}
 
 	targetPlatforms := strings.FieldsFunc(args.BuildFlags.Platforms, func(r rune) bool { return r == ',' })
@@ -336,7 +341,7 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 	for i, moduleName := range moduleNames {
 		createdRootDirectory := createdModuleRootDirectories[i]
 		if l := createdRootDirectory.MaximumSymlinkEscapementLevels; l == nil || l.Value != 0 {
-			logger.Fatalf("Module %#v contains one or more symbolic links that potentially escape the module's root directory", moduleName.String())
+			logger.Fatal(formatted.Textf("Module %#v contains one or more symbolic links that potentially escape the module's root directory", moduleName.String()))
 		}
 		createdObject, err := model_core.MarshalAndEncodePatchedMessage(
 			createdModuleRootDirectories[i].Message,
@@ -344,7 +349,7 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 			directoryParameters.GetEncoder(),
 		)
 		if err != nil {
-			logger.Fatalf("Failed to create root directory object for module %#v: %s", moduleName.String(), err)
+			logger.Fatal(formatted.Textf("Failed to create root directory object for module %#v: %s", moduleName.String(), err))
 		}
 
 		createdObjectTree := model_core.CreatedObjectTree(createdObject.Value)
@@ -377,7 +382,7 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 		uint32(referenceFormat.GetMaximumObjectSizeBytes()),
 	)
 	if err != nil {
-		logger.Fatal("Failed to create build specification encoder: ", err)
+		logger.Fatal(formatted.Textf("Failed to create build specification encoder: %s", err))
 	}
 
 	createdBuildSpecification, err := model_core.MarshalAndEncodePatchedMessage(
@@ -386,10 +391,10 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 		buildSpecificationEncoder,
 	)
 	if err != nil {
-		logger.Fatal("Failed to create build specification object: ", err)
+		logger.Fatal(formatted.Textf("Failed to create build specification object: %s", err))
 	}
 
-	logger.Info("Uploading module sources")
+	logger.Info(formatted.Text("Uploading module sources"))
 	instanceName := object.NewInstanceName(args.CommonFlags.RemoteInstanceName)
 	buildSpecificationReference := createdBuildSpecification.Value.Contents.GetReference()
 	if err := dag.UploadDAG(
@@ -409,30 +414,30 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 			SizeBytes: 1 << 20,
 		}),
 	); err != nil {
-		logger.Fatal("Failed to upload workspace directory: ", err)
+		logger.Fatal(formatted.Textf("Failed to upload workspace directory: %s", err))
 	}
 
 	clientPrivateKeyData, err := os.ReadFile(args.CommonFlags.RemoteExecutorClientPrivateKey)
 	if err != nil {
-		logger.Fatalf("Failed to read --remote_executor_client_private_key=%#v: %s", args.CommonFlags.RemoteExecutorClientPrivateKey, err)
+		logger.Fatal(formatted.Textf("Failed to read --remote_executor_client_private_key=%#v: %s", args.CommonFlags.RemoteExecutorClientPrivateKey, err))
 	}
 	clientPrivateKey, err := remoteexecution.ParseECDHPrivateKey(clientPrivateKeyData)
 	if err != nil {
-		logger.Fatalf("Failed to parse --remote_executor_client_private_key=%#v: %s", args.CommonFlags.RemoteExecutorClientPrivateKey, err)
+		logger.Fatal(formatted.Textf("Failed to parse --remote_executor_client_private_key=%#v: %s", args.CommonFlags.RemoteExecutorClientPrivateKey, err))
 	}
 
 	clientCertificateChainData, err := os.ReadFile(args.CommonFlags.RemoteExecutorClientCertificateChain)
 	if err != nil {
-		logger.Fatalf("Failed to read --remote_executor_client_certificate_chain=%#v: %s", args.CommonFlags.RemoteExecutorClientCertificateChain, err)
+		logger.Fatal(formatted.Textf("Failed to read --remote_executor_client_certificate_chain=%#v: %s", args.CommonFlags.RemoteExecutorClientCertificateChain, err))
 	}
 	clientCertificateChain, err := remoteexecution.ParseCertificateChain(clientCertificateChainData)
 	if err != nil {
-		logger.Fatalf("Failed to parse --remote_executor_client_certificate_chain=%#v: %s", args.CommonFlags.RemoteExecutorClientCertificateChain, err)
+		logger.Fatal(formatted.Textf("Failed to parse --remote_executor_client_certificate_chain=%#v: %s", args.CommonFlags.RemoteExecutorClientCertificateChain, err))
 	}
 
 	remoteExecutorClient, err := newGRPCClient(args.CommonFlags.RemoteExecutor, &args.CommonFlags)
 	if err != nil {
-		logger.Fatalf("Failed to create gRPC client for --remote_executor=%#v: %s", args.CommonFlags.RemoteExecutor, err)
+		logger.Fatal(formatted.Textf("Failed to create gRPC client for --remote_executor=%#v: %s", args.CommonFlags.RemoteExecutor, err))
 	}
 	builderClient := remoteexecution.NewClient[*model_build_pb.Action, emptypb.Empty, *model_build_pb.Result](
 		remoteexecution_pb.NewExecutionClient(remoteExecutorClient),
@@ -442,15 +447,15 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 
 	builderPKIXPublicKey, err := base64.StdEncoding.DecodeString(args.CommonFlags.RemoteExecutorBuilderPkixPublicKey)
 	if err != nil {
-		logger.Fatalf("Failed to base64 decode --remote_executor_builder_pkix_public_key: %s", err)
+		logger.Fatal(formatted.Textf("Failed to base64 decode --remote_executor_builder_pkix_public_key: %s", err))
 	}
 	builderPublicKey, err := x509.ParsePKIXPublicKey(builderPKIXPublicKey)
 	if err != nil {
-		logger.Fatalf("Failed to parse --remote_executor_builder_pkix_public_key: %s", err)
+		logger.Fatal(formatted.Textf("Failed to parse --remote_executor_builder_pkix_public_key: %s", err))
 	}
 	builderECDHPublicKey, ok := builderPublicKey.(*ecdh.PublicKey)
 	if !ok {
-		logger.Fatalf("--remote_executor_builder_pkix_public_key is not an ECDH public key")
+		logger.Fatal(formatted.Textf("--remote_executor_builder_pkix_public_key is not an ECDH public key"))
 	}
 
 	var invocationID uuid.UUID
@@ -459,7 +464,7 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 	} else {
 		invocationID, err = uuid.Parse(v)
 		if err != nil {
-			logger.Fatalf("Invalid --invocation_id=%#v: %s", v, err)
+			logger.Fatal(formatted.Textf("Invalid --invocation_id=%#v: %s", v, err))
 		}
 	}
 	var buildRequestID uuid.UUID
@@ -468,27 +473,42 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 	} else {
 		buildRequestID, err = uuid.Parse(v)
 		if err != nil {
-			logger.Fatalf("Invalid --build_request_id=%#v: %s", v, err)
+			logger.Fatal(formatted.Textf("Invalid --build_request_id=%#v: %s", v, err))
 		}
 	}
 
 	decodableBuildSpecificationReference := model_core.CopyDecodable(createdBuildSpecification, buildSpecificationReference)
-	logger.Infof(
-		"Performing build of specification %s",
-		model_core.DecodableLocalReferenceToString(decodableBuildSpecificationReference),
-	)
+	buildSpecificationReferenceStr := model_core.DecodableLocalReferenceToString(decodableBuildSpecificationReference)
+	buildSpecificationLink := formatted.Text(buildSpecificationReferenceStr)
+	browserURL := args.CommonFlags.BrowserUrl
+	if browserURL != "" {
+		if buildSpecificationURL, err := url.JoinPath(
+			browserURL,
+			"object",
+			url.PathEscape(instanceName.String()),
+			referenceFormat.ToProto().String(),
+			buildSpecificationReferenceStr,
+			"message",
+			"bonanza.model.build.BuildSpecification",
+		); err == nil {
+			buildSpecificationLink = formatted.Link(buildSpecificationURL, buildSpecificationLink)
+		}
+	}
+	logger.Info(formatted.Join(formatted.Text("Performing build of specification "), buildSpecificationLink))
+
 	var result model_build_pb.Result
 	var errBuild error
-	for event := range builderClient.RunAction(
+	namespace := object.Namespace{
+		InstanceName:    instanceName,
+		ReferenceFormat: referenceFormat,
+	}
+	for range builderClient.RunAction(
 		context.Background(),
 		builderECDHPublicKey,
 		&model_build_pb.Action{
-			InvocationId:   invocationID.String(),
-			BuildRequestId: buildRequestID.String(),
-			Namespace: object.Namespace{
-				InstanceName:    instanceName,
-				ReferenceFormat: referenceFormat,
-			}.ToProto(),
+			InvocationId:                invocationID.String(),
+			BuildRequestId:              buildRequestID.String(),
+			Namespace:                   namespace.ToProto(),
 			BuildSpecificationReference: model_core.DecodableLocalReferenceToWeakProto(decodableBuildSpecificationReference),
 			BuildSpecificationEncoders:  defaultEncoders,
 		},
@@ -498,13 +518,81 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 		&result,
 		&errBuild,
 	) {
-		logger.Info(event)
+		// TODO: Display events as they come in.
 	}
 	if errBuild != nil {
-		logger.Fatal("Failed to perform build: ", errBuild)
+		logger.Fatal(formatted.Textf("Failed to perform build: %s", errBuild))
 	}
-	if err := status.FromProto(result.Status); err != nil {
-		logger.Fatal("Failed to perform build: ", err)
+
+	var evaluationsReference *model_core.Decodable[object.LocalReference]
+	if result.EvaluationsReference != nil {
+		r, err := model_core.NewDecodableLocalReferenceFromWeakProto(referenceFormat, result.EvaluationsReference)
+		if err != nil {
+			logger.Fatal(formatted.Textf("Invalid evaluations reference: %s", err))
+		}
+		evaluationsReference = &r
 	}
-	logger.Info(result)
+
+	if f := result.Failure; f != nil {
+		printStackTrace(namespace, f.StackTraceKeys, logger, browserURL, evaluationsReference)
+		logger.Fatal(formatted.Textf("Failed to perform build: %s", status.FromProto(f.Status)))
+	}
+}
+
+func printStackTrace(namespace object.Namespace, stackTraceKeys [][]byte, logger logging.Logger, browserURL string, evaluationsReference *model_core.Decodable[object.LocalReference]) {
+	if len(stackTraceKeys) > 0 {
+		stackTraceKeyAnys := make([]model_core.TopLevelMessage[*anypb.Any, object.LocalReference], 0, len(stackTraceKeys))
+		longestType := 0
+		for i, key := range stackTraceKeys {
+			keyAny, err := model_core.UnmarshalTopLevelMessage[anypb.Any](namespace.ReferenceFormat, key)
+			if err != nil {
+				logger.Error(formatted.Textf(" Failed to unmarshal stack trace key at index %d: %w", i, err))
+				return
+			}
+
+			stackTraceKeyAnys = append(stackTraceKeyAnys, keyAny)
+			if l := len(getAbbreviatedTypeURL(keyAny.Message.TypeUrl)); longestType < l {
+				longestType = l
+			}
+		}
+
+		logger.Error(formatted.Text("Traceback (most recent key last):"))
+		for i, keyAny := range stackTraceKeyAnys {
+			var body string
+			if _, err := model_core.UnmarshalTopLevelAnyNew[object.LocalReference](keyAny); err == nil {
+				body = "{TODO}"
+			} else {
+				body = fmt.Sprintf("Failed to unmarshal key: %w", err)
+			}
+			abbreviatedType := getAbbreviatedTypeURL(keyAny.Message.TypeUrl)
+			abbreviatedTypeNode := formatted.Text(abbreviatedType)
+			if browserURL != "" && evaluationsReference != nil {
+				if evaluationURL, err := url.JoinPath(
+					browserURL,
+					"evaluation",
+					url.PathEscape(namespace.InstanceName.String()),
+					namespace.ReferenceFormat.ToProto().String(),
+					model_core.DecodableLocalReferenceToString(*evaluationsReference),
+					base64.RawURLEncoding.EncodeToString(stackTraceKeys[i]),
+				); err == nil {
+					abbreviatedTypeNode = formatted.Link(evaluationURL, abbreviatedTypeNode)
+				}
+			}
+			logger.Error(formatted.Join(
+				formatted.Text("  "),
+				abbreviatedTypeNode,
+				formatted.Textf("%*s", longestType-len(abbreviatedType), ""),
+				formatted.Textf("  "),
+				formatted.Text(body),
+			))
+		}
+	}
+}
+
+func getAbbreviatedTypeURL(typeURL string) string {
+	typeURL = strings.TrimSuffix(typeURL, ".Key")
+	if dot := strings.LastIndexByte(typeURL, '.'); dot >= 0 {
+		return typeURL[dot+1:]
+	}
+	return typeURL
 }

@@ -4,31 +4,31 @@ import (
 	"os"
 
 	"github.com/buildbarn/bonanza/pkg/bazelclient/arguments"
+	"github.com/buildbarn/bonanza/pkg/bazelclient/formatted"
 
 	"golang.org/x/term"
 )
 
 type Logger interface {
-	Fatal(v ...any)
-	Fatalf(format string, v ...any)
-	Info(v ...any)
-	Infof(format string, v ...any)
+	Error(message formatted.Node)
+	Fatal(message formatted.Node)
+	Info(message formatted.Node)
 }
 
 func NewLoggerFromFlags(commonFlags *arguments.CommonFlags) Logger {
 	w := os.Stderr
-	var escapeSequences *EscapeSequences
+	var writeFormatted FormattedNodeWriter
 	switch commonFlags.Color {
 	case arguments.Color_Yes:
-		escapeSequences = &VT100EscapeSequences
+		writeFormatted = formatted.WriteVT100
 	case arguments.Color_No:
-		escapeSequences = &NoEscapeSequences
+		writeFormatted = formatted.WritePlainText
 	case arguments.Color_Auto:
 		if term.IsTerminal(int(w.Fd())) {
-			escapeSequences = &VT100EscapeSequences
+			writeFormatted = formatted.WriteVT100
 		} else {
-			escapeSequences = &NoEscapeSequences
+			writeFormatted = formatted.WritePlainText
 		}
 	}
-	return NewConsoleLogger(w, escapeSequences)
+	return NewConsoleLogger(w, writeFormatted)
 }

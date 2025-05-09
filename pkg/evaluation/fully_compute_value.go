@@ -64,25 +64,25 @@ func (ks *keyState[TReference, TMetadata]) getKeyType() string {
 
 func (ks *keyState[TReference, TMetadata]) getDependencyCycle(
 	cyclePath *[]*keyState[TReference, TMetadata],
-	seen map[*keyState[TReference, TMetadata]]int,
+	seen map[*keyState[TReference, TMetadata]]struct{},
 	missingDependencies map[*keyState[TReference, TMetadata]][]*keyState[TReference, TMetadata],
-) int {
+) bool {
 	pathLength := len(*cyclePath)
 	for _, ksDep := range missingDependencies[ks] {
 		*cyclePath = append(*cyclePath, ksDep)
-		if index, ok := seen[ksDep]; ok {
-			return index
+		if _, ok := seen[ksDep]; ok {
+			return true
 		}
-		seen[ksDep] = pathLength
+		seen[ksDep] = struct{}{}
 
-		if index := ksDep.getDependencyCycle(cyclePath, seen, missingDependencies); index >= 0 {
-			return index
+		if ksDep.getDependencyCycle(cyclePath, seen, missingDependencies) {
+			return true
 		}
 
 		*cyclePath = (*cyclePath)[:pathLength]
 		delete(seen, ksDep)
 	}
-	panic("failed to find cyclic dependency")
+	return false
 }
 
 type valueState[TReference object.BasicReference, TMetadata any] interface {
@@ -252,6 +252,7 @@ func FullyComputeValue[TReference object.BasicReference, TMetadata any](
 ) (
 	model_core.Message[proto.Message, TReference],
 	iter.Seq[Evaluation[TReference]],
+	[]model_core.Message[proto.Message, TReference],
 	error,
 ) {
 	keys := map[string]*keyState[TReference, TMetadata]{}
@@ -284,7 +285,7 @@ func FullyComputeValue[TReference object.BasicReference, TMetadata any](
 
 	requestedKeyStr, err := getKeyString(requestedKey)
 	if err != nil {
-		return model_core.Message[proto.Message, TReference]{}, resultsIterator, err
+		return model_core.Message[proto.Message, TReference]{}, resultsIterator, nil, err
 	}
 	requestedValueState := &messageValueState[TReference, TMetadata]{}
 	requestedKeyState := &keyState[TReference, TMetadata]{
@@ -304,8 +305,8 @@ func FullyComputeValue[TReference object.BasicReference, TMetadata any](
 		ks := p.firstPendingKey
 		if ks == nil {
 			stack := []*keyState[TReference, TMetadata]{requestedKeyState}
-			seen := map[*keyState[TReference, TMetadata]]int{
-				requestedKeyState: 0,
+			seen := map[*keyState[TReference, TMetadata]]struct{}{
+				requestedKeyState: {},
 			}
 			missingDependencies := map[*keyState[TReference, TMetadata]][]*keyState[TReference, TMetadata]{}
 			for _, ks := range keys {
@@ -313,30 +314,17 @@ func FullyComputeValue[TReference object.BasicReference, TMetadata any](
 					missingDependencies[ksBlocked] = append(missingDependencies[ksBlocked], ks)
 				}
 			}
-			cycleStart := requestedKeyState.getDependencyCycle(&stack, seen, missingDependencies)
+			requestedKeyState.getDependencyCycle(
+				&stack,
+				seen,
+				missingDependencies,
+			)
 
-			traceLongestKeyType := 0
-			for _, ksIter := range stack {
-				if l := len(ksIter.getKeyType()); traceLongestKeyType < l {
-					traceLongestKeyType = l
-				}
+			stackKeys := make([]model_core.Message[proto.Message, TReference], 0, len(stack))
+			for _, ks := range stack {
+				stackKeys = append(stackKeys, ks.key)
 			}
-
-			var cycleStr []byte
-			for index, ksIter := range stack {
-				if index == cycleStart || index == len(stack)-1 {
-					cycleStr = append(cycleStr, "\n→ "...)
-				} else {
-					cycleStr = append(cycleStr, "\n  "...)
-				}
-				keyType := ksIter.getKeyType()
-				cycleStr = append(cycleStr, keyType...)
-				for i := len(keyType); i < traceLongestKeyType+2; i++ {
-					cycleStr = append(cycleStr, ' ')
-				}
-				cycleStr = appendFormattedKey(cycleStr, ksIter.key)
-			}
-			return model_core.Message[proto.Message, TReference]{}, resultsIterator, fmt.Errorf("Traceback (most recent key last):%s\nCyclic evaluation dependency detected", string(cycleStr))
+			return model_core.Message[proto.Message, TReference]{}, resultsIterator, stackKeys, errors.New("cyclic evaluation dependency detected")
 		}
 
 		p.firstPendingKey = ks.next
@@ -368,26 +356,12 @@ func FullyComputeValue[TReference object.BasicReference, TMetadata any](
 				fmt.Printf("\n")
 				ks.dependencies = slices.Sorted(maps.Keys(e.dependencies))
 
-				var stack []*keyState[TReference, TMetadata]
-				traceLongestKeyType := 0
+				var stack []model_core.Message[proto.Message, TReference]
 				for ksIter := ks; ksIter != nil; ksIter = ksIter.parent {
-					stack = append(stack, ksIter)
-					if l := len(ksIter.getKeyType()); traceLongestKeyType < l {
-						traceLongestKeyType = l
-					}
+					stack = append(stack, ksIter.key)
 				}
-				var stackStr []byte
-				for i := len(stack) - 1; i >= 0; i-- {
-					ksIter := stack[i]
-					stackStr = append(stackStr, "\n  "...)
-					keyType := ksIter.getKeyType()
-					stackStr = append(stackStr, keyType...)
-					for i := len(keyType); i < traceLongestKeyType+2; i++ {
-						stackStr = append(stackStr, ' ')
-					}
-					stackStr = appendFormattedKey(stackStr, ksIter.key)
-				}
-				return model_core.Message[proto.Message, TReference]{}, resultsIterator, fmt.Errorf("Traceback (most recent key last):%s\n%w", string(stackStr), err)
+				slices.Reverse(stack)
+				return model_core.Message[proto.Message, TReference]{}, resultsIterator, stack, err
 			}
 			// Value could not be computed, because one of
 			// its dependencies hasn't been computed yet.
@@ -412,7 +386,7 @@ func FullyComputeValue[TReference object.BasicReference, TMetadata any](
 		}
 	}
 
-	return requestedValueState.value, resultsIterator, nil
+	return requestedValueState.value, resultsIterator, nil, nil
 }
 
 type ValueChildrenStorerForTesting ValueChildrenStorer[object.LocalReference]

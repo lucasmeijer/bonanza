@@ -121,7 +121,7 @@ message Action {
   // Reference of the build specification DAG.
   bonanza.model.core.WeakDecodableReference build_specification_reference = 4
       [(bonanza.model.core.object_format) = {
-        message_list_type_name:
+        message_type_name:
           "bonanza.model.build.BuildSpecification";
       }];
 
@@ -132,5 +132,25 @@ message Action {
 }
 
 message Result {
-  google.rpc.Status status = 1;
+  message Failure {
+    // If set, the failure occurred while executing the evaluation
+    // function. A stack trace of all keys leading up to the failure are
+    // provided. The last element corresponds to the key whose
+    // evaluation caused the failure.
+    repeated bytes stack_trace_keys = 1;
+
+    // Failure error message.
+    google.rpc.Status status = 2;
+  }
+
+  // Details of the build failure, if any failure occurred.
+  Failure failure = 1;
+
+  // If set, list of outcomes of the keys that were evaluated during
+  // this build.
+  bonanza.model.core.WeakDecodableReference evaluations_reference = 2
+      [(bonanza.model.core.object_format) = {
+        message_list_type_name:
+          "bonanza.model.evaluation.Evaluation";
+      }];
 }

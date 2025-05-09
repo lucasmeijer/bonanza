@@ -11,6 +11,7 @@ go_library(
         "//pkg/bazelclient/commands/info",
         "//pkg/bazelclient/commands/license",
         "//pkg/bazelclient/commands/version",
+        "//pkg/bazelclient/formatted",
         "//pkg/bazelclient/logging",
         "@com_github_buildbarn_bb_storage//pkg/filesystem",
         "@com_github_buildbarn_bb_storage//pkg/filesystem/path",

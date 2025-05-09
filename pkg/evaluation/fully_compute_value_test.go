@@ -57,7 +57,7 @@ func TestFullyComputeValue(t *testing.T) {
 			AnyTimes()
 		valueChildrenStorer := NewMockValueChildrenStorerForTesting(ctrl)
 
-		m, _, err := evaluation.FullyComputeValue(
+		m, _, _, err := evaluation.FullyComputeValue(
 			ctx,
 			computer,
 			model_core.NewSimpleTopLevelMessage[object.LocalReference, proto.Message](

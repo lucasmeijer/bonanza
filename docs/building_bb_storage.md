@@ -100,6 +100,15 @@ common:bonanza --builtins_module=builtins_bzl
 # on Linux, and the --repo_platform points to workers running macOS, the
 # build is expected to behave as if it is run on macOS.
 common:bonanza --repo_platform=//platforms:repo
+
+# Just like Buildbarn, Bonanza comes with a web service named
+# bonanza_browser that can be used to inspect objects in storage. By
+# setting this flag to the address of this service, bonanza_bazel is
+# capable of emitting clickable links in its terminal output.
+#
+# This option should only be enabled if your terminal supports "OSC 8"
+# style hyperlinks. https://github.com/Alhadis/OSC8-Adoption/
+common:bonanza --browser_url=http://localhost:9982/
 ```
 
 Noteworthy is the `--repo_platform` flag pointing to `//platforms:repo`.

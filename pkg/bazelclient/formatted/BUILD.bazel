@@ -1,0 +1,29 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "formatted",
+    srcs = [
+        "attr.go",
+        "join.go",
+        "link.go",
+        "node.go",
+        "text.go",
+        "write_plain_text.go",
+        "write_vt100.go",
+    ],
+    importpath = "github.com/buildbarn/bonanza/pkg/bazelclient/formatted",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "formatted_test",
+    srcs = [
+        "write_plain_text_test.go",
+        "write_vt100_test.go",
+    ],
+    deps = [
+        ":formatted",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)

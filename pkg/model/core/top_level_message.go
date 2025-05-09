@@ -1,9 +1,12 @@
 package core
 
 import (
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bonanza/pkg/encoding/varint"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -47,9 +50,9 @@ func (m TopLevelMessage[TMessage, TReference]) Decay() Message[TMessage, TRefere
 	return NewMessage(m.Message, m.OutgoingReferences)
 }
 
-// MarshalTopLevelMessage converts the contents of a top-level message
-// to a byte sequence. This byte sequence can be used to sort messages
-// along a total order, or to act as a map key.
+// MarshalTopLevelMessage converts the contents of a top-level Protobuf
+// message to a byte sequence. This byte sequence can be used to sort
+// messages along a total order, or to act as a map key.
 func MarshalTopLevelMessage[TMessage proto.Message, TReference object.BasicReference](m TopLevelMessage[TMessage, TReference]) ([]byte, error) {
 	degree := m.OutgoingReferences.GetDegree()
 	key := varint.AppendForward(nil, degree)
@@ -57,6 +60,47 @@ func MarshalTopLevelMessage[TMessage proto.Message, TReference object.BasicRefer
 		key = append(key, m.OutgoingReferences.GetOutgoingReference(i).GetRawReference()...)
 	}
 	return marshalOptions.MarshalAppend(key, m.Message)
+}
+
+// UnmarshalTopLevelMessage performs the inverse of
+// MarshalTopLevelMessage. It can be used to convert a byte sequence to
+// a top-level Protobuf message.
+func UnmarshalTopLevelMessage[
+	TMessage any,
+	TMessagePtr interface {
+		*TMessage
+		proto.Message
+	},
+](referenceFormat object.ReferenceFormat, data []byte) (TopLevelMessage[TMessagePtr, object.LocalReference], error) {
+	// Extract the leading number of outgoing references.
+	degree, n := varint.ConsumeForward[uint](data)
+	if n < 0 {
+		return TopLevelMessage[TMessagePtr, object.LocalReference]{}, status.Error(codes.InvalidArgument, "Failed to extract degree")
+	}
+	data = data[n:]
+
+	referenceSizeBytes := referenceFormat.GetReferenceSizeBytes()
+	if maximumDegree := uint(len(data) / referenceSizeBytes); degree > maximumDegree {
+		return TopLevelMessage[TMessagePtr, object.LocalReference]{}, status.Errorf(codes.InvalidArgument, "Message has degree %d, while %d bytes is sufficient to only fit %d outgoing references", degree, len(data), maximumDegree)
+	}
+
+	// Convert the outgoing references to their native representation.
+	// TODO: Any way we can converge with object.Contents? Ideally
+	// we'd keep these references in their byte slice.
+	outgoingReferences := make(object.OutgoingReferencesList[object.LocalReference], 0, degree)
+	for i := 0; i < int(degree); i++ {
+		localReference, err := referenceFormat.NewLocalReference(data[i*referenceSizeBytes:][:referenceSizeBytes])
+		if err != nil {
+			return TopLevelMessage[TMessagePtr, object.LocalReference]{}, util.StatusWrapf(err, "Invalid outgoing reference at index %d", i)
+		}
+		outgoingReferences = append(outgoingReferences, localReference)
+	}
+
+	var m TMessage
+	if err := proto.Unmarshal(data[int(degree)*referenceSizeBytes:], TMessagePtr(&m)); err != nil {
+		return TopLevelMessage[TMessagePtr, object.LocalReference]{}, err
+	}
+	return NewTopLevelMessage(TMessagePtr(&m), outgoingReferences), nil
 }
 
 // MessagesEqual returns true if two top-level messages contain the same

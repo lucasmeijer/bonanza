@@ -8,6 +8,7 @@ import (
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
 	"github.com/buildbarn/bonanza/pkg/bazelclient/arguments"
 	"github.com/buildbarn/bonanza/pkg/bazelclient/commands"
+	"github.com/buildbarn/bonanza/pkg/bazelclient/formatted"
 	"github.com/buildbarn/bonanza/pkg/bazelclient/logging"
 )
 
@@ -17,11 +18,11 @@ func DoInfo(args *arguments.InfoCommand, workspacePath path.Parser) {
 
 	workspacePathBuilder, scopeWalker := path.EmptyBuilder.Join(path.NewAbsoluteScopeWalker(path.VoidComponentWalker))
 	if err := path.Resolve(workspacePath, scopeWalker); err != nil {
-		logger.Fatal("Failed to obtain workspace path: ", err)
+		logger.Fatal(formatted.Textf("Failed to obtain workspace path: %s", err))
 	}
 	workspacePathStr, err := path.LocalFormat.GetString(workspacePathBuilder)
 	if err != nil {
-		logger.Fatal("Failed to obtain workspace path: ", err)
+		logger.Fatal(formatted.Textf("Failed to obtain workspace path: %s", err))
 	}
 
 	keys := map[string]string{
@@ -40,7 +41,7 @@ func DoInfo(args *arguments.InfoCommand, workspacePath path.Parser) {
 		key := args.Arguments[0]
 		value, ok := keys[key]
 		if !ok {
-			logger.Fatalf("Unknown key: %#v", key)
+			logger.Fatal(formatted.Textf("Unknown key: %#v", key))
 		}
 		fmt.Println(value)
 	default:
@@ -59,6 +60,6 @@ func DoInfo(args *arguments.InfoCommand, workspacePath path.Parser) {
 	}
 
 	if len(unknownKeysList) > 0 {
-		logger.Fatalf("Unknown key(s): %s", strings.Join(unknownKeysList, ", "))
+		logger.Fatal(formatted.Textf("Unknown key(s): %s", strings.Join(unknownKeysList, ", ")))
 	}
 }

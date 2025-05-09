@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"runtime"
@@ -283,14 +282,18 @@ func (e *builderExecutor) Execute(ctx context.Context, action *model_build_pb.Ac
 	namespace, err := object.NewNamespace(action.Namespace)
 	if err != nil {
 		return &model_build_pb.Result{
-			Status: status.Convert(util.StatusWrap(err, "Invalid namespace")).Proto(),
+			Failure: &model_build_pb.Result_Failure{
+				Status: status.Convert(util.StatusWrap(err, "Invalid namespace")).Proto(),
+			},
 		}, 0, remoteworker_pb.CurrentState_Completed_FAILED
 	}
 	instanceName := namespace.InstanceName
 	buildSpecificationReference, err := model_core.NewDecodableLocalReferenceFromWeakProto(namespace.ReferenceFormat, action.BuildSpecificationReference)
 	if err != nil {
 		return &model_build_pb.Result{
-			Status: status.Convert(util.StatusWrap(err, "Invalid build specification reference")).Proto(),
+			Failure: &model_build_pb.Result_Failure{
+				Status: status.Convert(util.StatusWrap(err, "Invalid build specification reference")).Proto(),
+			},
 		}, 0, remoteworker_pb.CurrentState_Completed_FAILED
 	}
 	buildSpecificationEncoder, err := encoding.NewBinaryEncoderFromProto(
@@ -299,12 +302,14 @@ func (e *builderExecutor) Execute(ctx context.Context, action *model_build_pb.Ac
 	)
 	if err != nil {
 		return &model_build_pb.Result{
-			Status: status.Convert(util.StatusWrap(err, "Invalid build specification encoder")).Proto(),
+			Failure: &model_build_pb.Result_Failure{
+				Status: status.Convert(util.StatusWrap(err, "Invalid build specification encoder")).Proto(),
+			},
 		}, 0, remoteworker_pb.CurrentState_Completed_FAILED
 	}
 
 	// Perform the build.
-	value, resultsIterator, errCompute := evaluation.FullyComputeValue(
+	value, resultsIterator, stackTraceKeys, errCompute := evaluation.FullyComputeValue(
 		ctx,
 		model_analysis.NewTypedComputer(model_analysis.NewBaseComputer[builderReference, builderReferenceMetadata](
 			model_parser.NewParsedObjectPoolIngester[builderReference](
@@ -410,7 +415,9 @@ func (e *builderExecutor) Execute(ctx context.Context, action *model_build_pb.Ac
 		)
 		if err != nil {
 			return &model_build_pb.Result{
-				Status: status.Convert(err).Proto(),
+				Failure: &model_build_pb.Result_Failure{
+					Status: status.Convert(err).Proto(),
+				},
 			}, 0, remoteworker_pb.CurrentState_Completed_FAILED
 		}
 		patcher := key.Patcher
@@ -427,7 +434,9 @@ func (e *builderExecutor) Execute(ctx context.Context, action *model_build_pb.Ac
 			)
 			if err != nil {
 				return &model_build_pb.Result{
-					Status: status.Convert(err).Proto(),
+					Failure: &model_build_pb.Result_Failure{
+						Status: status.Convert(err).Proto(),
+					},
 				}, 0, remoteworker_pb.CurrentState_Completed_FAILED
 			}
 			patcher.Merge(value.Patcher)
@@ -465,7 +474,9 @@ func (e *builderExecutor) Execute(ctx context.Context, action *model_build_pb.Ac
 			)
 			if err != nil {
 				return &model_build_pb.Result{
-					Status: status.Convert(err).Proto(),
+					Failure: &model_build_pb.Result_Failure{
+						Status: status.Convert(err).Proto(),
+					},
 				}, 0, remoteworker_pb.CurrentState_Completed_FAILED
 			}
 			if err := dependencyTreeBuilder.PushChild(
@@ -479,14 +490,18 @@ func (e *builderExecutor) Execute(ctx context.Context, action *model_build_pb.Ac
 				),
 			); err != nil {
 				return &model_build_pb.Result{
-					Status: status.Convert(err).Proto(),
+					Failure: &model_build_pb.Result_Failure{
+						Status: status.Convert(err).Proto(),
+					},
 				}, 0, remoteworker_pb.CurrentState_Completed_FAILED
 			}
 		}
 		dependencies, err := dependencyTreeBuilder.FinalizeList()
 		if err != nil {
 			return &model_build_pb.Result{
-				Status: status.Convert(err).Proto(),
+				Failure: &model_build_pb.Result_Failure{
+					Status: status.Convert(err).Proto(),
+				},
 			}, 0, remoteworker_pb.CurrentState_Completed_FAILED
 		}
 		patcher.Merge(dependencies.Patcher)
@@ -506,16 +521,21 @@ func (e *builderExecutor) Execute(ctx context.Context, action *model_build_pb.Ac
 			),
 		); err != nil {
 			return &model_build_pb.Result{
-				Status: status.Convert(err).Proto(),
+				Failure: &model_build_pb.Result_Failure{
+					Status: status.Convert(err).Proto(),
+				},
 			}, 0, remoteworker_pb.CurrentState_Completed_FAILED
 		}
 	}
 	evaluations, err := evaluationTreeBuilder.FinalizeList()
 	if err != nil {
 		return &model_build_pb.Result{
-			Status: status.Convert(err).Proto(),
+			Failure: &model_build_pb.Result_Failure{
+				Status: status.Convert(err).Proto(),
+			},
 		}, 0, remoteworker_pb.CurrentState_Completed_FAILED
 	}
+	var evaluationsReference *model_core_pb.WeakDecodableReference
 	if len(evaluations.Message) > 0 {
 		createdEvaluations, err := model_core.MarshalAndEncodePatchedListMessage(
 			evaluations,
@@ -524,7 +544,9 @@ func (e *builderExecutor) Execute(ctx context.Context, action *model_build_pb.Ac
 		)
 		if err != nil {
 			return &model_build_pb.Result{
-				Status: status.Convert(err).Proto(),
+				Failure: &model_build_pb.Result_Failure{
+					Status: status.Convert(err).Proto(),
+				},
 			}, 0, remoteworker_pb.CurrentState_Completed_FAILED
 		}
 		createdEvaluationsReference := createdEvaluations.Value.Contents.GetReference()
@@ -542,29 +564,55 @@ func (e *builderExecutor) Execute(ctx context.Context, action *model_build_pb.Ac
 			object.Unlimited,
 		); err != nil {
 			return &model_build_pb.Result{
-				Status: status.Convert(errCompute).Proto(),
+				Failure: &model_build_pb.Result_Failure{
+					Status: status.Convert(errCompute).Proto(),
+				},
 			}, 0, remoteworker_pb.CurrentState_Completed_FAILED
 		}
-
-		// TODO: This reference should be embedded in the
-		// response that is sent back to the client.
-		log.Print(
-			"Evaluations: ",
-			model_core.DecodableLocalReferenceToString(
-				model_core.CopyDecodable(
-					createdEvaluations,
-					createdEvaluationsReference,
-				),
+		evaluationsReference = model_core.DecodableLocalReferenceToWeakProto(
+			model_core.CopyDecodable(
+				createdEvaluations,
+				createdEvaluationsReference,
 			),
 		)
 	}
 
 	if errCompute != nil {
+		var marshaledStackTraceKeys [][]byte
+		for _, key := range stackTraceKeys {
+			topLevelKey, _ := model_core.Patch(model_core.NewDiscardingObjectCapturer[builderReference](), key).SortAndSetReferences()
+			keyAny, err := model_core.MarshalTopLevelAny(topLevelKey)
+			if err != nil {
+				return &model_build_pb.Result{
+					Failure: &model_build_pb.Result_Failure{
+						Status: status.Convert(err).Proto(),
+					},
+					EvaluationsReference: evaluationsReference,
+				}, 0, remoteworker_pb.CurrentState_Completed_FAILED
+			}
+			marshaledKey, err := model_core.MarshalTopLevelMessage(keyAny)
+			if err != nil {
+				return &model_build_pb.Result{
+					Failure: &model_build_pb.Result_Failure{
+						Status: status.Convert(err).Proto(),
+					},
+					EvaluationsReference: evaluationsReference,
+				}, 0, remoteworker_pb.CurrentState_Completed_FAILED
+			}
+			marshaledStackTraceKeys = append(marshaledStackTraceKeys, marshaledKey)
+		}
 		return &model_build_pb.Result{
-			Status: status.Convert(errCompute).Proto(),
+			Failure: &model_build_pb.Result_Failure{
+				StackTraceKeys: marshaledStackTraceKeys,
+				Status:         status.Convert(errCompute).Proto(),
+			},
+			EvaluationsReference: evaluationsReference,
 		}, 0, remoteworker_pb.CurrentState_Completed_FAILED
 	}
 	return &model_build_pb.Result{
-		Status: status.Newf(codes.Internal, "TODO: %s", value).Proto(),
+		Failure: &model_build_pb.Result_Failure{
+			Status: status.Newf(codes.Internal, "TODO: %s", value).Proto(),
+		},
+		EvaluationsReference: evaluationsReference,
 	}, 0, remoteworker_pb.CurrentState_Completed_FAILED
 }

@@ -70,6 +70,11 @@ var startupFlags = []flag{
 
 var commonFlags = []flag{
 	{
+		longName:    "browser_url",
+		description: "URL at which the Bonanza Browser service is hosted. This causes command line output to contain clickable links to the Bonanza Browser service.",
+		flagType:    stringFlagType{},
+	},
+	{
 		longName:    "build_request_id",
 		description: "Unique identifier, in UUID format, for the build being run.",
 		flagType:    stringFlagType{},

@@ -4,13 +4,13 @@ go_library(
     name = "logging",
     srcs = [
         "console_logger.go",
-        "escape_sequences.go",
         "logger.go",
     ],
     importpath = "github.com/buildbarn/bonanza/pkg/bazelclient/logging",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/bazelclient/arguments",
+        "//pkg/bazelclient/formatted",
         "@org_golang_x_term//:term",
     ],
 )
