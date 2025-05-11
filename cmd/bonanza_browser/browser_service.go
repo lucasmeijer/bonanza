@@ -1137,7 +1137,7 @@ func (d *messageJSONRenderer) renderField(fieldDescriptor protoreflect.FieldDesc
 						h.A(
 							h.Class("link link-accent whitespace-nowrap"),
 							h.Href(link),
-							g.Text(rawReference),
+							g.Textf("%#v", rawReference),
 						),
 					}
 				}
