@@ -1110,13 +1110,13 @@ func (d *messageJSONRenderer) renderField(fieldDescriptor protoreflect.FieldDesc
 	case protoreflect.GroupKind, protoreflect.MessageKind:
 		if r, ok := value.Message.Message().Interface().(*model_core_pb.DecodableReference); ok {
 			if reference, err := model_core.FlattenDecodableReference(model_core.Nested(value, r)); err == nil {
-				rawReference := model_core.DecodableLocalReferenceToString(reference)
 				if fieldOptions, ok := fieldDescriptor.Options().(*descriptorpb.FieldOptions); ok {
 					// Field is a valid reference for
 					// which we have type information in
 					// the field options. Emit a link to
 					// the object.
 					objectFormat := proto.GetExtension(fieldOptions, model_core_pb.E_ObjectFormat).(*model_core_pb.ObjectFormat)
+					rawReference := model_core.DecodableLocalReferenceToString(reference)
 					var link string
 					switch format := objectFormat.GetFormat().(type) {
 					case *model_core_pb.ObjectFormat_Raw:
@@ -1126,7 +1126,12 @@ func (d *messageJSONRenderer) renderField(fieldDescriptor protoreflect.FieldDesc
 					case *model_core_pb.ObjectFormat_MessageListTypeName:
 						link = path.Join(d.basePath, rawReference, "message_list", format.MessageListTypeName)
 					default:
-						return []g.Node{g.Text("Reference field with unknown object format")}
+						return []g.Node{
+							h.Span(
+								h.Class("text-red-600"),
+								g.Text("[ Reference field with unknown object format ]"),
+							),
+						}
 					}
 					return []g.Node{
 						h.A(
