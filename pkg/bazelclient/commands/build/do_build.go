@@ -5,6 +5,7 @@ import (
 	"crypto/ecdh"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -46,6 +47,9 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -557,12 +561,23 @@ func printStackTrace(namespace object.Namespace, stackTraceKeys [][]byte, logger
 		}
 
 		logger.Error(formatted.Text("Traceback (most recent key last):"))
+		var f messageJSONFormatter
+		if browserURL != "" {
+			if baseURL, err := url.JoinPath(
+				browserURL,
+				"object",
+				url.PathEscape(namespace.InstanceName.String()),
+				namespace.ReferenceFormat.ToProto().String(),
+			); err == nil {
+				f.baseURL = baseURL
+			}
+		}
 		for i, keyAny := range stackTraceKeyAnys {
-			var body string
-			if _, err := model_core.UnmarshalTopLevelAnyNew[object.LocalReference](keyAny); err == nil {
-				body = "{TODO}"
+			var body formatted.Node
+			if key, err := model_core.UnmarshalTopLevelAnyNew[object.LocalReference](keyAny); err == nil {
+				body = f.formatJSONMessage(model_core.Nested(key.Decay(), key.Message.ProtoReflect()))
 			} else {
-				body = fmt.Sprintf("Failed to unmarshal key: %w", err)
+				body = formatted.Bold(formatted.Text(fmt.Sprintf("Failed to unmarshal key: %s", err)))
 			}
 			abbreviatedType := getAbbreviatedTypeURL(keyAny.Message.TypeUrl)
 			abbreviatedTypeNode := formatted.Text(abbreviatedType)
@@ -583,7 +598,7 @@ func printStackTrace(namespace object.Namespace, stackTraceKeys [][]byte, logger
 				abbreviatedTypeNode,
 				formatted.Textf("%*s", longestType-len(abbreviatedType), ""),
 				formatted.Textf("  "),
-				formatted.Text(body),
+				body,
 			))
 		}
 	}
@@ -595,4 +610,139 @@ func getAbbreviatedTypeURL(typeURL string) string {
 		return typeURL[dot+1:]
 	}
 	return typeURL
+}
+
+type messageJSONFormatter struct {
+	baseURL string
+}
+
+func (f *messageJSONFormatter) formatJSONField(fieldDescriptor protoreflect.FieldDescriptor, value model_core.Message[protoreflect.Value, object.LocalReference]) formatted.Node {
+	var v any
+	switch fieldDescriptor.Kind() {
+	// Simple scalar types for which we can just call json.Marshal().
+	case protoreflect.BoolKind:
+		v = value.Message.Bool()
+	case protoreflect.Int32Kind, protoreflect.Int64Kind,
+		protoreflect.Sint32Kind, protoreflect.Sint64Kind,
+		protoreflect.Sfixed32Kind, protoreflect.Sfixed64Kind:
+		v = value.Message.Int()
+	case protoreflect.Uint32Kind, protoreflect.Uint64Kind,
+		protoreflect.Fixed32Kind, protoreflect.Fixed64Kind:
+		v = value.Message.Uint()
+	case protoreflect.FloatKind, protoreflect.DoubleKind:
+		v = value.Message.Float()
+	case protoreflect.StringKind:
+		v = value.Message.String()
+	case protoreflect.BytesKind:
+		v = value.Message.Bytes()
+
+	case protoreflect.GroupKind, protoreflect.MessageKind:
+		if r, ok := value.Message.Message().Interface().(*model_core_pb.DecodableReference); ok {
+			if reference, err := model_core.FlattenDecodableReference(model_core.Nested(value, r)); err == nil {
+				rawReference := model_core.DecodableLocalReferenceToString(reference)
+				formattedReference := formatted.Cyan(formatted.Textf("%#v", rawReference))
+				if f.baseURL != "" {
+					if fieldOptions, ok := fieldDescriptor.Options().(*descriptorpb.FieldOptions); ok {
+						// Field is a valid reference for
+						// which we have type information in
+						// the field options. Emit a link to
+						// the object.
+						objectFormat := proto.GetExtension(fieldOptions, model_core_pb.E_ObjectFormat).(*model_core_pb.ObjectFormat)
+						switch format := objectFormat.GetFormat().(type) {
+						case *model_core_pb.ObjectFormat_Raw:
+							if link, err := url.JoinPath(f.baseURL, rawReference, "raw"); err == nil {
+								return formatted.Link(link, formattedReference)
+							}
+						case *model_core_pb.ObjectFormat_MessageTypeName:
+							if link, err := url.JoinPath(f.baseURL, rawReference, "message", format.MessageTypeName); err == nil {
+								return formatted.Link(link, formattedReference)
+							}
+						case *model_core_pb.ObjectFormat_MessageListTypeName:
+							if link, err := url.JoinPath(f.baseURL, rawReference, "message_list", format.MessageListTypeName); err == nil {
+								return formatted.Link(link, formattedReference)
+							}
+						}
+					}
+				}
+				return formattedReference
+			}
+		}
+
+		// Recurse into message.
+		return f.formatJSONMessage(model_core.Nested(value, value.Message.Message()))
+
+	case protoreflect.EnumKind:
+		// Render an enum value as a string or integer,
+		// depending on whether it corresponds to a known value.
+		number := value.Message.Enum()
+		if enumValueDescriptor := fieldDescriptor.Enum().Values().ByNumber(number); enumValueDescriptor != nil {
+			v = string(enumValueDescriptor.Name())
+		} else {
+			v = number
+		}
+
+	default:
+		return formatted.Bold(formatted.Red(formatted.Text("[ Unknown field kind ]")))
+	}
+
+	return f.formatJSONValue(v)
+}
+
+func (f *messageJSONFormatter) formatJSONValue(v any) formatted.Node {
+	jsonValue, err := json.Marshal(v)
+	if err != nil {
+		return formatted.Bold(formatted.Red(formatted.Textf("[ %s ]", err)))
+	}
+	return formatted.Magenta(formatted.Text(string(jsonValue)))
+}
+
+func (f *messageJSONFormatter) formatJSONMessage(m model_core.Message[protoreflect.Message, object.LocalReference]) formatted.Node {
+	fields := map[string]formatted.Node{}
+	m.Message.Range(func(fieldDescriptor protoreflect.FieldDescriptor, value protoreflect.Value) bool {
+		var valueNode formatted.Node
+		if fieldDescriptor.IsList() {
+			// Repeated fields should be rendered as JSON lists.
+			list := value.List()
+			listLength := list.Len()
+			if listLength == 0 {
+				valueNode = formatted.Text("[]")
+			} else {
+				listParts := make([]formatted.Node, 0, 2*listLength+1)
+				separator := "["
+				for i := 0; i < listLength; i++ {
+					listParts = append(
+						listParts,
+						formatted.Text(separator),
+						f.formatJSONField(fieldDescriptor, model_core.Nested(m, list.Get(i))),
+					)
+					separator = ", "
+				}
+				valueNode = formatted.Join(append(listParts, formatted.Text("]"))...)
+			}
+		} else {
+			valueNode = f.formatJSONField(fieldDescriptor, model_core.Nested(m, value))
+		}
+		name := fieldDescriptor.JSONName()
+		fields[name] = valueNode
+		return true
+	})
+
+	// Sort fields by name and join them together in a single JSON object.
+	if len(fields) == 0 {
+		return formatted.Text("{}")
+	}
+
+	messageParts := make([]formatted.Node, 0, 4*len(fields)+1)
+	separator := "{"
+	for _, key := range slices.Sorted(maps.Keys(fields)) {
+		messageParts = append(
+			messageParts,
+			formatted.Text(separator),
+			formatted.Yellow(formatted.Textf("%#v", key)),
+			formatted.Text(": "),
+			fields[key],
+		)
+		separator = ", "
+	}
+	return formatted.Join(append(messageParts, formatted.Text("}"))...)
 }

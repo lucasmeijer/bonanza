@@ -36,6 +36,16 @@ type foregroundColor struct {
 	color int
 }
 
+// Red renders text with a red foreground color.
+func Red(base Node) Node {
+	return &foregroundColor{
+		attr: attr{
+			base: base,
+		},
+		color: 31,
+	}
+}
+
 // Green renders text with a green foreground color.
 func Green(base Node) Node {
 	return &foregroundColor{
@@ -46,13 +56,33 @@ func Green(base Node) Node {
 	}
 }
 
-// Red renders text with a red foreground color.
-func Red(base Node) Node {
+// Yellow renders text with a yellow foreground color.
+func Yellow(base Node) Node {
 	return &foregroundColor{
 		attr: attr{
 			base: base,
 		},
-		color: 31,
+		color: 33,
+	}
+}
+
+// Magenta renders text with a magenta foreground color.
+func Magenta(base Node) Node {
+	return &foregroundColor{
+		attr: attr{
+			base: base,
+		},
+		color: 35,
+	}
+}
+
+// Cyan renders text with a cyan foreground color.
+func Cyan(base Node) Node {
+	return &foregroundColor{
+		attr: attr{
+			base: base,
+		},
+		color: 36,
 	}
 }
 
