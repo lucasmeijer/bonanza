@@ -685,101 +685,104 @@ func renderObjectPage(
 		h.Div(
 			h.Class("flex w-full space-x-4 p-4"),
 
-			h.Div(
-				h.Class("flex flex-col w-1/3 space-y-4"),
+			h.Div(append(
+				[]g.Node{
+					h.Class("flex flex-col w-1/3 space-y-4"),
 
-				h.Div(
-					append(
-						[]g.Node{
-							h.Class("card bg-base-200 p-4 shadow"),
-							h.H1(
-								h.Class("card-title text-2xl mb-4"),
-								g.Text("Reference"),
-							),
-							h.Table(
-								h.Class("table"),
+					h.Div(
+						append(
+							[]g.Node{
+								h.Class("card bg-base-200 p-4 shadow"),
+								h.H1(
+									h.Class("card-title text-2xl mb-4"),
+									g.Text("Reference"),
+								),
+								h.Table(
+									h.Class("table"),
 
-								h.Tr(
-									h.Th(
-										h.Class("whitespace-nowrap"),
-										g.Text("Object:"),
+									h.Tr(
+										h.Th(
+											h.Class("whitespace-nowrap"),
+											g.Text("Object:"),
+										),
+										h.Td(
+											h.Class("break-all"),
+											h.Span(
+												h.Class("font-mono"),
+												g.Text(rawReference),
+											),
+										),
 									),
-									h.Td(
-										h.Class("break-all"),
-										h.Span(
-											h.Class("font-mono"),
-											g.Text(rawReference),
+									h.Tr(
+										h.Th(
+											h.Class("whitespace-nowrap"),
+											g.Text("Decoding parameters:"),
+										),
+										h.Td(
+											h.Class("break-all"),
+											h.Span(
+												h.Class("font-mono"),
+												g.Text(base64.RawURLEncoding.EncodeToString(decodableReference.GetDecodingParameters())),
+											),
+										),
+									),
+									h.Tr(
+										h.Th(
+											h.Class("whitespace-nowrap"),
+											g.Text("SHA-256 hash:"),
+										),
+										h.Td(
+											h.Class("break-all"),
+											h.Span(
+												h.Class("font-mono"),
+												g.Text(hex.EncodeToString(decodableReference.Value.GetHash())),
+											),
+										),
+									),
+									h.Tr(
+										h.Th(
+											h.Class("whitespace-nowrap"),
+											g.Text("Size:"),
+										),
+										h.Td(
+											g.Textf("%d byte(s)", decodableReference.Value.GetSizeBytes()),
+										),
+									),
+									h.Tr(
+										h.Th(
+											h.Class("whitespace-nowrap"),
+											g.Text("Height:"),
+										),
+										h.Td(
+											g.Textf("%d", decodableReference.Value.GetHeight()),
+										),
+									),
+									h.Tr(
+										h.Th(
+											h.Class("whitespace-nowrap"),
+											g.Text("Degree:"),
+										),
+										h.Td(
+											g.Textf("%d outgoing reference(s)", decodableReference.Value.GetDegree()),
+										),
+									),
+									h.Tr(
+										h.Th(
+											h.Class("whitespace-nowrap"),
+											g.Text("Maximum total parents size:"),
+										),
+										h.Td(
+											g.Textf("%d byte(s)", decodableReference.Value.GetMaximumTotalParentsSizeBytes(false)),
 										),
 									),
 								),
-								h.Tr(
-									h.Th(
-										h.Class("whitespace-nowrap"),
-										g.Text("Decoding parameters:"),
-									),
-									h.Td(
-										h.Class("break-all"),
-										h.Span(
-											h.Class("font-mono"),
-											g.Text(base64.RawURLEncoding.EncodeToString(decodableReference.GetDecodingParameters())),
-										),
-									),
-								),
-								h.Tr(
-									h.Th(
-										h.Class("whitespace-nowrap"),
-										g.Text("SHA-256 hash:"),
-									),
-									h.Td(
-										h.Class("break-all"),
-										h.Span(
-											h.Class("font-mono"),
-											g.Text(hex.EncodeToString(decodableReference.Value.GetHash())),
-										),
-									),
-								),
-								h.Tr(
-									h.Th(
-										h.Class("whitespace-nowrap"),
-										g.Text("Size:"),
-									),
-									h.Td(
-										g.Textf("%d byte(s)", decodableReference.Value.GetSizeBytes()),
-									),
-								),
-								h.Tr(
-									h.Th(
-										h.Class("whitespace-nowrap"),
-										g.Text("Height:"),
-									),
-									h.Td(
-										g.Textf("%d", decodableReference.Value.GetHeight()),
-									),
-								),
-								h.Tr(
-									h.Th(
-										h.Class("whitespace-nowrap"),
-										g.Text("Degree:"),
-									),
-									h.Td(
-										g.Textf("%d outgoing reference(s)", decodableReference.Value.GetDegree()),
-									),
-								),
-								h.Tr(
-									h.Th(
-										h.Class("whitespace-nowrap"),
-										g.Text("Maximum total parents size:"),
-									),
-									h.Td(
-										g.Textf("%d byte(s)", decodableReference.Value.GetMaximumTotalParentsSizeBytes(false)),
-									),
-								),
-							),
-						},
-						renderEncoderSelector(recentlyObservedEncoders, currentEncoderConfiguration)...,
-					)...,
-				),
-			),
+							},
+						)...,
+					),
+				},
+
+				renderEncoderSelector(recentlyObservedEncoders, currentEncoderConfiguration)...,
+			)...),
 
 			h.Div(
 				h.Class("card bg-base-200 message-contents w-2/3 p-4 shadow"),
