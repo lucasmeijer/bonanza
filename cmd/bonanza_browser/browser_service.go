@@ -205,7 +205,6 @@ func trimRecentlyObservedEncoders(in []*browser_pb.RecentlyObservedEncoder) []*b
 }
 
 func getCookie(r *http.Request) *browser_pb.Cookie {
-	// TODO: Decrypt!
 	cookie, err := r.Cookie("bonanza_browser")
 	if err != nil {
 		return &browser_pb.Cookie{}
@@ -219,6 +218,22 @@ func getCookie(r *http.Request) *browser_pb.Cookie {
 		return &browser_pb.Cookie{}
 	}
 	return &cookieMessage
+}
+
+func setCookie(w http.ResponseWriter, recentlyObservedEncoders []*browser_pb.RecentlyObservedEncoder) {
+	if cookie, err := proto.Marshal(
+		&browser_pb.Cookie{
+			RecentlyObservedEncoders: recentlyObservedEncoders,
+		},
+	); err == nil {
+		http.SetCookie(w, &http.Cookie{
+			Name:     "bonanza_browser",
+			Value:    base64.RawURLEncoding.EncodeToString(cookie),
+			Path:     "/",
+			HttpOnly: true,
+			SameSite: http.SameSiteStrictMode,
+		})
+	}
 }
 
 func getEncoderFromForm(r *http.Request) ([]*browser_pb.RecentlyObservedEncoder, string, error) {
@@ -647,6 +662,7 @@ func (s *BrowserService) doEvaluation(w http.ResponseWriter, r *http.Request) (g
 // renderObjectPage renders a HTML page for displaying the contents of
 // an object.
 func renderObjectPage(
+	w http.ResponseWriter,
 	decodableReference model_core.Decodable[object.GlobalReference],
 	payloadRenderers []payloadRenderer,
 	currentPayloadRendererIndex int,
@@ -654,6 +670,8 @@ func renderObjectPage(
 	recentlyObservedEncoders []*browser_pb.RecentlyObservedEncoder,
 	payload []g.Node,
 ) g.Node {
+	setCookie(w, recentlyObservedEncoders)
+
 	formatTabs := make([][]g.Node, 0, len(payloadRenderers))
 	for _, payloadRenderer := range payloadRenderers {
 		formatTabs = append(formatTabs, []g.Node{
@@ -812,6 +830,7 @@ func (s *BrowserService) doObject(
 	recentlyObservedEncoders, currentEncoderConfigurationStr, err := getEncodersFromRequest(r)
 	if err != nil {
 		return renderObjectPage(
+			w,
 			objectReference,
 			payloadRenderers,
 			currentPayloadRendererIndex,
@@ -825,6 +844,7 @@ func (s *BrowserService) doObject(
 	o, err := s.objectDownloader.DownloadObject(r.Context(), objectReference.Value)
 	if err != nil {
 		return renderObjectPage(
+			w,
 			objectReference,
 			payloadRenderers,
 			currentPayloadRendererIndex,
@@ -849,21 +869,9 @@ func (s *BrowserService) doObject(
 			recentlyObservedEncoders[1:]...,
 		),
 	)
-	if cookie, err := proto.Marshal(
-		&browser_pb.Cookie{
-			RecentlyObservedEncoders: newRecentlyObservedEncoders,
-		},
-	); err == nil {
-		http.SetCookie(w, &http.Cookie{
-			Name:     "bonanza_browser",
-			Value:    base64.RawURLEncoding.EncodeToString(cookie),
-			Path:     "/",
-			HttpOnly: true,
-			SameSite: http.SameSiteStrictMode,
-		})
-	}
 
 	return renderObjectPage(
+		w,
 		objectReference,
 		payloadRenderers,
 		currentPayloadRendererIndex,
