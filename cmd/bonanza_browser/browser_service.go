@@ -43,6 +43,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/descriptorpb"
+	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -428,6 +429,16 @@ func (s *BrowserService) doEvaluation(w http.ResponseWriter, r *http.Request) (g
 	if err != nil {
 		return nil, err
 	}
+	referenceFormat := evaluationListReference.Value.GetReferenceFormat()
+
+	keyBytes, err := base64.RawURLEncoding.DecodeString(r.PathValue("key"))
+	if err != nil {
+		return nil, err
+	}
+	keyAny, err := model_core.UnmarshalTopLevelMessage[anypb.Any](referenceFormat, keyBytes)
+	if err != nil {
+		return nil, err
+	}
 
 	recentlyObservedEncoders, currentEncoderConfigurationStr, err := getEncodersFromRequest(r)
 	if err != nil {
@@ -435,7 +446,6 @@ func (s *BrowserService) doEvaluation(w http.ResponseWriter, r *http.Request) (g
 		return nil, err
 	}
 
-	referenceFormat := evaluationListReference.Value.GetReferenceFormat()
 	binaryEncoder, err := model_encoding.NewBinaryEncoderFromProto(
 		recentlyObservedEncoders[0].Configuration,
 		uint32(referenceFormat.GetMaximumObjectSizeBytes()),
@@ -469,10 +479,6 @@ func (s *BrowserService) doEvaluation(w http.ResponseWriter, r *http.Request) (g
 		return nil, err
 	}
 
-	key, err := base64.RawURLEncoding.DecodeString(r.PathValue("key"))
-	if err != nil {
-		return nil, err
-	}
 	evaluation, err := btree.Find(
 		ctx,
 		evaluationListReader,
@@ -488,9 +494,9 @@ func (s *BrowserService) doEvaluation(w http.ResponseWriter, r *http.Request) (g
 				if err != nil {
 					return -1, nil
 				}
-				return bytes.Compare(key, marshaledKey), nil
+				return bytes.Compare(keyBytes, marshaledKey), nil
 			case *model_evaluation_pb.Evaluation_Parent_:
-				return bytes.Compare(key, level.Parent.FirstKey), level.Parent.Reference
+				return bytes.Compare(keyBytes, level.Parent.FirstKey), level.Parent.Reference
 			default:
 				return 0, nil
 			}
@@ -534,7 +540,7 @@ func (s *BrowserService) doEvaluation(w http.ResponseWriter, r *http.Request) (g
 				[]g.Node{
 					h.Class("card my-2 p-4 bg-neutral text-neutral-content font-mono h-auto! overflow-x-auto"),
 				},
-				jsonRenderer.renderMessage(model_core.Nested(evaluation, evaluationLeaf.Leaf.Key.ProtoReflect()))...,
+				jsonRenderer.renderMessage(model_core.Nested(keyAny.Decay(), keyAny.Message.ProtoReflect()))...,
 			)...,
 		),
 
