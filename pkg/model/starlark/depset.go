@@ -56,9 +56,8 @@ func deduplicateAndAddTransitive[TReference object.BasicReference, TMetadata mod
 		case model_core.Message[*model_starlark_pb.List_Element, TReference]:
 			switch level := v.Message.Level.(type) {
 			case *model_starlark_pb.List_Element_Leaf:
-				// Encoded child.
-				// TODO: Do we want to deduplicate these
-				// as well?
+				// Encoded child. These get deduplicated
+				// during encoding.
 				*children = append(*children, v)
 			case *model_starlark_pb.List_Element_Parent_:
 				// Multiple encoded children. Deduplicate
@@ -195,10 +194,37 @@ func (d *Depset[TReference, TMetadata]) CompareSameType(thread *starlark.Thread,
 }
 
 type depsetChildrenEncoder[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata] struct {
-	path        map[starlark.Value]struct{}
-	options     *ValueEncodingOptions[TReference, TMetadata]
-	treeBuilder btree.Builder[*model_starlark_pb.List_Element, TMetadata]
-	needsCode   bool
+	path         map[starlark.Value]struct{}
+	options      *ValueEncodingOptions[TReference, TMetadata]
+	treeBuilder  btree.Builder[*model_starlark_pb.List_Element, TMetadata]
+	needsCode    bool
+	elementsSeen map[string]struct{}
+	depsetsSeen  map[*any]struct{}
+}
+
+// pushUniqueElement adds an element to the resulting depset, if and
+// only if the element hasn't been seen before during the current
+// encoding pass.
+//
+// Note that this does not guarantee that the depset as a whole does not
+// contain any duplication, because other depsets may be referenced that
+// haven't been accessed explicitly. Such redundancy is only eliminated
+// when depset.to_list() is called.
+func (e *depsetChildrenEncoder[TReference, TMetadata]) pushUniqueElement(element model_core.PatchedMessage[*model_starlark_pb.List_Element, TMetadata]) error {
+	topLevelElement, _ := element.SortAndSetReferences()
+	marshaledElement, err := model_core.MarshalTopLevelMessage(topLevelElement)
+	if err != nil {
+		return err
+	}
+
+	key := string(marshaledElement)
+	if _, ok := e.elementsSeen[key]; !ok {
+		e.elementsSeen[key] = struct{}{}
+		if err := e.treeBuilder.PushChild(element); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (e *depsetChildrenEncoder[TReference, TMetadata]) encode(children any) error {
@@ -210,8 +236,7 @@ func (e *depsetChildrenEncoder[TReference, TMetadata]) encode(children any) erro
 			return err
 		}
 		e.needsCode = e.needsCode || valueNeedsCode
-		// TODO: Should we also deduplicate elements at this point?
-		if err := e.treeBuilder.PushChild(
+		if err := e.pushUniqueElement(
 			model_core.NewPatchedMessage(
 				&model_starlark_pb.List_Element{
 					Level: &model_starlark_pb.List_Element_Leaf{
@@ -224,16 +249,19 @@ func (e *depsetChildrenEncoder[TReference, TMetadata]) encode(children any) erro
 			return err
 		}
 	case model_core.Message[*model_starlark_pb.List_Element, TReference]:
-		if err := e.treeBuilder.PushChild(
+		if err := e.pushUniqueElement(
 			model_core.Patch(e.options.ObjectCapturer, v),
 		); err != nil {
 			return err
 		}
 	case []any:
-		for _, child := range v {
-			if err := e.encode(child); err != nil {
-				return err
+		if _, ok := e.depsetsSeen[&v[0]]; !ok {
+			for _, child := range v {
+				if err := e.encode(child); err != nil {
+					return err
+				}
 			}
+			e.depsetsSeen[&v[0]] = struct{}{}
 		}
 	default:
 		panic("unexpected element type")
@@ -247,9 +275,11 @@ func (e *depsetChildrenEncoder[TReference, TMetadata]) encode(children any) erro
 // retained, and the "order" field of the depset is of no importance.
 func (d *Depset[TReference, TMetadata]) EncodeList(path map[starlark.Value]struct{}, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[[]*model_starlark_pb.List_Element, TMetadata], bool, error) {
 	e := depsetChildrenEncoder[TReference, TMetadata]{
-		path:        path,
-		options:     options,
-		treeBuilder: NewListBuilder(options),
+		path:         path,
+		options:      options,
+		treeBuilder:  NewListBuilder(options),
+		elementsSeen: map[string]struct{}{},
+		depsetsSeen:  map[*any]struct{}{},
 	}
 	if err := e.encode(d.children); err != nil {
 		return model_core.PatchedMessage[[]*model_starlark_pb.List_Element, TMetadata]{}, false, err
