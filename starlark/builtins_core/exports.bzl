@@ -763,13 +763,14 @@ def builtins_internal_cc_common_configure_features(
         elif cpp_configuration.cs_fdo_instrument:
             all_features += ["cs_fdo_instrument"]
 
-    branch_fdo_provider = cc_toolchain._fdo_context.branch_fdo_profile
+    branch_fdo_provider = getattr(cc_toolchain._fdo_context, "branch_fdo_profile", None)
 
+    propeller_optimize_info = getattr(cc_toolchain._fdo_context, "propeller_optimize_info", None)
     enable_propeller_optimize = (
-        cc_toolchain._fdo_context.propeller_optimize_info and
+        propeller_optimize_info and
         (
-            cc_toolchain._fdo_context.propeller_optimize_info.cc_artifact or
-            cc_toolchain._fdo_context.propeller_optimize_info.ld_artifact
+            propeller_optimize_info.cc_artifact or
+            propeller_optimize_info.ld_artifact
         )
     )
 
