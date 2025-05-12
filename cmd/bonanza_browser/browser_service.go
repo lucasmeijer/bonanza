@@ -623,7 +623,9 @@ func (s *BrowserService) doEvaluation(w http.ResponseWriter, r *http.Request) (g
 		),
 		now: time.Now(),
 	}
-	keyJSONNodes := jsonRenderer.renderMessage(model_core.Nested(keyAny.Decay(), keyAny.Message.ProtoReflect()))
+	keyJSONNodes := jsonRenderer.renderTopLevelMessage(
+		model_core.NewTopLevelMessage(keyAny.Message.ProtoReflect(), keyAny.OutgoingReferences),
+	)
 
 	recentlyObservedEncoders, currentEncoderConfigurationStr, err := getEncodersFromRequest(r)
 	if err != nil {
@@ -1283,14 +1285,10 @@ func renderJSONValue(v any) []g.Node {
 
 var binaryEncoderDescriptor = (&model_encoding_pb.BinaryEncoder{}).ProtoReflect().Descriptor()
 
-func (d *messageJSONRenderer) renderMessage(m model_core.Message[protoreflect.Message, object.LocalReference]) []g.Node {
-	// If the provided message is a model_core_pb.Any, render it
-	// similar to how protojson renders an anypb.Any. Namely, render
-	// the payload message with an added "@type" field containing
-	// the type URL.
-	fields := map[string][]g.Node{}
-	if anyMessage, ok := m.Message.Interface().(*model_core_pb.Any); ok {
-		anyValue, err := model_core.UnmarshalAnyNew(model_core.Nested(m, anyMessage))
+func (d *messageJSONRenderer) renderTopLevelMessage(m model_core.TopLevelMessage[protoreflect.Message, object.LocalReference]) []g.Node {
+	switch message := m.Message.Interface().(type) {
+	case *anypb.Any:
+		anyValue, err := model_core.UnmarshalTopLevelAnyNew(model_core.NewTopLevelMessage(message, m.OutgoingReferences))
 		if err != nil {
 			return []g.Node{
 				h.Span(
@@ -1299,10 +1297,65 @@ func (d *messageJSONRenderer) renderMessage(m model_core.Message[protoreflect.Me
 				),
 			}
 		}
-		m = model_core.Nested(anyValue.Decay(), anyValue.Message.ProtoReflect())
-		fields["@type"] = renderJSONValue(anyMessage.Value.TypeUrl)
+		return d.renderMessageCommon(
+			model_core.Nested(anyValue.Decay(), anyValue.Message.ProtoReflect()),
+			map[string][]g.Node{
+				"@type": renderJSONValue(message.TypeUrl),
+			},
+		)
+	case *model_core_pb.Any:
+		// If the provided message is a model_core_pb.Any,
+		// render it similar to how protojson renders an
+		// anypb.Any. Namely, render the payload message with an
+		// added "@type" field containing the type URL.
+		anyValue, err := model_core.UnmarshalAnyNew(model_core.Nested(m.Decay(), message))
+		if err != nil {
+			return []g.Node{
+				h.Span(
+					h.Class("text-red-600"),
+					g.Textf("[ %s ]", err),
+				),
+			}
+		}
+		return d.renderMessageCommon(
+			model_core.Nested(anyValue.Decay(), anyValue.Message.ProtoReflect()),
+			map[string][]g.Node{
+				"@type": renderJSONValue(message.Value.TypeUrl),
+			},
+		)
+	default:
+		return d.renderMessageCommon(m.Decay(), map[string][]g.Node{})
 	}
+}
 
+func (d *messageJSONRenderer) renderMessage(m model_core.Message[protoreflect.Message, object.LocalReference]) []g.Node {
+	switch message := m.Message.Interface().(type) {
+	case *model_core_pb.Any:
+		// If the provided message is a model_core_pb.Any,
+		// render it similar to how protojson renders an
+		// anypb.Any. Namely, render the payload message with an
+		// added "@type" field containing the type URL.
+		anyValue, err := model_core.UnmarshalAnyNew(model_core.Nested(m, message))
+		if err != nil {
+			return []g.Node{
+				h.Span(
+					h.Class("text-red-600"),
+					g.Textf("[ %s ]", err),
+				),
+			}
+		}
+		return d.renderMessageCommon(
+			model_core.Nested(anyValue.Decay(), anyValue.Message.ProtoReflect()),
+			map[string][]g.Node{
+				"@type": renderJSONValue(message.Value.TypeUrl),
+			},
+		)
+	default:
+		return d.renderMessageCommon(m, map[string][]g.Node{})
+	}
+}
+
+func (d *messageJSONRenderer) renderMessageCommon(m model_core.Message[protoreflect.Message, object.LocalReference], fields map[string][]g.Node) []g.Node {
 	// Iterate over all message fields and render their values.
 	m.Message.Range(func(fieldDescriptor protoreflect.FieldDescriptor, value protoreflect.Value) bool {
 		var valueNodes []g.Node
@@ -1439,7 +1492,7 @@ func (messageJSONPayloadRenderer) render(r *http.Request, o model_core.Decodable
 		basePath: "../..",
 		now:      time.Now(),
 	}
-	rendered := d.renderMessage(model_core.NewMessage(message, o.Value))
+	rendered := d.renderTopLevelMessage(model_core.NewTopLevelMessage(message, o.Value))
 	return rendered, d.observedEncoders
 }
 
