@@ -45,6 +45,27 @@ type getExpectedTransitionOutputEnvironment[TReference any] interface {
 	GetVisibleTargetValue(model_core.PatchedMessage[*model_analysis_pb.VisibleTarget_Key, dag.ObjectContentsWalker]) model_core.Message[*model_analysis_pb.VisibleTarget_Value, TReference]
 }
 
+// stringToStarlarkLabelOrNone converts a string containing a resolved
+// label value to a Protobuf message of a Starlark Label object. If the
+// string is empty, it is converted to None.
+//
+// This function can, for example, be used to convert a label setting's
+// build_setting_default to a Starlark value.
+func stringToStarlarkLabelOrNone(v string) *model_starlark_pb.Value {
+	if v == "" {
+		return &model_starlark_pb.Value{
+			Kind: &model_starlark_pb.Value_None{
+				None: &emptypb.Empty{},
+			},
+		}
+	}
+	return &model_starlark_pb.Value{
+		Kind: &model_starlark_pb.Value_Label{
+			Label: v,
+		},
+	}
+}
+
 func getExpectedTransitionOutput[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](e getExpectedTransitionOutputEnvironment[TReference], transitionPackage label.CanonicalPackage, output string) (expectedTransitionOutput[TReference], error) {
 	// Resolve the actual build setting target corresponding
 	// to the string value provided as part of the
@@ -103,11 +124,7 @@ func getExpectedTransitionOutput[TReference object.BasicReference, TMetadata mod
 			canonicalizer = unpack.IfNotNone(labelSettingUnpackerInto)
 		}
 		defaultValue = model_core.NewSimpleMessage[TReference](
-			&model_starlark_pb.Value{
-				Kind: &model_starlark_pb.Value_Label{
-					Label: targetKind.LabelSetting.BuildSettingDefault,
-				},
-			},
+			stringToStarlarkLabelOrNone(targetKind.LabelSetting.BuildSettingDefault),
 		)
 	case *model_starlark_pb.Target_Definition_RuleTarget:
 		// Build setting is written in Starlark.
@@ -383,20 +400,7 @@ func (c *baseComputer[TReference, TMetadata]) getBuildSettingValue(ctx context.C
 	case *model_starlark_pb.Target_Definition_LabelSetting:
 		// Build setting is a label_setting() or
 		// label_flag().
-		var buildSettingDefault *model_starlark_pb.Value
-		if targetKind.LabelSetting.BuildSettingDefault == "" {
-			buildSettingDefault = &model_starlark_pb.Value{
-				Kind: &model_starlark_pb.Value_None{
-					None: &emptypb.Empty{},
-				},
-			}
-		} else {
-			buildSettingDefault = &model_starlark_pb.Value{
-				Kind: &model_starlark_pb.Value_Label{
-					Label: targetKind.LabelSetting.BuildSettingDefault,
-				},
-			}
-		}
+		buildSettingDefault := stringToStarlarkLabelOrNone(targetKind.LabelSetting.BuildSettingDefault)
 		if targetKind.LabelSetting.SingletonList {
 			buildSettingDefault = &model_starlark_pb.Value{
 				Kind: &model_starlark_pb.Value_List{
