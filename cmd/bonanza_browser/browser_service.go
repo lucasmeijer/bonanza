@@ -324,6 +324,102 @@ func renderTabsLiftWithNeutralContent(tabs [][]g.Node, selectedTabIndex int, con
 	return h.Div(nodes...)
 }
 
+// renderReferenceCard renders a card containing all of the properties
+// of an object reference. This card is shown on the top left of both
+// the evaluation and object pages.
+func renderReferenceCard(title string, decodableReference model_core.Decodable[object.GlobalReference]) g.Node {
+	return h.Div(
+		append(
+			[]g.Node{
+				h.Class("card bg-base-200 p-4 shadow"),
+				h.H1(
+					h.Class("card-title text-2xl mb-4"),
+					g.Text(title),
+				),
+				h.Table(
+					h.Class("table"),
+
+					h.Tr(
+						h.Th(
+							h.Class("whitespace-nowrap"),
+							g.Text("Object:"),
+						),
+						h.Td(
+							h.Class("break-all"),
+							h.Span(
+								h.Class("font-mono"),
+								g.Text(base64.RawURLEncoding.EncodeToString(decodableReference.Value.GetRawReference())),
+							),
+						),
+					),
+					h.Tr(
+						h.Th(
+							h.Class("whitespace-nowrap"),
+							g.Text("Decoding parameters:"),
+						),
+						h.Td(
+							h.Class("break-all"),
+							h.Span(
+								h.Class("font-mono"),
+								g.Text(base64.RawURLEncoding.EncodeToString(decodableReference.GetDecodingParameters())),
+							),
+						),
+					),
+					h.Tr(
+						h.Th(
+							h.Class("whitespace-nowrap"),
+							g.Text("SHA-256 hash:"),
+						),
+						h.Td(
+							h.Class("break-all"),
+							h.Span(
+								h.Class("font-mono"),
+								g.Text(hex.EncodeToString(decodableReference.Value.GetHash())),
+							),
+						),
+					),
+					h.Tr(
+						h.Th(
+							h.Class("whitespace-nowrap"),
+							g.Text("Size:"),
+						),
+						h.Td(
+							g.Textf("%d byte(s)", decodableReference.Value.GetSizeBytes()),
+						),
+					),
+					h.Tr(
+						h.Th(
+							h.Class("whitespace-nowrap"),
+							g.Text("Height:"),
+						),
+						h.Td(
+							g.Textf("%d", decodableReference.Value.GetHeight()),
+						),
+					),
+					h.Tr(
+						h.Th(
+							h.Class("whitespace-nowrap"),
+							g.Text("Degree:"),
+						),
+						h.Td(
+							g.Textf("%d outgoing reference(s)", decodableReference.Value.GetDegree()),
+						),
+					),
+					h.Tr(
+						h.Th(
+							h.Class("whitespace-nowrap"),
+							g.Text("Maximum total parents size:"),
+						),
+						h.Td(
+							g.Textf("%d byte(s)", decodableReference.Value.GetMaximumTotalParentsSizeBytes(false)),
+						),
+					),
+				),
+			},
+		)...,
+	)
+}
+
 func renderEncoderSelector(recentlyObservedEncoders []*browser_pb.RecentlyObservedEncoder, currentEncoderConfiguration string) []g.Node {
 	recentlyObservedEncodersNodes := []g.Node{
 		h.Class("card bg-base-200 w-full p-4 shadow"),
@@ -439,6 +535,70 @@ func renderEncoderSelector(recentlyObservedEncoders []*browser_pb.RecentlyObserv
 	}
 }
 
+// renderEvaluationPage renders a HTML page for displaying the contents
+// of an evaluation of a key stored in an evaluation list.
+func renderEvaluationPage(
+	w http.ResponseWriter,
+	evaluationListReference model_core.Decodable[object.GlobalReference],
+	keyJSONNodes []g.Node,
+	valueNodes []g.Node,
+	dependenciesNodes []g.Node,
+	currentEncoderConfiguration string,
+	recentlyObservedEncoders []*browser_pb.RecentlyObservedEncoder,
+) g.Node {
+	setCookie(w, recentlyObservedEncoders)
+
+	evaluationCard := []g.Node{
+		h.Class("card bg-base-200 message-contents w-2/3 p-4 shadow"),
+		h.H1(
+			h.Class("card-title text-2xl mb-4"),
+			g.Text("Evaluation"),
+		),
+
+		h.H2(
+			h.Class("text-xl my-2"),
+			g.Text("Key"),
+		),
+		h.Div(append(
+			[]g.Node{
+				h.Class("card my-2 p-4 bg-neutral text-neutral-content font-mono h-auto! overflow-x-auto"),
+			},
+			keyJSONNodes...,
+		)...),
+
+		h.H2(
+			h.Class("text-xl my-2"),
+			g.Text("Value"),
+		),
+	}
+	evaluationCard = append(evaluationCard, valueNodes...)
+
+	evaluationCard = append(
+		evaluationCard,
+		h.H2(
+			h.Class("text-xl my-2"),
+			g.Text("Dependencies"),
+		),
+	)
+	evaluationCard = append(evaluationCard, dependenciesNodes...)
+
+	return renderPage("TODO: Pick title", []g.Node{
+		h.Div(
+			h.Class("flex w-full space-x-4 p-4"),
+
+			h.Div(append(
+				[]g.Node{
+					h.Class("flex flex-col w-1/3 space-y-4"),
+					renderReferenceCard("Evaluation list reference", evaluationListReference),
+				},
+				renderEncoderSelector(recentlyObservedEncoders, currentEncoderConfiguration)...,
+			)...),
+
+			h.Div(evaluationCard...),
+		),
+	})
+}
+
 func (s *BrowserService) doEvaluation(w http.ResponseWriter, r *http.Request) (g.Node, error) {
 	evaluationListReference, err := getReferenceFromRequest(r)
 	if err != nil {
@@ -455,10 +615,28 @@ func (s *BrowserService) doEvaluation(w http.ResponseWriter, r *http.Request) (g
 		return nil, err
 	}
 
+	jsonRenderer := messageJSONRenderer{
+		basePath: path.Join(
+			"../../../../object",
+			url.PathEscape(evaluationListReference.Value.InstanceName.String()),
+			referenceFormat.ToProto().String(),
+		),
+		now: time.Now(),
+	}
+	keyJSONNodes := jsonRenderer.renderMessage(model_core.Nested(keyAny.Decay(), keyAny.Message.ProtoReflect()))
+
 	recentlyObservedEncoders, currentEncoderConfigurationStr, err := getEncodersFromRequest(r)
 	if err != nil {
-		// TODO: Render page!
-		return nil, err
+		errNodes := renderErrorAlert(fmt.Errorf("failed to obtain encoder configuration: %w", err))
+		return renderEvaluationPage(
+			w,
+			evaluationListReference,
+			keyJSONNodes,
+			errNodes,
+			errNodes,
+			currentEncoderConfigurationStr,
+			recentlyObservedEncoders,
+		), nil
 	}
 
 	binaryEncoder, err := model_encoding.NewBinaryEncoderFromProto(
@@ -466,8 +644,16 @@ func (s *BrowserService) doEvaluation(w http.ResponseWriter, r *http.Request) (g
 		uint32(referenceFormat.GetMaximumObjectSizeBytes()),
 	)
 	if err != nil {
-		// TODO: Render page!
-		return nil, err
+		errNodes := renderErrorAlert(fmt.Errorf("failed to create encoder: %w", err))
+		return renderEvaluationPage(
+			w,
+			evaluationListReference,
+			keyJSONNodes,
+			errNodes,
+			errNodes,
+			currentEncoderConfigurationStr,
+			recentlyObservedEncoders,
+		), nil
 	}
 
 	parsedObjectPoolIngester := model_parser.NewParsedObjectPoolIngester(
@@ -476,7 +662,6 @@ func (s *BrowserService) doEvaluation(w http.ResponseWriter, r *http.Request) (g
 			object_namespacemapping.NewNamespaceAddingDownloader(s.objectDownloader, evaluationListReference.Value.InstanceName),
 		),
 	)
-
 	evaluationListReader := model_parser.LookupParsedObjectReader(
 		parsedObjectPoolIngester,
 		model_parser.NewChainedObjectParser(
@@ -490,8 +675,16 @@ func (s *BrowserService) doEvaluation(w http.ResponseWriter, r *http.Request) (g
 		model_core.CopyDecodable(evaluationListReference, evaluationListReference.Value.LocalReference),
 	)
 	if err != nil {
-		// TODO: Render page!
-		return nil, err
+		errNodes := renderErrorAlert(fmt.Errorf("failed to download and decode evaluation list object: %w", err))
+		return renderEvaluationPage(
+			w,
+			evaluationListReference,
+			keyJSONNodes,
+			errNodes,
+			errNodes,
+			currentEncoderConfigurationStr,
+			recentlyObservedEncoders,
+		), nil
 	}
 
 	evaluation, err := btree.Find(
@@ -518,145 +711,109 @@ func (s *BrowserService) doEvaluation(w http.ResponseWriter, r *http.Request) (g
 		},
 	)
 	if err != nil {
-		return nil, err
-	}
-	if !evaluation.IsSet() {
-		// TODO: Render page!
-		return nil, errors.New("key not found")
-	}
-	evaluationLeaf, ok := evaluation.Message.Level.(*model_evaluation_pb.Evaluation_Leaf_)
-	if !ok {
-		// TODO: Render page!
-		return nil, errors.New("key is not a valid leaf")
-	}
-
-	jsonRenderer := messageJSONRenderer{
-		basePath: path.Join(
-			"../../../../object",
-			url.PathEscape(evaluationListReference.Value.InstanceName.String()),
-			referenceFormat.ToProto().String(),
-		),
-		now: time.Now(),
+		errNodes := renderErrorAlert(fmt.Errorf("failed to look up key in evaluation list: %w", err))
+		return renderEvaluationPage(
+			w,
+			evaluationListReference,
+			keyJSONNodes,
+			errNodes,
+			errNodes,
+			currentEncoderConfigurationStr,
+			recentlyObservedEncoders,
+		), nil
 	}
 
-	evaluationCard := []g.Node{
-		h.Class("card bg-base-200 message-contents w-2/3 p-4 shadow"),
-		h.H1(
-			h.Class("card-title text-2xl mb-4"),
-			g.Text("Evaluation"),
-		),
+	valueNodes := renderWarningAlert("This key yields a native value that cannot be represented as JSON, or evaluation failed to yield a value.")
+	dependenciesNodes := renderWarningAlert("This key has no dependencies, or evaluation failed to yield a list of dependencies.")
+	if evaluation.IsSet() {
+		evaluationLeaf, ok := evaluation.Message.Level.(*model_evaluation_pb.Evaluation_Leaf_)
+		if !ok {
+			errNodes := renderErrorAlert(errors.New("evaluation list entry is not a valid leaf"))
+			return renderEvaluationPage(
+				w,
+				evaluationListReference,
+				keyJSONNodes,
+				errNodes,
+				errNodes,
+				currentEncoderConfigurationStr,
+				recentlyObservedEncoders,
+			), nil
+		}
 
-		h.H2(
-			h.Class("text-xl my-2"),
-			g.Text("Key"),
-		),
-		h.Div(
-			append(
-				[]g.Node{
-					h.Class("card my-2 p-4 bg-neutral text-neutral-content font-mono h-auto! overflow-x-auto"),
-				},
-				jsonRenderer.renderMessage(model_core.Nested(keyAny.Decay(), keyAny.Message.ProtoReflect()))...,
-			)...,
-		),
-
-		h.H2(
-			h.Class("text-xl my-2"),
-			g.Text("Value"),
-		),
-	}
-	if v := evaluationLeaf.Leaf.Value; v != nil {
-		evaluationCard = append(
-			evaluationCard,
-			h.Div(
-				append(
-					[]g.Node{
-						h.Class("card my-2 p-4 bg-neutral text-neutral-content font-mono h-auto! overflow-x-auto"),
-					},
-					jsonRenderer.renderMessage(model_core.Nested(evaluation, v.ProtoReflect()))...,
-				)...,
-			),
-		)
-	} else {
-		evaluationCard = append(evaluationCard, g.Text("This key yields a native value that cannot be represented as JSON, or evaluation failed to yield a value."))
-	}
-
-	evaluationCard = append(
-		evaluationCard,
-		h.H2(
-			h.Class("text-xl my-2"),
-			g.Text("Dependencies"),
-		),
-	)
-	if dependencies := evaluationLeaf.Leaf.Dependencies; len(dependencies) > 0 {
-		dependencyListReader := model_parser.LookupParsedObjectReader(
-			parsedObjectPoolIngester,
-			model_parser.NewChainedObjectParser(
-				model_parser.NewEncodedObjectParser[object.LocalReference](binaryEncoder),
-				model_parser.NewMessageListObjectParser[object.LocalReference, model_evaluation_pb.Dependency](),
-			),
-		)
-		var errIter error
-		for dependency := range btree.AllLeaves(
-			ctx,
-			dependencyListReader,
-			model_core.Nested(evaluation, dependencies),
-			func(element model_core.Message[*model_evaluation_pb.Dependency, object.LocalReference]) (*model_core_pb.DecodableReference, error) {
-				if level, ok := element.Message.Level.(*model_evaluation_pb.Dependency_Parent_); ok {
-					return level.Parent.Reference, nil
-				}
-				return nil, nil
-			},
-			&errIter,
-		) {
-			if dependencyLeaf, ok := dependency.Message.Level.(*model_evaluation_pb.Dependency_LeafKey); ok {
-				cardNodes := []g.Node{
-					h.Class("block card my-2 p-4 bg-neutral text-neutral-content font-mono h-auto! overflow-x-auto"),
-				}
-				if dependencyKey, err := model_core.FlattenAny(model_core.Nested(dependency, dependencyLeaf.LeafKey)); err == nil {
-					if marshaledDependencyKey, err := model_core.MarshalTopLevelMessage(dependencyKey); err == nil {
-						cardNodes = append(cardNodes, h.Form(
-							h.Action(base64.RawURLEncoding.EncodeToString(marshaledDependencyKey)),
-							h.Button(
-								h.Class("btn btn-primary btn-square float-right inline-block"),
-								g.Text("↗"),
-							),
-						))
-					}
-				}
-				cardNodes = append(
-					cardNodes,
-					jsonRenderer.renderMessage(model_core.Nested(dependency, dependencyLeaf.LeafKey.ProtoReflect()))...,
-				)
-				evaluationCard = append(
-					evaluationCard,
-					h.Div(cardNodes...),
-				)
+		if v := evaluationLeaf.Leaf.Value; v != nil {
+			valueNodes = []g.Node{
+				h.Div(
+					append(
+						[]g.Node{
+							h.Class("card my-2 p-4 bg-neutral text-neutral-content font-mono h-auto! overflow-x-auto"),
+						},
+						jsonRenderer.renderMessage(model_core.Nested(evaluation, v.ProtoReflect()))...,
+					)...,
+				),
 			}
 		}
-		if errIter != nil {
-			evaluationCard = append(evaluationCard, g.Text("TODO: ERROR"))
+
+		if dependencies := evaluationLeaf.Leaf.Dependencies; len(dependencies) > 0 {
+			dependencyListReader := model_parser.LookupParsedObjectReader(
+				parsedObjectPoolIngester,
+				model_parser.NewChainedObjectParser(
+					model_parser.NewEncodedObjectParser[object.LocalReference](binaryEncoder),
+					model_parser.NewMessageListObjectParser[object.LocalReference, model_evaluation_pb.Dependency](),
+				),
+			)
+			var errIter error
+			var nodes []g.Node
+			for dependency := range btree.AllLeaves(
+				ctx,
+				dependencyListReader,
+				model_core.Nested(evaluation, dependencies),
+				func(element model_core.Message[*model_evaluation_pb.Dependency, object.LocalReference]) (*model_core_pb.DecodableReference, error) {
+					if level, ok := element.Message.Level.(*model_evaluation_pb.Dependency_Parent_); ok {
+						return level.Parent.Reference, nil
+					}
+					return nil, nil
+				},
+				&errIter,
+			) {
+				if dependencyLeaf, ok := dependency.Message.Level.(*model_evaluation_pb.Dependency_LeafKey); ok {
+					cardNodes := []g.Node{
+						h.Class("block card my-2 p-4 bg-neutral text-neutral-content font-mono h-auto! overflow-x-auto"),
+					}
+					if dependencyKey, err := model_core.FlattenAny(model_core.Nested(dependency, dependencyLeaf.LeafKey)); err == nil {
+						if marshaledDependencyKey, err := model_core.MarshalTopLevelMessage(dependencyKey); err == nil {
+							cardNodes = append(cardNodes, h.Form(
+								h.Action(base64.RawURLEncoding.EncodeToString(marshaledDependencyKey)),
+								h.Button(
+									h.Class("btn btn-primary btn-square float-right inline-block"),
+									g.Text("↗"),
+								),
+							))
+						}
+					}
+					cardNodes = append(
+						cardNodes,
+						jsonRenderer.renderMessage(model_core.Nested(dependency, dependencyLeaf.LeafKey.ProtoReflect()))...,
+					)
+					nodes = append(nodes, h.Div(cardNodes...))
+				}
+			}
+			if errIter == nil {
+				dependenciesNodes = nodes
+			} else {
+				dependenciesNodes = renderErrorAlert(errIter)
+			}
 		}
-	} else {
-		evaluationCard = append(evaluationCard, g.Text("This key has no dependencies, or evaluation failed to yield a list of dependencies."))
 	}
 
-	return renderPage("TODO: Pick title", []g.Node{
-		h.Div(
-			h.Class("flex w-full space-x-4 p-4"),
-
-			h.Div(
-				append(
-					[]g.Node{
-						h.Class("flex flex-col w-1/3 space-y-4"),
-					},
-
-					renderEncoderSelector(recentlyObservedEncoders, currentEncoderConfigurationStr)...,
-				)...,
-			),
-
-			h.Div(evaluationCard...),
-		),
-	}), nil
+	return renderEvaluationPage(
+		w,
+		evaluationListReference,
+		keyJSONNodes,
+		valueNodes,
+		dependenciesNodes,
+		currentEncoderConfigurationStr,
+		recentlyObservedEncoders,
+	), nil
 }
 
 // renderObjectPage renders a HTML page for displaying the contents of
@@ -688,99 +845,8 @@ func renderObjectPage(
 			h.Div(append(
 				[]g.Node{
 					h.Class("flex flex-col w-1/3 space-y-4"),
-
-					h.Div(
-						append(
-							[]g.Node{
-								h.Class("card bg-base-200 p-4 shadow"),
-								h.H1(
-									h.Class("card-title text-2xl mb-4"),
-									g.Text("Reference"),
-								),
-								h.Table(
-									h.Class("table"),
-
-									h.Tr(
-										h.Th(
-											h.Class("whitespace-nowrap"),
-											g.Text("Object:"),
-										),
-										h.Td(
-											h.Class("break-all"),
-											h.Span(
-												h.Class("font-mono"),
-												g.Text(rawReference),
-											),
-										),
-									),
-									h.Tr(
-										h.Th(
-											h.Class("whitespace-nowrap"),
-											g.Text("Decoding parameters:"),
-										),
-										h.Td(
-											h.Class("break-all"),
-											h.Span(
-												h.Class("font-mono"),
-												g.Text(base64.RawURLEncoding.EncodeToString(decodableReference.GetDecodingParameters())),
-											),
-										),
-									),
-									h.Tr(
-										h.Th(
-											h.Class("whitespace-nowrap"),
-											g.Text("SHA-256 hash:"),
-										),
-										h.Td(
-											h.Class("break-all"),
-											h.Span(
-												h.Class("font-mono"),
-												g.Text(hex.EncodeToString(decodableReference.Value.GetHash())),
-											),
-										),
-									),
-									h.Tr(
-										h.Th(
-											h.Class("whitespace-nowrap"),
-											g.Text("Size:"),
-										),
-										h.Td(
-											g.Textf("%d byte(s)", decodableReference.Value.GetSizeBytes()),
-										),
-									),
-									h.Tr(
-										h.Th(
-											h.Class("whitespace-nowrap"),
-											g.Text("Height:"),
-										),
-										h.Td(
-											g.Textf("%d", decodableReference.Value.GetHeight()),
-										),
-									),
-									h.Tr(
-										h.Th(
-											h.Class("whitespace-nowrap"),
-											g.Text("Degree:"),
-										),
-										h.Td(
-											g.Textf("%d outgoing reference(s)", decodableReference.Value.GetDegree()),
-										),
-									),
-									h.Tr(
-										h.Th(
-											h.Class("whitespace-nowrap"),
-											g.Text("Maximum total parents size:"),
-										),
-										h.Td(
-											g.Textf("%d byte(s)", decodableReference.Value.GetMaximumTotalParentsSizeBytes(false)),
-										),
-									),
-								),
-							},
-						)...,
-					),
+					renderReferenceCard("Object reference", decodableReference),
 				},
-
 				renderEncoderSelector(recentlyObservedEncoders, currentEncoderConfiguration)...,
 			)...),
 
@@ -804,8 +870,19 @@ func renderObjectPage(
 func renderErrorAlert(err error) []g.Node {
 	return []g.Node{
 		h.Div(
-			h.Class("alert alert-error"),
+			h.Class("alert alert-error shadow-sm"),
 			g.Text(err.Error()),
+		),
+	}
+}
+
+// renderWarningAlert renders a warning message in the form of a yellow
+// alert banner.
+func renderWarningAlert(message string) []g.Node {
+	return []g.Node{
+		h.Div(
+			h.Class("alert alert-warning shadow-sm"),
+			g.Text(message),
 		),
 	}
 }

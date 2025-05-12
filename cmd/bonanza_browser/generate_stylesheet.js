@@ -25,6 +25,7 @@ async function main() {
   let compiledCss = compiler.build([
     '[--tab-bg:var(--color-neutral)]',
     'alert-error',
+    'alert-warning',
     'alert',
     'bg-amber-100',
     'bg-base-100',
