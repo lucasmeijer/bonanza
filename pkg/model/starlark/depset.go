@@ -452,9 +452,7 @@ func (d *Depset[TReference, TMetadata]) doToList(thread *starlark.Thread, b *sta
 	if err != nil {
 		return nil, err
 	}
-	l := starlark.NewList(elements)
-	l.Freeze()
-	return l, nil
+	return starlark.NewList(elements), nil
 }
 
 // valueSet is a simple set type for starlark.Value. It's not possible
