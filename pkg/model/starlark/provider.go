@@ -3,6 +3,8 @@ package starlark
 import (
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 
@@ -14,32 +16,55 @@ import (
 	"go.starlark.net/starlark"
 )
 
-type ProviderInstanceProperties struct {
+type ProviderInstanceProperties[TReference any, TMetadata model_core.CloneableReferenceMetadata] struct {
 	LateNamedValue
-	dictLike bool
+	dictLike       bool
+	computedFields map[string]NamedFunction[TReference, TMetadata]
 }
 
-func (pip *ProviderInstanceProperties) Encode() (*model_starlark_pb.Provider_InstanceProperties, error) {
+func (pip *ProviderInstanceProperties[TReference, TMetadata]) Encode(path map[starlark.Value]struct{}, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.Provider_InstanceProperties, TMetadata], bool, error) {
 	if pip.Identifier == nil {
-		return nil, errors.New("provider does not have a name")
+		return model_core.PatchedMessage[*model_starlark_pb.Provider_InstanceProperties, TMetadata]{}, false, errors.New("provider does not have a name")
 	}
-	return &model_starlark_pb.Provider_InstanceProperties{
-		ProviderIdentifier: pip.Identifier.String(),
-		DictLike:           pip.dictLike,
-	}, nil
+
+	patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
+	computedFields := make([]*model_starlark_pb.Provider_InstanceProperties_ComputedField, 0, len(pip.computedFields))
+	needsCode := false
+	for _, name := range slices.Sorted(maps.Keys(pip.computedFields)) {
+		function, functionNeedsCode, err := pip.computedFields[name].Encode(path, options)
+		if err != nil {
+			return model_core.PatchedMessage[*model_starlark_pb.Provider_InstanceProperties, TMetadata]{}, false, err
+		}
+		computedFields = append(computedFields, &model_starlark_pb.Provider_InstanceProperties_ComputedField{
+			Name:     name,
+			Function: function.Message,
+		})
+		patcher.Merge(function.Patcher)
+		needsCode = needsCode || functionNeedsCode
+	}
+
+	return model_core.NewPatchedMessage(
+		&model_starlark_pb.Provider_InstanceProperties{
+			ProviderIdentifier: pip.Identifier.String(),
+			DictLike:           pip.dictLike,
+			ComputedFields:     computedFields,
+		},
+		patcher,
+	), needsCode, nil
 }
 
-func NewProviderInstanceProperties(identifier *pg_label.CanonicalStarlarkIdentifier, dictLike bool) *ProviderInstanceProperties {
-	return &ProviderInstanceProperties{
+func NewProviderInstanceProperties[TReference any, TMetadata model_core.CloneableReferenceMetadata](identifier *pg_label.CanonicalStarlarkIdentifier, dictLike bool, computedFields map[string]NamedFunction[TReference, TMetadata]) *ProviderInstanceProperties[TReference, TMetadata] {
+	return &ProviderInstanceProperties[TReference, TMetadata]{
 		LateNamedValue: LateNamedValue{
 			Identifier: identifier,
 		},
-		dictLike: dictLike,
+		dictLike:       dictLike,
+		computedFields: computedFields,
 	}
 }
 
 type Provider[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata] struct {
-	*ProviderInstanceProperties
+	*ProviderInstanceProperties[TReference, TMetadata]
 	fields       []string
 	initFunction *NamedFunction[TReference, TMetadata]
 }
@@ -51,7 +76,7 @@ var (
 	_ starlark.TotallyOrdered                                                      = (*Provider[object.LocalReference, model_core.CloneableReferenceMetadata])(nil)
 )
 
-func NewProvider[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](instanceProperties *ProviderInstanceProperties, fields []string, initFunction *NamedFunction[TReference, TMetadata]) *Provider[TReference, TMetadata] {
+func NewProvider[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](instanceProperties *ProviderInstanceProperties[TReference, TMetadata], fields []string, initFunction *NamedFunction[TReference, TMetadata]) *Provider[TReference, TMetadata] {
 	return &Provider[TReference, TMetadata]{
 		ProviderInstanceProperties: instanceProperties,
 		fields:                     fields,
@@ -136,16 +161,15 @@ func (p *Provider[TReference, TMetadata]) CallInternal(thread *starlark.Thread, 
 }
 
 func (p *Provider[TReference, TMetadata]) EncodeValue(path map[starlark.Value]struct{}, currentIdentifier *pg_label.CanonicalStarlarkIdentifier, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.Value, TMetadata], bool, error) {
-	instanceProperties, err := p.ProviderInstanceProperties.Encode()
+	instanceProperties, needsCode, err := p.ProviderInstanceProperties.Encode(path, options)
 	if err != nil {
 		return model_core.PatchedMessage[*model_starlark_pb.Value, TMetadata]{}, false, err
 	}
 
 	provider := &model_starlark_pb.Provider{
-		InstanceProperties: instanceProperties,
+		InstanceProperties: instanceProperties.Message,
 	}
-	patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
-	needsCode := false
+	patcher := instanceProperties.Patcher
 
 	if p.initFunction != nil {
 		initFunction, initFunctionNeedsCode, err := p.initFunction.Encode(path, options)

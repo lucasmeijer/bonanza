@@ -534,6 +534,25 @@ message Provider {
     // If set, the fields in this struct can also be accessed using
     // square brackets and the "in" binary operator.
     bool dict_like = 2;
+
+    message ComputedField {
+      // The name of the field to add to the struct.
+      string name = 1;
+
+      // The function to invoke to compute the value of the field. This
+      // function is called with a single positional argument containing
+      // the value of the struct.
+      Function function = 2;
+    }
+
+    // Additional fields to add to instances of this provider whose
+    // values can be computed using the explicitly provided fields.
+    //
+    // This feature can be used to add fields to structs that are not
+    // hashable (lists, functions), without losing the ability to hash
+    // the struct itself. This is needed to properly implement types
+    // such as LibraryToLink.
+    repeated ComputedField computed_fields = 3;
   }
 
   // Properties that affect the behavior of structs that are created

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"maps"
 	"slices"
 	"sort"
 	"strings"
@@ -33,7 +34,7 @@ import (
 // and not read an excessive amount of data from storage.
 type Struct[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata] struct {
 	// Constant fields.
-	providerInstanceProperties *ProviderInstanceProperties
+	providerInstanceProperties *ProviderInstanceProperties[TReference, TMetadata]
 	keys                       []string
 	values                     []any
 
@@ -55,7 +56,7 @@ var (
 // having types starlark.Value and
 // model_core.Message[*model_starlark_pb.Value, TReference],
 // respectively.
-func NewStructFromDict[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](providerInstanceProperties *ProviderInstanceProperties, entries map[string]any) *Struct[TReference, TMetadata] {
+func NewStructFromDict[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](providerInstanceProperties *ProviderInstanceProperties[TReference, TMetadata], entries map[string]any) *Struct[TReference, TMetadata] {
 	keys := make([]string, 0, len(entries))
 	for k := range entries {
 		keys = append(keys, k)
@@ -69,7 +70,7 @@ func NewStructFromDict[TReference object.BasicReference, TMetadata model_core.Cl
 	return newStructFromLists[TReference, TMetadata](providerInstanceProperties, keys, values)
 }
 
-func newStructFromLists[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](providerInstanceProperties *ProviderInstanceProperties, keys []string, values []any) *Struct[TReference, TMetadata] {
+func newStructFromLists[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](providerInstanceProperties *ProviderInstanceProperties[TReference, TMetadata], keys []string, values []any) *Struct[TReference, TMetadata] {
 	return &Struct[TReference, TMetadata]{
 		providerInstanceProperties: providerInstanceProperties,
 		keys:                       keys,
@@ -203,19 +204,30 @@ func (s *Struct[TReference, TMetadata]) fieldAtIndex(thread *starlark.Thread, in
 // Attr returns the value of a field contained in a Starlark struct
 // value.
 func (s *Struct[TReference, TMetadata]) Attr(thread *starlark.Thread, name string) (starlark.Value, error) {
-	index, ok := sort.Find(
+	if index, ok := sort.Find(
 		len(s.keys),
 		func(i int) int { return strings.Compare(name, s.keys[i]) },
-	)
-	if !ok {
-		return nil, nil
+	); ok {
+		return s.fieldAtIndex(thread, index)
 	}
-	return s.fieldAtIndex(thread, index)
+
+	if pip := s.providerInstanceProperties; pip != nil {
+		if function, ok := pip.computedFields[name]; ok {
+			return starlark.Call(thread, function, starlark.Tuple{s}, nil)
+		}
+	}
+
+	return nil, nil
 }
 
 // AttrNames returns the names of the fields contained in a Starlark
 // struct value.
 func (s *Struct[TReference, TMetadata]) AttrNames() []string {
+	if pip := s.providerInstanceProperties; pip != nil && len(pip.computedFields) > 0 {
+		allKeys := append(slices.Collect(maps.Keys(pip.computedFields)), s.keys...)
+		sort.Strings(allKeys)
+		return slices.Compact(allKeys)
+	}
 	return s.keys
 }
 
@@ -370,18 +382,21 @@ func (s *Struct[TReference, TMetadata]) EncodeStructFields(path map[starlark.Val
 // expected to only be a struct or provider instance, such as the return
 // value of a rule implementation function.
 func (s *Struct[TReference, TMetadata]) Encode(path map[starlark.Value]struct{}, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.Struct, TMetadata], bool, error) {
-	var providerInstanceProperties *model_starlark_pb.Provider_InstanceProperties
-	if pip := s.providerInstanceProperties; pip != nil {
-		var err error
-		providerInstanceProperties, err = pip.Encode()
-		if err != nil {
-			return model_core.PatchedMessage[*model_starlark_pb.Struct, TMetadata]{}, false, err
-		}
-	}
-
 	fields, needsCode, err := s.EncodeStructFields(path, options)
 	if err != nil {
 		return model_core.PatchedMessage[*model_starlark_pb.Struct, TMetadata]{}, false, err
+	}
+	patcher := fields.Patcher
+
+	var providerInstanceProperties *model_starlark_pb.Provider_InstanceProperties
+	if pip := s.providerInstanceProperties; pip != nil {
+		m, mNeedsCode, err := pip.Encode(path, options)
+		if err != nil {
+			return model_core.PatchedMessage[*model_starlark_pb.Struct, TMetadata]{}, false, err
+		}
+		providerInstanceProperties = m.Message
+		patcher.Merge(m.Patcher)
+		needsCode = needsCode || mNeedsCode
 	}
 
 	return model_core.NewPatchedMessage(
@@ -389,7 +404,7 @@ func (s *Struct[TReference, TMetadata]) Encode(path map[starlark.Value]struct{},
 			Fields:                     fields.Message,
 			ProviderInstanceProperties: providerInstanceProperties,
 		},
-		fields.Patcher,
+		patcher,
 	), needsCode, nil
 }
 

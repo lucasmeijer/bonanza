@@ -1135,6 +1135,7 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 					return nil, fmt.Errorf("%s: got %d positional arguments, want at most 1", b.Name(), len(args))
 				}
 				doc := ""
+				var computedFields map[string]NamedFunction[TReference, TMetadata]
 				dictLike := false
 				var fields any
 				var init *NamedFunction[TReference, TMetadata]
@@ -1143,6 +1144,7 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 					// Positional arguments.
 					"doc?", unpack.Bind(thread, &doc, unpack.String),
 					// Keyword arguments.
+					"computed_fields?", unpack.Bind(thread, &computedFields, unpack.Dict(unpack.String, namedFunctionUnpackerInto)),
 					"dict_like?", unpack.Bind(thread, &dictLike, unpack.Bool),
 					"fields?", unpack.Bind(thread, &fields, unpack.IfNotNone(unpack.Or([]unpack.UnpackerInto[any]{
 						unpack.Decay(unpack.Dict(unpack.String, unpack.String)),
@@ -1166,7 +1168,7 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 				sort.Strings(fieldNames)
 				fieldNames = slices.Compact(fieldNames)
 
-				instanceProperties := NewProviderInstanceProperties(nil, dictLike)
+				instanceProperties := NewProviderInstanceProperties(nil, dictLike, computedFields)
 
 				// If an init function is provided, we're
 				// supposed to return both the provider with

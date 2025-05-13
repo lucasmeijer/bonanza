@@ -212,8 +212,6 @@ var emptyRunfilesValue = &model_starlark_pb.Value{
 	},
 }
 
-var defaultInfoProviderInstanceProperties = model_starlark.NewProviderInstanceProperties(&defaultInfoProviderIdentifier, false)
-
 func getSingleFileConfiguredTargetValue[TMetadata model_core.WalkableReferenceMetadata](file model_core.PatchedMessage[*model_starlark_pb.File, TMetadata]) PatchedConfiguredTargetValue {
 	fileValue := &model_starlark_pb.Value{
 		Kind: &model_starlark_pb.Value_File{
@@ -1373,6 +1371,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 			providerInstancesByIdentifier[providerIdentifier] = providerInstance
 		}
 
+		defaultInfoProviderInstanceProperties := model_starlark.NewProviderInstanceProperties[TReference, TMetadata](&defaultInfoProviderIdentifier, false, nil)
 		if defaultInfo, ok := providerInstancesByIdentifier[defaultInfoProviderIdentifier]; ok {
 			// Rule returned DefaultInfo. Make sure that
 			// "data_runfiles", "default_runfiles" and
@@ -1423,7 +1422,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 					),
 					"files": model_starlark.NewDepsetFromList[TReference, TMetadata](nil, model_starlark_pb.Depset_DEFAULT),
 					"files_to_run": model_starlark.NewStructFromDict[TReference, TMetadata](
-						model_starlark.NewProviderInstanceProperties(&filesToRunProviderIdentifier, false),
+						model_starlark.NewProviderInstanceProperties[TReference, TMetadata](&filesToRunProviderIdentifier, false, nil),
 						map[string]any{
 							"executable":            starlark.None,
 							"repo_mapping_manifest": starlark.None,

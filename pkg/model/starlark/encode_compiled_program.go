@@ -545,7 +545,7 @@ func DecodeValue[TReference object.BasicReference, TMetadata model_core.Cloneabl
 		if instanceProperties == nil {
 			return nil, errors.New("provider instance properties are missing")
 		}
-		providerIdentifier, err := pg_label.NewCanonicalStarlarkIdentifier(instanceProperties.ProviderIdentifier)
+		providerInstanceProperties, err := decodeProviderInstanceProperties[TReference, TMetadata](model_core.Nested(encodedValue, instanceProperties))
 		if err != nil {
 			return nil, err
 		}
@@ -557,7 +557,7 @@ func DecodeValue[TReference object.BasicReference, TMetadata model_core.Cloneabl
 			initFunction = &f
 		}
 		return NewProvider[TReference](
-			NewProviderInstanceProperties(&providerIdentifier, instanceProperties.DictLike),
+			providerInstanceProperties,
 			typedValue.Provider.Fields,
 			initFunction,
 		), nil
@@ -836,6 +836,24 @@ func decodeDepset[TReference object.BasicReference, TMetadata model_core.Cloneab
 	return NewDepsetFromList[TReference, TMetadata](children, depset.Message.Order)
 }
 
+func decodeProviderInstanceProperties[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](m model_core.Message[*model_starlark_pb.Provider_InstanceProperties, TReference]) (*ProviderInstanceProperties[TReference, TMetadata], error) {
+	providerIdentifier, err := pg_label.NewCanonicalStarlarkIdentifier(m.Message.ProviderIdentifier)
+	if err != nil {
+		return nil, err
+	}
+
+	computedFields := make(map[string]NamedFunction[TReference, TMetadata], len(m.Message.ComputedFields))
+	for _, computedField := range m.Message.ComputedFields {
+		computedFields[computedField.Name] = NewNamedFunction(
+			NewProtoNamedFunctionDefinition[TReference, TMetadata](
+				model_core.Nested(m, computedField.Function),
+			),
+		)
+	}
+
+	return NewProviderInstanceProperties(&providerIdentifier, m.Message.DictLike, computedFields), nil
+}
+
 func decodeToolchainType[TReference any, TMetadata model_core.CloneableReferenceMetadata](toolchainType *model_starlark_pb.ToolchainType) (*ToolchainType[TReference, TMetadata], error) {
 	toolchainTypeLabel, err := pg_label.NewResolvedLabel(toolchainType.ToolchainType)
 	if err != nil {
@@ -845,13 +863,13 @@ func decodeToolchainType[TReference any, TMetadata model_core.CloneableReference
 }
 
 func DecodeStruct[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](m model_core.Message[*model_starlark_pb.Struct, TReference], options *ValueDecodingOptions[TReference]) (*Struct[TReference, TMetadata], error) {
-	var providerInstanceProperties *ProviderInstanceProperties
+	var providerInstanceProperties *ProviderInstanceProperties[TReference, TMetadata]
 	if pip := m.Message.ProviderInstanceProperties; pip != nil {
-		providerIdentifier, err := pg_label.NewCanonicalStarlarkIdentifier(pip.ProviderIdentifier)
+		var err error
+		providerInstanceProperties, err = decodeProviderInstanceProperties[TReference, TMetadata](model_core.Nested(m, pip))
 		if err != nil {
-			return nil, fmt.Errorf("invalid provider identifier %#v: %w", providerIdentifier, err)
+			return nil, err
 		}
-		providerInstanceProperties = NewProviderInstanceProperties(&providerIdentifier, pip.DictLike)
 	}
 
 	var keys []string
