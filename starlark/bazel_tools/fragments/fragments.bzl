@@ -98,8 +98,9 @@ def _cpp_fragment_impl(ctx):
     propeller_optimize_absolute_ld_profile = ctx.attr._propeller_optimize_absolute_ld_profile[BuildSettingInfo].value
     proto_profile = ctx.attr._proto_profile[BuildSettingInfo].value
     save_feature_state = ctx.attr._save_feature_state[BuildSettingInfo].value
+    start_end_lib = ctx.attr._start_end_lib[BuildSettingInfo].value
     strip = ctx.attr._strip[BuildSettingInfo].value
-    stripopt = ctx.attr._strip[BuildSettingInfo].value
+    stripopt = ctx.attr._stripopt[BuildSettingInfo].value
     should_strip_binaries = strip == "always" or (strip == "sometimes" and compilation_mode == "fastbuild")
     use_specific_tool_files = ctx.attr._use_specific_tool_files[BuildSettingInfo].value
     return [FragmentInfo(
@@ -125,6 +126,7 @@ def _cpp_fragment_impl(ctx):
         force_pic = lambda: force_pic,
         generate_llvm_lcov = lambda: generate_llvm_lcov,
         grte_top = lambda: grte_top,
+        incompatible_use_specific_tool_files = lambda: use_specific_tool_files,
         linkopts = ctx.attr._linkopt[BuildSettingInfo].value,
         minimum_os_version = lambda: minimum_os_version,
         process_headers_in_dependencies = lambda: process_headers_in_dependencies,
@@ -133,8 +135,8 @@ def _cpp_fragment_impl(ctx):
         proto_profile = lambda: proto_profile,
         save_feature_state = lambda: save_feature_state,
         should_strip_binaries = lambda: should_strip_binaries,
+        start_end_lib = lambda: start_end_lib,
         strip_opts = lambda: stripopt,
-        incompatible_use_specific_tool_files = lambda: use_specific_tool_files,
     )]
 
 cpp_fragment = rule(
@@ -167,6 +169,7 @@ cpp_fragment = rule(
         "_save_feature_state": attr.label(default = "//command_line_option:experimental_save_feature_state"),
         "_starlark_compiling": attr.label(default = "//command_line_option:experimental_starlark_compiling"),
         "_starlark_linking": attr.label(default = "//command_line_option:experimental_starlark_linking"),
+        "_start_end_lib": attr.label(default = "//command_line_option:start_end_lib"),
         "_strip": attr.label(default = "//command_line_option:strip"),
         "_stripopt": attr.label(default = "//command_line_option:stripopt"),
         "_use_specific_tool_files": attr.label(default = "//command_line_option:incompatible_use_specific_tool_files"),
