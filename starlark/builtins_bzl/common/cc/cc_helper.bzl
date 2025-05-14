@@ -22,8 +22,8 @@ load(
     _artifact_category = "artifact_category",
 )
 load(":common/cc/cc_info.bzl", "CcInfo")
+load(":common/cc/semantics.bzl", "semantics")
 load(":common/objc/objc_common.bzl", "objc_common")
-load(":common/objc/semantics.bzl", objc_semantics = "semantics")
 load(":common/paths.bzl", "paths")
 
 cc_internal = _builtins.internal.cc_internal
@@ -132,7 +132,7 @@ def _get_dynamic_library_for_runtime_or_none(library, linking_statically):
 
     return library.dynamic_library
 
-_CPP_TOOLCHAIN_TYPE = "@" + objc_semantics.get_repo() + "//tools/cpp:toolchain_type"
+_CPP_TOOLCHAIN_TYPE = "@" + semantics.get_repo() + "//tools/cpp:toolchain_type"
 
 def _find_cpp_toolchain(ctx, *, mandatory = True):
     """
@@ -306,7 +306,7 @@ OBJCPP_SOURCE = [".mm"]
 CLIF_INPUT_PROTO = [".ipb"]
 CLIF_OUTPUT_PROTO = [".opb"]
 CC_HEADER = [".h", ".hh", ".hpp", ".ipp", ".hxx", ".h++", ".inc", ".inl", ".tlh", ".tli", ".H", ".tcc"]
-ASSESMBLER_WITH_C_PREPROCESSOR = [".S"]
+ASSEMBLER_WITH_C_PREPROCESSOR = [".S"]
 ASSEMBLER = [".s", ".asm"]
 ARCHIVE = [".a", ".lib"]
 PIC_ARCHIVE = [".pic.a"]
@@ -324,7 +324,7 @@ CC_AND_OBJC.extend(OBJC_SOURCE)
 CC_AND_OBJC.extend(OBJCPP_SOURCE)
 CC_AND_OBJC.extend(CC_HEADER)
 CC_AND_OBJC.extend(ASSEMBLER)
-CC_AND_OBJC.extend(ASSESMBLER_WITH_C_PREPROCESSOR)
+CC_AND_OBJC.extend(ASSEMBLER_WITH_C_PREPROCESSOR)
 
 DISALLOWED_HDRS_FILES = []
 DISALLOWED_HDRS_FILES.extend(ARCHIVE)
@@ -340,7 +340,9 @@ extensions = struct(
     CC_SOURCE = CC_SOURCE,
     C_SOURCE = C_SOURCE,
     CC_HEADER = CC_HEADER,
-    ASSESMBLER_WITH_C_PREPROCESSOR = ASSESMBLER_WITH_C_PREPROCESSOR,
+    ASSEMBLER_WITH_C_PREPROCESSOR = ASSEMBLER_WITH_C_PREPROCESSOR,
+    # TODO(b/345158656): Remove ASSESMBLER_WITH_C_PREPROCESSOR after next blaze release
+    ASSESMBLER_WITH_C_PREPROCESSOR = ASSEMBLER_WITH_C_PREPROCESSOR,
     ASSEMBLER = ASSEMBLER,
     ARCHIVE = ARCHIVE,
     PIC_ARCHIVE = PIC_ARCHIVE,
@@ -1110,7 +1112,7 @@ def _create_cc_instrumented_files_info(ctx, cc_config, cc_toolchain, metadata_fi
     extensions = CC_SOURCE + \
                  C_SOURCE + \
                  CC_HEADER + \
-                 ASSESMBLER_WITH_C_PREPROCESSOR + \
+                 ASSEMBLER_WITH_C_PREPROCESSOR + \
                  ASSEMBLER
     coverage_environment = {}
     if ctx.configuration.coverage_enabled:

@@ -39,13 +39,10 @@ def link_action(
         additional_object_files = [],
 
         # Inputs from linking_contexts and toolchain:
-        libraries,
+        libraries_to_link,
         linkstamps,
         linkopts,
         non_code_inputs,
-        # TODO(b/331164666): merge into libraries or additional_object_files
-        toolchain_libraries_type,
-        toolchain_libraries_input,
 
         # Custom user input/output files and variables:
         additional_linker_inputs,  # TODO(b/331164666): rename to linker_input_files
@@ -72,8 +69,6 @@ def link_action(
     The function collects all object files, maps them with LTO mapping when present.
     It declares linkstamp object (but doesn't yet compile them).
 
-    All object files are wrapped with LegacyLinkerInputs.
-
     It prepares link build variables specific to linking actions and creates the
     action by calling `finalize_link_action`.
 
@@ -92,12 +87,10 @@ def link_action(
         cc_toolchain: (CcToolchainInfo) CcToolchainInfo provider to be used.
         compilation_outputs: (CompilationOutputs) Compilation outputs containing object files to link.
         additional_object_files: (list[File]) Additional object files not in the `compilation_outputs`.
-        libraries: (list[LegacyLinkerInput]) The libraries to link in.
+        libraries_to_link: (list[LibraryToLink]) The libraries to link in.
         linkstamps: (list[Linkstamp]) The linkstamps to use.
         linkopts: (list[str]) Additional list of linker options.
         non_code_inputs: (list[File]) Additional inputs to the linker.
-        toolchain_libraries_type: (artifact_category) Type of toolchain libraries.
-        toolchain_libraries_input: (depset[File]) Toolchain libraries.
         additional_linker_inputs: (list[File]|depset[File]) For additional inputs to the linking action,
           e.g.: linking scripts.
         link_action_outputs: (list[File]) For additional outputs to the linking action, e.g.: map files.
@@ -149,8 +142,8 @@ def link_action(
         non_code_inputs.append(thinlto_param_file)
 
     linkstamp_map = _map_linkstamps_to_outputs(actions, linkstamps, output)
-    linkstamp_object_file_inputs = [cc_internal.linkstamp_linker_input(input) for input in linkstamp_map.values()]
-    object_file_inputs = [cc_internal.simple_linker_input(input) for input in object_files]
+    linkstamp_object_file_inputs = linkstamp_map.values()
+    object_file_inputs = object_files
 
     object_artifacts = [lto_mapping.get(obj, obj) for obj in object_files]
     linkstamp_object_artifacts = [lto_mapping.get(obj, obj) for obj in linkstamp_map.values()]
@@ -222,12 +215,10 @@ def link_action(
         # Inputs:
         object_file_inputs,
         non_code_inputs,
-        libraries,
+        libraries_to_link,
         linkstamp_map,
         linkstamp_object_artifacts,
         linkstamp_object_file_inputs,
-        toolchain_libraries_type,
-        toolchain_libraries_input,
         user_link_flags,
         # Custom user input files and variables:
         additional_linker_inputs,
