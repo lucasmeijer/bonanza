@@ -575,7 +575,7 @@ def builtins_internal_apple_common_dotted_version(v):
     return v
 
 def builtins_internal_cc_common_action_is_enabled(*, feature_configuration, action_name):
-    return feature_configuration.is_enabled(action_name)
+    return action_name in feature_configuration._enabled_action_config_action_names
 
 def builtins_internal_cc_common_check_private_api(allowlist = []):
     pass
@@ -2223,10 +2223,14 @@ def builtins_internal_cc_common_get_memory_inefficient_command_line(
     return ["TODO", "get_memory_inefficient_command_line"]
 
 def _tool_get_tool_path_string(tool):
-    fail(tool)
+    return tool.path
 
 def _tool_is_with_features_satisfied(with_feature_sets, enabled_feature_names):
-    fail(with_feature_sets)
+    if not with_feature_sets:
+        return True
+    for feature_set in with_feature_sets:
+        fail("TODO: match feature_set.features and feature_set.not_features!")
+    return False
 
 def _action_config_get_tool(action_config, enabled_feature_names):
     for tool in action_config.tools:
@@ -2419,18 +2423,26 @@ def builtins_internal_cc_internal_create_cc_launcher_info(*, cc_info, compilatio
     )
 
 def library_to_link_disable_whole_archive(lib):
+    disable_whole_archive = lib._disable_whole_archive
     return lambda: lib._disable_whole_archive
 
 def library_to_link_must_keep_debug(lib):
-    return lambda: lib._must_keep_debug
+    must_keep_debug = lib._must_keep_debug
+    return lambda: must_keep_debug
+
+def library_to_link_objects_private(lib):
+    object_files = lib._object_files
+    return lambda: object_files.to_list()
 
 def library_to_link_pic_objects_private(lib):
-    return lambda: lib._pic_object_files.to_list()
+    pic_object_files = lib._pic_object_files
+    return lambda: pic_object_files.to_list()
 
 LibraryToLink = provider(
     computed_fields = {
         "disable_whole_archive": library_to_link_disable_whole_archive,
         "must_keep_debug": library_to_link_must_keep_debug,
+        "objects_private": library_to_link_objects_private,
         "pic_objects_private": library_to_link_pic_objects_private,
     },
 )
@@ -2439,6 +2451,7 @@ def builtins_internal_cc_internal_create_library_to_link(library_to_link):
     return LibraryToLink(
         _disable_whole_archive = getattr(library_to_link, "disable_whole_archive", False),
         _must_keep_debug = getattr(library_to_link, "must_keep_debug", False),
+        _object_files = depset(getattr(library_to_link, "object_files", [])),
         _pic_object_files = depset(getattr(library_to_link, "pic_object_files", [])),
         alwayslink = getattr(library_to_link, "dynamic_library", False),
         dynamic_library = getattr(library_to_link, "dynamic_library", None),
