@@ -580,12 +580,18 @@ def builtins_internal_cc_common_action_is_enabled(*, feature_configuration, acti
 def builtins_internal_cc_common_check_private_api(allowlist = []):
     pass
 
-def _create_compilation_outputs(objects, pic_objects, lto_compilation_context):
+def _create_compilation_outputs(
+        *,
+        header_tokens,
+        lto_compilation_context,
+        objects,
+        pic_objects):
     # TODO: Where do we get these from?
     dwo_files = depset()
     pic_dwo_files = depset()
 
     return struct(
+        _header_tokens = header_tokens,
         _dwo_files = dwo_files,
         _objects = objects,
         _pic_dwo_files = pic_dwo_files,
@@ -600,13 +606,20 @@ def _create_compilation_outputs(objects, pic_objects, lto_compilation_context):
         pic_objects = pic_objects.to_list(),
 
         # TODO: Where do these come from?
-        files_to_compile = lambda parse_headers = False, use_pic = False: depset(),
+        files_to_compile = lambda parse_headers = False, use_pic = False: depset(
+            direct = [],
+            transitive = [pic_objects if use_pic else objects] +
+                         ([header_tokens] if parse_headers else []),
+        ),
         gcno_files = lambda: [],
-        header_tokens = lambda: [],
+        header_tokens = lambda: header_tokens.to_list(),
         module_files = lambda: [],
         pic_gcno_files = lambda: [],
         temps = lambda: depset(),
     )
+
+def feature_configuration_get_command_line(feature_configuration, action, variables):
+    pass
 
 def builtins_internal_cc_common_compile_fork(
         *,
@@ -650,17 +663,236 @@ def builtins_internal_cc_common_compile_fork(
         textual_hdrs = [],
         user_compile_flags = [],
         variables_extension = None):
+    merged_compilation_context = builtins_internal_cc_common_merge_compilation_contexts(
+        compilation_contexts,
+        implementation_compilation_contexts,
+    )
+
+    objects = []
+    pic_objects = []
+    for src in srcs:
+        p = src[0].path
+        if p.endswith(".c"):
+            action_name = "c-compile"
+        elif p.endswith(".cc"):
+            action_name = "c++-compile"
+        else:
+            fail(src)
+        base = p.rsplit(".", 1)[0]
+
+        object_file = actions.declare_file(base + ".o")
+        variables = builtins_internal_cc_common_create_compile_variables(
+            cc_toolchain = cc_toolchain,
+            feature_configuration = feature_configuration,
+            source_file = p,
+            output_file = object_file.path,
+            user_compile_flags = user_compile_flags,
+            include_directories = merged_compilation_context.includes,
+            quote_include_directories = merged_compilation_context.quote_includes,
+            system_include_directories = merged_compilation_context.system_includes,
+            framework_include_directories = merged_compilation_context.framework_includes,
+            preprocessor_defines = merged_compilation_context.defines,
+            use_pic = False,
+            variables_extension = variables_extension,
+        )
+        actions.run(
+            executable = builtins_internal_cc_common_get_tool_for_action(feature_configuration, action_name),
+            arguments = builtins_internal_cc_common_get_memory_inefficient_command_line(feature_configuration, action_name, variables),
+            inputs = [src[0]],
+            outputs = [object_file],
+        )
+        objects.append(object_file)
+
+        pic_object_file = actions.declare_file(base + ".pic.o")
+        pic_variables = builtins_internal_cc_common_create_compile_variables(
+            cc_toolchain = cc_toolchain,
+            feature_configuration = feature_configuration,
+            source_file = p,
+            output_file = pic_object_file.path,
+            user_compile_flags = user_compile_flags,
+            include_directories = merged_compilation_context.includes,
+            quote_include_directories = merged_compilation_context.quote_includes,
+            system_include_directories = merged_compilation_context.system_includes,
+            framework_include_directories = merged_compilation_context.framework_includes,
+            preprocessor_defines = merged_compilation_context.defines,
+            use_pic = True,
+            variables_extension = variables_extension,
+        )
+        actions.run(
+            executable = builtins_internal_cc_common_get_tool_for_action(feature_configuration, action_name),
+            arguments = builtins_internal_cc_common_get_memory_inefficient_command_line(feature_configuration, action_name, pic_variables),
+            inputs = [src[0]],
+            outputs = [pic_object_file],
+        )
+        pic_objects.append(pic_object_file)
+
     # TODO: Fill this in properly.
-    compilation_context = builtins_internal_cc_common_create_compilation_context()
+    compilation_context = builtins_internal_cc_common_create_compilation_context(
+        headers = depset(public_hdrs),
+    )
 
     # TODO: Fill this in properly.
     srcs_compilation_outputs = _create_compilation_outputs(
-        objects = depset(),
-        pic_objects = depset(),
         lto_compilation_context = struct(TODO_lto_compilation_context = True),
+        header_tokens = depset(),
+        objects = depset(objects),
+        pic_objects = depset(pic_objects),
     )
 
     return compilation_context, srcs_compilation_outputs
+
+def _selectable_get_name(selectable):
+    if selectable.type_name == "action_config":
+        return selectable.action_name
+    return selectable.name
+
+def feature_configuration_is_enabled(feature_configuration):
+    enabled_feature_names = feature_configuration._enabled_feature_names
+    return lambda feature: feature in enabled_feature_names
+
+FeatureConfiguration = provider(
+    computed_fields = {
+        "is_enabled": feature_configuration_is_enabled,
+    },
+)
+
+def _get_feature_configuration(
+        requested_features,
+        selectables_by_name,
+        selectables,
+        provides,
+        implies,
+        implied_by,
+        requires,
+        required_by,
+        action_configs_by_action_name,
+        cc_toolchain_path):
+    requested_selectables = set([
+        name
+        for name in requested_features
+        if name in selectables_by_name
+    ])
+
+    enabled = set()
+
+    def enable_all_implied_by(selectable):
+        # Bazel's implementation uses recursion, which Starlark does not
+        # permit. Add some dummy loops to work around this.
+        queue = set([selectable])
+        for dummy1 in selectables_by_name:
+            for dummy2 in selectables_by_name:
+                if not queue:
+                    return
+                selectable = queue.pop()
+                if selectable not in enabled:
+                    enabled.add(selectable)
+                    for implied in implies.get(selectable, set()):
+                        queue.add(implied)
+        fail("enable_all_implied_by failed to process all selectables")
+
+    def is_implied_by_enabled_activatable(selectable):
+        # TODO: Use set.isdisjoint(), which starlark-go does not support.
+        return bool(implied_by[selectable].intersection(enabled))
+
+    def all_implications_enabled(selectable):
+        for implied in implies.get(selectable, set()):
+            if implied not in enabled:
+                return False
+        return True
+
+    def all_requirements_met(feature):
+        if feature not in requires:
+            return True
+        for requires_all_of in requires[feature]:
+            requirement_met = True
+            for required in requires_all_of:
+                if not required in enabled:
+                    requirement_met = False
+            if requirement_met:
+                return True
+        return False
+
+    def is_satisfied(selectable):
+        return (
+            (selectable in requested_selectables or is_implied_by_enabled_activatable(selectable)) and
+            all_implications_enabled(selectable) and
+            all_requirements_met(selectable)
+        )
+
+    def check_activatable(selectable):
+        if selectable not in enabled or is_satisfied(selectable):
+            return
+        enabled.remove(selectable)
+
+        for implies_current in implied_by[selectable]:
+            check_activatable(implies_current)
+        for requires_current in required_by[selectable]:
+            check_activatable(requires_current)
+        for implied in implies[selectable]:
+            check_activatable(implied)
+
+    def disable_unsupported_activatables():
+        check = set(enabled)
+        for i in check:
+            check_activatable(i)
+
+    def is_feature(activatable):
+        return {
+            "action_config": False,
+            "feature": True,
+        }[activatable.type_name]
+
+    def is_action_config(activatable):
+        return {
+            "action_config": True,
+            "feature": False,
+        }[activatable.type_name]
+
+    # From FeatureSelection.run():
+    for selectable in requested_selectables:
+        enable_all_implied_by(selectable)
+    disable_unsupported_activatables()
+    enabled_activatables_in_order_builder = []
+    for selectable in selectables:
+        if _selectable_get_name(selectable) in enabled:
+            enabled_activatables_in_order_builder.append(selectable)
+
+    enabled_activatables_in_order = enabled_activatables_in_order_builder
+    enabled_features_in_order = [
+        activatable
+        for activatable in enabled_activatables_in_order
+        if is_feature(activatable)
+    ]
+    enabled_action_configs_in_order = [
+        activatable
+        for activatable in enabled_activatables_in_order
+        if is_action_config(activatable)
+    ]
+
+    for provided in provides:
+        conflicts = []
+        for selectable_providing_string in provides[provided]:
+            if selectable_providing_string in enabled_activatables_in_order:
+                conflicts.append(selectable_providing_string.name)
+
+        if len(conflicts) > 1:
+            fail("Symbol %s is provided by all of the following features: %s" % (provided, " ".join(conflicts)))
+
+    enabled_action_config_names = set([
+        action_config.action_name
+        for action_config in enabled_action_configs_in_order
+    ])
+
+    enabled_feature_names = set([
+        feature.name
+        for feature in enabled_features_in_order
+    ])
+    return FeatureConfiguration(
+        _action_config_by_action_name = action_configs_by_action_name,
+        _enabled_action_config_action_names = enabled_action_config_names,
+        _enabled_feature_names = enabled_feature_names,
+        is_requested = lambda feature: feature in requested_features,
+    )
 
 def builtins_internal_cc_common_configure_features(
         ctx,
@@ -668,6 +900,7 @@ def builtins_internal_cc_common_configure_features(
         language = None,
         requested_features = [],
         unsupported_features = []):
+    # From CcCommon.configureFeaturesOrThrowEvalException():
     cpp_configuration = cc_toolchain._cpp_configuration
 
     all_requested_features_builder = set()
@@ -701,6 +934,7 @@ def builtins_internal_cc_common_configure_features(
 
     all_unsupported_features = unsupported_features_builder
 
+    toolchain_features = cc_toolchain._toolchain_features
     all_features = (
         [
             cpp_configuration.compilation_mode(),
@@ -733,7 +967,7 @@ def builtins_internal_cc_common_configure_features(
             "strip",
         ] +
         requested_features +
-        cc_toolchain._toolchain_features._default_selectables
+        toolchain_features._default_selectables
     )
 
     if language in ["objc", "objc++"]:
@@ -786,16 +1020,28 @@ def builtins_internal_cc_common_configure_features(
         if feature not in all_unsupported_features:
             all_requested_features_builder.add(feature)
 
-    # TODO: Implement the algorithm of FeatureSelection.java to
-    # grow/prune these based on "requires"/"implies".
-    return struct(
-        _tool_for_action = {
-            name: action_config.tools[0].path
-            for name, action_config in cc_toolchain._toolchain_features._action_configs_by_action_name.items()
-        },
-        is_requested = lambda feature: feature in all_requested_features_builder,
-        is_enabled = lambda feature: feature in all_requested_features_builder,
+    feature_configuration = _get_feature_configuration(
+        all_requested_features_builder,
+        toolchain_features._selectables_by_name,
+        toolchain_features._selectables,
+        toolchain_features._provides,
+        toolchain_features._implies,
+        toolchain_features._implied_by,
+        toolchain_features._requires,
+        toolchain_features._required_by,
+        toolchain_features._action_configs_by_action_name,
+        toolchain_features._cc_toolchain_path,
     )
+    for feature in unsupported_features:
+        if feature_configuration.is_enabled(feature):
+            fail("The C++ toolchain '%s' unconditionally implies feature '%s', which is unsupported by this rule. This is most likely a misconfiguration in the C++ toolchain." % toolchain.get_cc_toolchain_label(), feature)
+    if (
+        cpp_configuration.force_pic and
+        not feature_configuration.is_enabled("pic") and
+        not feature_configuration.is_enabled("supports_pic")
+    ):
+        fail("PIC compilation is requested but the toolchain does not support it (feature named 'supports_pic' is not enabled)")
+    return feature_configuration
 
 def _feature(
         name,
@@ -1134,7 +1380,7 @@ def builtins_internal_cc_common_create_cc_toolchain_config_info(
         if "autofdo" not in feature_names:
             legacy_features_builder.append(_feature(
                 name = "autofdo",
-                provides = "profile",
+                provides = ["profile"],
                 flag_sets = [_flag_set(
                     actions = [
                         "c-compile",
@@ -1777,14 +2023,24 @@ def builtins_internal_cc_common_create_cc_toolchain_config_info(
 def _create_compilation_context(
         *,
         additional_inputs,
+        defines,
+        framework_includes,
         headers,
+        includes,
         module_map,
-        transitive_modules):
-    virtual_to_original_headers = depset()
+        quote_includes,
+        system_includes,
+        transitive_modules,
+        virtual_to_original_headers):
     return struct(
         additional_inputs = lambda: additional_inputs,
+        defines = defines,
+        framework_includes = framework_includes,
         headers = headers,
+        includes = includes,
         module_map = module_map,
+        quote_includes = quote_includes,
+        system_includes = system_includes,
         transitive_modules = transitive_modules,
         validation_artifacts = depset(),
         virtual_to_original_headers = lambda: virtual_to_original_headers,
@@ -1842,9 +2098,15 @@ def builtins_internal_cc_common_create_compilation_context(
 
     return _create_compilation_context(
         additional_inputs = additional_inputs,
+        defines = defines or depset(),
+        framework_includes = framework_includes or depset(),
         headers = headers or depset(),
+        includes = includes or depset(),
         module_map = module_map,
+        quote_includes = quote_includes or depset(),
+        system_includes = system_includes or depset(),
         transitive_modules = lambda use_pic: pic_modules if use_pic else modules,
+        virtual_to_original_headers = virtual_to_original_headers or depset(),
     )
 
 def _create_lto_compilation_context():
@@ -1860,9 +2122,10 @@ def builtins_internal_cc_common_create_compilation_outputs(
         objects = None,
         pic_objects = None):
     return _create_compilation_outputs(
+        header_tokens = depset(),
+        lto_compilation_context = lto_compilation_context or _create_lto_compilation_context(),
         objects = objects or depset(),
         pic_objects = pic_objects or depset(),
-        lto_compilation_context = lto_compilation_context or _create_lto_compilation_context(),
     )
 
 def builtins_internal_cc_common_create_compile_variables(
@@ -1884,7 +2147,7 @@ def builtins_internal_cc_common_create_compile_variables(
         variables_extension = None,
         strip_opts = None,
         input_file = None):
-    pass
+    return struct(_todo_is_compile_variables = True)
 
 def _create_debug_context(dwo_files, pic_dwo_files):
     return struct(
@@ -1957,41 +2220,62 @@ def builtins_internal_cc_common_get_memory_inefficient_command_line(
         feature_configuration,
         action_name,
         variables):
-    return ["TODO"]
+    return ["TODO", "get_memory_inefficient_command_line"]
+
+def _tool_get_tool_path_string(tool):
+    fail(tool)
+
+def _tool_is_with_features_satisfied(with_feature_sets, enabled_feature_names):
+    fail(with_feature_sets)
+
+def _action_config_get_tool(action_config, enabled_feature_names):
+    for tool in action_config.tools:
+        if _tool_is_with_features_satisfied(tool.with_features, enabled_feature_names):
+            return tool
+    fail("Matching tool for action %s not found for given feature configuration" % action_config.action_name)
 
 def builtins_internal_cc_common_get_tool_for_action(feature_configuration, action_name):
-    return feature_configuration._tool_for_action[action_name]
+    action_config = feature_configuration._action_config_by_action_name[action_name]
+    return _tool_get_tool_path_string(
+        _action_config_get_tool(action_config, feature_configuration._enabled_feature_names),
+    )
 
 def builtins_internal_cc_common_get_tool_requirement_for_action(*, action_name, feature_configuration):
     return []
 
 def builtins_internal_cc_common_merge_compilation_contexts(compilation_contexts = [], non_exported_compilation_contexts = []):
-    additional_inputs = depset(transitive = [
-        cc.additional_inputs()
-        for cc in compilation_contexts
-    ])
-    headers = depset(transitive = [
-        cc.headers
-        for cc in compilation_contexts
-    ])
-    modules = depset(transitive = [
-        cc.transitive_modules(use_pic = False)
-        for cc in compilation_contexts
-    ])
-    pic_modules = depset(transitive = [
-        cc.transitive_modules(use_pic = True)
-        for cc in compilation_contexts
-    ])
+    additional_inputs = depset(transitive = [cc.additional_inputs() for cc in compilation_contexts])
+    defines = depset(transitive = [cc.defines for cc in compilation_contexts])
+    framework_includes = depset(transitive = [cc.framework_includes for cc in compilation_contexts])
+    headers = depset(transitive = [cc.headers for cc in compilation_contexts])
+    includes = depset(transitive = [cc.includes for cc in compilation_contexts])
+    modules = depset(transitive = [cc.transitive_modules(use_pic = False) for cc in compilation_contexts])
+    pic_modules = depset(transitive = [cc.transitive_modules(use_pic = True) for cc in compilation_contexts])
+    quote_includes = depset(transitive = [cc.quote_includes for cc in compilation_contexts])
+    system_includes = depset(transitive = [cc.system_includes for cc in compilation_contexts])
+    virtual_to_original_headers = depset(transitive = [cc.virtual_to_original_headers() for cc in compilation_contexts])
 
     return _create_compilation_context(
         additional_inputs = additional_inputs,
+        defines = defines,
+        framework_includes = framework_includes,
         headers = headers,
+        includes = includes,
         module_map = None,
+        quote_includes = quote_includes,
+        system_includes = system_includes,
         transitive_modules = lambda use_pic: pic_modules if use_pic else modules,
+        virtual_to_original_headers = virtual_to_original_headers,
     )
 
 def builtins_internal_cc_common_merge_compilation_outputs(*, compilation_outputs = []):
     return _create_compilation_outputs(
+        header_tokens = depset(
+            transitive = [
+                co._header_tokens
+                for co in compilation_outputs
+            ],
+        ),
         objects = depset(
             transitive = [
                 co._objects
@@ -2062,26 +2346,51 @@ def builtins_internal_cc_internal_cc_toolchain_features(*, toolchain_config_info
         if action_config.enabled:
             default_selectables.append(action_config.action_name)
 
+    implies = {}
+    requires = {}
+    provides = {}
+    implied_by = {}
+    required_by = {}
+
+    for feature in toolchain_config_info._features:
+        name = feature.name
+        for required_features in feature.requires:
+            all_of = set()
+            for required_name in required_features.features:
+                all_of.add(required_name)
+                required_by.setdefault(required_name, set()).add(name)
+            requires.setdefault(name, set()).union(all_of)
+        for implied_name in feature.implies:
+            implied_by.setdefault(implied_name, set()).add(name)
+            implies.setdefault(name, set()).add(implied_name)
+        for provides_name in feature.provides:
+            provides.setdefault(provides_name, set()).add(name)
+
+    for action_config in toolchain_config_info._action_configs:
+        name = action_config.action_name
+        for implied_name in action_config.implies:
+            implied_by.setdefault(implied_name, set()).add(name)
+            implies.setdefault(name, set()).add(implied_name)
+
     return struct(
+        _action_configs_by_action_name = action_configs_by_action_name,
         _artifact_name_patterns = toolchain_config_info._artifact_name_patterns,
+        _cc_toolchain_path = tools_directory,
+        _default_selectables = default_selectables,
+        _implied_by = implied_by,
+        _implies = implies,
+        _provides = provides,
+        _required_by = required_by,
+        _requires = requires,
         _selectables = selectables,
         _selectables_by_name = selectables_by_name,
-        _action_configs_by_action_name = action_configs_by_action_name,
-        # TODO: Set these fields properly.
-        # _implies = ...,
-        # _implied_by = ...,
-        # _requires = ...,
-        # _provides = ...,
-        # _required_by = ...,
-        _default_selectables = default_selectables,
-        _cc_toolchain_path = tools_directory,
     )
 
 def builtins_internal_cc_internal_cc_toolchain_variables(vars):
     return "TODO"
 
 def builtins_internal_cc_internal_collect_libraries_to_link(
-        linker_inputs,
+        libraries_to_link,
         cc_toolchain,
         feature_configuration,
         output,
@@ -2089,16 +2398,11 @@ def builtins_internal_cc_internal_collect_libraries_to_link(
         link_type,
         linking_mode,
         is_native_deps,
-        need_whole_archive,
         solib_dir,
         toolchain_libraries_solib_dir,
-        allow_lto_indexing,
-        lto_mapping,
         workspace_name):
     return struct(
         all_runtime_library_search_directories = depset(),
-        expanded_linker_inputs = [],
-        libraries_to_link = [],
         library_search_directories = depset(),
     )
 
@@ -2114,6 +2418,53 @@ def builtins_internal_cc_internal_create_cc_launcher_info(*, cc_info, compilatio
         compilation_outputs = lambda: compilation_outputs,
     )
 
+def library_to_link_disable_whole_archive(lib):
+    return lambda: lib._disable_whole_archive
+
+def library_to_link_must_keep_debug(lib):
+    return lambda: lib._must_keep_debug
+
+def library_to_link_pic_objects_private(lib):
+    return lambda: lib._pic_object_files.to_list()
+
+LibraryToLink = provider(
+    computed_fields = {
+        "disable_whole_archive": library_to_link_disable_whole_archive,
+        "must_keep_debug": library_to_link_must_keep_debug,
+        "pic_objects_private": library_to_link_pic_objects_private,
+    },
+)
+
+def builtins_internal_cc_internal_create_library_to_link(library_to_link):
+    return LibraryToLink(
+        _disable_whole_archive = getattr(library_to_link, "disable_whole_archive", False),
+        _must_keep_debug = getattr(library_to_link, "must_keep_debug", False),
+        _pic_object_files = depset(getattr(library_to_link, "pic_object_files", [])),
+        alwayslink = getattr(library_to_link, "dynamic_library", False),
+        dynamic_library = getattr(library_to_link, "dynamic_library", None),
+        interface_library = getattr(library_to_link, "interface_library", None),
+        pic_static_library = getattr(library_to_link, "pic_static_library", None),
+        resolved_symlink_dynamic_library = getattr(library_to_link, "resolved_symlink_dynamic_library", None),
+        # Notice "resolve_" instead of "resolved_".
+        resolved_symlink_interface_library = getattr(library_to_link, "resolve_symlink_interface_library", None),
+        static_library = getattr(library_to_link, "static_library", None),
+    )
+
+def builtins_internal_cc_internal_create_shared_non_lto_artifacts(
+        actions,
+        lto_compilation_context,
+        is_linker,
+        feature_configuration,
+        cc_toolchain,
+        use_pic,
+        object_files):
+    shared_non_lto_backends = {}
+    lto_bitcode_inputs = lto_compilation_context.lto_bitcode_inputs()
+    for input_artifact in object_files:
+        if input_artifact in lto_bitcode_inputs:
+            fail("TODO")
+    return shared_non_lto_backends
+
 def builtins_internal_cc_internal_dynamic_library_soname(actions, path, preserve_name):
     if preserve_name:
         return path.rsplit("/", 1)[-1]
@@ -2121,6 +2472,7 @@ def builtins_internal_cc_internal_dynamic_library_soname(actions, path, preserve
 
 def builtins_internal_cc_internal_empty_compilation_outputs():
     return _create_compilation_outputs(
+        header_tokens = depset(),
         objects = depset(),
         pic_objects = depset(),
         lto_compilation_context = _create_lto_compilation_context(),
@@ -2131,6 +2483,12 @@ def builtins_internal_cc_internal_escape_label(label):
         "_U" if c == "_" else "_S" if c == "/" else "_B" if c == "\\" else "_C" if c == ":" else "_A" if c == "@" else c
         for c in (label.repo_name + "@" + label.package + ":" + label.name).elems()
     ])
+
+def builtins_internal_cc_internal_for_object_file(name, is_whole_archive):
+    return struct(__todo_is_for_object_file = True)
+
+def builtins_internal_cc_internal_for_static_library(name, is_whole_archive):
+    return struct(__todo_is_for_static_library = True)
 
 # Artifact name patterns that are registered by default.
 # Obtained from ArtifactCategory.java.
@@ -2359,9 +2717,13 @@ exported_toplevels["_builtins"] = struct(
             collect_libraries_to_link = builtins_internal_cc_internal_collect_libraries_to_link,
             convert_library_to_link_list_to_linker_input_list = builtins_internal_cc_internal_convert_library_to_link_list_to_linker_input_list,
             create_cc_launcher_info = builtins_internal_cc_internal_create_cc_launcher_info,
+            create_library_to_link = builtins_internal_cc_internal_create_library_to_link,
+            create_shared_non_lto_artifacts = builtins_internal_cc_internal_create_shared_non_lto_artifacts,
             dynamic_library_soname = builtins_internal_cc_internal_dynamic_library_soname,
             empty_compilation_outputs = builtins_internal_cc_internal_empty_compilation_outputs,
             escape_label = builtins_internal_cc_internal_escape_label,
+            for_object_file = builtins_internal_cc_internal_for_object_file,
+            for_static_library = builtins_internal_cc_internal_for_static_library,
             get_artifact_name_for_category = builtins_internal_cc_internal_get_artifact_name_for_category,
             get_link_args = builtins_internal_cc_internal_get_link_args,
             launcher_provider = CcLauncherInfo,
