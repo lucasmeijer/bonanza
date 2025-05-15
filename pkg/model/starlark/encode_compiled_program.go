@@ -427,6 +427,15 @@ type ValueDecodingOptions[TReference any] struct {
 	BzlFileBuiltins starlark.StringDict
 }
 
+// getThread creates a Starlark thread that can be used whenever the
+// decoding process depends on having a valid Starlark thread. This is,
+// for example, needed when inserting elements into dicts and sets.
+func (o *ValueDecodingOptions[TReference]) getThread() *starlark.Thread {
+	thread := &starlark.Thread{}
+	thread.SetLocal(ValueDecodingOptionsKey, o)
+	return thread
+}
+
 func DecodeValue[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](encodedValue model_core.Message[*model_starlark_pb.Value, TReference], currentIdentifier *pg_label.CanonicalStarlarkIdentifier, options *ValueDecodingOptions[TReference]) (starlark.Value, error) {
 	switch typedValue := encodedValue.Message.GetKind().(type) {
 	case *model_starlark_pb.Value_Aspect:
@@ -670,6 +679,26 @@ func DecodeValue[TReference object.BasicReference, TMetadata model_core.Cloneabl
 			}
 		}
 		return NewSelect[TReference, TMetadata](groups, concatenationOperator), nil
+	case *model_starlark_pb.Value_Set:
+		thread := options.getThread()
+		set := starlark.NewSet(0)
+		var errIter error
+		for element := range AllListLeafElementsSkippingDuplicateParents(
+			options.Context,
+			options.Readers.List,
+			model_core.Nested(encodedValue, typedValue.Set.Elements),
+			map[model_core.Decodable[object.LocalReference]]struct{}{},
+			&errIter,
+		) {
+			element, err := DecodeValue[TReference, TMetadata](element, nil, options)
+			if err != nil {
+				return nil, err
+			}
+			if err := set.Insert(thread, element); err != nil {
+				return nil, err
+			}
+		}
+		return set, errIter
 	case *model_starlark_pb.Value_Str:
 		return starlark.String(typedValue.Str), nil
 	case *model_starlark_pb.Value_Struct:
@@ -897,12 +926,7 @@ type dictEntriesDecodingOptions[TReference any] struct {
 }
 
 func decodeDictEntries[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](in model_core.Message[*model_starlark_pb.Dict, TReference], options *dictEntriesDecodingOptions[TReference]) error {
-	// Adding entries to the dict may require binary comparisons
-	// against keys. This may require having the value decoding
-	// options.
-	thread := &starlark.Thread{}
-	thread.SetLocal(ValueDecodingOptionsKey, options.valueDecodingOptions)
-
+	thread := options.valueDecodingOptions.getThread()
 	var errIter error
 	for key, value := range AllDictLeafEntries(
 		options.valueDecodingOptions.Context,
