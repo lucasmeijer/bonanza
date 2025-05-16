@@ -889,6 +889,7 @@ def _get_feature_configuration(
     return FeatureConfiguration(
         _action_config_by_action_name = action_configs_by_action_name,
         _enabled_action_config_action_names = enabled_action_config_names,
+        _enabled_features = enabled_features_in_order,
         _enabled_feature_names = enabled_feature_names,
         is_requested = lambda feature: feature in requested_features,
     )
@@ -2146,7 +2147,33 @@ def builtins_internal_cc_common_create_compile_variables(
         variables_extension = None,
         strip_opts = None,
         input_file = None):
-    return struct(_todo_is_compile_variables = True)
+    # From CompileBuildVariables.setupCommonVariablesInternal():
+    variables = {}
+    variables["include_paths"] = include_directories or depset()
+    variables["quote_include_paths"] = quote_include_directories or depset()
+    variables["system_include_paths"] = system_include_directories or depset()
+    variables["framework_include_paths"] = framework_include_directories or depset()
+    variables["preprocessor_defines"] = preprocessor_defines or depset()
+    variables.update(variables_extension)
+
+    # From CompileBuildVariables.setupSpecificVariables():
+    variables["user_compile_flags"] = user_compile_flags or []
+    if source_file:
+        variables["source_file"] = source_file
+    if output_file:
+        variables["output_file"] = output_file
+    if thinlto_index:
+        variables["thinlto_index"] = thinlto_index
+    if thinlto_input_bitcode_file:
+        variables["thinlto_input_bitcode_file"] = thinlto_input_bitcode_file
+    if thinlto_output_object_file:
+        variables["thinlto_output_object_file"] = thinlto_output_object_file
+    if use_pic:
+        variables["pic"] = ""
+
+    # From CcModule.getCompileBuildVariables():
+    variables["striptopts"] = strip_opts
+    return variables
 
 def _create_debug_context(dwo_files, pic_dwo_files):
     return struct(
@@ -2215,11 +2242,127 @@ def builtins_internal_cc_common_get_execution_requirements(
         feature_configuration):
     return []
 
+def flag_expand(flag, variables, command_line):
+    expanded = ""
+    mode = 0
+    variable_name = ""
+    for c in flag.elems():
+        if mode == 0:
+            if c == "%":
+                mode = 1
+            else:
+                expanded += c
+        elif mode == 1:
+            if c == "%":
+                expanded += c
+            elif c == "{":
+                mode = 2
+            else:
+                fail("% not followed by % or {")
+        elif mode == 2:
+            if c == "}":
+                expanded += variables[variable_name]
+                variable_name = ""
+                mode = 0
+            else:
+                variable_name += c
+
+    command_line.append(expanded)
+
+def flag_group_can_be_expanded(flag_group, variables):
+    if flag_group.expand_if_available and flag_group.expand_if_available not in variables:
+        return False
+    if flag_group.expand_if_not_available and flag_group.expand_if_not_available in variables:
+        return False
+    if flag_group.expand_if_true and not bool(variables.get(flag_group.expand_if_true, False)):
+        return False
+    if flag_group.expand_if_false and bool(variables.get(flag_group.expand_if_false, True)):
+        return False
+    if flag_group.expand_if_equal:
+        fail("TODO: support expand_if_equal: %s" % flag_group.expand_if_equal)
+    return True
+
+def flag_group_expand_command_line(flag_group, variables, command_line):
+    if not flag_group_can_be_expanded(flag_group, variables):
+        return
+    if flag_group.iterate_over:
+        variable_values = variables[flag_group.iterate_over]
+        if type(variable_values) == "depset":
+            variable_values = variable_values.to_list()
+        for variable_value in variable_values:
+            nested_variables = dict(variables)
+            nested_variables[flag_group.iterate_over] = variable_value
+            for expandable in flag_group.flags:
+                flag_expand(expandable, nested_variables, command_line)
+            for expandable in flag_group.flag_groups:
+                flag_group_expand_command_line(expandable, nested_variables, command_line)
+    else:
+        for expandable in flag_group.flags:
+            flag_expand(expandable, variables, command_line)
+        for expandable in flag_group.flag_groups:
+            flag_group_expand_command_line(expandable, variables, command_line)
+
+def is_with_features_satisfied(with_feature_sets, enabled_feature_names):
+    if not with_feature_sets:
+        return True
+    for feature_set in with_feature_sets:
+        if (
+            enabled_feature_names.issuperset(feature_set.features) and
+            enabled_feature_names.isdisjoint(feature_set.not_features)
+        ):
+            return True
+    return False
+
+def flag_set_expand_command_line(flag_set, action, variables, enabled_feature_names, command_line):
+    # TODO: Do we need to do anything with expand_if_all_available?
+    if not is_with_features_satisfied(flag_set.with_features, enabled_feature_names):
+        return
+    if action not in flag_set.actions:
+        return
+    for flag_group in flag_set.flag_groups:
+        flag_group_expand_command_line(flag_group, variables, command_line)
+
+def action_config_expand_command_line(action_config, variables, enabled_feature_names, command_line):
+    for flag_set in action_config.flag_sets:
+        flag_set_expand_command_line(
+            flag_set,
+            action_config.action_name,
+            variables,
+            enabled_feature_names,
+            command_line,
+        )
+
+def feature_expand_command_line(feature, action, variables, enabled_feature_names, command_line):
+    for flag_set in feature.flag_sets:
+        flag_set_expand_command_line(
+            flag_set,
+            action,
+            variables,
+            enabled_feature_names,
+            command_line,
+        )
+
 def builtins_internal_cc_common_get_memory_inefficient_command_line(
         feature_configuration,
         action_name,
         variables):
-    return ["TODO", "get_memory_inefficient_command_line"]
+    command_line = []
+    if action_name in feature_configuration._enabled_action_config_action_names:
+        action_config_expand_command_line(
+            feature_configuration._action_config_by_action_name[action_name],
+            variables,
+            feature_configuration._enabled_feature_names,
+            command_line,
+        )
+    for feature in feature_configuration._enabled_features:
+        feature_expand_command_line(
+            feature,
+            action_name,
+            variables,
+            feature_configuration._enabled_feature_names,
+            command_line,
+        )
+    return command_line
 
 def _tool_get_tool_path_string(tool):
     return tool.path
