@@ -808,6 +808,16 @@ func (s *BrowserService) doEvaluation(w http.ResponseWriter, r *http.Request) (g
 		}
 	}
 
+	// Rendering values might reveal the existence of additional encoders.
+	newRecentlyObservedEncoders := trimRecentlyObservedEncoders(
+		append(
+			append(
+				[]*browser_pb.RecentlyObservedEncoder{recentlyObservedEncoders[0]},
+				jsonRenderer.observedEncoders...,
+			),
+			recentlyObservedEncoders[1:]...,
+		),
+	)
 	return renderEvaluationPage(
 		w,
 		evaluationListReference,
@@ -815,7 +825,7 @@ func (s *BrowserService) doEvaluation(w http.ResponseWriter, r *http.Request) (g
 		valueNodes,
 		dependenciesNodes,
 		currentEncoderConfigurationStr,
-		recentlyObservedEncoders,
+		newRecentlyObservedEncoders,
 	), nil
 }
 
