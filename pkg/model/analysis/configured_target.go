@@ -3,6 +3,7 @@ package analysis
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"maps"
@@ -2601,11 +2602,17 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunCommon(
 	toolsDirect []starlark.Value,
 ) error {
 	// Use the name of the first output file as a somewhat stable
-	// identifier of the action. Associate the outputs with this action.
+	// identifier of the action. As this identifier is local to the
+	// configured target, it doesn't need to be too long to be
+	// unique.
 	if len(outputs) == 0 {
 		return errors.New("action has no outputs")
 	}
 	actionID := []byte(outputs[0].packageRelativePath.String())
+	if maxLength := 16; len(actionID) >= maxLength {
+		h := sha256.Sum256(actionID)
+		actionID = h[:maxLength]
+	}
 
 	// ctx.actions.run() needs to prefix the arguments with the name
 	// of the executable. ctx.actions.run_shell() needs to add
