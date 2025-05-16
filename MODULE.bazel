@@ -133,6 +133,7 @@ go_deps_dev.module_override(
         "//:patches/net_starlark_go/getattr-error-checking.diff",
         "//:patches/net_starlark_go/octal.diff",
         "//:patches/net_starlark_go/unwrap.diff",
+        "//:patches/net_starlark_go/set-isdisjoint.diff",
     ],
     path = "go.starlark.net",
 )

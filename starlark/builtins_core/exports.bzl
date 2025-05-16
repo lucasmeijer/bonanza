@@ -791,8 +791,7 @@ def _get_feature_configuration(
         fail("enable_all_implied_by failed to process all selectables")
 
     def is_implied_by_enabled_activatable(selectable):
-        # TODO: Use set.isdisjoint(), which starlark-go does not support.
-        return bool(implied_by[selectable].intersection(enabled))
+        return not implied_by[selectable].isdisjoint(enabled)
 
     def all_implications_enabled(selectable):
         for implied in implies.get(selectable, set()):
