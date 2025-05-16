@@ -47,6 +47,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
@@ -697,6 +698,13 @@ func (f *messageJSONFormatter) formatJSONValue(v any) formatted.Node {
 }
 
 func (f *messageJSONFormatter) formatJSONMessage(m model_core.Message[protoreflect.Message, object.LocalReference]) formatted.Node {
+	switch v := m.Message.Interface().(type) {
+	case *durationpb.Duration:
+		if jsonValue, err := protojson.Marshal(v); err == nil {
+			return formatted.Magenta(formatted.Text(string(jsonValue)))
+		}
+	}
+
 	fields := map[string]formatted.Node{}
 	m.Message.Range(func(fieldDescriptor protoreflect.FieldDescriptor, value protoreflect.Value) bool {
 		var valueNode formatted.Node

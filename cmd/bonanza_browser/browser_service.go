@@ -44,6 +44,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -1356,6 +1357,18 @@ func (d *messageJSONRenderer) renderMessage(m model_core.Message[protoreflect.Me
 }
 
 func (d *messageJSONRenderer) renderMessageCommon(m model_core.Message[protoreflect.Message, object.LocalReference], fields map[string][]g.Node) []g.Node {
+	switch v := m.Message.Interface().(type) {
+	case *durationpb.Duration:
+		if jsonValue, err := protojson.Marshal(v); err == nil {
+			return []g.Node{
+				h.Span(
+					h.Class("text-fuchsia-300"),
+					g.Text(string(jsonValue)),
+				),
+			}
+		}
+	}
+
 	// Iterate over all message fields and render their values.
 	m.Message.Range(func(fieldDescriptor protoreflect.FieldDescriptor, value protoreflect.Value) bool {
 		var valueNodes []g.Node
