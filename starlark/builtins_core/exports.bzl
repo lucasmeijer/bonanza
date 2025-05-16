@@ -671,20 +671,21 @@ def builtins_internal_cc_common_compile_fork(
     objects = []
     pic_objects = []
     for src in srcs:
-        p = src[0].path
-        if p.endswith(".c"):
+        src_file = src[0]
+        src_base = src_file.basename
+        if src_base.endswith(".c"):
             action_name = "c-compile"
-        elif p.endswith(".cc"):
+        elif src_base.endswith(".cc"):
             action_name = "c++-compile"
         else:
             fail(src)
-        base = p.rsplit(".", 1)[0]
+        object_file_base = "_objs/%s/%s" % (name, src_base.rsplit(".", 1)[0])
 
-        object_file = actions.declare_file(base + ".o")
+        object_file = actions.declare_file(object_file_base + ".o")
         variables = builtins_internal_cc_common_create_compile_variables(
             cc_toolchain = cc_toolchain,
             feature_configuration = feature_configuration,
-            source_file = p,
+            source_file = src_file.path,
             output_file = object_file.path,
             user_compile_flags = user_compile_flags,
             include_directories = merged_compilation_context.includes,
@@ -703,11 +704,11 @@ def builtins_internal_cc_common_compile_fork(
         )
         objects.append(object_file)
 
-        pic_object_file = actions.declare_file(base + ".pic.o")
+        pic_object_file = actions.declare_file(object_file_base + ".pic.o")
         pic_variables = builtins_internal_cc_common_create_compile_variables(
             cc_toolchain = cc_toolchain,
             feature_configuration = feature_configuration,
-            source_file = p,
+            source_file = src_file.path,
             output_file = pic_object_file.path,
             user_compile_flags = user_compile_flags,
             include_directories = merged_compilation_context.includes,
