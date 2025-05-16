@@ -617,6 +617,13 @@ type messageJSONFormatter struct {
 	baseURL string
 }
 
+func formatReferenceLink(link, rawReference string) formatted.Node {
+	if len(rawReference) > 8+3 {
+		rawReference = rawReference[:8] + "..."
+	}
+	return formatted.Link(link, formatted.Cyan(formatted.Textf("%#v", rawReference)))
+}
+
 func (f *messageJSONFormatter) formatJSONField(fieldDescriptor protoreflect.FieldDescriptor, value model_core.Message[protoreflect.Value, object.LocalReference]) formatted.Node {
 	var v any
 	switch fieldDescriptor.Kind() {
@@ -641,7 +648,6 @@ func (f *messageJSONFormatter) formatJSONField(fieldDescriptor protoreflect.Fiel
 		if r, ok := value.Message.Message().Interface().(*model_core_pb.DecodableReference); ok {
 			if reference, err := model_core.FlattenDecodableReference(model_core.Nested(value, r)); err == nil {
 				rawReference := model_core.DecodableLocalReferenceToString(reference)
-				formattedReference := formatted.Cyan(formatted.Textf("%#v", rawReference))
 				if f.baseURL != "" {
 					if fieldOptions, ok := fieldDescriptor.Options().(*descriptorpb.FieldOptions); ok {
 						// Field is a valid reference for
@@ -652,20 +658,20 @@ func (f *messageJSONFormatter) formatJSONField(fieldDescriptor protoreflect.Fiel
 						switch format := objectFormat.GetFormat().(type) {
 						case *model_core_pb.ObjectFormat_Raw:
 							if link, err := url.JoinPath(f.baseURL, rawReference, "raw"); err == nil {
-								return formatted.Link(link, formattedReference)
+								return formatReferenceLink(link, rawReference)
 							}
 						case *model_core_pb.ObjectFormat_MessageTypeName:
 							if link, err := url.JoinPath(f.baseURL, rawReference, "message", format.MessageTypeName); err == nil {
-								return formatted.Link(link, formattedReference)
+								return formatReferenceLink(link, rawReference)
 							}
 						case *model_core_pb.ObjectFormat_MessageListTypeName:
 							if link, err := url.JoinPath(f.baseURL, rawReference, "message_list", format.MessageListTypeName); err == nil {
-								return formatted.Link(link, formattedReference)
+								return formatReferenceLink(link, rawReference)
 							}
 						}
 					}
 				}
-				return formattedReference
+				return formatted.Cyan(formatted.Textf("%#v", rawReference))
 			}
 		}
 
