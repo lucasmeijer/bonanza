@@ -551,6 +551,12 @@
             "Package"
          ]
       },
+      "TargetAction": {
+         "dependsOn": [
+            "ConfiguredTarget"
+         ],
+         "keyContainsReferences": true
+      },
       "TargetActionResult": {
          "dependsOn": [
             "BuiltinsModuleNames",
@@ -559,7 +565,6 @@
             "CommandReaders",
             "CompiledBzlFileDecodedGlobals",
             "CompiledBzlFileFunctionFactory",
-            "ConfiguredTarget",
             "DirectoryCreationParameters",
             "DirectoryCreationParametersObject",
             "DirectoryReaders",
@@ -567,7 +572,8 @@
             "FileListRoot",
             "FileRoot",
             "RootModule",
-            "SuccessfulActionResult"
+            "SuccessfulActionResult",
+            "TargetAction"
          ],
          "keyContainsReferences": true
       },

@@ -2808,17 +2808,17 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunCommon(
 		return err
 	}
 
-	action, err := inlinedtree.Build(
-		inlinedtree.CandidateList[*model_analysis_pb.ConfiguredTarget_Value_Action_Leaf, TMetadata]{
-			// Fields that should always be inlined into the action.
+	actionDefinition, err := inlinedtree.Build(
+		inlinedtree.CandidateList[*model_analysis_pb.TargetActionDefinition, TMetadata]{
+			// Fields that should always be inlined into the
+			// action definition.
 			{
 				ExternalMessage: model_core.NewSimplePatchedMessage[TMetadata]((proto.Message)(nil)),
 				ParentAppender: func(
-					action model_core.PatchedMessage[*model_analysis_pb.ConfiguredTarget_Value_Action_Leaf, TMetadata],
+					actionDefinition model_core.PatchedMessage[*model_analysis_pb.TargetActionDefinition, TMetadata],
 					externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
 				) {
-					action.Message.Id = actionID
-					action.Message.PlatformPkixPublicKey = rc.execGroups[execGroupIndex].platformPkixPublicKey
+					actionDefinition.Message.PlatformPkixPublicKey = rc.execGroups[execGroupIndex].platformPkixPublicKey
 				},
 			},
 			// Fields that can be stored externally if needed.
@@ -2828,12 +2828,12 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunCommon(
 					argsList.Patcher,
 				),
 				ParentAppender: func(
-					action model_core.PatchedMessage[*model_analysis_pb.ConfiguredTarget_Value_Action_Leaf, TMetadata],
+					actionDefinition model_core.PatchedMessage[*model_analysis_pb.TargetActionDefinition, TMetadata],
 					externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
 				) {
 					// TODO: This should push out the
 					// arguments if they get too big.
-					action.Message.Arguments = argsList.Message
+					actionDefinition.Message.Arguments = argsList.Message
 				},
 			},
 			{
@@ -2842,12 +2842,12 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunCommon(
 					encodedInputs.Patcher,
 				),
 				ParentAppender: func(
-					action model_core.PatchedMessage[*model_analysis_pb.ConfiguredTarget_Value_Action_Leaf, TMetadata],
+					actionDefinition model_core.PatchedMessage[*model_analysis_pb.TargetActionDefinition, TMetadata],
 					externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
 				) {
 					// TODO: This should push out the
 					// inputs if they get too big.
-					action.Message.Inputs = encodedInputs.Message
+					actionDefinition.Message.Inputs = encodedInputs.Message
 				},
 			},
 			{
@@ -2856,12 +2856,12 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunCommon(
 					encodedTools.Patcher,
 				),
 				ParentAppender: func(
-					action model_core.PatchedMessage[*model_analysis_pb.ConfiguredTarget_Value_Action_Leaf, TMetadata],
+					actionDefinition model_core.PatchedMessage[*model_analysis_pb.TargetActionDefinition, TMetadata],
 					externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
 				) {
 					// TODO: This should push out the
 					// tools if they get too big.
-					action.Message.Tools = encodedTools.Message
+					actionDefinition.Message.Tools = encodedTools.Message
 				},
 			},
 			{
@@ -2871,13 +2871,13 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunCommon(
 				),
 				Encoder: rc.commandEncoder,
 				ParentAppender: func(
-					action model_core.PatchedMessage[*model_analysis_pb.ConfiguredTarget_Value_Action_Leaf, TMetadata],
+					actionDefinition model_core.PatchedMessage[*model_analysis_pb.TargetActionDefinition, TMetadata],
 					externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
 				) {
-					action.Message.OutputPathPattern = model_command.GetPathPatternWithChildren(
+					actionDefinition.Message.OutputPathPattern = model_command.GetPathPatternWithChildren(
 						outputPathPatternChildren,
 						externalObject,
-						action.Patcher,
+						actionDefinition.Patcher,
 						rc.environment,
 					)
 				},
@@ -2888,7 +2888,13 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunCommon(
 	if err != nil {
 		return err
 	}
-	rc.actions = append(rc.actions, action)
+	rc.actions = append(rc.actions, model_core.NewPatchedMessage(
+		&model_analysis_pb.ConfiguredTarget_Value_Action_Leaf{
+			Id:         actionID,
+			Definition: actionDefinition.Message,
+		},
+		actionDefinition.Patcher,
+	))
 	return nil
 }
 

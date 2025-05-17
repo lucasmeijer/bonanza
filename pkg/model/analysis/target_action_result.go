@@ -1,7 +1,6 @@
 package analysis
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -126,28 +125,29 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 		return PatchedTargetActionResultValue{}, fmt.Errorf("invalid target label: %w", err)
 	}
 
-	commandEncoder, gotCommandEncoder := e.GetCommandEncoderObjectValue(&model_analysis_pb.CommandEncoderObject_Key{})
-	commandReaders, gotCommandReaders := e.GetCommandReadersValue(&model_analysis_pb.CommandReaders_Key{})
-	allBuiltinsModulesNames := e.GetBuiltinsModuleNamesValue(&model_analysis_pb.BuiltinsModuleNames_Key{})
 	configurationReference := model_core.Nested(key, key.Message.ConfigurationReference)
 	patchedConfigurationReference := model_core.Patch(e, configurationReference)
-	configuredTarget := e.GetConfiguredTargetValue(
+	action := e.GetTargetActionValue(
 		model_core.NewPatchedMessage(
-			&model_analysis_pb.ConfiguredTarget_Key{
+			&model_analysis_pb.TargetAction_Key{
 				Label:                  targetLabel.String(),
 				ConfigurationReference: patchedConfigurationReference.Message,
+				ActionId:               key.Message.ActionId,
 			},
 			model_core.MapReferenceMetadataToWalkers(patchedConfigurationReference.Patcher),
 		),
 	)
+	commandEncoder, gotCommandEncoder := e.GetCommandEncoderObjectValue(&model_analysis_pb.CommandEncoderObject_Key{})
+	commandReaders, gotCommandReaders := e.GetCommandReadersValue(&model_analysis_pb.CommandReaders_Key{})
+	allBuiltinsModulesNames := e.GetBuiltinsModuleNamesValue(&model_analysis_pb.BuiltinsModuleNames_Key{})
 	directoryCreationParameters, gotDirectoryCreationParameters := e.GetDirectoryCreationParametersObjectValue(&model_analysis_pb.DirectoryCreationParametersObject_Key{})
 	directoryCreationParametersMessage := e.GetDirectoryCreationParametersValue(&model_analysis_pb.DirectoryCreationParameters_Key{})
 	directoryReaders, gotDirectoryReaders := e.GetDirectoryReadersValue(&model_analysis_pb.DirectoryReaders_Key{})
 	fileCreationParametersMessage := e.GetFileCreationParametersValue(&model_analysis_pb.FileCreationParameters_Key{})
-	if !allBuiltinsModulesNames.IsSet() ||
+	if !action.IsSet() ||
+		!allBuiltinsModulesNames.IsSet() ||
 		!gotCommandEncoder ||
 		!gotCommandReaders ||
-		!configuredTarget.IsSet() ||
 		!gotDirectoryCreationParameters ||
 		!gotDirectoryReaders ||
 		!directoryCreationParametersMessage.IsSet() ||
@@ -155,37 +155,10 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 		return PatchedTargetActionResultValue{}, evaluation.ErrMissingDependency
 	}
 
-	// Look up the action within the configured target.
-	// TODO: Should this be moved into a separate function, so that
-	// changes to a single action does not require others to be
-	// recomputed?
-	actionID := key.Message.ActionId
-	action, err := btree.Find(
-		ctx,
-		c.configuredTargetActionReader,
-		model_core.Nested(configuredTarget, configuredTarget.Message.Actions),
-		func(entry model_core.Message[*model_analysis_pb.ConfiguredTarget_Value_Action, TReference]) (int, *model_core_pb.DecodableReference) {
-			switch level := entry.Message.Level.(type) {
-			case *model_analysis_pb.ConfiguredTarget_Value_Action_Leaf_:
-				return bytes.Compare(actionID, level.Leaf.Id), nil
-			case *model_analysis_pb.ConfiguredTarget_Value_Action_Parent_:
-				return bytes.Compare(actionID, level.Parent.FirstId), level.Parent.Reference
-			default:
-				return 0, nil
-			}
-		},
-	)
-	if err != nil {
-		return PatchedTargetActionResultValue{}, err
+	actionDefinition := action.Message.Definition
+	if actionDefinition == nil {
+		return PatchedTargetActionResultValue{}, errors.New("action definition missing")
 	}
-	if !action.IsSet() {
-		return PatchedTargetActionResultValue{}, errors.New("target does not yield an action with the provided identifier")
-	}
-	actionLevel, ok := action.Message.Level.(*model_analysis_pb.ConfiguredTarget_Value_Action_Leaf_)
-	if !ok {
-		return PatchedTargetActionResultValue{}, errors.New("action is not a leaf")
-	}
-	actionLeaf := actionLevel.Leaf
 
 	// Construct the list of command line arguments.
 	// TODO: Respect use_param_file().
@@ -199,7 +172,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 	for args := range btree.AllLeaves(
 		ctx,
 		c.argsReader,
-		model_core.Nested(action, actionLeaf.Arguments),
+		model_core.Nested(action, actionDefinition.Arguments),
 		/* traverser = */ func(element model_core.Message[*model_analysis_pb.Args, TReference]) (*model_core_pb.DecodableReference, error) {
 			if level, ok := element.Message.Level.(*model_analysis_pb.Args_Parent_); ok {
 				return level.Parent.Reference, nil
@@ -521,7 +494,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 	packageRelativeOutputPathPatternChildren, err := model_command.PathPatternGetChildren(
 		ctx,
 		commandReaders.PathPatternChildren,
-		model_core.Nested(action, actionLeaf.OutputPathPattern),
+		model_core.Nested(action, actionDefinition.OutputPathPattern),
 	)
 	if err != nil {
 		return PatchedTargetActionResultValue{}, err
@@ -635,7 +608,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 	}
 	if err := addFilesToChangeTrackingDirectory(
 		e,
-		model_core.Nested(action, actionLeaf.Inputs),
+		model_core.Nested(action, actionDefinition.Inputs),
 		&rootDirectory,
 		loadOptions,
 	); err != nil {
@@ -644,7 +617,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 	// TODO: We need to add runfiles for the tools!
 	if err := addFilesToChangeTrackingDirectory(
 		e,
-		model_core.Nested(action, actionLeaf.Tools),
+		model_core.Nested(action, actionDefinition.Tools),
 		&rootDirectory,
 		loadOptions,
 	); err != nil {
@@ -697,7 +670,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 					// to pick a default.
 					ExecutionTimeout:      &durationpb.Duration{Seconds: 3600},
 					InputRootReference:    patcher.CaptureAndAddDecodableReference(rootDirectoryObject, e),
-					PlatformPkixPublicKey: actionLeaf.PlatformPkixPublicKey,
+					PlatformPkixPublicKey: actionDefinition.PlatformPkixPublicKey,
 				},
 			},
 			model_core.MapReferenceMetadataToWalkers(patcher),
