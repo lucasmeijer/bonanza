@@ -545,6 +545,12 @@ message ConfiguredTarget {
         // Command, any objects contained in the pattern should be
         // encoded using the command encoder.
         bonanza.model.command.PathPattern output_path_pattern = 6;
+
+        // Directories that should be present in the output directory
+        // prior to running the action. For example, if this action is
+        // expected to write to output file "a/b.txt", the initial
+        // output directory will contain an empty directory named "a".
+        bonanza.model.filesystem.Directory initial_output_directory = 7;
       }
 
       oneof level {
