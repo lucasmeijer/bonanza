@@ -170,9 +170,11 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 			targetActionResult := e.GetTargetActionResultValue(
 				model_core.NewPatchedMessage(
 					&model_analysis_pb.TargetActionResult_Key{
-						Label:                  targetLabel.String(),
-						ConfigurationReference: patchedConfigurationReference.Message,
-						ActionId:               source.ActionId,
+						Id: &model_analysis_pb.TargetActionId{
+							Label:                  targetLabel.String(),
+							ConfigurationReference: patchedConfigurationReference.Message,
+							ActionId:               source.ActionId,
+						},
 					},
 					model_core.MapReferenceMetadataToWalkers(patchedConfigurationReference.Patcher),
 				),

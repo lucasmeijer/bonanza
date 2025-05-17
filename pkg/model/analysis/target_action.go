@@ -13,11 +13,15 @@ import (
 )
 
 func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionValue(ctx context.Context, key model_core.Message[*model_analysis_pb.TargetAction_Key, TReference], e TargetActionEnvironment[TReference, TMetadata]) (PatchedTargetActionValue, error) {
-	patchedConfigurationReference := model_core.Patch(e, model_core.Nested(key, key.Message.ConfigurationReference))
+	id := key.Message.Id
+	if id == nil {
+		return PatchedTargetActionValue{}, errors.New("no target action identifier specified")
+	}
+	patchedConfigurationReference := model_core.Patch(e, model_core.Nested(key, id.ConfigurationReference))
 	configuredTarget := e.GetConfiguredTargetValue(
 		model_core.NewPatchedMessage(
 			&model_analysis_pb.ConfiguredTarget_Key{
-				Label:                  key.Message.Label,
+				Label:                  id.Label,
 				ConfigurationReference: patchedConfigurationReference.Message,
 			},
 			model_core.MapReferenceMetadataToWalkers(patchedConfigurationReference.Patcher),
@@ -27,7 +31,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionValue(ctx conte
 		return PatchedTargetActionValue{}, evaluation.ErrMissingDependency
 	}
 
-	actionID := key.Message.ActionId
+	actionID := id.ActionId
 	action, err := btree.Find(
 		ctx,
 		c.configuredTargetActionReader,

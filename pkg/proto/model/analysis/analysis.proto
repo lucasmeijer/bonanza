@@ -1531,21 +1531,26 @@ message Target {
   }
 }
 
+message TargetActionId {
+  // The label of the target that declared the action.
+  string label = 1;
+
+  // The configuration that was used to compute the configured target
+  // declaring the action.
+  bonanza.model.core.DecodableReference configuration_reference = 2
+      [(bonanza.model.core.object_format) = {
+        message_list_type_name:
+          "bonanza.model.analysis.BuildSettingOverride";
+      }];
+
+  // The identifier of the action within the configured target.
+  bytes action_id = 3;
+}
+
 message TargetAction {
   message Key {
-    // The label of the target that declared the action.
-    string label = 1;
-
-    // The configuration that was used to compute the configured target
-    // declaring the action.
-    bonanza.model.core.DecodableReference configuration_reference = 2
-        [(bonanza.model.core.object_format) = {
-          message_list_type_name:
-            "bonanza.model.analysis.BuildSettingOverride";
-        }];
-
-    // The identifier of the action within the configured target.
-    bytes action_id = 3;
+    // The identifier of the target action.
+    TargetActionId id = 1;
   }
 
   message Value {
@@ -1556,19 +1561,8 @@ message TargetAction {
 
 message TargetActionResult {
   message Key {
-    // The label of the target that declared the action.
-    string label = 1;
-
-    // The configuration that was used to compute the configured target
-    // declaring the action.
-    bonanza.model.core.DecodableReference configuration_reference = 2
-        [(bonanza.model.core.object_format) = {
-          message_list_type_name:
-            "bonanza.model.analysis.BuildSettingOverride";
-        }];
-
-    // The identifier of the action within the configured target.
-    bytes action_id = 3;
+    // The identifier of the target action.
+    TargetActionId id = 1;
   }
 
   message Value {

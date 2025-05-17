@@ -120,21 +120,22 @@ func (c *baseComputer[TReference, TMetadata]) expandFileIfDirectory(e expandFile
 }
 
 func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx context.Context, key model_core.Message[*model_analysis_pb.TargetActionResult_Key, TReference], e TargetActionResultEnvironment[TReference, TMetadata]) (PatchedTargetActionResultValue, error) {
-	targetLabel, err := label.NewCanonicalLabel(key.Message.Label)
+	id := model_core.Nested(key, key.Message.Id)
+	if id.Message == nil {
+		return PatchedTargetActionResultValue{}, errors.New("no target action identifier specified")
+	}
+	targetLabel, err := label.NewCanonicalLabel(id.Message.Label)
 	if err != nil {
 		return PatchedTargetActionResultValue{}, fmt.Errorf("invalid target label: %w", err)
 	}
 
-	configurationReference := model_core.Nested(key, key.Message.ConfigurationReference)
-	patchedConfigurationReference := model_core.Patch(e, configurationReference)
+	patchedID := model_core.Patch(e, id)
 	action := e.GetTargetActionValue(
 		model_core.NewPatchedMessage(
 			&model_analysis_pb.TargetAction_Key{
-				Label:                  targetLabel.String(),
-				ConfigurationReference: patchedConfigurationReference.Message,
-				ActionId:               key.Message.ActionId,
+				Id: patchedID.Message,
 			},
-			model_core.MapReferenceMetadataToWalkers(patchedConfigurationReference.Patcher),
+			model_core.MapReferenceMetadataToWalkers(patchedID.Patcher),
 		),
 	)
 	commandEncoder, gotCommandEncoder := e.GetCommandEncoderObjectValue(&model_analysis_pb.CommandEncoderObject_Key{})
@@ -515,7 +516,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 			return PatchedTargetActionResultValue{}, err
 		}
 	}
-	configurationReferenceComponent, err := model_starlark.ConfigurationReferenceToComponent(configurationReference)
+	configurationReferenceComponent, err := model_starlark.ConfigurationReferenceToComponent(model_core.Nested(id, id.Message.ConfigurationReference))
 	if err != nil {
 		return PatchedTargetActionResultValue{}, err
 	}
