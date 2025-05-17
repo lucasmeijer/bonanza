@@ -8,6 +8,7 @@ import (
 	"iter"
 	"maps"
 	"slices"
+	"sort"
 
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/storage/dag"
@@ -262,6 +263,7 @@ func FullyComputeValue[TReference object.BasicReference, TMetadata any](
 
 			value := ks.value.getMessageValue()
 			dependencies := make([]model_core.Message[proto.Message, TReference], 0, len(ks.dependencies))
+			sort.Strings(ks.dependencies)
 			for _, dependency := range ks.dependencies {
 				dependencies = append(dependencies, keys[dependency].key)
 			}
@@ -348,13 +350,13 @@ func FullyComputeValue[TReference object.BasicReference, TMetadata any](
 			dependencies:  map[string]struct{}{},
 		}
 		err = ks.value.compute(ctx, c, &e)
+		ks.dependencies = slices.Collect(maps.Keys(e.dependencies))
 		if err != nil {
 			if p.err != nil {
 				err = p.err
 			}
 			if !errors.Is(err, ErrMissingDependency) {
 				fmt.Printf("\n")
-				ks.dependencies = slices.Sorted(maps.Keys(e.dependencies))
 
 				var stack []model_core.Message[proto.Message, TReference]
 				for ksIter := ks; ksIter != nil; ksIter = ksIter.parent {
@@ -373,7 +375,6 @@ func FullyComputeValue[TReference object.BasicReference, TMetadata any](
 			// Successfully computed value. Unblock any keys
 			// that were waiting on us and enqueue them if
 			// they no longer have any blockers.
-			ks.dependencies = slices.Sorted(maps.Keys(e.dependencies))
 			for ksBlocked := range ks.blocking {
 				ksBlocked.blockedCount--
 				if ksBlocked.blockedCount == 0 {
