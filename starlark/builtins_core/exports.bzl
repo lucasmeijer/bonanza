@@ -681,6 +681,11 @@ def builtins_internal_cc_common_compile_fork(
             fail(src)
         object_file_base = "_objs/%s/%s" % (name, src_base.rsplit(".", 1)[0])
 
+        inputs = depset(
+            direct = [src[0]],
+            transitive = [cc_toolchain._compiler_files],
+        )
+
         object_file = actions.declare_file(object_file_base + ".o")
         variables = builtins_internal_cc_common_create_compile_variables(
             cc_toolchain = cc_toolchain,
@@ -699,7 +704,7 @@ def builtins_internal_cc_common_compile_fork(
         actions.run(
             executable = builtins_internal_cc_common_get_tool_for_action(feature_configuration, action_name),
             arguments = builtins_internal_cc_common_get_memory_inefficient_command_line(feature_configuration, action_name, variables),
-            inputs = [src[0]],
+            inputs = inputs,
             outputs = [object_file],
         )
         objects.append(object_file)
@@ -722,7 +727,7 @@ def builtins_internal_cc_common_compile_fork(
         actions.run(
             executable = builtins_internal_cc_common_get_tool_for_action(feature_configuration, action_name),
             arguments = builtins_internal_cc_common_get_memory_inefficient_command_line(feature_configuration, action_name, pic_variables),
-            inputs = [src[0]],
+            inputs = inputs,
             outputs = [pic_object_file],
         )
         pic_objects.append(pic_object_file)
