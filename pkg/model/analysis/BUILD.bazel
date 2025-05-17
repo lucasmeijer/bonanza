@@ -62,6 +62,8 @@ go_library(
         "successful_action_result.go",
         "target.go",
         "target_action.go",
+        "target_action_command.go",
+        "target_action_input_root.go",
         "target_action_result.go",
         "target_completion.go",
         "target_pattern_expansion.go",

@@ -557,7 +557,7 @@
          ],
          "keyContainsReferences": true
       },
-      "TargetActionResult": {
+      "TargetActionCommand": {
          "dependsOn": [
             "BuiltinsModuleNames",
             "CanonicalRepoName",
@@ -567,13 +567,32 @@
             "CompiledBzlFileFunctionFactory",
             "DirectoryCreationParameters",
             "DirectoryCreationParametersObject",
-            "DirectoryReaders",
             "FileCreationParameters",
             "FileListRoot",
             "FileRoot",
             "RootModule",
-            "SuccessfulActionResult",
             "TargetAction"
+         ],
+         "keyContainsReferences": true
+      },
+      "TargetActionInputRoot": {
+         "dependsOn": [
+            "DirectoryCreationParametersObject",
+            "DirectoryReaders",
+            "FileCreationParameters",
+            "FileListRoot",
+            "FileRoot",
+            "TargetAction"
+         ],
+         "keyContainsReferences": true
+      },
+      "TargetActionResult": {
+         "dependsOn": [
+            "DirectoryReaders",
+            "SuccessfulActionResult",
+            "TargetAction",
+            "TargetActionCommand",
+            "TargetActionInputRoot"
          ],
          "keyContainsReferences": true
       },

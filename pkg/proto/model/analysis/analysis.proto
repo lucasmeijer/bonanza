@@ -1559,6 +1559,36 @@ message TargetAction {
   }
 }
 
+message TargetActionCommand {
+  message Key {
+    // The identifier of the target action.
+    TargetActionId id = 1;
+  }
+
+  message Value {
+    bonanza.model.core.DecodableReference command_reference = 1
+        [(bonanza.model.core.object_format) = {
+          message_type_name:
+            "bonanza.model.command.Command";
+        }];
+  }
+}
+
+message TargetActionInputRoot {
+  message Key {
+    // The identifier of the target action.
+    TargetActionId id = 1;
+  }
+
+  message Value {
+    bonanza.model.core.DecodableReference input_root_reference = 1
+        [(bonanza.model.core.object_format) = {
+          message_type_name:
+            "bonanza.model.filesystem.Directory";
+        }];
+  }
+}
+
 message TargetActionResult {
   message Key {
     // The identifier of the target action.
