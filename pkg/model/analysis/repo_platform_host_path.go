@@ -160,7 +160,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRepoPlatformHostPathValue(c
 		// RepoPlatformHostPath recursively.
 		capturedDirectory, err := model_filesystem.DirectoryNodeGetContents(
 			ctx,
-			directoryReaders.Directory,
+			directoryReaders.DirectoryContents,
 			model_core.Nested(outputs, directories[index]),
 		)
 		if err != nil {
@@ -169,9 +169,9 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRepoPlatformHostPathValue(c
 
 		var rootDirectory changeTrackingDirectory[TReference, TMetadata]
 		loadOptions := changeTrackingDirectoryLoadOptions[TReference]{
-			context:         ctx,
-			directoryReader: directoryReaders.Directory,
-			leavesReader:    directoryReaders.Leaves,
+			context:                 ctx,
+			directoryContentsReader: directoryReaders.DirectoryContents,
+			leavesReader:            directoryReaders.Leaves,
 		}
 		if err := rootDirectory.setContents(capturedDirectory, &loadOptions); err != nil {
 			return PatchedRepoPlatformHostPathValue{}, err
@@ -205,9 +205,9 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRepoPlatformHostPathValue(c
 				directoryCreationParameters,
 				&capturableChangeTrackingDirectory[TReference, TMetadata]{
 					options: &capturableChangeTrackingDirectoryOptions[TReference, TMetadata]{
-						context:         groupCtx,
-						directoryReader: directoryReaders.Directory,
-						objectCapturer:  e,
+						context:                 groupCtx,
+						directoryContentsReader: directoryReaders.DirectoryContents,
+						objectCapturer:          e,
 					},
 					directory: &rootDirectory,
 				},

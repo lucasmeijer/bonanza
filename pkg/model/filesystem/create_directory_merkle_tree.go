@@ -247,15 +247,15 @@ func (b *directoryMerkleTreeBuilder[TDirectory, TFile]) walkDirectory(
 func (b *directoryMerkleTreeBuilder[TDirectory, TFile]) maybeFinalizeDirectory(ud *unfinalizedDirectory[TDirectory, TFile], count uint32) error {
 	for ; ud.unfinalizedCount.Add(-count) == 0; ud = ud.parent {
 		count = 1
-		inlineCandidates := make(inlinedtree.CandidateList[*model_filesystem_pb.Directory, TDirectory], 0, 1+len(ud.directories))
+		inlineCandidates := make(inlinedtree.CandidateList[*model_filesystem_pb.DirectoryContents, TDirectory], 0, 1+len(ud.directories))
 		defer inlineCandidates.Discard()
 
-		leavesInline := &model_filesystem_pb.Directory_LeavesInline{
+		leavesInline := &model_filesystem_pb.DirectoryContents_LeavesInline{
 			LeavesInline: ud.leaves.Message,
 		}
 		inlineCandidates = append(
 			inlineCandidates,
-			inlinedtree.Candidate[*model_filesystem_pb.Directory, TDirectory]{
+			inlinedtree.Candidate[*model_filesystem_pb.DirectoryContents, TDirectory]{
 				ExternalMessage: model_core.NewPatchedMessage[proto.Message](
 					ud.leaves.Message,
 					model_core.MapReferenceMessagePatcherMetadata(
@@ -267,13 +267,13 @@ func (b *directoryMerkleTreeBuilder[TDirectory, TFile]) maybeFinalizeDirectory(u
 				),
 				Encoder: b.directoryEncoder,
 				ParentAppender: func(
-					directory model_core.PatchedMessage[*model_filesystem_pb.Directory, TDirectory],
+					directory model_core.PatchedMessage[*model_filesystem_pb.DirectoryContents, TDirectory],
 					externalObject *model_core.Decodable[model_core.CreatedObject[TDirectory]],
 				) {
 					if externalObject == nil {
 						directory.Message.Leaves = leavesInline
 					} else {
-						directory.Message.Leaves = &model_filesystem_pb.Directory_LeavesExternal{
+						directory.Message.Leaves = &model_filesystem_pb.DirectoryContents_LeavesExternal{
 							LeavesExternal: &model_filesystem_pb.LeavesReference{
 								Reference: directory.Patcher.CaptureAndAddDecodableReference(
 									*externalObject,
@@ -299,14 +299,14 @@ func (b *directoryMerkleTreeBuilder[TDirectory, TFile]) maybeFinalizeDirectory(u
 			}
 			inlineCandidates = append(
 				inlineCandidates,
-				inlinedtree.Candidate[*model_filesystem_pb.Directory, TDirectory]{
+				inlinedtree.Candidate[*model_filesystem_pb.DirectoryContents, TDirectory]{
 					ExternalMessage: model_core.NewPatchedMessage[proto.Message](
 						createdDirectory.Message.Message,
 						createdDirectory.Message.Patcher,
 					),
 					Encoder: b.directoryEncoder,
 					ParentAppender: func(
-						directory model_core.PatchedMessage[*model_filesystem_pb.Directory, TDirectory],
+						directory model_core.PatchedMessage[*model_filesystem_pb.DirectoryContents, TDirectory],
 						externalObject *model_core.Decodable[model_core.CreatedObject[TDirectory]],
 					) {
 						if externalObject == nil {
@@ -358,7 +358,7 @@ func (b *directoryMerkleTreeBuilder[TDirectory, TFile]) maybeFinalizeDirectory(u
 // contains all of the metadata that needs to be available when creating
 // a DirectoryReference message for referring to the root directory.
 type CreatedDirectory[TDirectory model_core.ReferenceMetadata] struct {
-	Message                        model_core.PatchedMessage[*model_filesystem_pb.Directory, TDirectory]
+	Message                        model_core.PatchedMessage[*model_filesystem_pb.DirectoryContents, TDirectory]
 	MaximumSymlinkEscapementLevels *wrapperspb.UInt32Value
 }
 
@@ -369,7 +369,7 @@ type CreatedDirectory[TDirectory model_core.ReferenceMetadata] struct {
 // tree for which no DirectoryReference exists (e.g., because it was not
 // the root directory of a directory cluster). In cases where a
 // DirectoryReference is available, this function should not be used.
-func NewCreatedDirectoryBare[TDirectory model_core.ReferenceMetadata](message model_core.PatchedMessage[*model_filesystem_pb.Directory, TDirectory]) (*CreatedDirectory[TDirectory], error) {
+func NewCreatedDirectoryBare[TDirectory model_core.ReferenceMetadata](message model_core.PatchedMessage[*model_filesystem_pb.DirectoryContents, TDirectory]) (*CreatedDirectory[TDirectory], error) {
 	cd := &CreatedDirectory[TDirectory]{
 		Message:                        message,
 		MaximumSymlinkEscapementLevels: &wrapperspb.UInt32Value{Value: 0},
@@ -400,14 +400,14 @@ func (cd *CreatedDirectory[TDirectory]) raiseMaximumSymlinkEscapementLevels(maxi
 // raiseDirectoryMaximumSymlinkEscapementLevels recursively traverses a
 // Directory message and raises the value of
 // MaximumSymlinkEscapementLevels if needed.
-func (cd *CreatedDirectory[TDirectory]) raiseDirectoryMaximumSymlinkEscapementLevels(d *model_filesystem_pb.Directory, currentPath *path.Trace, currentDepth uint32) error {
+func (cd *CreatedDirectory[TDirectory]) raiseDirectoryMaximumSymlinkEscapementLevels(d *model_filesystem_pb.DirectoryContents, currentPath *path.Trace, currentDepth uint32) error {
 	// Process all symbolic links in the current directory.
 	switch leaves := d.Leaves.(type) {
-	case *model_filesystem_pb.Directory_LeavesExternal:
+	case *model_filesystem_pb.DirectoryContents_LeavesExternal:
 		if cd.raiseMaximumSymlinkEscapementLevels(leaves.LeavesExternal.MaximumSymlinkEscapementLevels, currentDepth) {
 			return nil
 		}
-	case *model_filesystem_pb.Directory_LeavesInline:
+	case *model_filesystem_pb.DirectoryContents_LeavesInline:
 		for _, child := range leaves.LeavesInline.Symlinks {
 			escapementCounter := NewEscapementCountingScopeWalker()
 			if err := path.Resolve(path.UNIXFormat.NewParser(child.Target), escapementCounter); err != nil {

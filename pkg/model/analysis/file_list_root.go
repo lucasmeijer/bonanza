@@ -34,7 +34,7 @@ func addFilesToChangeTrackingDirectory[TReference object.BasicReference, TMetada
 ) error {
 	missingDependencies := false
 	for i, element := range fileList.Message {
-		var root model_core.Message[*model_filesystem_pb.Directory, TReference]
+		var root model_core.Message[*model_filesystem_pb.DirectoryContents, TReference]
 		switch level := element.Level.(type) {
 		case *model_starlark_pb.List_Element_Parent_:
 			patchedReference := model_core.Patch(e, model_core.Nested(fileList, level.Parent.Reference))
@@ -101,9 +101,9 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileListRootValue(ctx conte
 		filesList,
 		&rootDirectory,
 		&changeTrackingDirectoryLoadOptions[TReference]{
-			context:         ctx,
-			directoryReader: directoryReaders.Directory,
-			leavesReader:    directoryReaders.Leaves,
+			context:                 ctx,
+			directoryContentsReader: directoryReaders.DirectoryContents,
+			leavesReader:            directoryReaders.Leaves,
 		},
 	); err != nil {
 		return PatchedFileListRootValue{}, err
@@ -119,9 +119,9 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileListRootValue(ctx conte
 			directoryCreationParameters,
 			&capturableChangeTrackingDirectory[TReference, TMetadata]{
 				options: &capturableChangeTrackingDirectoryOptions[TReference, TMetadata]{
-					context:         ctx,
-					directoryReader: directoryReaders.Directory,
-					objectCapturer:  e,
+					context:                 ctx,
+					directoryContentsReader: directoryReaders.DirectoryContents,
+					objectCapturer:          e,
 				},
 				directory: &rootDirectory,
 			},

@@ -32,7 +32,7 @@ type currentPackageLimitingDirectoryOptions[TReference any] struct {
 // features like glob() work.
 type currentPackageLimitingDirectory[TReference any] struct {
 	options   *currentPackageLimitingDirectoryOptions[TReference]
-	directory model_core.Message[*model_filesystem_pb.Directory, TReference]
+	directory model_core.Message[*model_filesystem_pb.DirectoryContents, TReference]
 }
 
 func (d *currentPackageLimitingDirectory[TReference]) Close() error {
@@ -65,7 +65,7 @@ func (d *currentPackageLimitingDirectory[TReference]) ReadDir() ([]filesystem.Fi
 				// Report directory if it is not a package.
 				childDirectory, err := model_filesystem.DirectoryNodeGetContents(
 					d.options.context,
-					d.options.directoryReaders.Directory,
+					d.options.directoryReaders.DirectoryContents,
 					model_core.Nested(d.directory, entry),
 				)
 				if err != nil {
@@ -152,7 +152,7 @@ func (d *currentPackageLimitingDirectory[TReference]) EnterCapturableDirectory(n
 	}
 	childDirectory, err := model_filesystem.DirectoryNodeGetContents(
 		d.options.context,
-		d.options.directoryReaders.Directory,
+		d.options.directoryReaders.DirectoryContents,
 		model_core.Nested(d.directory, directories[index]),
 	)
 	if err != nil {
@@ -182,7 +182,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFilesInPackageValue(ctx con
 		return PatchedFilesInPackageValue{}, evaluation.ErrMissingDependency
 	}
 
-	packageDirectory, err := c.getPackageDirectory(ctx, e, directoryReaders.Directory, key.Package)
+	packageDirectory, err := c.getPackageDirectory(ctx, e, directoryReaders.DirectoryContents, key.Package)
 	if err != nil {
 		return PatchedFilesInPackageValue{}, err
 	}

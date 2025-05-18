@@ -180,7 +180,7 @@ func (icf *objectBackedInitialContentsFetcher) FetchContents(fileReadMonitorFact
 // hierarchy, skipping parts of the hierarchy that have not been
 // modified.
 type ApplyGetRawDirectory struct {
-	RawDirectory model_core.Message[*model_filesystem_pb.Directory, object.LocalReference]
+	RawDirectory model_core.Message[*model_filesystem_pb.DirectoryContents, object.LocalReference]
 	Err          error
 }
 

@@ -122,7 +122,7 @@ type changeTrackingDirectory[TReference object.BasicReference, TMetadata model_c
 	symlinks    map[path.Component]path.Parser
 }
 
-func (d *changeTrackingDirectory[TReference, TMetadata]) setContents(contents model_core.Message[*model_filesystem_pb.Directory, TReference], options *changeTrackingDirectoryLoadOptions[TReference]) error {
+func (d *changeTrackingDirectory[TReference, TMetadata]) setContents(contents model_core.Message[*model_filesystem_pb.DirectoryContents, TReference], options *changeTrackingDirectoryLoadOptions[TReference]) error {
 	leaves, err := model_filesystem.DirectoryGetLeaves(options.context, options.leavesReader, contents)
 	if err != nil {
 		return err
@@ -165,7 +165,7 @@ func (d *changeTrackingDirectory[TReference, TMetadata]) setContents(contents mo
 // mergeContents recursively merges the contents of a given directory
 // message into an already existing changeTrackingDirectory. Any
 // conflicts will cause merging to fail.
-func (d *changeTrackingDirectory[TReference, TMetadata]) mergeContents(contents model_core.Message[*model_filesystem_pb.Directory, TReference], options *changeTrackingDirectoryLoadOptions[TReference]) error {
+func (d *changeTrackingDirectory[TReference, TMetadata]) mergeContents(contents model_core.Message[*model_filesystem_pb.DirectoryContents, TReference], options *changeTrackingDirectoryLoadOptions[TReference]) error {
 	if err := d.maybeLoadContents(options); err != nil {
 		return err
 	}
@@ -223,7 +223,7 @@ func (d *changeTrackingDirectory[TReference, TMetadata]) mergeContents(contents 
 		} else if _, ok := d.symlinks[name]; ok {
 			return fmt.Errorf("directory %#v conflicts with an existing symbolic link", name.String())
 		} else if child, ok := d.directories[name]; ok {
-			childMessage, err := model_filesystem.DirectoryNodeGetContents(options.context, options.directoryReader, model_core.Nested(contents, directory))
+			childMessage, err := model_filesystem.DirectoryNodeGetContents(options.context, options.directoryContentsReader, model_core.Nested(contents, directory))
 			if err != nil {
 				return err
 			}
@@ -323,16 +323,16 @@ func (d *changeTrackingDirectory[TReference, TMetadata]) setSymlink(loadOptions 
 }
 
 type changeTrackingDirectoryLoadOptions[TReference any] struct {
-	context         context.Context
-	directoryReader model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_filesystem_pb.Directory, TReference]]
-	leavesReader    model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_filesystem_pb.Leaves, TReference]]
+	context                 context.Context
+	directoryContentsReader model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_filesystem_pb.DirectoryContents, TReference]]
+	leavesReader            model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_filesystem_pb.Leaves, TReference]]
 }
 
 func (d *changeTrackingDirectory[TReference, TMetadata]) maybeLoadContents(options *changeTrackingDirectoryLoadOptions[TReference]) error {
 	if reference := d.currentReference; reference.IsSet() {
 		// Directory has not been accessed before. Load it from
 		// storage and ingest its contents.
-		directoryMessage, err := model_parser.Dereference(options.context, options.directoryReader, model_core.Nested(reference, reference.Message.GetReference()))
+		directoryMessage, err := model_parser.Dereference(options.context, options.directoryContentsReader, model_core.Nested(reference, reference.Message.GetReference()))
 		if err != nil {
 			return err
 		}
@@ -449,12 +449,12 @@ func (r *changeTrackingDirectoryResolver[TReference, TMetadata]) OnUp() (path.Co
 }
 
 type capturableChangeTrackingDirectoryOptions[TReference, TMetadata any] struct {
-	context                context.Context
-	directoryReader        model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_filesystem_pb.Directory, TReference]]
-	fileCreationParameters *model_filesystem.FileCreationParameters
-	fileMerkleTreeCapturer model_filesystem.FileMerkleTreeCapturer[TMetadata]
-	patchedFiles           io.ReaderAt
-	objectCapturer         model_core.ExistingObjectCapturer[TReference, TMetadata]
+	context                 context.Context
+	directoryContentsReader model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_filesystem_pb.DirectoryContents, TReference]]
+	fileCreationParameters  *model_filesystem.FileCreationParameters
+	fileMerkleTreeCapturer  model_filesystem.FileMerkleTreeCapturer[TMetadata]
+	patchedFiles            io.ReaderAt
+	objectCapturer          model_core.ExistingObjectCapturer[TReference, TMetadata]
 }
 
 type capturableChangeTrackingDirectory[TReference object.BasicReference, TMetadata model_core.ReferenceMetadata] struct {
@@ -475,7 +475,7 @@ func (cd *capturableChangeTrackingDirectory[TReference, TMetadata]) EnterCaptura
 		// Directory has not been modified. Load the copy from
 		// storage, so that it may potentially be inlined into
 		// the parent directory.
-		directoryMessage, err := model_parser.Dereference(cd.options.context, cd.options.directoryReader, model_core.Nested(reference, reference.Message.GetReference()))
+		directoryMessage, err := model_parser.Dereference(cd.options.context, cd.options.directoryContentsReader, model_core.Nested(reference, reference.Message.GetReference()))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -997,9 +997,9 @@ func (c *baseComputer[TReference, TMetadata]) applyPatches(
 
 	// Strip the provided directory prefix.
 	loadOptions := &changeTrackingDirectoryLoadOptions[TReference]{
-		context:         ctx,
-		directoryReader: directoryReaders.Directory,
-		leavesReader:    directoryReaders.Leaves,
+		context:                 ctx,
+		directoryContentsReader: directoryReaders.DirectoryContents,
+		leavesReader:            directoryReaders.Leaves,
 	}
 	rootDirectoryResolver := changeTrackingDirectoryResolver[TReference, model_core.FileBackedObjectLocation]{
 		loadOptions: loadOptions,
@@ -1280,9 +1280,9 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) maybeGetDirectoryRe
 		if v, ok := mrc.environment.GetDirectoryReadersValue(&model_analysis_pb.DirectoryReaders_Key{}); ok {
 			mrc.directoryReaders = v
 			mrc.directoryLoadOptions = &changeTrackingDirectoryLoadOptions[TReference]{
-				context:         mrc.context,
-				directoryReader: v.Directory,
-				leavesReader:    v.Leaves,
+				context:                 mrc.context,
+				directoryContentsReader: v.DirectoryContents,
+				leavesReader:            v.Leaves,
 			}
 		}
 	}
@@ -2308,8 +2308,8 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doWhich(thread *sta
 
 	createdInputRoot, err := model_core.MarshalAndEncodePatchedMessage(
 		model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](
-			&model_filesystem_pb.Directory{
-				Leaves: &model_filesystem_pb.Directory_LeavesInline{
+			&model_filesystem_pb.DirectoryContents{
+				Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
 					LeavesInline: &model_filesystem_pb.Leaves{},
 				},
 			},
@@ -3264,12 +3264,12 @@ func (c *baseComputer[TReference, TMetadata]) createMerkleTreeFromChangeTracking
 			directoryCreationParameters,
 			&capturableChangeTrackingDirectory[TReference, model_core.FileBackedObjectLocation]{
 				options: &capturableChangeTrackingDirectoryOptions[TReference, model_core.FileBackedObjectLocation]{
-					context:                groupCtx,
-					directoryReader:        directoryReaders.Directory,
-					fileCreationParameters: fileCreationParameters,
-					fileMerkleTreeCapturer: model_filesystem.NewSimpleFileMerkleTreeCapturer(fileWritingObjectCapturer),
-					patchedFiles:           patchedFiles,
-					objectCapturer:         fileBackedObjectCapturer[TReference]{},
+					context:                 groupCtx,
+					directoryContentsReader: directoryReaders.DirectoryContents,
+					fileCreationParameters:  fileCreationParameters,
+					fileMerkleTreeCapturer:  model_filesystem.NewSimpleFileMerkleTreeCapturer(fileWritingObjectCapturer),
+					patchedFiles:            patchedFiles,
+					objectCapturer:          fileBackedObjectCapturer[TReference]{},
 				},
 				directory: rootDirectory,
 			},

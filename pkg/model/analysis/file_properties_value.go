@@ -47,7 +47,7 @@ func (r *reposFilePropertiesResolver[TReference, TMetadata]) setCurrentRepo(name
 
 	r.currentRepo = model_filesystem.NewDirectoryComponentWalker[TReference](
 		r.context,
-		r.directoryReaders.Directory,
+		r.directoryReaders.DirectoryContents,
 		r.directoryReaders.Leaves,
 		r.handleRepoOnUp,
 		model_core.Nested(repoValue, repoValue.Message.RootDirectoryReference.GetReference()),

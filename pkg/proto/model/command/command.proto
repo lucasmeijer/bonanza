@@ -142,7 +142,7 @@ message Outputs {
   // If Command.output_path_pattern is set, the contents of the files
   // and directories matched by the provided pattern after execution of
   // the command completed.
-  bonanza.model.filesystem.Directory output_root = 3;
+  bonanza.model.filesystem.DirectoryContents output_root = 3;
 }
 
 message Action {
@@ -164,7 +164,7 @@ message Action {
   bonanza.model.core.WeakDecodableReference input_root_reference = 4
       [(bonanza.model.core.object_format) = {
         message_list_type_name:
-          "bonanza.model.filesystem.Directory";
+          "bonanza.model.filesystem.DirectoryContents";
       }];
 }
 

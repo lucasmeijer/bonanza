@@ -147,9 +147,9 @@ func (w *capturedDirectoryWalker) GetContents(ctx context.Context) (*object.Cont
 	return w.object.Contents, walkers, nil
 }
 
-func (w *capturedDirectoryWalker) gatherWalkers(directory *model_filesystem_pb.Directory, pathTrace *path.Trace, walkers []dag.ObjectContentsWalker) error {
+func (w *capturedDirectoryWalker) gatherWalkers(directory *model_filesystem_pb.DirectoryContents, pathTrace *path.Trace, walkers []dag.ObjectContentsWalker) error {
 	switch leaves := directory.Leaves.(type) {
-	case *model_filesystem_pb.Directory_LeavesExternal:
+	case *model_filesystem_pb.DirectoryContents_LeavesExternal:
 		index, err := model_core.GetIndexFromReferenceMessage(leaves.LeavesExternal.Reference.GetReference(), len(walkers))
 		if err != nil {
 			return util.StatusWrapf(err, "Invalid reference index for leaves of directory %#v", pathTrace.GetUNIXString())
@@ -160,7 +160,7 @@ func (w *capturedDirectoryWalker) gatherWalkers(directory *model_filesystem_pb.D
 			decodingParameters: leaves.LeavesExternal.Reference.DecodingParameters,
 			pathTrace:          pathTrace,
 		}
-	case *model_filesystem_pb.Directory_LeavesInline:
+	case *model_filesystem_pb.DirectoryContents_LeavesInline:
 		if err := w.options.gatherWalkersForLeaves(model_core.NewMessage(leaves.LeavesInline, w.object.Contents), pathTrace, walkers); err != nil {
 			return err
 		}

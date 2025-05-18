@@ -24,7 +24,7 @@ func TestBuild(t *testing.T) {
 		// If no candidates are provided, there is no data,
 		// meaning an empty message needs to be emitted.
 		output, err := inlinedtree.Build(
-			inlinedtree.CandidateList[*model_filesystem_pb.Directory, model_core.ReferenceMetadata]{},
+			inlinedtree.CandidateList[*model_filesystem_pb.DirectoryContents, model_core.ReferenceMetadata]{},
 			&inlinedtree.Options{
 				ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
 				MaximumSizeBytes: 16 * 1024,
@@ -33,7 +33,7 @@ func TestBuild(t *testing.T) {
 		require.NoError(t, err)
 
 		references, metadata := output.Patcher.SortAndSetReferences()
-		testutil.RequireEqualProto(t, &model_filesystem_pb.Directory{}, output.Message)
+		testutil.RequireEqualProto(t, &model_filesystem_pb.DirectoryContents{}, output.Message)
 		require.Empty(t, references)
 		require.Empty(t, metadata)
 	})
@@ -52,19 +52,19 @@ func TestBuild(t *testing.T) {
 				Target: "b",
 			}},
 		}
-		leavesInline := &model_filesystem_pb.Directory_LeavesInline{
+		leavesInline := &model_filesystem_pb.DirectoryContents_LeavesInline{
 			LeavesInline: leaves,
 		}
 		parentAppender := NewMockParentAppenderForTesting(ctrl)
 		metadata1 := NewMockReferenceMetadata(ctrl)
 		parentAppender.EXPECT().Call(gomock.Any(), nil).
-			Do(func(output model_core.PatchedMessage[*model_filesystem_pb.Directory, model_core.ReferenceMetadata], externalObject *model_core.Decodable[model_core.CreatedObject[model_core.ReferenceMetadata]]) {
+			Do(func(output model_core.PatchedMessage[*model_filesystem_pb.DirectoryContents, model_core.ReferenceMetadata], externalObject *model_core.Decodable[model_core.CreatedObject[model_core.ReferenceMetadata]]) {
 				output.Message.Leaves = leavesInline
 			}).
 			Times(2)
 		parentAppender.EXPECT().Call(gomock.Any(), gomock.Not(nil)).
-			Do(func(output model_core.PatchedMessage[*model_filesystem_pb.Directory, model_core.ReferenceMetadata], externalObject *model_core.Decodable[model_core.CreatedObject[model_core.ReferenceMetadata]]) {
-				output.Message.Leaves = &model_filesystem_pb.Directory_LeavesExternal{
+			Do(func(output model_core.PatchedMessage[*model_filesystem_pb.DirectoryContents, model_core.ReferenceMetadata], externalObject *model_core.Decodable[model_core.CreatedObject[model_core.ReferenceMetadata]]) {
+				output.Message.Leaves = &model_filesystem_pb.DirectoryContents_LeavesExternal{
 					LeavesExternal: &model_filesystem_pb.LeavesReference{
 						Reference: &model_core_pb.DecodableReference{
 							Reference:          output.Patcher.AddReference(externalObject.Value.Contents.GetReference(), metadata1),
@@ -77,7 +77,7 @@ func TestBuild(t *testing.T) {
 		metadata1.EXPECT().Discard()
 
 		output, err := inlinedtree.Build(
-			inlinedtree.CandidateList[*model_filesystem_pb.Directory, model_core.ReferenceMetadata]{{
+			inlinedtree.CandidateList[*model_filesystem_pb.DirectoryContents, model_core.ReferenceMetadata]{{
 				ExternalMessage: model_core.NewSimplePatchedMessage[model_core.ReferenceMetadata, proto.Message](leaves),
 				Encoder:         encoder,
 				ParentAppender:  parentAppender.Call,
@@ -90,7 +90,7 @@ func TestBuild(t *testing.T) {
 		require.NoError(t, err)
 
 		references, metadata := output.Patcher.SortAndSetReferences()
-		testutil.RequireEqualProto(t, &model_filesystem_pb.Directory{
+		testutil.RequireEqualProto(t, &model_filesystem_pb.DirectoryContents{
 			Leaves: leavesInline,
 		}, output.Message)
 		require.Empty(t, references)
@@ -116,16 +116,16 @@ func TestBuild(t *testing.T) {
 		}
 		parentAppender := NewMockParentAppenderForTesting(ctrl)
 		parentAppender.EXPECT().Call(gomock.Any(), nil).
-			Do(func(output model_core.PatchedMessage[*model_filesystem_pb.Directory, model_core.ReferenceMetadata], externalObject *model_core.Decodable[model_core.CreatedObject[model_core.ReferenceMetadata]]) {
-				output.Message.Leaves = &model_filesystem_pb.Directory_LeavesInline{
+			Do(func(output model_core.PatchedMessage[*model_filesystem_pb.DirectoryContents, model_core.ReferenceMetadata], externalObject *model_core.Decodable[model_core.CreatedObject[model_core.ReferenceMetadata]]) {
+				output.Message.Leaves = &model_filesystem_pb.DirectoryContents_LeavesInline{
 					LeavesInline: leaves,
 				}
 			}).
 			Times(1)
 		metadata1 := NewMockReferenceMetadata(ctrl)
 		parentAppender.EXPECT().Call(gomock.Any(), gomock.Not(nil)).
-			Do(func(output model_core.PatchedMessage[*model_filesystem_pb.Directory, model_core.ReferenceMetadata], externalObject *model_core.Decodable[model_core.CreatedObject[model_core.ReferenceMetadata]]) {
-				output.Message.Leaves = &model_filesystem_pb.Directory_LeavesExternal{
+			Do(func(output model_core.PatchedMessage[*model_filesystem_pb.DirectoryContents, model_core.ReferenceMetadata], externalObject *model_core.Decodable[model_core.CreatedObject[model_core.ReferenceMetadata]]) {
+				output.Message.Leaves = &model_filesystem_pb.DirectoryContents_LeavesExternal{
 					LeavesExternal: &model_filesystem_pb.LeavesReference{
 						Reference: &model_core_pb.DecodableReference{
 							Reference:          output.Patcher.AddReference(externalObject.Value.Contents.GetReference(), metadata1),
@@ -138,7 +138,7 @@ func TestBuild(t *testing.T) {
 		metadata1.EXPECT().Discard().Times(1)
 
 		output, err := inlinedtree.Build(
-			inlinedtree.CandidateList[*model_filesystem_pb.Directory, model_core.ReferenceMetadata]{{
+			inlinedtree.CandidateList[*model_filesystem_pb.DirectoryContents, model_core.ReferenceMetadata]{{
 				ExternalMessage: model_core.NewSimplePatchedMessage[model_core.ReferenceMetadata, proto.Message](leaves),
 				Encoder:         encoder,
 				ParentAppender:  parentAppender.Call,
@@ -151,8 +151,8 @@ func TestBuild(t *testing.T) {
 		require.NoError(t, err)
 
 		references, metadata := output.Patcher.SortAndSetReferences()
-		testutil.RequireEqualProto(t, &model_filesystem_pb.Directory{
-			Leaves: &model_filesystem_pb.Directory_LeavesExternal{
+		testutil.RequireEqualProto(t, &model_filesystem_pb.DirectoryContents{
+			Leaves: &model_filesystem_pb.DirectoryContents_LeavesExternal{
 				LeavesExternal: &model_filesystem_pb.LeavesReference{
 					Reference: &model_core_pb.DecodableReference{
 						Reference: &model_core_pb.Reference{
@@ -184,19 +184,19 @@ func TestBuild(t *testing.T) {
 				Target: "This is a very long symbolic link target",
 			}},
 		}
-		leavesInline := &model_filesystem_pb.Directory_LeavesInline{
+		leavesInline := &model_filesystem_pb.DirectoryContents_LeavesInline{
 			LeavesInline: leaves,
 		}
 		parentAppender := NewMockParentAppenderForTesting(ctrl)
 		parentAppender.EXPECT().Call(gomock.Any(), nil).
-			Do(func(output model_core.PatchedMessage[*model_filesystem_pb.Directory, model_core.ReferenceMetadata], externalObject *model_core.Decodable[model_core.CreatedObject[model_core.ReferenceMetadata]]) {
+			Do(func(output model_core.PatchedMessage[*model_filesystem_pb.DirectoryContents, model_core.ReferenceMetadata], externalObject *model_core.Decodable[model_core.CreatedObject[model_core.ReferenceMetadata]]) {
 				output.Message.Leaves = leavesInline
 			}).
 			Times(2)
 		metadata1 := NewMockReferenceMetadata(ctrl)
 		parentAppender.EXPECT().Call(gomock.Any(), gomock.Not(nil)).
-			Do(func(output model_core.PatchedMessage[*model_filesystem_pb.Directory, model_core.ReferenceMetadata], externalObject *model_core.Decodable[model_core.CreatedObject[model_core.ReferenceMetadata]]) {
-				output.Message.Leaves = &model_filesystem_pb.Directory_LeavesExternal{
+			Do(func(output model_core.PatchedMessage[*model_filesystem_pb.DirectoryContents, model_core.ReferenceMetadata], externalObject *model_core.Decodable[model_core.CreatedObject[model_core.ReferenceMetadata]]) {
+				output.Message.Leaves = &model_filesystem_pb.DirectoryContents_LeavesExternal{
 					LeavesExternal: &model_filesystem_pb.LeavesReference{
 						Reference: &model_core_pb.DecodableReference{
 							Reference:          output.Patcher.AddReference(externalObject.Value.Contents.GetReference(), metadata1),
@@ -209,7 +209,7 @@ func TestBuild(t *testing.T) {
 		metadata1.EXPECT().Discard()
 
 		output, err := inlinedtree.Build(
-			inlinedtree.CandidateList[*model_filesystem_pb.Directory, model_core.ReferenceMetadata]{{
+			inlinedtree.CandidateList[*model_filesystem_pb.DirectoryContents, model_core.ReferenceMetadata]{{
 				ExternalMessage: model_core.NewSimplePatchedMessage[model_core.ReferenceMetadata, proto.Message](leaves),
 				Encoder:         encoder,
 				ParentAppender:  parentAppender.Call,
@@ -222,7 +222,7 @@ func TestBuild(t *testing.T) {
 		require.NoError(t, err)
 
 		references, metadata := output.Patcher.SortAndSetReferences()
-		testutil.RequireEqualProto(t, &model_filesystem_pb.Directory{
+		testutil.RequireEqualProto(t, &model_filesystem_pb.DirectoryContents{
 			Leaves: leavesInline,
 		}, output.Message)
 		require.Empty(t, references)
@@ -240,18 +240,18 @@ func TestBuild(t *testing.T) {
 				Target: "This is a very long symbolic link target",
 			}},
 		}
-		leavesInline := &model_filesystem_pb.Directory_LeavesInline{
+		leavesInline := &model_filesystem_pb.DirectoryContents_LeavesInline{
 			LeavesInline: leaves,
 		}
 		parentAppender := NewMockParentAppenderForTesting(ctrl)
 		parentAppender.EXPECT().Call(gomock.Any(), nil).
-			Do(func(output model_core.PatchedMessage[*model_filesystem_pb.Directory, model_core.ReferenceMetadata], externalObject *model_core.Decodable[model_core.CreatedObject[model_core.ReferenceMetadata]]) {
+			Do(func(output model_core.PatchedMessage[*model_filesystem_pb.DirectoryContents, model_core.ReferenceMetadata], externalObject *model_core.Decodable[model_core.CreatedObject[model_core.ReferenceMetadata]]) {
 				output.Message.Leaves = leavesInline
 			}).
 			Times(2)
 
 		output, err := inlinedtree.Build(
-			inlinedtree.CandidateList[*model_filesystem_pb.Directory, model_core.ReferenceMetadata]{{
+			inlinedtree.CandidateList[*model_filesystem_pb.DirectoryContents, model_core.ReferenceMetadata]{{
 				ExternalMessage: model_core.NewSimplePatchedMessage[model_core.ReferenceMetadata](proto.Message(nil)),
 				ParentAppender:  parentAppender.Call,
 			}},
@@ -263,7 +263,7 @@ func TestBuild(t *testing.T) {
 		require.NoError(t, err)
 
 		references, metadata := output.Patcher.SortAndSetReferences()
-		testutil.RequireEqualProto(t, &model_filesystem_pb.Directory{
+		testutil.RequireEqualProto(t, &model_filesystem_pb.DirectoryContents{
 			Leaves: leavesInline,
 		}, output.Message)
 		require.Empty(t, references)

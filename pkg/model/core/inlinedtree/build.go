@@ -255,4 +255,4 @@ func Build[
 
 // ParentAppenderForTesting is an instantiation of ParentAppender for
 // generating mocks to be used by tests.
-type ParentAppenderForTesting ParentAppender[*model_filesystem_pb.Directory, model_core.ReferenceMetadata]
+type ParentAppenderForTesting ParentAppender[*model_filesystem_pb.DirectoryContents, model_core.ReferenceMetadata]

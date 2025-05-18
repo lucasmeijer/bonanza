@@ -16,9 +16,9 @@ import (
 // follow references to objects that are encoded using the directory
 // access parameters that are part of the BuildSpecification.
 type DirectoryReaders[TReference any] struct {
-	Directory      model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_filesystem_pb.Directory, TReference]]
-	Leaves         model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_filesystem_pb.Leaves, TReference]]
-	CommandOutputs model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_command_pb.Outputs, TReference]]
+	DirectoryContents model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_filesystem_pb.DirectoryContents, TReference]]
+	Leaves            model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_filesystem_pb.Leaves, TReference]]
+	CommandOutputs    model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_command_pb.Outputs, TReference]]
 }
 
 func (c *baseComputer[TReference, TMetadata]) ComputeDirectoryReadersValue(ctx context.Context, key *model_analysis_pb.DirectoryReaders_Key, e DirectoryReadersEnvironment[TReference, TMetadata]) (*DirectoryReaders[TReference], error) {
@@ -36,11 +36,11 @@ func (c *baseComputer[TReference, TMetadata]) ComputeDirectoryReadersValue(ctx c
 
 	encoderObjectParser := model_parser.NewEncodedObjectParser[TReference](directoryAccessParameters.GetEncoder())
 	return &DirectoryReaders[TReference]{
-		Directory: model_parser.LookupParsedObjectReader(
+		DirectoryContents: model_parser.LookupParsedObjectReader(
 			c.parsedObjectPoolIngester,
 			model_parser.NewChainedObjectParser(
 				encoderObjectParser,
-				model_parser.NewMessageObjectParser[TReference, model_filesystem_pb.Directory](),
+				model_parser.NewMessageObjectParser[TReference, model_filesystem_pb.DirectoryContents](),
 			),
 		),
 		Leaves: model_parser.LookupParsedObjectReader(

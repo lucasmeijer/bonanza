@@ -74,8 +74,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeStableInputRootPathValue(ct
 
 	createdInputRoot, err := model_core.MarshalAndEncodePatchedMessage(
 		model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](
-			&model_filesystem_pb.Directory{
-				Leaves: &model_filesystem_pb.Directory_LeavesInline{
+			&model_filesystem_pb.DirectoryContents{
+				Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
 					LeavesInline: &model_filesystem_pb.Leaves{},
 				},
 			},

@@ -23,7 +23,7 @@ type DirectoryCluster []Directory
 
 // Directory contained in a DirectoryCluster.
 type Directory struct {
-	Directory *model_filesystem_pb.Directory
+	Directory *model_filesystem_pb.DirectoryContents
 
 	// Indices at which child directories with inline contents are
 	// accessible within the same cluster. If the child directory
@@ -45,7 +45,7 @@ func (p *directoryClusterObjectParser[TReference]) ParseObject(in model_core.Mes
 		return model_core.Message[DirectoryCluster, TReference]{}, 0, status.Error(codes.InvalidArgument, "Unexpected decoding parameters")
 	}
 
-	var d model_filesystem_pb.Directory
+	var d model_filesystem_pb.DirectoryContents
 	if err := proto.Unmarshal(in.Message, &d); err != nil {
 		return model_core.Message[DirectoryCluster, TReference]{}, 0, util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to parse directory")
 	}
@@ -69,7 +69,7 @@ func (p *directoryClusterObjectParser[TReference]) GetDecodingParametersSizeByte
 	return 0
 }
 
-func addDirectoriesToCluster[TReference any](c *DirectoryCluster, d model_core.Message[*model_filesystem_pb.Directory, TReference], dTrace *path.Trace) (int, error) {
+func addDirectoriesToCluster[TReference any](c *DirectoryCluster, d model_core.Message[*model_filesystem_pb.DirectoryContents, TReference], dTrace *path.Trace) (int, error) {
 	directoryIndex := len(*c)
 	childDirectoryIndices := make([]int, len(d.Message.Directories))
 	*c = append(

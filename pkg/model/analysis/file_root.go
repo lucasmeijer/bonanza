@@ -62,13 +62,13 @@ func getStarlarkFileProperties[TReference object.BasicReference, TMetadata model
 	}
 	componentWalker := model_filesystem.NewDirectoryComponentWalker[TReference](
 		ctx,
-		directoryReaders.Directory,
+		directoryReaders.DirectoryContents,
 		directoryReaders.Leaves,
 		func() (path.ComponentWalker, error) {
 			return nil, errors.New("path resolution escapes input root")
 		},
 		model_core.Message[*model_core_pb.DecodableReference, TReference]{},
-		[]model_core.Message[*model_filesystem_pb.Directory, TReference]{
+		[]model_core.Message[*model_filesystem_pb.DirectoryContents, TReference]{
 			model_core.Nested(targetOutput, targetOutput.Message.RootDirectory),
 		},
 	)
@@ -372,9 +372,9 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 
 			var rootDirectory changeTrackingDirectory[TReference, TMetadata]
 			loadOptions := &changeTrackingDirectoryLoadOptions[TReference]{
-				context:         ctx,
-				directoryReader: directoryReaders.Directory,
-				leavesReader:    directoryReaders.Leaves,
+				context:                 ctx,
+				directoryContentsReader: directoryReaders.DirectoryContents,
+				leavesReader:            directoryReaders.Leaves,
 			}
 			if err := rootDirectory.setContents(
 				model_core.Nested(symlinkTarget, symlinkTarget.Message.RootDirectory),
@@ -513,7 +513,7 @@ func createFileRootFromChangeTrackingDirectory[TReference object.BasicReference,
 
 type pathPrependingDirectory[TDirectory, TFile model_core.ReferenceMetadata] struct {
 	components []path.Component
-	directory  model_core.PatchedMessage[*model_filesystem_pb.Directory, TDirectory]
+	directory  model_core.PatchedMessage[*model_filesystem_pb.DirectoryContents, TDirectory]
 }
 
 func (pathPrependingDirectory[TDirectory, TFile]) Close() error {

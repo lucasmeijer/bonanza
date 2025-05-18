@@ -39,12 +39,12 @@ func NewDirectoryAccessParametersFromProto(m *model_filesystem_pb.DirectoryAcces
 	}, nil
 }
 
-func (p *DirectoryAccessParameters) DecodeDirectory(contents *object.Contents, decodingParameters []byte) (*model_filesystem_pb.Directory, error) {
+func (p *DirectoryAccessParameters) DecodeDirectory(contents *object.Contents, decodingParameters []byte) (*model_filesystem_pb.DirectoryContents, error) {
 	decodedData, err := p.encoder.DecodeBinary(contents.GetPayload(), decodingParameters)
 	if err != nil {
 		return nil, err
 	}
-	var directory model_filesystem_pb.Directory
+	var directory model_filesystem_pb.DirectoryContents
 	if err := proto.Unmarshal(decodedData, &directory); err != nil {
 		return nil, util.StatusWrapWithCode(err, codes.InvalidArgument, "Invalid Protobuf message")
 	}

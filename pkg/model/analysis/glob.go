@@ -24,7 +24,7 @@ import (
 // symbolic links encountered during glob() expansion.
 type globPathResolver[TReference object.BasicReference, TMetadata BaseComputerReferenceMetadata] struct {
 	walker  *globDirectoryWalker[TReference, TMetadata]
-	stack   util.NonEmptyStack[model_core.Message[*model_filesystem_pb.Directory, TReference]]
+	stack   util.NonEmptyStack[model_core.Message[*model_filesystem_pb.DirectoryContents, TReference]]
 	gotFile bool
 }
 
@@ -39,7 +39,7 @@ func (r *globPathResolver[TReference, TMetadata]) OnDirectory(name path.Componen
 	); ok {
 		childDirectory, err := model_filesystem.DirectoryNodeGetContents(
 			w.context,
-			w.directoryReaders.Directory,
+			w.directoryReaders.DirectoryContents,
 			model_core.Nested(d, directories[i]),
 		)
 		if err != nil {
@@ -90,7 +90,7 @@ func (r *globPathResolver[TReference, TMetadata]) OnTerminal(name path.Component
 	); ok {
 		childDirectory, err := model_filesystem.DirectoryNodeGetContents(
 			w.context,
-			w.directoryReaders.Directory,
+			w.directoryReaders.DirectoryContents,
 			model_core.Nested(d, directories[i]),
 		)
 		if err != nil {
@@ -144,7 +144,7 @@ type globDirectoryWalker[TReference object.BasicReference, TMetadata BaseCompute
 	matchedPaths       []string
 }
 
-func (w *globDirectoryWalker[TReference, TMetadata]) walkDirectory(dStack util.NonEmptyStack[model_core.Message[*model_filesystem_pb.Directory, TReference]], dPath *path.Trace, dMatcher *glob.Matcher) error {
+func (w *globDirectoryWalker[TReference, TMetadata]) walkDirectory(dStack util.NonEmptyStack[model_core.Message[*model_filesystem_pb.DirectoryContents, TReference]], dPath *path.Trace, dMatcher *glob.Matcher) error {
 	var childMatcher glob.Matcher
 	d := dStack.Peek()
 
@@ -171,7 +171,7 @@ MatchDirectories:
 		if childMatcher.WriteRune('/') {
 			childDirectory, err := model_filesystem.DirectoryNodeGetContents(
 				w.context,
-				w.directoryReaders.Directory,
+				w.directoryReaders.DirectoryContents,
 				model_core.Nested(d, entry),
 			)
 			if err != nil {

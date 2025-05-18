@@ -45,9 +45,9 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionInputRootValue(
 
 	var rootDirectory changeTrackingDirectory[TReference, TMetadata]
 	loadOptions := &changeTrackingDirectoryLoadOptions[TReference]{
-		context:         ctx,
-		directoryReader: directoryReaders.Directory,
-		leavesReader:    directoryReaders.Leaves,
+		context:                 ctx,
+		directoryContentsReader: directoryReaders.DirectoryContents,
+		leavesReader:            directoryReaders.Leaves,
 	}
 	if err := addFilesToChangeTrackingDirectory(
 		e,
@@ -77,9 +77,9 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionInputRootValue(
 			directoryCreationParameters,
 			&capturableChangeTrackingDirectory[TReference, TMetadata]{
 				options: &capturableChangeTrackingDirectoryOptions[TReference, TMetadata]{
-					context:         ctx,
-					directoryReader: directoryReaders.Directory,
-					objectCapturer:  e,
+					context:                 ctx,
+					directoryContentsReader: directoryReaders.DirectoryContents,
+					objectCapturer:          e,
 				},
 				directory: &rootDirectory,
 			},

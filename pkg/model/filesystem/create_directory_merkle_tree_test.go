@@ -18,8 +18,8 @@ func TestNewCreatedDirectoryBare(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
 		cd, err := model_filesystem.NewCreatedDirectoryBare(
 			model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](
-				&model_filesystem_pb.Directory{
-					Leaves: &model_filesystem_pb.Directory_LeavesInline{
+				&model_filesystem_pb.DirectoryContents{
+					Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
 						LeavesInline: &model_filesystem_pb.Leaves{},
 					},
 				},
@@ -36,8 +36,8 @@ func TestNewCreatedDirectoryBare(t *testing.T) {
 	t.Run("RootSymlinkNotEscaping", func(t *testing.T) {
 		cd, err := model_filesystem.NewCreatedDirectoryBare(
 			model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](
-				&model_filesystem_pb.Directory{
-					Leaves: &model_filesystem_pb.Directory_LeavesInline{
+				&model_filesystem_pb.DirectoryContents{
+					Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
 						LeavesInline: &model_filesystem_pb.Leaves{
 							Symlinks: []*model_filesystem_pb.SymlinkNode{{
 								Name:   "hello",
@@ -59,8 +59,8 @@ func TestNewCreatedDirectoryBare(t *testing.T) {
 	t.Run("RootSymlinkEscapingSingleLevel", func(t *testing.T) {
 		cd, err := model_filesystem.NewCreatedDirectoryBare(
 			model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](
-				&model_filesystem_pb.Directory{
-					Leaves: &model_filesystem_pb.Directory_LeavesInline{
+				&model_filesystem_pb.DirectoryContents{
+					Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
 						LeavesInline: &model_filesystem_pb.Leaves{
 							Symlinks: []*model_filesystem_pb.SymlinkNode{{
 								Name:   "hello",
@@ -82,8 +82,8 @@ func TestNewCreatedDirectoryBare(t *testing.T) {
 	t.Run("RootSymlinkAbsolute", func(t *testing.T) {
 		cd, err := model_filesystem.NewCreatedDirectoryBare(
 			model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](
-				&model_filesystem_pb.Directory{
-					Leaves: &model_filesystem_pb.Directory_LeavesInline{
+				&model_filesystem_pb.DirectoryContents{
+					Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
 						LeavesInline: &model_filesystem_pb.Leaves{
 							Symlinks: []*model_filesystem_pb.SymlinkNode{{
 								Name:   "hello",
@@ -101,8 +101,8 @@ func TestNewCreatedDirectoryBare(t *testing.T) {
 	t.Run("DirectoryEscapingMultipleLevels", func(t *testing.T) {
 		cd, err := model_filesystem.NewCreatedDirectoryBare(
 			model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](
-				&model_filesystem_pb.Directory{
-					Leaves: &model_filesystem_pb.Directory_LeavesInline{
+				&model_filesystem_pb.DirectoryContents{
+					Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
 						LeavesInline: &model_filesystem_pb.Leaves{},
 					},
 					Directories: []*model_filesystem_pb.DirectoryNode{{

@@ -60,7 +60,7 @@ message SymlinkNode {
   string target = 2;
 }
 
-message Directory {
+message DirectoryContents {
   oneof leaves {
     // The leaves are large enough, that it could not be inlined into
     // the current directory.
@@ -85,7 +85,7 @@ message DirectoryNode {
 
     // The subdirectory is small enough, that its contents have been
     // inlined.
-    Directory contents_inline = 3;
+    DirectoryContents contents_inline = 3;
   }
 }
 
@@ -94,7 +94,7 @@ message DirectoryReference {
   bonanza.model.core.DecodableReference reference = 1
       [(bonanza.model.core.object_format) = {
         message_type_name:
-          "bonanza.model.filesystem.Directory";
+          "bonanza.model.filesystem.DirectoryContents";
       }];
 
   // The number of subdirectories present in the directory. This value
