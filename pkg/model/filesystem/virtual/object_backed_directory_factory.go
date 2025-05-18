@@ -209,15 +209,15 @@ func (d *objectBackedDirectory) getDirectory(ctx context.Context) (model_core.Me
 
 func (d objectBackedDirectory) lookupDirectoryNode(directoryNode model_core.Message[*model_filesystem_pb.DirectoryNode, object.LocalReference], childDirectoryIndex int) (virtual.Directory, virtual.Status) {
 	df := d.factory
-	switch contents := directoryNode.Message.Contents.(type) {
-	case *model_filesystem_pb.DirectoryNode_ContentsExternal:
+	switch contents := directoryNode.Message.Directory.GetContents().(type) {
+	case *model_filesystem_pb.Directory_ContentsExternal:
 		childReference, err := model_core.FlattenDecodableReference(model_core.Nested(directoryNode, contents.ContentsExternal.Reference))
 		if err != nil {
 			df.errorLogger.Log(util.StatusWrapf(err, "Invalid reference for directory with name %#v in directory %d in directory cluster with reference %s", directoryNode.Message.Name, d.directoryIndex, d.clusterReference))
 			return nil, virtual.StatusErrIO
 		}
 		return df.LookupDirectory(childReference, 0, contents.ContentsExternal.DirectoriesCount), virtual.StatusOK
-	case *model_filesystem_pb.DirectoryNode_ContentsInline:
+	case *model_filesystem_pb.Directory_ContentsInline:
 		return df.LookupDirectory(d.clusterReference, uint(childDirectoryIndex), uint32(len(contents.ContentsInline.Directories))), virtual.StatusOK
 	default:
 		df.errorLogger.Log(status.Errorf(codes.InvalidArgument, "Invalid contents for directory with name %#v in directory %d in directory cluster with reference %s", directoryNode.Message.Name, d.directoryIndex, d.clusterReference))

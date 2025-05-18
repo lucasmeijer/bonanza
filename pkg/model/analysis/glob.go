@@ -37,10 +37,10 @@ func (r *globPathResolver[TReference, TMetadata]) OnDirectory(name path.Componen
 		len(directories),
 		func(i int) int { return strings.Compare(n, directories[i].Name) },
 	); ok {
-		childDirectory, err := model_filesystem.DirectoryNodeGetContents(
+		childDirectory, err := model_filesystem.DirectoryGetContents(
 			w.context,
 			w.directoryReaders.DirectoryContents,
-			model_core.Nested(d, directories[i]),
+			model_core.Nested(d, directories[i].Directory),
 		)
 		if err != nil {
 			return nil, err
@@ -88,10 +88,10 @@ func (r *globPathResolver[TReference, TMetadata]) OnTerminal(name path.Component
 		len(directories),
 		func(i int) int { return strings.Compare(n, directories[i].Name) },
 	); ok {
-		childDirectory, err := model_filesystem.DirectoryNodeGetContents(
+		childDirectory, err := model_filesystem.DirectoryGetContents(
 			w.context,
 			w.directoryReaders.DirectoryContents,
-			model_core.Nested(d, directories[i]),
+			model_core.Nested(d, directories[i].Directory),
 		)
 		if err != nil {
 			return nil, err
@@ -169,10 +169,10 @@ MatchDirectories:
 		// Traverse into the directory if the still reachable
 		// part of the NFA contains positive end states.
 		if childMatcher.WriteRune('/') {
-			childDirectory, err := model_filesystem.DirectoryNodeGetContents(
+			childDirectory, err := model_filesystem.DirectoryGetContents(
 				w.context,
 				w.directoryReaders.DirectoryContents,
-				model_core.Nested(d, entry),
+				model_core.Nested(d, entry.Directory),
 			)
 			if err != nil {
 				return fmt.Errorf("failed to get directory %#v", childPath.GetUNIXString())

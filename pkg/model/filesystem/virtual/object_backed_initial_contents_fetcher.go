@@ -92,8 +92,8 @@ func (icf *objectBackedInitialContentsFetcher) FetchContents(fileReadMonitorFact
 		}
 
 		var child virtual.InitialContentsFetcher
-		switch contents := entry.Contents.(type) {
-		case *model_filesystem_pb.DirectoryNode_ContentsExternal:
+		switch contents := entry.Directory.GetContents().(type) {
+		case *model_filesystem_pb.Directory_ContentsExternal:
 			childReference, err := model_core.FlattenDecodableReference(model_core.Nested(directory, contents.ContentsExternal.Reference))
 			if err != nil {
 				return nil, util.StatusWrapf(err, "Invalid reference for directory with name %#v", entry.Name)
@@ -103,7 +103,7 @@ func (icf *objectBackedInitialContentsFetcher) FetchContents(fileReadMonitorFact
 				clusterReference: childReference,
 				directoryIndex:   0,
 			}
-		case *model_filesystem_pb.DirectoryNode_ContentsInline:
+		case *model_filesystem_pb.Directory_ContentsInline:
 			child = &objectBackedInitialContentsFetcher{
 				options:          options,
 				clusterReference: icf.clusterReference,

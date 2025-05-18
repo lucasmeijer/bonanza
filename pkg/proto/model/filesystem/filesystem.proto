@@ -74,19 +74,24 @@ message DirectoryContents {
   repeated DirectoryNode directories = 3;
 }
 
+message Directory {
+  oneof contents {
+    // The contents of the directory are large enough, that it could not
+    // be inlined into the current directory.
+    DirectoryReference contents_external = 1;
+
+    // The contents of the directory are small enough, that its contents
+    // have been inlined.
+    DirectoryContents contents_inline = 2;
+  }
+}
+
 message DirectoryNode {
   // The name of the subdirectory.
   string name = 1;
 
-  oneof contents {
-    // The subdirectory is large enough, that it could not be inlined
-    // into the current directory.
-    DirectoryReference contents_external = 2;
-
-    // The subdirectory is small enough, that its contents have been
-    // inlined.
-    DirectoryContents contents_inline = 3;
-  }
+  // The contents of the subdirectory.
+  Directory directory = 2;
 }
 
 message DirectoryReference {

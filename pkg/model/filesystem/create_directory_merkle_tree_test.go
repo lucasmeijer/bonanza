@@ -107,12 +107,14 @@ func TestNewCreatedDirectoryBare(t *testing.T) {
 					},
 					Directories: []*model_filesystem_pb.DirectoryNode{{
 						Name: "hello",
-						Contents: &model_filesystem_pb.DirectoryNode_ContentsExternal{
-							ContentsExternal: &model_filesystem_pb.DirectoryReference{
-								Reference: &model_core_pb.DecodableReference{
-									Reference: &model_core_pb.Reference{Index: 1},
+						Directory: &model_filesystem_pb.Directory{
+							Contents: &model_filesystem_pb.Directory_ContentsExternal{
+								ContentsExternal: &model_filesystem_pb.DirectoryReference{
+									Reference: &model_core_pb.DecodableReference{
+										Reference: &model_core_pb.Reference{Index: 1},
+									},
+									MaximumSymlinkEscapementLevels: &wrapperspb.UInt32Value{Value: 3},
 								},
-								MaximumSymlinkEscapementLevels: &wrapperspb.UInt32Value{Value: 3},
 							},
 						},
 					}},

@@ -63,10 +63,10 @@ func (d *currentPackageLimitingDirectory[TReference]) ReadDir() ([]filesystem.Fi
 			if (len(files) == 0 || entry.Name < files[0].Name) &&
 				(len(symlinks) == 0 || entry.Name < symlinks[0].Name) {
 				// Report directory if it is not a package.
-				childDirectory, err := model_filesystem.DirectoryNodeGetContents(
+				childDirectory, err := model_filesystem.DirectoryGetContents(
 					d.options.context,
 					d.options.directoryReaders.DirectoryContents,
-					model_core.Nested(d.directory, entry),
+					model_core.Nested(d.directory, entry.Directory),
 				)
 				if err != nil {
 					return nil, fmt.Errorf("failed to get contents for directory %#v: %w", entry.Name, err)
@@ -150,10 +150,10 @@ func (d *currentPackageLimitingDirectory[TReference]) EnterCapturableDirectory(n
 	if !ok {
 		panic("attempted to enter a directory that was not reported by ReadDir()")
 	}
-	childDirectory, err := model_filesystem.DirectoryNodeGetContents(
+	childDirectory, err := model_filesystem.DirectoryGetContents(
 		d.options.context,
 		d.options.directoryReaders.DirectoryContents,
-		model_core.Nested(d.directory, directories[index]),
+		model_core.Nested(d.directory, directories[index].Directory),
 	)
 	if err != nil {
 		return nil, nil, err

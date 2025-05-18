@@ -223,7 +223,11 @@ func (d *changeTrackingDirectory[TReference, TMetadata]) mergeContents(contents 
 		} else if _, ok := d.symlinks[name]; ok {
 			return fmt.Errorf("directory %#v conflicts with an existing symbolic link", name.String())
 		} else if child, ok := d.directories[name]; ok {
-			childMessage, err := model_filesystem.DirectoryNodeGetContents(options.context, options.directoryContentsReader, model_core.Nested(contents, directory))
+			childMessage, err := model_filesystem.DirectoryGetContents(
+				options.context,
+				options.directoryContentsReader,
+				model_core.Nested(contents, directory.Directory),
+			)
 			if err != nil {
 				return err
 			}
@@ -266,12 +270,12 @@ func (d *changeTrackingDirectory[TReference, TMetadata]) createUnchangedDirector
 	directoryNode model_core.Message[*model_filesystem_pb.DirectoryNode, TReference],
 	options *changeTrackingDirectoryLoadOptions[TReference],
 ) error {
-	switch childContents := directoryNode.Message.Contents.(type) {
-	case *model_filesystem_pb.DirectoryNode_ContentsExternal:
+	switch childContents := directoryNode.Message.Directory.GetContents().(type) {
+	case *model_filesystem_pb.Directory_ContentsExternal:
 		d.setDirectorySimple(name, &changeTrackingDirectory[TReference, TMetadata]{
 			currentReference: model_core.Nested(directoryNode, childContents.ContentsExternal),
 		})
-	case *model_filesystem_pb.DirectoryNode_ContentsInline:
+	case *model_filesystem_pb.Directory_ContentsInline:
 		dChild := &changeTrackingDirectory[TReference, TMetadata]{}
 		if err := dChild.setContents(
 			model_core.Nested(directoryNode, childContents.ContentsInline),

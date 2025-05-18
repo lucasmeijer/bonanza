@@ -158,10 +158,10 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRepoPlatformHostPathValue(c
 		// contains any more symlinks that point to locations
 		// outside this directory. If so, invoke
 		// RepoPlatformHostPath recursively.
-		capturedDirectory, err := model_filesystem.DirectoryNodeGetContents(
+		capturedDirectory, err := model_filesystem.DirectoryGetContents(
 			ctx,
 			directoryReaders.DirectoryContents,
-			model_core.Nested(outputs, directories[index]),
+			model_core.Nested(outputs, directories[index].Directory),
 		)
 		if err != nil {
 			return PatchedRepoPlatformHostPathValue{}, err

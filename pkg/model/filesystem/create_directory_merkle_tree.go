@@ -293,8 +293,10 @@ func (b *directoryMerkleTreeBuilder[TDirectory, TFile]) maybeFinalizeDirectory(u
 			createdDirectory := directoryNode.createdDirectory
 			inlineDirectoryNode := model_filesystem_pb.DirectoryNode{
 				Name: nameStr,
-				Contents: &model_filesystem_pb.DirectoryNode_ContentsInline{
-					ContentsInline: createdDirectory.Message.Message,
+				Directory: &model_filesystem_pb.Directory{
+					Contents: &model_filesystem_pb.Directory_ContentsInline{
+						ContentsInline: createdDirectory.Message.Message,
+					},
 				},
 			}
 			inlineCandidates = append(
@@ -314,13 +316,15 @@ func (b *directoryMerkleTreeBuilder[TDirectory, TFile]) maybeFinalizeDirectory(u
 						} else {
 							directory.Message.Directories = append(directory.Message.Directories, &model_filesystem_pb.DirectoryNode{
 								Name: nameStr,
-								Contents: &model_filesystem_pb.DirectoryNode_ContentsExternal{
-									ContentsExternal: createdDirectory.ToDirectoryReference(
-										directory.Patcher.CaptureAndAddDecodableReference(
-											*externalObject,
-											model_core.CreatedObjectCapturerFunc[TDirectory](b.capturer.CaptureLeaves),
+								Directory: &model_filesystem_pb.Directory{
+									Contents: &model_filesystem_pb.Directory_ContentsExternal{
+										ContentsExternal: createdDirectory.ToDirectoryReference(
+											directory.Patcher.CaptureAndAddDecodableReference(
+												*externalObject,
+												model_core.CreatedObjectCapturerFunc[TDirectory](b.capturer.CaptureLeaves),
+											),
 										),
-									),
+									},
 								},
 							})
 						}
@@ -429,12 +433,12 @@ func (cd *CreatedDirectory[TDirectory]) raiseDirectoryMaximumSymlinkEscapementLe
 			return status.Errorf(codes.InvalidArgument, "Invalid name for child %#v inside directory %#v", child.Name, currentPath.GetUNIXString())
 		}
 		childPath := currentPath.Append(childName)
-		switch contents := child.Contents.(type) {
-		case *model_filesystem_pb.DirectoryNode_ContentsExternal:
+		switch contents := child.Directory.GetContents().(type) {
+		case *model_filesystem_pb.Directory_ContentsExternal:
 			if cd.raiseMaximumSymlinkEscapementLevels(contents.ContentsExternal.MaximumSymlinkEscapementLevels, childDepth) {
 				return nil
 			}
-		case *model_filesystem_pb.DirectoryNode_ContentsInline:
+		case *model_filesystem_pb.Directory_ContentsInline:
 			if err := cd.raiseDirectoryMaximumSymlinkEscapementLevels(contents.ContentsInline, childPath, childDepth); err != nil {
 				return err
 			}

@@ -170,8 +170,8 @@ func (w *capturedDirectoryWalker) gatherWalkers(directory *model_filesystem_pb.D
 
 	for _, childDirectory := range directory.Directories {
 		childPathTrace := pathTrace.Append(path.MustNewComponent(childDirectory.Name))
-		switch contents := childDirectory.Contents.(type) {
-		case *model_filesystem_pb.DirectoryNode_ContentsExternal:
+		switch contents := childDirectory.Directory.GetContents().(type) {
+		case *model_filesystem_pb.Directory_ContentsExternal:
 			index, err := model_core.GetIndexFromReferenceMessage(contents.ContentsExternal.Reference.GetReference(), len(walkers))
 			if err != nil {
 				return util.StatusWrapf(err, "Invalid reference index for directory %#v", childPathTrace.GetUNIXString())
@@ -182,7 +182,7 @@ func (w *capturedDirectoryWalker) gatherWalkers(directory *model_filesystem_pb.D
 				decodingParameters: contents.ContentsExternal.Reference.DecodingParameters,
 				pathTrace:          childPathTrace,
 			}
-		case *model_filesystem_pb.DirectoryNode_ContentsInline:
+		case *model_filesystem_pb.Directory_ContentsInline:
 			if err := w.gatherWalkers(contents.ContentsInline, childPathTrace, walkers); err != nil {
 				return err
 			}

@@ -60,7 +60,11 @@ func (c *baseComputer[TReference, TMetadata]) getPackageDirectory(
 			// Base package does not exist.
 			return model_core.Message[*model_filesystem_pb.DirectoryContents, TReference]{}, nil
 		}
-		baseDirectory, err = model_filesystem.DirectoryNodeGetContents(ctx, directoryContentsReader, model_core.Nested(baseDirectory, directories[directoryIndex]))
+		baseDirectory, err = model_filesystem.DirectoryGetContents(
+			ctx,
+			directoryContentsReader,
+			model_core.Nested(baseDirectory, directories[directoryIndex].Directory),
+		)
 		if err != nil {
 			return model_core.Message[*model_filesystem_pb.DirectoryContents, TReference]{}, err
 		}
@@ -115,7 +119,11 @@ func (pec *packageExistenceChecker[TReference]) findPackagesBelow(d model_core.M
 		}
 		childTrace := dTrace.Append(name)
 
-		childDirectory, err := model_filesystem.DirectoryNodeGetContents(pec.context, pec.directoryReaders.DirectoryContents, model_core.Nested(d, entry))
+		childDirectory, err := model_filesystem.DirectoryGetContents(
+			pec.context,
+			pec.directoryReaders.DirectoryContents,
+			model_core.Nested(d, entry.Directory),
+		)
 		if err != nil {
 			return fmt.Errorf("failed to get contents of directory %#v: %w", childTrace.GetUNIXString(), err)
 		}

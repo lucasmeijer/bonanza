@@ -374,21 +374,99 @@ func (*DirectoryContents_LeavesExternal) isDirectoryContents_Leaves() {}
 
 func (*DirectoryContents_LeavesInline) isDirectoryContents_Leaves() {}
 
-type DirectoryNode struct {
+type Directory struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	Name  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Types that are valid to be assigned to Contents:
 	//
-	//	*DirectoryNode_ContentsExternal
-	//	*DirectoryNode_ContentsInline
-	Contents      isDirectoryNode_Contents `protobuf_oneof:"contents"`
+	//	*Directory_ContentsExternal
+	//	*Directory_ContentsInline
+	Contents      isDirectory_Contents `protobuf_oneof:"contents"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Directory) Reset() {
+	*x = Directory{}
+	mi := &file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Directory) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Directory) ProtoMessage() {}
+
+func (x *Directory) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Directory.ProtoReflect.Descriptor instead.
+func (*Directory) Descriptor() ([]byte, []int) {
+	return file_pkg_proto_model_filesystem_filesystem_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *Directory) GetContents() isDirectory_Contents {
+	if x != nil {
+		return x.Contents
+	}
+	return nil
+}
+
+func (x *Directory) GetContentsExternal() *DirectoryReference {
+	if x != nil {
+		if x, ok := x.Contents.(*Directory_ContentsExternal); ok {
+			return x.ContentsExternal
+		}
+	}
+	return nil
+}
+
+func (x *Directory) GetContentsInline() *DirectoryContents {
+	if x != nil {
+		if x, ok := x.Contents.(*Directory_ContentsInline); ok {
+			return x.ContentsInline
+		}
+	}
+	return nil
+}
+
+type isDirectory_Contents interface {
+	isDirectory_Contents()
+}
+
+type Directory_ContentsExternal struct {
+	ContentsExternal *DirectoryReference `protobuf:"bytes,1,opt,name=contents_external,json=contentsExternal,proto3,oneof"`
+}
+
+type Directory_ContentsInline struct {
+	ContentsInline *DirectoryContents `protobuf:"bytes,2,opt,name=contents_inline,json=contentsInline,proto3,oneof"`
+}
+
+func (*Directory_ContentsExternal) isDirectory_Contents() {}
+
+func (*Directory_ContentsInline) isDirectory_Contents() {}
+
+type DirectoryNode struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Directory     *Directory             `protobuf:"bytes,2,opt,name=directory,proto3" json:"directory,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *DirectoryNode) Reset() {
 	*x = DirectoryNode{}
-	mi := &file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[6]
+	mi := &file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -400,7 +478,7 @@ func (x *DirectoryNode) String() string {
 func (*DirectoryNode) ProtoMessage() {}
 
 func (x *DirectoryNode) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[6]
+	mi := &file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -413,7 +491,7 @@ func (x *DirectoryNode) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DirectoryNode.ProtoReflect.Descriptor instead.
 func (*DirectoryNode) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_model_filesystem_filesystem_proto_rawDescGZIP(), []int{6}
+	return file_pkg_proto_model_filesystem_filesystem_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *DirectoryNode) GetName() string {
@@ -423,46 +501,12 @@ func (x *DirectoryNode) GetName() string {
 	return ""
 }
 
-func (x *DirectoryNode) GetContents() isDirectoryNode_Contents {
+func (x *DirectoryNode) GetDirectory() *Directory {
 	if x != nil {
-		return x.Contents
+		return x.Directory
 	}
 	return nil
 }
-
-func (x *DirectoryNode) GetContentsExternal() *DirectoryReference {
-	if x != nil {
-		if x, ok := x.Contents.(*DirectoryNode_ContentsExternal); ok {
-			return x.ContentsExternal
-		}
-	}
-	return nil
-}
-
-func (x *DirectoryNode) GetContentsInline() *DirectoryContents {
-	if x != nil {
-		if x, ok := x.Contents.(*DirectoryNode_ContentsInline); ok {
-			return x.ContentsInline
-		}
-	}
-	return nil
-}
-
-type isDirectoryNode_Contents interface {
-	isDirectoryNode_Contents()
-}
-
-type DirectoryNode_ContentsExternal struct {
-	ContentsExternal *DirectoryReference `protobuf:"bytes,2,opt,name=contents_external,json=contentsExternal,proto3,oneof"`
-}
-
-type DirectoryNode_ContentsInline struct {
-	ContentsInline *DirectoryContents `protobuf:"bytes,3,opt,name=contents_inline,json=contentsInline,proto3,oneof"`
-}
-
-func (*DirectoryNode_ContentsExternal) isDirectoryNode_Contents() {}
-
-func (*DirectoryNode_ContentsInline) isDirectoryNode_Contents() {}
 
 type DirectoryReference struct {
 	state                          protoimpl.MessageState   `protogen:"open.v1"`
@@ -475,7 +519,7 @@ type DirectoryReference struct {
 
 func (x *DirectoryReference) Reset() {
 	*x = DirectoryReference{}
-	mi := &file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[7]
+	mi := &file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -487,7 +531,7 @@ func (x *DirectoryReference) String() string {
 func (*DirectoryReference) ProtoMessage() {}
 
 func (x *DirectoryReference) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[7]
+	mi := &file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -500,7 +544,7 @@ func (x *DirectoryReference) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DirectoryReference.ProtoReflect.Descriptor instead.
 func (*DirectoryReference) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_model_filesystem_filesystem_proto_rawDescGZIP(), []int{7}
+	return file_pkg_proto_model_filesystem_filesystem_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *DirectoryReference) GetReference() *core.DecodableReference {
@@ -538,7 +582,7 @@ type FileContents struct {
 
 func (x *FileContents) Reset() {
 	*x = FileContents{}
-	mi := &file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[8]
+	mi := &file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -550,7 +594,7 @@ func (x *FileContents) String() string {
 func (*FileContents) ProtoMessage() {}
 
 func (x *FileContents) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[8]
+	mi := &file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -563,7 +607,7 @@ func (x *FileContents) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FileContents.ProtoReflect.Descriptor instead.
 func (*FileContents) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_model_filesystem_filesystem_proto_rawDescGZIP(), []int{8}
+	return file_pkg_proto_model_filesystem_filesystem_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *FileContents) GetLevel() isFileContents_Level {
@@ -623,7 +667,7 @@ type DirectoryAccessParameters struct {
 
 func (x *DirectoryAccessParameters) Reset() {
 	*x = DirectoryAccessParameters{}
-	mi := &file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[9]
+	mi := &file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -635,7 +679,7 @@ func (x *DirectoryAccessParameters) String() string {
 func (*DirectoryAccessParameters) ProtoMessage() {}
 
 func (x *DirectoryAccessParameters) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[9]
+	mi := &file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -648,7 +692,7 @@ func (x *DirectoryAccessParameters) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DirectoryAccessParameters.ProtoReflect.Descriptor instead.
 func (*DirectoryAccessParameters) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_model_filesystem_filesystem_proto_rawDescGZIP(), []int{9}
+	return file_pkg_proto_model_filesystem_filesystem_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *DirectoryAccessParameters) GetEncoders() []*encoding.BinaryEncoder {
@@ -668,7 +712,7 @@ type DirectoryCreationParameters struct {
 
 func (x *DirectoryCreationParameters) Reset() {
 	*x = DirectoryCreationParameters{}
-	mi := &file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[10]
+	mi := &file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -680,7 +724,7 @@ func (x *DirectoryCreationParameters) String() string {
 func (*DirectoryCreationParameters) ProtoMessage() {}
 
 func (x *DirectoryCreationParameters) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[10]
+	mi := &file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -693,7 +737,7 @@ func (x *DirectoryCreationParameters) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DirectoryCreationParameters.ProtoReflect.Descriptor instead.
 func (*DirectoryCreationParameters) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_model_filesystem_filesystem_proto_rawDescGZIP(), []int{10}
+	return file_pkg_proto_model_filesystem_filesystem_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *DirectoryCreationParameters) GetAccess() *DirectoryAccessParameters {
@@ -720,7 +764,7 @@ type FileAccessParameters struct {
 
 func (x *FileAccessParameters) Reset() {
 	*x = FileAccessParameters{}
-	mi := &file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[11]
+	mi := &file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -732,7 +776,7 @@ func (x *FileAccessParameters) String() string {
 func (*FileAccessParameters) ProtoMessage() {}
 
 func (x *FileAccessParameters) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[11]
+	mi := &file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -745,7 +789,7 @@ func (x *FileAccessParameters) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FileAccessParameters.ProtoReflect.Descriptor instead.
 func (*FileAccessParameters) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_model_filesystem_filesystem_proto_rawDescGZIP(), []int{11}
+	return file_pkg_proto_model_filesystem_filesystem_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *FileAccessParameters) GetChunkEncoders() []*encoding.BinaryEncoder {
@@ -775,7 +819,7 @@ type FileCreationParameters struct {
 
 func (x *FileCreationParameters) Reset() {
 	*x = FileCreationParameters{}
-	mi := &file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[12]
+	mi := &file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -787,7 +831,7 @@ func (x *FileCreationParameters) String() string {
 func (*FileCreationParameters) ProtoMessage() {}
 
 func (x *FileCreationParameters) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[12]
+	mi := &file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -800,7 +844,7 @@ func (x *FileCreationParameters) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FileCreationParameters.ProtoReflect.Descriptor instead.
 func (*FileCreationParameters) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_model_filesystem_filesystem_proto_rawDescGZIP(), []int{12}
+	return file_pkg_proto_model_filesystem_filesystem_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *FileCreationParameters) GetAccess() *FileAccessParameters {
@@ -909,22 +953,27 @@ var file_pkg_proto_model_filesystem_filesystem_proto_rawDesc = string([]byte{
 	0x62, 0x6f, 0x6e, 0x61, 0x6e, 0x7a, 0x61, 0x2e, 0x6d, 0x6f, 0x64, 0x65, 0x6c, 0x2e, 0x66, 0x69,
 	0x6c, 0x65, 0x73, 0x79, 0x73, 0x74, 0x65, 0x6d, 0x2e, 0x44, 0x69, 0x72, 0x65, 0x63, 0x74, 0x6f,
 	0x72, 0x79, 0x4e, 0x6f, 0x64, 0x65, 0x52, 0x0b, 0x64, 0x69, 0x72, 0x65, 0x63, 0x74, 0x6f, 0x72,
-	0x69, 0x65, 0x73, 0x42, 0x08, 0x0a, 0x06, 0x6c, 0x65, 0x61, 0x76, 0x65, 0x73, 0x22, 0xe4, 0x01,
-	0x0a, 0x0d, 0x44, 0x69, 0x72, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x79, 0x4e, 0x6f, 0x64, 0x65, 0x12,
-	0x12, 0x0a, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x6e,
-	0x61, 0x6d, 0x65, 0x12, 0x5b, 0x0a, 0x11, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x73, 0x5f,
-	0x65, 0x78, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x6c, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x2c,
-	0x2e, 0x62, 0x6f, 0x6e, 0x61, 0x6e, 0x7a, 0x61, 0x2e, 0x6d, 0x6f, 0x64, 0x65, 0x6c, 0x2e, 0x66,
-	0x69, 0x6c, 0x65, 0x73, 0x79, 0x73, 0x74, 0x65, 0x6d, 0x2e, 0x44, 0x69, 0x72, 0x65, 0x63, 0x74,
-	0x6f, 0x72, 0x79, 0x52, 0x65, 0x66, 0x65, 0x72, 0x65, 0x6e, 0x63, 0x65, 0x48, 0x00, 0x52, 0x10,
-	0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x73, 0x45, 0x78, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x6c,
-	0x12, 0x56, 0x0a, 0x0f, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x73, 0x5f, 0x69, 0x6e, 0x6c,
-	0x69, 0x6e, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x2b, 0x2e, 0x62, 0x6f, 0x6e, 0x61,
-	0x6e, 0x7a, 0x61, 0x2e, 0x6d, 0x6f, 0x64, 0x65, 0x6c, 0x2e, 0x66, 0x69, 0x6c, 0x65, 0x73, 0x79,
-	0x73, 0x74, 0x65, 0x6d, 0x2e, 0x44, 0x69, 0x72, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x79, 0x43, 0x6f,
-	0x6e, 0x74, 0x65, 0x6e, 0x74, 0x73, 0x48, 0x00, 0x52, 0x0e, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e,
-	0x74, 0x73, 0x49, 0x6e, 0x6c, 0x69, 0x6e, 0x65, 0x42, 0x0a, 0x0a, 0x08, 0x63, 0x6f, 0x6e, 0x74,
-	0x65, 0x6e, 0x74, 0x73, 0x22, 0xa2, 0x02, 0x0a, 0x12, 0x44, 0x69, 0x72, 0x65, 0x63, 0x74, 0x6f,
+	0x69, 0x65, 0x73, 0x42, 0x08, 0x0a, 0x06, 0x6c, 0x65, 0x61, 0x76, 0x65, 0x73, 0x22, 0xcc, 0x01,
+	0x0a, 0x09, 0x44, 0x69, 0x72, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x79, 0x12, 0x5b, 0x0a, 0x11, 0x63,
+	0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x73, 0x5f, 0x65, 0x78, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x6c,
+	0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x2c, 0x2e, 0x62, 0x6f, 0x6e, 0x61, 0x6e, 0x7a, 0x61,
+	0x2e, 0x6d, 0x6f, 0x64, 0x65, 0x6c, 0x2e, 0x66, 0x69, 0x6c, 0x65, 0x73, 0x79, 0x73, 0x74, 0x65,
+	0x6d, 0x2e, 0x44, 0x69, 0x72, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x79, 0x52, 0x65, 0x66, 0x65, 0x72,
+	0x65, 0x6e, 0x63, 0x65, 0x48, 0x00, 0x52, 0x10, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x73,
+	0x45, 0x78, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x6c, 0x12, 0x56, 0x0a, 0x0f, 0x63, 0x6f, 0x6e, 0x74,
+	0x65, 0x6e, 0x74, 0x73, 0x5f, 0x69, 0x6e, 0x6c, 0x69, 0x6e, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28,
+	0x0b, 0x32, 0x2b, 0x2e, 0x62, 0x6f, 0x6e, 0x61, 0x6e, 0x7a, 0x61, 0x2e, 0x6d, 0x6f, 0x64, 0x65,
+	0x6c, 0x2e, 0x66, 0x69, 0x6c, 0x65, 0x73, 0x79, 0x73, 0x74, 0x65, 0x6d, 0x2e, 0x44, 0x69, 0x72,
+	0x65, 0x63, 0x74, 0x6f, 0x72, 0x79, 0x43, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x73, 0x48, 0x00,
+	0x52, 0x0e, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x73, 0x49, 0x6e, 0x6c, 0x69, 0x6e, 0x65,
+	0x42, 0x0a, 0x0a, 0x08, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x73, 0x22, 0x66, 0x0a, 0x0d,
+	0x44, 0x69, 0x72, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x79, 0x4e, 0x6f, 0x64, 0x65, 0x12, 0x12, 0x0a,
+	0x04, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x6e, 0x61, 0x6d,
+	0x65, 0x12, 0x41, 0x0a, 0x09, 0x64, 0x69, 0x72, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x79, 0x18, 0x02,
+	0x20, 0x01, 0x28, 0x0b, 0x32, 0x23, 0x2e, 0x62, 0x6f, 0x6e, 0x61, 0x6e, 0x7a, 0x61, 0x2e, 0x6d,
+	0x6f, 0x64, 0x65, 0x6c, 0x2e, 0x66, 0x69, 0x6c, 0x65, 0x73, 0x79, 0x73, 0x74, 0x65, 0x6d, 0x2e,
+	0x44, 0x69, 0x72, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x79, 0x52, 0x09, 0x64, 0x69, 0x72, 0x65, 0x63,
+	0x74, 0x6f, 0x72, 0x79, 0x22, 0xa2, 0x02, 0x0a, 0x12, 0x44, 0x69, 0x72, 0x65, 0x63, 0x74, 0x6f,
 	0x72, 0x79, 0x52, 0x65, 0x66, 0x65, 0x72, 0x65, 0x6e, 0x63, 0x65, 0x12, 0x76, 0x0a, 0x09, 0x72,
 	0x65, 0x66, 0x65, 0x72, 0x65, 0x6e, 0x63, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x26,
 	0x2e, 0x62, 0x6f, 0x6e, 0x61, 0x6e, 0x7a, 0x61, 0x2e, 0x6d, 0x6f, 0x64, 0x65, 0x6c, 0x2e, 0x63,
@@ -1034,7 +1083,7 @@ func file_pkg_proto_model_filesystem_filesystem_proto_rawDescGZIP() []byte {
 	return file_pkg_proto_model_filesystem_filesystem_proto_rawDescData
 }
 
-var file_pkg_proto_model_filesystem_filesystem_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_pkg_proto_model_filesystem_filesystem_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_pkg_proto_model_filesystem_filesystem_proto_goTypes = []any{
 	(*Leaves)(nil),                      // 0: bonanza.model.filesystem.Leaves
 	(*LeavesReference)(nil),             // 1: bonanza.model.filesystem.LeavesReference
@@ -1042,43 +1091,45 @@ var file_pkg_proto_model_filesystem_filesystem_proto_goTypes = []any{
 	(*FileNode)(nil),                    // 3: bonanza.model.filesystem.FileNode
 	(*SymlinkNode)(nil),                 // 4: bonanza.model.filesystem.SymlinkNode
 	(*DirectoryContents)(nil),           // 5: bonanza.model.filesystem.DirectoryContents
-	(*DirectoryNode)(nil),               // 6: bonanza.model.filesystem.DirectoryNode
-	(*DirectoryReference)(nil),          // 7: bonanza.model.filesystem.DirectoryReference
-	(*FileContents)(nil),                // 8: bonanza.model.filesystem.FileContents
-	(*DirectoryAccessParameters)(nil),   // 9: bonanza.model.filesystem.DirectoryAccessParameters
-	(*DirectoryCreationParameters)(nil), // 10: bonanza.model.filesystem.DirectoryCreationParameters
-	(*FileAccessParameters)(nil),        // 11: bonanza.model.filesystem.FileAccessParameters
-	(*FileCreationParameters)(nil),      // 12: bonanza.model.filesystem.FileCreationParameters
-	(*core.DecodableReference)(nil),     // 13: bonanza.model.core.DecodableReference
-	(*wrapperspb.UInt32Value)(nil),      // 14: google.protobuf.UInt32Value
-	(*encoding.BinaryEncoder)(nil),      // 15: bonanza.model.encoding.BinaryEncoder
+	(*Directory)(nil),                   // 6: bonanza.model.filesystem.Directory
+	(*DirectoryNode)(nil),               // 7: bonanza.model.filesystem.DirectoryNode
+	(*DirectoryReference)(nil),          // 8: bonanza.model.filesystem.DirectoryReference
+	(*FileContents)(nil),                // 9: bonanza.model.filesystem.FileContents
+	(*DirectoryAccessParameters)(nil),   // 10: bonanza.model.filesystem.DirectoryAccessParameters
+	(*DirectoryCreationParameters)(nil), // 11: bonanza.model.filesystem.DirectoryCreationParameters
+	(*FileAccessParameters)(nil),        // 12: bonanza.model.filesystem.FileAccessParameters
+	(*FileCreationParameters)(nil),      // 13: bonanza.model.filesystem.FileCreationParameters
+	(*core.DecodableReference)(nil),     // 14: bonanza.model.core.DecodableReference
+	(*wrapperspb.UInt32Value)(nil),      // 15: google.protobuf.UInt32Value
+	(*encoding.BinaryEncoder)(nil),      // 16: bonanza.model.encoding.BinaryEncoder
 }
 var file_pkg_proto_model_filesystem_filesystem_proto_depIdxs = []int32{
 	3,  // 0: bonanza.model.filesystem.Leaves.files:type_name -> bonanza.model.filesystem.FileNode
 	4,  // 1: bonanza.model.filesystem.Leaves.symlinks:type_name -> bonanza.model.filesystem.SymlinkNode
-	13, // 2: bonanza.model.filesystem.LeavesReference.reference:type_name -> bonanza.model.core.DecodableReference
-	14, // 3: bonanza.model.filesystem.LeavesReference.maximum_symlink_escapement_levels:type_name -> google.protobuf.UInt32Value
-	8,  // 4: bonanza.model.filesystem.FileProperties.contents:type_name -> bonanza.model.filesystem.FileContents
+	14, // 2: bonanza.model.filesystem.LeavesReference.reference:type_name -> bonanza.model.core.DecodableReference
+	15, // 3: bonanza.model.filesystem.LeavesReference.maximum_symlink_escapement_levels:type_name -> google.protobuf.UInt32Value
+	9,  // 4: bonanza.model.filesystem.FileProperties.contents:type_name -> bonanza.model.filesystem.FileContents
 	2,  // 5: bonanza.model.filesystem.FileNode.properties:type_name -> bonanza.model.filesystem.FileProperties
 	1,  // 6: bonanza.model.filesystem.DirectoryContents.leaves_external:type_name -> bonanza.model.filesystem.LeavesReference
 	0,  // 7: bonanza.model.filesystem.DirectoryContents.leaves_inline:type_name -> bonanza.model.filesystem.Leaves
-	6,  // 8: bonanza.model.filesystem.DirectoryContents.directories:type_name -> bonanza.model.filesystem.DirectoryNode
-	7,  // 9: bonanza.model.filesystem.DirectoryNode.contents_external:type_name -> bonanza.model.filesystem.DirectoryReference
-	5,  // 10: bonanza.model.filesystem.DirectoryNode.contents_inline:type_name -> bonanza.model.filesystem.DirectoryContents
-	13, // 11: bonanza.model.filesystem.DirectoryReference.reference:type_name -> bonanza.model.core.DecodableReference
-	14, // 12: bonanza.model.filesystem.DirectoryReference.maximum_symlink_escapement_levels:type_name -> google.protobuf.UInt32Value
-	13, // 13: bonanza.model.filesystem.FileContents.file_contents_list_reference:type_name -> bonanza.model.core.DecodableReference
-	13, // 14: bonanza.model.filesystem.FileContents.chunk_reference:type_name -> bonanza.model.core.DecodableReference
-	15, // 15: bonanza.model.filesystem.DirectoryAccessParameters.encoders:type_name -> bonanza.model.encoding.BinaryEncoder
-	9,  // 16: bonanza.model.filesystem.DirectoryCreationParameters.access:type_name -> bonanza.model.filesystem.DirectoryAccessParameters
-	15, // 17: bonanza.model.filesystem.FileAccessParameters.chunk_encoders:type_name -> bonanza.model.encoding.BinaryEncoder
-	15, // 18: bonanza.model.filesystem.FileAccessParameters.file_contents_list_encoders:type_name -> bonanza.model.encoding.BinaryEncoder
-	11, // 19: bonanza.model.filesystem.FileCreationParameters.access:type_name -> bonanza.model.filesystem.FileAccessParameters
-	20, // [20:20] is the sub-list for method output_type
-	20, // [20:20] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	7,  // 8: bonanza.model.filesystem.DirectoryContents.directories:type_name -> bonanza.model.filesystem.DirectoryNode
+	8,  // 9: bonanza.model.filesystem.Directory.contents_external:type_name -> bonanza.model.filesystem.DirectoryReference
+	5,  // 10: bonanza.model.filesystem.Directory.contents_inline:type_name -> bonanza.model.filesystem.DirectoryContents
+	6,  // 11: bonanza.model.filesystem.DirectoryNode.directory:type_name -> bonanza.model.filesystem.Directory
+	14, // 12: bonanza.model.filesystem.DirectoryReference.reference:type_name -> bonanza.model.core.DecodableReference
+	15, // 13: bonanza.model.filesystem.DirectoryReference.maximum_symlink_escapement_levels:type_name -> google.protobuf.UInt32Value
+	14, // 14: bonanza.model.filesystem.FileContents.file_contents_list_reference:type_name -> bonanza.model.core.DecodableReference
+	14, // 15: bonanza.model.filesystem.FileContents.chunk_reference:type_name -> bonanza.model.core.DecodableReference
+	16, // 16: bonanza.model.filesystem.DirectoryAccessParameters.encoders:type_name -> bonanza.model.encoding.BinaryEncoder
+	10, // 17: bonanza.model.filesystem.DirectoryCreationParameters.access:type_name -> bonanza.model.filesystem.DirectoryAccessParameters
+	16, // 18: bonanza.model.filesystem.FileAccessParameters.chunk_encoders:type_name -> bonanza.model.encoding.BinaryEncoder
+	16, // 19: bonanza.model.filesystem.FileAccessParameters.file_contents_list_encoders:type_name -> bonanza.model.encoding.BinaryEncoder
+	12, // 20: bonanza.model.filesystem.FileCreationParameters.access:type_name -> bonanza.model.filesystem.FileAccessParameters
+	21, // [21:21] is the sub-list for method output_type
+	21, // [21:21] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_pkg_proto_model_filesystem_filesystem_proto_init() }
@@ -1091,10 +1142,10 @@ func file_pkg_proto_model_filesystem_filesystem_proto_init() {
 		(*DirectoryContents_LeavesInline)(nil),
 	}
 	file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[6].OneofWrappers = []any{
-		(*DirectoryNode_ContentsExternal)(nil),
-		(*DirectoryNode_ContentsInline)(nil),
+		(*Directory_ContentsExternal)(nil),
+		(*Directory_ContentsInline)(nil),
 	}
-	file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[8].OneofWrappers = []any{
+	file_pkg_proto_model_filesystem_filesystem_proto_msgTypes[9].OneofWrappers = []any{
 		(*FileContents_FileContentsListReference)(nil),
 		(*FileContents_ChunkReference)(nil),
 	}
@@ -1104,7 +1155,7 @@ func file_pkg_proto_model_filesystem_filesystem_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pkg_proto_model_filesystem_filesystem_proto_rawDesc), len(file_pkg_proto_model_filesystem_filesystem_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

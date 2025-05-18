@@ -74,10 +74,10 @@ func (cw *DirectoryComponentWalker[TReference]) OnDirectory(name path.Component)
 		len(directories),
 		func(i int) int { return strings.Compare(n, directories[i].Name) },
 	); ok {
-		switch contents := directories[i].Contents.(type) {
-		case *model_filesystem_pb.DirectoryNode_ContentsExternal:
+		switch contents := directories[i].Directory.GetContents().(type) {
+		case *model_filesystem_pb.Directory_ContentsExternal:
 			cw.currentDirectoryReference = model_core.Nested(d, contents.ContentsExternal.Reference)
-		case *model_filesystem_pb.DirectoryNode_ContentsInline:
+		case *model_filesystem_pb.Directory_ContentsInline:
 			cw.stack = append(cw.stack, model_core.Nested(d, contents.ContentsInline))
 		default:
 			return nil, status.Error(codes.InvalidArgument, "Unknown directory contents type")
@@ -194,18 +194,18 @@ func DirectoryGetLeaves[TReference any](
 	}
 }
 
-// DirectoryNodeGetContents is a helper function for obtaining the
-// contents of a directory node.
-func DirectoryNodeGetContents[TReference any](
+// DirectoryGetContents is a helper function for obtaining the contents
+// of a directory.
+func DirectoryGetContents[TReference any](
 	ctx context.Context,
 	reader model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_filesystem_pb.DirectoryContents, TReference]],
-	directoryNode model_core.Message[*model_filesystem_pb.DirectoryNode, TReference],
+	directory model_core.Message[*model_filesystem_pb.Directory, TReference],
 ) (model_core.Message[*model_filesystem_pb.DirectoryContents, TReference], error) {
-	switch contents := directoryNode.Message.Contents.(type) {
-	case *model_filesystem_pb.DirectoryNode_ContentsExternal:
-		return model_parser.Dereference(ctx, reader, model_core.Nested(directoryNode, contents.ContentsExternal.Reference))
-	case *model_filesystem_pb.DirectoryNode_ContentsInline:
-		return model_core.Nested(directoryNode, contents.ContentsInline), nil
+	switch contents := directory.Message.Contents.(type) {
+	case *model_filesystem_pb.Directory_ContentsExternal:
+		return model_parser.Dereference(ctx, reader, model_core.Nested(directory, contents.ContentsExternal.Reference))
+	case *model_filesystem_pb.Directory_ContentsInline:
+		return model_core.Nested(directory, contents.ContentsInline), nil
 	default:
 		return model_core.Message[*model_filesystem_pb.DirectoryContents, TReference]{}, status.Error(codes.InvalidArgument, "Directory node has no contents")
 	}

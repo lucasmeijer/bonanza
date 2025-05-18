@@ -81,10 +81,10 @@ func addDirectoriesToCluster[TReference any](c *DirectoryCluster, d model_core.M
 	)
 
 	for i, entry := range d.Message.Directories {
-		switch contents := entry.Contents.(type) {
-		case *model_filesystem_pb.DirectoryNode_ContentsExternal:
+		switch contents := entry.Directory.GetContents().(type) {
+		case *model_filesystem_pb.Directory_ContentsExternal:
 			childDirectoryIndices[i] = -1
-		case *model_filesystem_pb.DirectoryNode_ContentsInline:
+		case *model_filesystem_pb.Directory_ContentsInline:
 			// Subdirectory is stored in the same object.
 			// Recurse into it, so that it gets its own
 			// directory index.
