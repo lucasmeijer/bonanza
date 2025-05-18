@@ -433,7 +433,7 @@ message TargetActionDefinition {
   // running the action. For example, if this action is expected to
   // write to output file "a/b.txt", the initial output directory will
   // contain an empty directory named "a".
-  bonanza.model.filesystem.DirectoryContents initial_output_directory = 6;
+  bonanza.model.filesystem.Directory initial_output_directory = 6;
 }
 
 message ConfiguredTarget {
