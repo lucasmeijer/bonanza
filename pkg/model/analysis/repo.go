@@ -115,7 +115,7 @@ type changeTrackingDirectory[TReference object.BasicReference, TMetadata model_c
 	// are still identical to the original version. If not set, the
 	// directory has been accessed and potentially modified,
 	// requiring it to be recomputed and uploaded once again.
-	currentReference model_core.Message[*model_filesystem_pb.DirectoryReference, TReference]
+	unmodifiedDirectory model_core.Message[*model_filesystem_pb.Directory, TReference]
 
 	directories map[path.Component]*changeTrackingDirectory[TReference, TMetadata]
 	files       map[path.Component]*changeTrackingFile[TReference, TMetadata]
@@ -155,9 +155,9 @@ func (d *changeTrackingDirectory[TReference, TMetadata]) setContents(contents mo
 		if !ok {
 			return fmt.Errorf("directory %#v has an invalid name", directory.Name)
 		}
-		if err := d.createUnchangedDirectory(name, model_core.Nested(contents, directory), options); err != nil {
-			return err
-		}
+		d.setDirectorySimple(name, &changeTrackingDirectory[TReference, TMetadata]{
+			unmodifiedDirectory: model_core.Nested(contents, directory.Directory),
+		})
 	}
 	return nil
 }
@@ -235,9 +235,9 @@ func (d *changeTrackingDirectory[TReference, TMetadata]) mergeContents(contents 
 				return err
 			}
 		} else {
-			if err := d.createUnchangedDirectory(name, model_core.Nested(contents, directory), options); err != nil {
-				return err
-			}
+			d.setDirectorySimple(name, &changeTrackingDirectory[TReference, TMetadata]{
+				unmodifiedDirectory: model_core.Nested(contents, directory.Directory),
+			})
 		}
 	}
 	return nil
@@ -263,31 +263,6 @@ func (d *changeTrackingDirectory[TReference, TMetadata]) getOrCreateDirectory(na
 		d.setDirectorySimple(name, dChild)
 	}
 	return dChild, nil
-}
-
-func (d *changeTrackingDirectory[TReference, TMetadata]) createUnchangedDirectory(
-	name path.Component,
-	directoryNode model_core.Message[*model_filesystem_pb.DirectoryNode, TReference],
-	options *changeTrackingDirectoryLoadOptions[TReference],
-) error {
-	switch childContents := directoryNode.Message.Directory.GetContents().(type) {
-	case *model_filesystem_pb.Directory_ContentsExternal:
-		d.setDirectorySimple(name, &changeTrackingDirectory[TReference, TMetadata]{
-			currentReference: model_core.Nested(directoryNode, childContents.ContentsExternal),
-		})
-	case *model_filesystem_pb.Directory_ContentsInline:
-		dChild := &changeTrackingDirectory[TReference, TMetadata]{}
-		if err := dChild.setContents(
-			model_core.Nested(directoryNode, childContents.ContentsInline),
-			options,
-		); err != nil {
-			return err
-		}
-		d.setDirectorySimple(name, dChild)
-	default:
-		return errors.New("unknown directory contents type")
-	}
-	return nil
 }
 
 func (d *changeTrackingDirectory[TReference, TMetadata]) setFileSimple(name path.Component, f *changeTrackingFile[TReference, TMetadata]) {
@@ -333,15 +308,15 @@ type changeTrackingDirectoryLoadOptions[TReference any] struct {
 }
 
 func (d *changeTrackingDirectory[TReference, TMetadata]) maybeLoadContents(options *changeTrackingDirectoryLoadOptions[TReference]) error {
-	if reference := d.currentReference; reference.IsSet() {
+	if directory := d.unmodifiedDirectory; directory.IsSet() {
 		// Directory has not been accessed before. Load it from
 		// storage and ingest its contents.
-		directoryMessage, err := model_parser.Dereference(options.context, options.directoryContentsReader, model_core.Nested(reference, reference.Message.GetReference()))
+		contents, err := model_filesystem.DirectoryGetContents(options.context, options.directoryContentsReader, directory)
 		if err != nil {
 			return err
 		}
-		d.currentReference.Clear()
-		if err := d.setContents(directoryMessage, options); err != nil {
+		d.unmodifiedDirectory.Clear()
+		if err := d.setContents(contents, options); err != nil {
 			return err
 		}
 	}
@@ -475,18 +450,21 @@ func (cd *capturableChangeTrackingDirectory[TReference, TMetadata]) EnterCaptura
 	if !ok {
 		panic("attempted to enter non-existent directory")
 	}
-	if reference := dChild.currentReference; reference.IsSet() {
+	if directory := dChild.unmodifiedDirectory; directory.IsSet() {
 		// Directory has not been modified. Load the copy from
 		// storage, so that it may potentially be inlined into
 		// the parent directory.
-		directoryMessage, err := model_parser.Dereference(cd.options.context, cd.options.directoryContentsReader, model_core.Nested(reference, reference.Message.GetReference()))
+		contents, err := model_filesystem.DirectoryGetContents(cd.options.context, cd.options.directoryContentsReader, directory)
 		if err != nil {
 			return nil, nil, err
 		}
-		return &model_filesystem.CreatedDirectory[TMetadata]{
-			Message:                        model_core.Patch(cd.options.objectCapturer, directoryMessage),
-			MaximumSymlinkEscapementLevels: dChild.currentReference.Message.GetMaximumSymlinkEscapementLevels(),
-		}, nil, nil
+		// TODO: This ends up recomputing
+		// MaximumSymlinkEscapementLevels, which may be readily
+		// available if this was a reference. Should we add a
+		// utility function to model_filesystem to prevent this?
+		patchedContents := model_core.Patch(cd.options.objectCapturer, contents)
+		createdDirectory, err := model_filesystem.NewCreatedDirectoryBare(patchedContents)
+		return createdDirectory, nil, err
 	}
 
 	// Directory contains one or more changes. Recurse into it.
@@ -996,7 +974,14 @@ func (c *baseComputer[TReference, TMetadata]) applyPatches(
 	}
 
 	rootDirectory := &changeTrackingDirectory[TReference, model_core.FileBackedObjectLocation]{
-		currentReference: rootRef,
+		unmodifiedDirectory: model_core.Nested(
+			rootRef,
+			&model_filesystem_pb.Directory{
+				Contents: &model_filesystem_pb.Directory_ContentsExternal{
+					ContentsExternal: rootRef.Message,
+				},
+			},
+		),
 	}
 
 	// Strip the provided directory prefix.
@@ -1590,7 +1575,14 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doDownloadAndExtrac
 
 	// Determine which directory to place inside the file system.
 	archiveRootDirectory := changeTrackingDirectory[TReference, model_core.FileBackedObjectLocation]{
-		currentReference: model_core.Nested(archiveContentsValue, archiveContentsValue.Message.Exists.Contents),
+		unmodifiedDirectory: model_core.Nested(
+			archiveContentsValue,
+			&model_filesystem_pb.Directory{
+				Contents: &model_filesystem_pb.Directory_ContentsExternal{
+					ContentsExternal: archiveContentsValue.Message.Exists.Contents,
+				},
+			},
+		),
 	}
 	rootDirectoryResolver := changeTrackingDirectoryResolver[TReference, model_core.FileBackedObjectLocation]{
 		loadOptions: mrc.directoryLoadOptions,
@@ -2716,7 +2708,14 @@ func (ui *externalRepoAddingPathUnpackerInto[TReference, TMetadata]) maybeAddExt
 				if rootDirectoryReference == nil {
 					return errors.New("root directory reference is not set")
 				}
-				repoDirectory.currentReference = model_core.Nested(repo, rootDirectoryReference)
+				repoDirectory.unmodifiedDirectory = model_core.Nested(
+					repo,
+					&model_filesystem_pb.Directory{
+						Contents: &model_filesystem_pb.Directory_ContentsExternal{
+							ContentsExternal: rootDirectoryReference,
+						},
+					},
+				)
 			}
 		}
 	}
@@ -3235,14 +3234,16 @@ func (c *baseComputer[TReference, TMetadata]) createMerkleTreeFromChangeTracking
 	fileCreationParameters *model_filesystem.FileCreationParameters,
 	patchedFiles io.ReaderAt,
 ) (model_core.PatchedMessage[*model_filesystem_pb.DirectoryReference, dag.ObjectContentsWalker], error) {
-	if r := rootDirectory.currentReference; r.IsSet() {
-		// Directory remained completely unmodified. Simply
-		// return the original directory.
-		m := model_core.Patch(e, r)
-		return model_core.NewPatchedMessage(
-			m.Message,
-			model_core.MapReferenceMetadataToWalkers(m.Patcher),
-		), nil
+	if directory := rootDirectory.unmodifiedDirectory; directory.IsSet() {
+		if contentsExternal, ok := directory.Message.GetContents().(*model_filesystem_pb.Directory_ContentsExternal); ok {
+			// Directory remained completely unmodified.
+			// Simply return the original directory.
+			m := model_core.Patch(e, model_core.Nested(directory, contentsExternal.ContentsExternal))
+			return model_core.NewPatchedMessage(
+				m.Message,
+				model_core.MapReferenceMetadataToWalkers(m.Patcher),
+			), nil
+		}
 	}
 
 	// We had to strip a path prefix or apply one or more patches.

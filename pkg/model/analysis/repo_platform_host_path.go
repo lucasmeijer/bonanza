@@ -15,6 +15,7 @@ import (
 	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
 	model_command_pb "github.com/buildbarn/bonanza/pkg/proto/model/command"
+	model_filesystem_pb "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 
 	"golang.org/x/sync/errgroup"
@@ -330,14 +331,16 @@ type changeTrackingDirectorySymlinksRelativizer[TReference object.BasicReference
 
 func (sr *changeTrackingDirectorySymlinksRelativizer[TReference, TMetadata]) relativizeSymlinksRecursively(dStack util.NonEmptyStack[*changeTrackingDirectory[TReference, TMetadata]], dPath *path.Trace, maximumEscapementLevels uint32) error {
 	d := dStack.Peek()
-	if d.currentReference.IsSet() {
-		currentMaximumEscapementLevels := d.currentReference.Message.MaximumSymlinkEscapementLevels
-		if currentMaximumEscapementLevels != nil && currentMaximumEscapementLevels.Value <= maximumEscapementLevels {
-			// This directory is guaranteed to not contain
-			// any symlinks that escape beyond the maximum
-			// number of permitted levels. There is no need
-			// to traverse it.
-			return nil
+	if directory := d.unmodifiedDirectory; directory.IsSet() {
+		if contentsExternal, ok := directory.Message.GetContents().(*model_filesystem_pb.Directory_ContentsExternal); ok {
+			currentMaximumEscapementLevels := contentsExternal.ContentsExternal.MaximumSymlinkEscapementLevels
+			if currentMaximumEscapementLevels != nil && currentMaximumEscapementLevels.Value <= maximumEscapementLevels {
+				// This directory is guaranteed to not contain
+				// any symlinks that escape beyond the maximum
+				// number of permitted levels. There is no need
+				// to traverse it.
+				return nil
+			}
 		}
 
 		if err := d.maybeLoadContents(sr.directoryLoadOptions); err != nil {
