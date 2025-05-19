@@ -71,7 +71,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionInputRootValue(
 			return PatchedTargetActionInputRootValue{}, err
 		}
 	}
-	// TODO: Respect initial_output_directory to create children!
+	outputDirectory.unmodifiedDirectory = model_core.Nested(action, actionDefinition.InitialOutputDirectory)
 
 	// Add input files.
 	if err := addFilesToChangeTrackingDirectory(
