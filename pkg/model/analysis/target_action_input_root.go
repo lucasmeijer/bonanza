@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/buildbarn/bonanza/pkg/evaluation"
+	"github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
@@ -17,6 +18,10 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionInputRootValue(
 	id := model_core.Nested(key, key.Message.Id)
 	if id.Message == nil {
 		return PatchedTargetActionInputRootValue{}, errors.New("no target action identifier specified")
+	}
+	targetLabel, err := label.NewCanonicalLabel(id.Message.Label)
+	if err != nil {
+		return PatchedTargetActionInputRootValue{}, errors.New("invalid target label")
 	}
 
 	patchedID := model_core.Patch(e, id)
@@ -49,6 +54,26 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionInputRootValue(
 		directoryContentsReader: directoryReaders.DirectoryContents,
 		leavesReader:            directoryReaders.Leaves,
 	}
+
+	// Add empty directories for the output directory of the current
+	// package and configuration.
+	components, err := getPackageOutputDirectoryComponents(
+		model_core.Nested(id, id.Message.ConfigurationReference),
+		targetLabel.GetCanonicalPackage(),
+	)
+	if err != nil {
+		return PatchedTargetActionInputRootValue{}, err
+	}
+	outputDirectory := &rootDirectory
+	for _, component := range components {
+		outputDirectory, err = outputDirectory.getOrCreateDirectory(component)
+		if err != nil {
+			return PatchedTargetActionInputRootValue{}, err
+		}
+	}
+	// TODO: Respect initial_output_directory to create children!
+
+	// Add input files.
 	if err := addFilesToChangeTrackingDirectory(
 		e,
 		model_core.Nested(action, actionDefinition.Inputs),
@@ -57,6 +82,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionInputRootValue(
 	); err != nil {
 		return PatchedTargetActionInputRootValue{}, err
 	}
+
+	// Add tools.
 	// TODO: We need to add runfiles for the tools!
 	if err := addFilesToChangeTrackingDirectory(
 		e,
