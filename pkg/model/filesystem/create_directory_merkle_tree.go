@@ -291,14 +291,6 @@ func (b *directoryMerkleTreeBuilder[TDirectory, TFile]) maybeFinalizeDirectory(u
 		for _, directoryNode := range ud.directories {
 			nameStr := directoryNode.name.String()
 			createdDirectory := directoryNode.createdDirectory
-			inlineDirectoryNode := model_filesystem_pb.DirectoryNode{
-				Name: nameStr,
-				Directory: &model_filesystem_pb.Directory{
-					Contents: &model_filesystem_pb.Directory_ContentsInline{
-						ContentsInline: createdDirectory.Message.Message,
-					},
-				},
-			}
 			inlineCandidates = append(
 				inlineCandidates,
 				inlinedtree.Candidate[*model_filesystem_pb.DirectoryContents, TDirectory]{
@@ -311,23 +303,17 @@ func (b *directoryMerkleTreeBuilder[TDirectory, TFile]) maybeFinalizeDirectory(u
 						directory model_core.PatchedMessage[*model_filesystem_pb.DirectoryContents, TDirectory],
 						externalObject *model_core.Decodable[model_core.CreatedObject[TDirectory]],
 					) {
-						if externalObject == nil {
-							directory.Message.Directories = append(directory.Message.Directories, &inlineDirectoryNode)
-						} else {
-							directory.Message.Directories = append(directory.Message.Directories, &model_filesystem_pb.DirectoryNode{
+						directory.Message.Directories = append(
+							directory.Message.Directories,
+							&model_filesystem_pb.DirectoryNode{
 								Name: nameStr,
-								Directory: &model_filesystem_pb.Directory{
-									Contents: &model_filesystem_pb.Directory_ContentsExternal{
-										ContentsExternal: createdDirectory.ToDirectoryReference(
-											directory.Patcher.CaptureAndAddDecodableReference(
-												*externalObject,
-												model_core.CreatedObjectCapturerFunc[TDirectory](b.capturer.CaptureLeaves),
-											),
-										),
-									},
-								},
+								Directory: GetDirectoryWithContents(
+									&createdDirectory,
+									externalObject,
+									directory.Patcher,
+									model_core.CreatedObjectCapturerFunc[TDirectory](b.capturer.CaptureLeaves),
+								),
 							})
-						}
 					},
 				},
 			)
@@ -494,4 +480,34 @@ func CreateDirectoryMerkleTree[TDirectory, TFile model_core.ReferenceMetadata](
 	var parent unfinalizedDirectory[TDirectory, TFile]
 	parent.unfinalizedCount.Store(2)
 	return b.walkDirectory(directory, nil, &parent, out)
+}
+
+// GetDirectoryWithContents creates a Directory message that either
+// contains or references a DirectoryContents message. This function is
+// typically called as part of inlinedtree.Build(), as that function
+// makes the decision whether there is enough space to inline the
+// contents of a directory.
+func GetDirectoryWithContents[TMetadata model_core.ReferenceMetadata](
+	createdDirectory *CreatedDirectory[TMetadata],
+	externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
+	patcher *model_core.ReferenceMessagePatcher[TMetadata],
+	objectCapturer model_core.CreatedObjectCapturer[TMetadata],
+) *model_filesystem_pb.Directory {
+	if externalObject == nil {
+		return &model_filesystem_pb.Directory{
+			Contents: &model_filesystem_pb.Directory_ContentsInline{
+				ContentsInline: createdDirectory.Message.Message,
+			},
+		}
+	}
+	return &model_filesystem_pb.Directory{
+		Contents: &model_filesystem_pb.Directory_ContentsExternal{
+			ContentsExternal: createdDirectory.ToDirectoryReference(
+				patcher.CaptureAndAddDecodableReference(
+					*externalObject,
+					objectCapturer,
+				),
+			),
+		},
+	}
 }

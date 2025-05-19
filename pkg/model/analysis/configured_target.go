@@ -13,6 +13,7 @@ import (
 
 	"github.com/buildbarn/bb-storage/pkg/filesystem"
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bonanza/pkg/evaluation"
 	"github.com/buildbarn/bonanza/pkg/label"
 	model_command "github.com/buildbarn/bonanza/pkg/model/command"
@@ -2766,6 +2767,44 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunCommon(
 		return err
 	}
 
+	// Tools such as compilers tend to expect that parent
+	// directories of output files already exist. Create a directory
+	// hierachy containing the parent directories of all output
+	// files. This directory will get merged into the input root.
+	var initialOutputDirectory changeTrackingDirectory[TReference, TMetadata]
+	for _, output := range outputs {
+		stack := util.NewNonEmptyStack(&initialOutputDirectory)
+		var r path.ScopeWalker
+		if output.fileType == model_starlark_pb.File_DIRECTORY {
+			// For directory outputs, Bazel also creates the
+			// directory itself. Not just its parents.
+			r = &changeTrackingDirectoryNewDirectoryResolver[TReference, TMetadata]{stack: stack}
+		} else {
+			r = &changeTrackingDirectoryNewFileResolver[TReference, TMetadata]{stack: stack}
+		}
+		if err := path.Resolve(path.UNIXFormat.NewParser(output.packageRelativePath.String()), r); err != nil {
+			return fmt.Errorf("failed to create parent directory for output %#v: %w", output.packageRelativePath.String(), err)
+		}
+	}
+	var createdInitialOutputDirectory model_filesystem.CreatedDirectory[TMetadata]
+	group, groupCtx := errgroup.WithContext(rc.context)
+	group.Go(func() error {
+		return model_filesystem.CreateDirectoryMerkleTree(
+			groupCtx,
+			semaphore.NewWeighted(1),
+			group,
+			rc.directoryCreationParameters,
+			&capturableChangeTrackingDirectory[TReference, TMetadata]{
+				directory: &initialOutputDirectory,
+			},
+			model_filesystem.NewSimpleDirectoryMerkleTreeCapturer(rc.environment),
+			&createdInitialOutputDirectory,
+		)
+	})
+	if err := group.Wait(); err != nil {
+		return err
+	}
+
 	// Gather inputs and tools.
 	//
 	// If tools are provided in the form of depsets, or Files that
@@ -2876,6 +2915,24 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRunCommon(
 				) {
 					actionDefinition.Message.OutputPathPattern = model_command.GetPathPatternWithChildren(
 						outputPathPatternChildren,
+						externalObject,
+						actionDefinition.Patcher,
+						rc.environment,
+					)
+				},
+			},
+			{
+				ExternalMessage: model_core.NewPatchedMessage[proto.Message](
+					outputPathPatternChildren.Message,
+					outputPathPatternChildren.Patcher,
+				),
+				Encoder: rc.commandEncoder,
+				ParentAppender: func(
+					actionDefinition model_core.PatchedMessage[*model_analysis_pb.TargetActionDefinition, TMetadata],
+					externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
+				) {
+					actionDefinition.Message.InitialOutputDirectory = model_filesystem.GetDirectoryWithContents(
+						&createdInitialOutputDirectory,
 						externalObject,
 						actionDefinition.Patcher,
 						rc.environment,
