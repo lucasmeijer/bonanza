@@ -682,8 +682,13 @@ def builtins_internal_cc_common_compile_fork(
         object_file_base = "_objs/%s/%s" % (name, src_base.rsplit(".", 1)[0])
 
         inputs = depset(
-            direct = [src[0]],
-            transitive = [cc_toolchain._compiler_files],
+            direct = [src[0]] + [
+                header[0]
+                for header in merged_compilation_context.headers.to_list()
+            ],
+            transitive = [
+                cc_toolchain._compiler_files,
+            ],
         )
 
         object_file = actions.declare_file(object_file_base + ".o")
