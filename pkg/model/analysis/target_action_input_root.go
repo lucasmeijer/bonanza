@@ -3,6 +3,7 @@ package analysis
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/buildbarn/bonanza/pkg/evaluation"
 	"github.com/buildbarn/bonanza/pkg/label"
@@ -62,13 +63,13 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionInputRootValue(
 		targetLabel.GetCanonicalPackage(),
 	)
 	if err != nil {
-		return PatchedTargetActionInputRootValue{}, err
+		return PatchedTargetActionInputRootValue{}, fmt.Errorf("failed to get package output directory: %w", err)
 	}
 	outputDirectory := &rootDirectory
 	for _, component := range components {
 		outputDirectory, err = outputDirectory.getOrCreateDirectory(component)
 		if err != nil {
-			return PatchedTargetActionInputRootValue{}, err
+			return PatchedTargetActionInputRootValue{}, fmt.Errorf("failed to create directory %#v: %w", component.String(), err)
 		}
 	}
 	outputDirectory.unmodifiedDirectory = model_core.Nested(action, actionDefinition.InitialOutputDirectory)
@@ -80,7 +81,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionInputRootValue(
 		&rootDirectory,
 		loadOptions,
 	); err != nil {
-		return PatchedTargetActionInputRootValue{}, err
+		return PatchedTargetActionInputRootValue{}, fmt.Errorf("failed to add input files to input root: %w", err)
 	}
 
 	// Add tools.
@@ -91,7 +92,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionInputRootValue(
 		&rootDirectory,
 		loadOptions,
 	); err != nil {
-		return PatchedTargetActionInputRootValue{}, err
+		return PatchedTargetActionInputRootValue{}, fmt.Errorf("failed to add tools to input root: %w", err)
 	}
 
 	group, groupCtx := errgroup.WithContext(ctx)
