@@ -1780,9 +1780,12 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 	case "coverage_instrumented":
 		return starlark.NewBuiltin("ctx.coverage_instrumented", rc.doCoverageInstrumented), nil
 	case "bin_dir":
+		configurationComponent, err := model_starlark.ConfigurationReferenceToComponent(rc.configurationReference)
+		if err != nil {
+			return nil, err
+		}
 		return model_starlark.NewStructFromDict[TReference, TMetadata](nil, map[string]any{
-			// TODO: Fill in the right configuration in the path.
-			"path": starlark.String("bazel-bin/TODO-CONFIGURATION/bin"),
+			"path": starlark.String(model_starlark.ComponentStrBazelOut + "/" + configurationComponent + "/" + model_starlark.ComponentStrBin),
 		}), nil
 	case "disabled_features":
 		return starlark.NewList(nil), nil
