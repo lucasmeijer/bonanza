@@ -313,10 +313,60 @@ filegroup = rule(
 )
 
 def _genrule_impl(ctx):
+    command_template = ctx.attr.cmd_bash or ctx.attr.cmd
+    ruledir = "/".join([
+        part
+        for part in [ctx.bin_dir.path, ctx.label.workspace_root, ctx.label.package]
+        if part
+    ])
+    additional_substitutions = {
+        "@D": ctx.attr.outs[0].path.rsplit("/", 1)[0] if len(ctx.attr.outs) == 1 else ruledir,
+        "RULEDIR": ruledir,
+        "SRCS": " ".join([src.path for src in ctx.files.srcs]),
+    }
+    location_targets = ctx.attr.srcs + ctx.attr.tools
+
+    def get_value(variable_name):
+        if variable_name in additional_substitutions:
+            return additional_substitutions[variable_name]
+        if variable_name in ctx.var:
+            return ctx.var[variable_name]
+        return ctx.expand_location("$(%s)" % variable_name, location_targets)
+
+    command = "source %s; " % ctx.file._genrule_setup.path
+    state = 0
+    variable_name = ""
+    for c in command_template.elems():
+        if state == 0:
+            if c == "$":
+                state = 1
+            else:
+                command += c
+        elif state == 1:
+            if c == "(":
+                state = 2
+            elif c == "@" or c == "<" or c == "^":
+                command += get_value(c)
+            else:
+                fail("unknown sequence $%s" % c)
+        elif state == 2:
+            if c == ")":
+                command += get_value(variable_name)
+                variable_name = ""
+                state = 0
+            else:
+                variable_name += c
+        else:
+            fail("bad state")
+    if state != 0:
+        fail("command terminates in the middle of a \"$\" directive")
+
     # TODO: Make this implementation more accurate.
     ctx.actions.run(
-        executable = "sh",
-        arguments = ["-c", ctx.expand_location(ctx.attr.cmd_bash or ctx.attr.cmd)],
+        executable = "/bin/bash",
+        arguments = ["-c", command],
+        inputs = [ctx.file._genrule_setup] + ctx.files.srcs,
+        tools = ctx.files.tools,
         outputs = ctx.outputs.outs,
     )
     return [DefaultInfo(files = depset(ctx.outputs.outs))]
@@ -336,8 +386,11 @@ genrule = rule(
         "outs": attr.output_list(mandatory = True),
         "srcs": attr.label_list(allow_files = True),
         "tools": attr.label_list(allow_files = True),
+        "_genrule_setup": attr.label(
+            allow_single_file = True,
+            default = "@bazel_tools//tools/genrule:genrule-setup.sh",
+        ),
     },
-    default_exec_group = False,
 )
 
 def _java_plugins_flag_alias_impl(ctx):
