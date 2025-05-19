@@ -201,7 +201,7 @@ func DirectoryGetContents[TReference any](
 	reader model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_filesystem_pb.DirectoryContents, TReference]],
 	directory model_core.Message[*model_filesystem_pb.Directory, TReference],
 ) (model_core.Message[*model_filesystem_pb.DirectoryContents, TReference], error) {
-	switch contents := directory.Message.Contents.(type) {
+	switch contents := directory.Message.GetContents().(type) {
 	case *model_filesystem_pb.Directory_ContentsExternal:
 		return model_parser.Dereference(ctx, reader, model_core.Nested(directory, contents.ContentsExternal.Reference))
 	case *model_filesystem_pb.Directory_ContentsInline:
