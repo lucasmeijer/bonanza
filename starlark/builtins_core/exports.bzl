@@ -2330,7 +2330,7 @@ def flag_expand(flag, variables, command_line):
                 fail("% not followed by % or {")
         elif mode == 2:
             if c == "}":
-                v = variables[variable_name]
+                v = variables_get_variable(variables, variable_name)
                 if type(v) == "File":
                     v = v.path
                 expanded += v
@@ -2341,18 +2341,58 @@ def flag_expand(flag, variables, command_line):
 
     command_line.append(expanded)
 
+def variables_is_available(variables, variable):
+    if variable in variables:
+        return True
+    for part in variable.split("."):
+        if type(variables) == "dict":
+            if part not in variables:
+                return False
+            variables = variables[part]
+        elif type(variables) == "struct":
+            if not hasattr(variables, part):
+                return False
+            variables = getattr(variables, part)
+        else:
+            fail("unknown type in value of part %s of variable %s: %s" % (part, variable, type(variables)))
+    return True
+
+def variables_get_variable(variables, variable):
+    if variable in variables:
+        return variables[variable]
+    for part in variable.split("."):
+        if type(variables) == "dict":
+            variables = variables[part]
+        elif type(variables) == "struct":
+            variables = getattr(variables, part)
+        else:
+            fail("unknown type in value of part %s of variable %s: %s" % (part, variable, type(variables)))
+    return variables
+
 def flag_group_can_be_expanded(flag_group, variables):
-    if flag_group.expand_if_available and flag_group.expand_if_available not in variables:
+    if (
+        flag_group.expand_if_available and
+        not variables_is_available(variables, flag_group.expand_if_available)
+    ):
         return False
-    if flag_group.expand_if_not_available and flag_group.expand_if_not_available in variables:
+    if (
+        flag_group.expand_if_not_available and
+        variables_is_available(variables, flag_group.expand_if_not_available)
+    ):
         return False
-    if flag_group.expand_if_true and not bool(variables.get(flag_group.expand_if_true, False)):
+    if flag_group.expand_if_true and (
+        not variables_is_available(variables, flag_group.expand_if_true) or
+        not bool(variables_get_variable(variables, flag_group.expand_if_true))
+    ):
         return False
-    if flag_group.expand_if_false and bool(variables.get(flag_group.expand_if_false, True)):
+    if flag_group.expand_if_false and (
+        not variables_is_available(variables, flag_group.expand_if_false) or
+        bool(variables_get_variable(variables, flag_group.expand_if_false))
+    ):
         return False
     if flag_group.expand_if_equal and (
-        flag_group.expand_if_equal.name not in variables or
-        flag_group.expand_if_equal.value != variables[flag_group.expand_if_equal.name]
+        not variables_is_available(variables, flag_group.expand_if_equal.name) or
+        variables_get_variable(variables, flag_group.expand_if_equal.name) != flag_group.expand_if_equal.value
     ):
         return False
     return True
@@ -2361,7 +2401,7 @@ def flag_group_expand_command_line(flag_group, variables, command_line):
     if not flag_group_can_be_expanded(flag_group, variables):
         return
     if flag_group.iterate_over:
-        variable_values = variables[flag_group.iterate_over]
+        variable_values = variables_get_variable(variables, flag_group.iterate_over)
         if type(variable_values) == "depset":
             variable_values = variable_values.to_list()
         for variable_value in variable_values:
@@ -2715,10 +2755,18 @@ def builtins_internal_cc_internal_escape_label(label):
     ])
 
 def builtins_internal_cc_internal_for_object_file(name, is_whole_archive):
-    return struct(__todo_is_for_object_file = True)
+    return struct(
+        is_whole_archive = is_whole_archive,
+        name = name,
+        type = "object_file",
+    )
 
 def builtins_internal_cc_internal_for_static_library(name, is_whole_archive):
-    return struct(__todo_is_for_static_library = True)
+    return struct(
+        is_whole_archive = is_whole_archive,
+        name = name,
+        type = "static_library",
+    )
 
 # Artifact name patterns that are registered by default.
 # Obtained from ArtifactCategory.java.
@@ -2771,8 +2819,8 @@ def builtins_internal_cc_internal_get_link_args(
     )
 
     # FromLinkCommandLine.getParamCommandLine():
-    if "linker_param_file" in build_variables:
-        linker_param_file_value = build_variables["linker_param_file"]
+    if variables_is_available(build_variables, "linker_param_file"):
+        linker_param_file_value = variables_get_variable(build_variables, "linker_param_file")
         command_line = [
             v
             for v in command_line
