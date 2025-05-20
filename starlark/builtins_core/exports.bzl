@@ -2330,7 +2330,10 @@ def flag_expand(flag, variables, command_line):
                 fail("% not followed by % or {")
         elif mode == 2:
             if c == "}":
-                expanded += variables[variable_name]
+                v = variables[variable_name]
+                if type(v) == "File":
+                    v = v.path
+                expanded += v
                 variable_name = ""
                 mode = 0
             else:
@@ -2347,8 +2350,11 @@ def flag_group_can_be_expanded(flag_group, variables):
         return False
     if flag_group.expand_if_false and bool(variables.get(flag_group.expand_if_false, True)):
         return False
-    if flag_group.expand_if_equal:
-        fail("TODO: support expand_if_equal: %s" % flag_group.expand_if_equal)
+    if flag_group.expand_if_equal and (
+        flag_group.expand_if_equal.name not in variables or
+        flag_group.expand_if_equal.value != variables[flag_group.expand_if_equal.name]
+    ):
+        return False
     return True
 
 def flag_group_expand_command_line(flag_group, variables, command_line):
@@ -2602,7 +2608,7 @@ def builtins_internal_cc_internal_cc_toolchain_features(*, toolchain_config_info
     )
 
 def builtins_internal_cc_internal_cc_toolchain_variables(vars):
-    return "TODO"
+    return vars
 
 def builtins_internal_cc_internal_collect_libraries_to_link(
         libraries_to_link,
@@ -2758,7 +2764,15 @@ def builtins_internal_cc_internal_get_link_args(
         build_variables,
         feature_configuration,
         parameter_file_type):
-    return native.current_ctx().actions.args()
+    args = native.current_ctx().actions.args()
+    args.add_all(
+        builtins_internal_cc_common_get_memory_inefficient_command_line(
+            feature_configuration,
+            action_name,
+            build_variables,
+        ),
+    )
+    return args
 
 def builtins_internal_cc_internal_licenses(ctx):
     return None

@@ -55,9 +55,18 @@ func (c *baseComputer[TReference, TMetadata]) ComputeCompiledBzlFileValue(ctx co
 		return PatchedCompiledBzlFileValue{}, err
 	}
 
+	// TODO: @@builtins_core+//:exports.bzl needs to use recursion
+	// in a couple of places. We should drop support for this once
+	// we remove the C++ bits from this file.
+	allowRecursion := false
+	if canonicalRepo.String() == "builtins_core+" {
+		allowRecursion = true
+	}
+
 	_, program, err := starlark.SourceProgramOptions(
 		&syntax.FileOptions{
-			Set: true,
+			Set:       true,
+			Recursion: allowRecursion,
 		},
 		canonicalLabel.String(),
 		bzlFileData,
