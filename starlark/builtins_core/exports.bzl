@@ -2764,14 +2764,23 @@ def builtins_internal_cc_internal_get_link_args(
         build_variables,
         feature_configuration,
         parameter_file_type):
-    args = native.current_ctx().actions.args()
-    args.add_all(
-        builtins_internal_cc_common_get_memory_inefficient_command_line(
-            feature_configuration,
-            action_name,
-            build_variables,
-        ),
+    command_line = builtins_internal_cc_common_get_memory_inefficient_command_line(
+        feature_configuration,
+        action_name,
+        build_variables,
     )
+
+    # FromLinkCommandLine.getParamCommandLine():
+    if "linker_param_file" in build_variables:
+        linker_param_file_value = build_variables["linker_param_file"]
+        command_line = [
+            v
+            for v in command_line
+            if linker_param_file_value not in v
+        ]
+
+    args = native.current_ctx().actions.args()
+    args.add_all(command_line)
     return args
 
 def builtins_internal_cc_internal_licenses(ctx):
