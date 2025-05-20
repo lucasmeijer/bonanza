@@ -671,9 +671,6 @@ def _create_compilation_outputs(
         temps = lambda: depset(),
     )
 
-def feature_configuration_get_command_line(feature_configuration, action, variables):
-    pass
-
 def builtins_internal_cc_common_compile_fork(
         *,
         actions,
