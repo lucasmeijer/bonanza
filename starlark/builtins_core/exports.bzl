@@ -2059,31 +2059,294 @@ def builtins_internal_cc_common_create_cc_toolchain_config_info(
         toolchain_id = lambda: toolchain_identifier,
     )
 
-def _create_compilation_context(
-        *,
-        additional_inputs,
-        defines,
-        framework_includes,
-        headers,
-        includes,
-        module_map,
-        quote_includes,
-        system_includes,
-        transitive_modules,
-        virtual_to_original_headers):
+def new_header_info_builder():
     return struct(
-        additional_inputs = lambda: additional_inputs,
-        defines = defines,
-        exporting_module_maps = lambda: [],
-        framework_includes = framework_includes,
-        headers = headers,
-        includes = includes,
-        module_map = lambda: module_map,
-        quote_includes = quote_includes,
-        system_includes = system_includes,
-        transitive_modules = transitive_modules,
-        validation_artifacts = depset(),
+        deps = [],
+        header_module = [None],
+        modular_public_headers = set(),
+        modular_private_headers = set(),
+        pic_header_module = [None],
+        separate_module = [None],
+        separate_module_headers = [],
+        separate_pic_module = [None],
+        textual_headers = set(),
+    )
+
+def header_info_add_textual_headers(hib, headers):
+    hib.textual_headers.update(headers)
+
+def header_info_add_public_headers(hib, headers):
+    for header in headers:
+        if header.path.endswith(".inc"):
+            hib.textual_headers.add(header)
+        else:
+            hib.modular_public_headers.add(header)
+
+def header_info_add_private_headers(hib, headers):
+    for header in headers:
+        if header.path.endswith(".inc"):
+            hib.textual_headers.add(header)
+        else:
+            hib.modular_private_headers.add(header)
+
+def header_info_set_pic_header_module(hib, header_module):
+    hib.pic_header_module[0] = header_module
+
+def header_info_set_header_module(hib, header_module):
+    hib.header_module[0] = header_module
+
+def header_info_set_separate_module_hdrs(hib, headers, separate_module, separate_pic_module):
+    hib.separate_module_headers.clear()
+    hib.separate_module_headers.extend(headers)
+    hib.separate_module[0] = separate_module
+    hib.separate_pic_module[0] = separate_pic_module
+
+def header_info_add_dep(hib, dep):
+    hib.deps.append(dep)
+
+def header_info_merge_header_info(hib, other_header_info):
+    hib.modular_public_headers.update(other_header_info.modular_public_headers)
+    hib.modular_private_headers.update(other_header_info.modular_private_headers)
+    hib.textual_headers.update(other_header_info.textual_headers)
+
+def header_info_build(hib):
+    return struct(
+        deps = hib.deps,
+        header_module = hib.header_module[0],
+        modular_private_headers = list(hib.modular_private_headers),
+        modular_public_headers = list(hib.modular_public_headers),
+        pic_header_module = hib.pic_header_module[0],
+        separate_module = hib.separate_module[0],
+        separate_module_headers = list(hib.separate_module_headers),
+        separate_pic_module = hib.separate_pic_module[0],
+        textual_headers = list(hib.textual_headers),
+    )
+
+def new_cc_compilation_context_builder():
+    return struct(
+        compilation_prerequisites = [depset()],
+        cpp_module_map = [None],
+        declared_include_srcs = [depset()],
+        defines = set(),
+        deps = [],
+        exported_deps = [],
+        external_include_dirs = [depset()],
+        framework_include_dirs = [depset()],
+        header_info_builder = new_header_info_builder(),
+        header_tokens = [depset()],
+        include_dirs = [depset()],
+        local_defines = set(),
+        non_code_inputs = [depset()],
+        propagate_module_map_as_action_input = [False],
+        quote_include_dirs = [depset()],
+        system_include_dirs = [depset()],
+        virtual_to_original_headers = [depset()],
+    )
+
+def cc_compilation_context_add_declared_include_srcs(ccb, declared_included_srcs):
+    ccb.declared_include_srcs[0] = depset(
+        direct = declared_included_srcs,
+        transitive = [ccb.declared_include_srcs[0]],
+    )
+    ccb.compilation_prerequisites[0] = depset(
+        direct = declared_included_srcs,
+        transitive = [ccb.compilation_prerequisites[0]],
+    )
+
+def cc_compilation_context_add_system_include_dirs(ccb, system_include_dirs):
+    ccb.system_include_dirs[0] = depset(
+        direct = system_include_dirs,
+        transitive = [ccb.system_include_dirs[0]],
+    )
+
+def cc_compilation_context_add_include_dirs(ccb, include_dirs):
+    ccb.include_dirs[0] = depset(
+        direct = include_dirs,
+        transitive = [ccb.include_dirs[0]],
+    )
+
+def cc_compilation_context_add_quote_include_dirs(ccb, quote_include_dirs):
+    ccb.quote_include_dirs[0] = depset(
+        direct = quote_include_dirs,
+        transitive = [ccb.quote_include_dirs[0]],
+    )
+
+def cc_compilation_context_add_framework_include_dirs(ccb, framework_include_dirs):
+    ccb.framework_include_dirs[0] = depset(
+        direct = framework_include_dirs,
+        transitive = [ccb.framework_include_dirs[0]],
+    )
+
+def cc_compilation_context_add_defines(ccb, defines):
+    ccb.defines.update(defines)
+
+def cc_compilation_context_add_non_transitive_defines(ccb, defines):
+    ccb.local_defines.update(defines)
+
+def cc_compilation_context_add_textual_hdrs(ccb, headers):
+    header_info_add_textual_headers(ccb.header_info_builder, headers)
+
+def cc_compilation_context_add_modular_public_hdrs(ccb, headers):
+    header_info_add_public_headers(ccb.header_info_builder, headers)
+
+def cc_compilation_context_add_modular_private_hdrs(ccb, headers):
+    header_info_add_private_headers(ccb.header_info_builder, headers)
+
+def cc_compilation_context_set_cpp_module_map(ccb, cpp_module_map):
+    ccb.cpp_module_map[0] = cpp_module_map
+
+def cc_compilation_context_add_external_include_dirs(ccb, external_include_dirs):
+    ccb.external_include_dirs[0] = depset(
+        direct = external_include_dirs,
+        transitive = [ccb.external_include_dirs[0]],
+    )
+
+def cc_compilation_context_add_virtual_to_original_headers(ccb, virtual_to_original_headers):
+    ccb.virtual_to_original_headers[0] = depset(
+        transitive = [ccb.virtual_to_original_headers[0], virtual_to_original_headers],
+    )
+
+def cc_compilation_context_add_dependent_cc_compilation_contexts(ccb, exported_cc_compilation_contexts, cc_compilation_contexts):
+    ccb.deps.append(cc_compilation_contexts)
+    ccb.exported_deps.append(exported_cc_compilation_contexts)
+
+def cc_compilation_context_add_non_code_inputs(ccb, inputs):
+    ccb.non_code_inputs[0] = depset(
+        direct = inputs,
+        transitive = [ccb.non_code_inputs[0]],
+    )
+
+def cc_compilation_context_set_propagate_cpp_module_map_as_action_input(ccb, propagate_module_map):
+    ccb.propagate_module_map_as_action_input[0] = propagate_module_map
+
+def cc_compilation_context_set_pic_header_module(ccb, pic_header_module):
+    header_info_set_pic_header_module(ccb.header_info_builder, pic_header_module)
+
+def cc_compilation_context_set_header_module(ccb, header_module):
+    header_info_set_header_module(ccb.header_info_builder, header_module)
+
+def cc_compilation_context_set_separate_module_hdrs(ccb, headers, separate_module, separate_pic_module):
+    header_info_set_separate_module_hdrs(ccb.header_info_builder, headers, separate_module, separate_pic_module)
+
+def cc_compilation_context_merge_dependent_cc_compilation_context(
+        ccb,
+        other_cc_compilation_context,
+        all_defines,
+        transitive_modules,
+        transitive_pic_modules,
+        direct_module_maps):
+    ccb.compilation_prerequisites[0] = depset(transitive = [ccb.compilation_prerequisites[0], other_cc_compilation_context._compilation_prerequisites])
+    ccb.include_dirs[0] = depset(transitive = [ccb.include_dirs[0], other_cc_compilation_context.includes])
+    ccb.quote_include_dirs[0] = depset(transitive = [ccb.quote_include_dirs[0], other_cc_compilation_context.quote_includes])
+    ccb.system_include_dirs[0] = depset(transitive = [ccb.system_include_dirs[0], other_cc_compilation_context.system_includes])
+    ccb.framework_include_dirs[0] = depset(transitive = [ccb.framework_include_dirs[0], other_cc_compilation_context.framework_includes])
+    ccb.external_include_dirs[0] = depset(transitive = [ccb.external_include_dirs[0], other_cc_compilation_context.external_includes])
+    ccb.declared_include_srcs[0] = depset(transitive = [ccb.declared_include_srcs[0], other_cc_compilation_context.headers])
+    header_info_add_dep(ccb.header_info_builder, other_cc_compilation_context._header_info)
+
+    transitive_modules[0] = depset(
+        direct =
+            ([other_cc_compilation_context._header_info.header_module] if other_cc_compilation_context._header_info.header_module else []) +
+            ([other_cc_compilation_context._header_info.separate_module] if other_cc_compilation_context._header_info.separate_module else []),
+        transitive = [transitive_modules[0], other_cc_compilation_context.transitive_modules(use_pic = False)],
+    )
+    transitive_pic_modules[0] = depset(
+        direct =
+            ([other_cc_compilation_context._header_info.pic_header_module] if other_cc_compilation_context._header_info.pic_header_module else []) +
+            ([other_cc_compilation_context._header_info.separate_pic_module] if other_cc_compilation_context._header_info.separate_pic_module else []),
+        transitive = [transitive_pic_modules[0], other_cc_compilation_context.transitive_modules(use_pic = True)],
+    )
+
+    ccb.non_code_inputs[0] = depset(transitive = [ccb.non_code_inputs[0], other_cc_compilation_context._non_code_inputs])
+
+    other_module_map = other_cc_compilation_context.module_map()
+    if other_module_map:
+        direct_module_maps.add(other_module_map.file())
+    for module_map in other_cc_compilation_context.exporting_module_maps():
+        direct_module_maps.add(module_map.file())
+
+    all_defines[0] = depset(transitive = [all_defines[0], other_cc_compilation_context.defines])
+    ccb.virtual_to_original_headers[0] = depset(transitive = [ccb.virtual_to_original_headers[0], other_cc_compilation_context.virtual_to_original_headers()])
+
+    ccb.header_tokens[0] = depset(transitive = [ccb.header_tokens[0], other_cc_compilation_context.validation_artifacts])
+
+def cc_compilation_context_merge_dependent_cc_compilation_contexts(
+        ccb,
+        exported_cc_compilation_contexts,
+        cc_compilation_contexts,
+        all_defines,
+        transitive_modules,
+        transitive_pic_modules,
+        direct_module_maps,
+        exporting_module_maps):
+    for cc_compilation_context in exported_cc_compilation_contexts + cc_compilation_contexts:
+        cc_compilation_context_merge_dependent_cc_compilation_context(
+            ccb,
+            cc_compilation_context,
+            all_defines,
+            transitive_modules,
+            transitive_pic_modules,
+            direct_module_maps,
+        )
+
+    for cc_compilation_context in exported_cc_compilation_contexts:
+        module_map = cc_compilation_context.module_map()
+        if module_map:
+            exporting_module_maps.add(module_map)
+        exporting_module_maps.update(cc_compilation_context.exporting_module_maps())
+
+        header_info_merge_header_info(ccb.header_info_builder, cc_compilation_context._header_info)
+
+def cc_compilation_context_build(ccb):
+    # From CcCompilationContext.Builder.build():
+    all_defines = [depset()]
+    transitive_modules = [depset()]
+    transitive_pic_modules = [depset()]
+    direct_module_maps = set()
+    exporting_module_maps = set()
+    cc_compilation_context_merge_dependent_cc_compilation_contexts(
+        ccb,
+        ccb.exported_deps[0],
+        ccb.deps[0],
+        all_defines,
+        transitive_modules,
+        transitive_pic_modules,
+        direct_module_maps,
+        exporting_module_maps,
+    )
+
+    all_defines[0] = depset(direct = list(ccb.defines), transitive = [all_defines[0]])
+
+    header_info = header_info_build(ccb.header_info_builder)
+    constructed_prereq = ccb.compilation_prerequisites[0]
+    module_map = ccb.cpp_module_map[0]
+    additional_inputs = depset(
+        direct = list(direct_module_maps) + (
+            [ccb.cpp_module_map[0].file()] if ccb.cpp_module_map[0] else []
+        ),
+        transitive = [ccb.non_code_inputs[0]],
+    )
+    exporting_module_maps_list = list(exporting_module_maps)
+    transitive_modules_depset = transitive_modules[0]
+    transitive_pic_modules_depset = transitive_pic_modules[0]
+    virtual_to_original_headers = ccb.virtual_to_original_headers[0]
+    return struct(
+        _compilation_prerequisites = constructed_prereq,
+        _header_info = header_info,
+        _non_code_inputs = ccb.non_code_inputs[0],
         virtual_to_original_headers = lambda: virtual_to_original_headers,
+        additional_inputs = lambda: additional_inputs,
+        defines = all_defines[0],
+        exporting_module_maps = lambda: exporting_module_maps_list,
+        external_includes = ccb.external_include_dirs[0],
+        framework_includes = ccb.framework_include_dirs[0],
+        headers = ccb.declared_include_srcs[0],
+        includes = ccb.include_dirs[0],
+        module_map = lambda: module_map,
+        quote_includes = ccb.quote_include_dirs[0],
+        system_includes = ccb.system_include_dirs[0],
+        transitive_modules = lambda use_pic: transitive_pic_modules_depset if use_pic else transitive_modules_depset,
+        validation_artifacts = ccb.header_tokens[0],
     )
 
 def builtins_internal_cc_common_create_compilation_context(
@@ -2116,38 +2379,54 @@ def builtins_internal_cc_common_create_compilation_context(
         separate_pic_module = None,
         system_includes = None,
         virtual_to_original_headers = None):
-    # TODO: We should also add direct_module_maps.
-    additional_inputs_transitive = []
-    if non_code_inputs:
-        additional_inputs_transitive.append(non_code_inputs)
-    additional_inputs = depset(transitive = additional_inputs_transitive)
+    # From CcModule.createCcCompilationContext():
+    cc_compilation_context = new_cc_compilation_context_builder()
 
-    modules_direct = []
-    if header_module:
-        modules_direct.append(header_module)
-    if separate_module:
-        modules_direct.append(separate_module)
-    modules = depset(modules_direct)
+    header_list = (headers or depset()).to_list()
+    cc_compilation_context_add_declared_include_srcs(cc_compilation_context, header_list)
+    textual_hdrs_list = list(direct_textual_headers)
+    modular_public_hdrs_list = list(direct_public_headers)
+    modular_private_hdrs_list = list(direct_private_headers)
 
-    pic_modules_direct = []
-    if pic_header_module:
-        pic_modules_direct.append(pic_header_module)
-    if separate_pic_module:
-        pic_modules_direct.append(separate_pic_module)
-    pic_modules = depset(pic_modules_direct)
+    cc_compilation_context_add_system_include_dirs(cc_compilation_context, (system_includes or depset()).to_list())
+    cc_compilation_context_add_include_dirs(cc_compilation_context, (includes or depset()).to_list())
+    cc_compilation_context_add_quote_include_dirs(cc_compilation_context, (quote_includes or depset()).to_list())
+    cc_compilation_context_add_framework_include_dirs(cc_compilation_context, (framework_includes or depset()).to_list())
+    cc_compilation_context_add_defines(cc_compilation_context, defines or list())
+    cc_compilation_context_add_non_transitive_defines(cc_compilation_context, local_defines or list())
+    cc_compilation_context_add_textual_hdrs(cc_compilation_context, textual_hdrs_list)
+    cc_compilation_context_add_modular_public_hdrs(cc_compilation_context, modular_public_hdrs_list)
+    cc_compilation_context_add_modular_private_hdrs(cc_compilation_context, modular_private_hdrs_list)
 
-    return _create_compilation_context(
-        additional_inputs = additional_inputs,
-        defines = defines or depset(),
-        framework_includes = framework_includes or depset(),
-        headers = headers or depset(),
-        includes = includes or depset(),
-        module_map = module_map,
-        quote_includes = quote_includes or depset(),
-        system_includes = system_includes or depset(),
-        transitive_modules = lambda use_pic: pic_modules if use_pic else modules,
-        virtual_to_original_headers = virtual_to_original_headers or depset(),
+    if module_map:
+        cc_compilation_context_set_cpp_module_map(cc_compilation_context, module_map)
+
+    cc_compilation_context_add_external_include_dirs(cc_compilation_context, (external_includes or depset()).to_list())
+
+    cc_compilation_context_add_virtual_to_original_headers(cc_compilation_context, virtual_to_original_headers or depset())
+
+    cc_compilation_context_add_dependent_cc_compilation_contexts(
+        cc_compilation_context,
+        exported_dependent_cc_compilation_contexts,
+        dependent_cc_compilation_contexts,
     )
+
+    cc_compilation_context_add_non_code_inputs(cc_compilation_context, non_code_inputs)
+
+    cc_compilation_context_set_propagate_cpp_module_map_as_action_input(cc_compilation_context, propagate_module_map_to_compile_action)
+    cc_compilation_context_set_pic_header_module(cc_compilation_context, pic_header_module)
+    cc_compilation_context_set_header_module(cc_compilation_context, header_module)
+    cc_compilation_context_set_separate_module_hdrs(
+        cc_compilation_context,
+        separate_module_headers,
+        separate_module,
+        separate_pic_module,
+    )
+
+    if add_public_headers_to_modular_headers:
+        cc_compilation_context_add_modular_public_hdrs(cc_compilation_context, header_list)
+
+    return cc_compilation_context_build(cc_compilation_context)
 
 def _create_lto_compilation_context():
     return struct(
@@ -2263,14 +2542,27 @@ def builtins_internal_cc_common_create_linking_context(
 def builtins_internal_cc_common_create_lto_compilation_context(*, objects = {}):
     return struct(__todo_lto_compilation_context = True)
 
+def cpp_module_map_file(module_map):
+    return lambda: module_map._file
+
+def cpp_module_map_umbrella_header(module_map):
+    return lambda: module_map._umbrella_header
+
+CppModuleMap = provider(
+    computed_fields = {
+        "file": cpp_module_map_file,
+        "umbrella_header": cpp_module_map_umbrella_header,
+    },
+)
+
 def builtins_internal_cc_common_create_module_map(
         *,
         file,
         name,
         umbrella_header = None):
-    return struct(
-        file = lambda: file,
-        umbrella_header = lambda: umbrella_header,
+    return CppModuleMap(
+        _file = file,
+        _umbrella_header = umbrella_header,
     )
 
 def builtins_internal_cc_common_get_environment_variables(
@@ -2479,29 +2771,13 @@ def builtins_internal_cc_common_get_tool_requirement_for_action(*, action_name, 
     return []
 
 def builtins_internal_cc_common_merge_compilation_contexts(compilation_contexts = [], non_exported_compilation_contexts = []):
-    additional_inputs = depset(transitive = [cc.additional_inputs() for cc in compilation_contexts])
-    defines = depset(transitive = [cc.defines for cc in compilation_contexts])
-    framework_includes = depset(transitive = [cc.framework_includes for cc in compilation_contexts])
-    headers = depset(transitive = [cc.headers for cc in compilation_contexts])
-    includes = depset(transitive = [cc.includes for cc in compilation_contexts])
-    modules = depset(transitive = [cc.transitive_modules(use_pic = False) for cc in compilation_contexts])
-    pic_modules = depset(transitive = [cc.transitive_modules(use_pic = True) for cc in compilation_contexts])
-    quote_includes = depset(transitive = [cc.quote_includes for cc in compilation_contexts])
-    system_includes = depset(transitive = [cc.system_includes for cc in compilation_contexts])
-    virtual_to_original_headers = depset(transitive = [cc.virtual_to_original_headers() for cc in compilation_contexts])
-
-    return _create_compilation_context(
-        additional_inputs = additional_inputs,
-        defines = defines,
-        framework_includes = framework_includes,
-        headers = headers,
-        includes = includes,
-        module_map = None,
-        quote_includes = quote_includes,
-        system_includes = system_includes,
-        transitive_modules = lambda use_pic: pic_modules if use_pic else modules,
-        virtual_to_original_headers = virtual_to_original_headers,
+    cc_compilation_context = new_cc_compilation_context_builder()
+    cc_compilation_context_add_dependent_cc_compilation_contexts(
+        cc_compilation_context,
+        compilation_contexts,
+        non_exported_compilation_contexts,
     )
+    return cc_compilation_context_build(cc_compilation_context)
 
 def builtins_internal_cc_common_merge_compilation_outputs(*, compilation_outputs = []):
     return _create_compilation_outputs(
