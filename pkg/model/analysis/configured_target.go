@@ -2236,6 +2236,8 @@ func (rca *ruleContextActions[TReference, TMetadata]) Attr(thread *starlark.Thre
 		return starlark.NewBuiltin("ctx.actions.declare_directory", rca.doDeclareDirectory), nil
 	case "declare_file":
 		return starlark.NewBuiltin("ctx.actions.declare_file", rca.doDeclareFile), nil
+	case "declare_shareable_artifact":
+		return starlark.NewBuiltin("ctx.actions.declare_shareable_artifact", rca.doDeclareShareableArtifact), nil
 	case "declare_symlink":
 		return starlark.NewBuiltin("ctx.actions.declare_symlink", rca.doDeclareSymlink), nil
 	case "expand_template":
@@ -2313,6 +2315,22 @@ func (rca *ruleContextActions[TReference, TMetadata]) doDeclareFile(thread *star
 	}
 
 	return rc.outputRegistrar.registerOutput(filename, sibling, model_starlark_pb.File_FILE)
+}
+
+func (rca *ruleContextActions[TReference, TMetadata]) doDeclareShareableArtifact(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var path label.TargetName
+	var artifactRoot starlark.Value
+	rc := rca.ruleContext
+	if err := starlark.UnpackArgs(
+		b.Name(), args, kwargs,
+		"path", unpack.Bind(thread, &path, unpack.TargetName),
+		"artifact_root?", &artifactRoot,
+	); err != nil {
+		return nil, err
+	}
+
+	// TODO: This ignores the artifact root entirely.
+	return rc.outputRegistrar.registerOutput(path, nil, model_starlark_pb.File_FILE)
 }
 
 func (rca *ruleContextActions[TReference, TMetadata]) doDeclareSymlink(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
