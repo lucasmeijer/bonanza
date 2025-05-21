@@ -14,11 +14,15 @@
 
 """Compilation helper for C++ rules."""
 
-load(":common/cc/cc_common.bzl", "cc_common")
-load(":common/cc/cc_helper.bzl", "cc_helper")
+load(
+    ":common/cc/cc_helper_internal.bzl",
+    "package_source_root",
+    "repository_exec_path",
+)
 load(":common/cc/semantics.bzl", "USE_EXEC_ROOT_FOR_VIRTUAL_INCLUDES_SYMLINKS")
 load(":common/paths.bzl", "paths")
 
+cc_common_internal = _builtins.internal.cc_common
 cc_internal = _builtins.internal.cc_internal
 
 _VIRTUAL_INCLUDES_DIR = "_virtual_includes"
@@ -44,7 +48,7 @@ def _repo_relative_path(artifact):
     return relative_path
 
 def _enabled(feature_configuration, feature_name):
-    return cc_common.is_enabled(feature_configuration = feature_configuration, feature_name = feature_name)
+    return feature_configuration.is_enabled(feature_name)
 
 def _compute_public_headers(
         actions,
@@ -107,7 +111,7 @@ def _compute_public_headers(
 
     module_map_headers = []
     virtual_to_original_headers_list = []
-    virtual_include_dir = paths.join(paths.join(cc_helper.package_source_root(label.workspace_name, label.package, is_sibling_repository_layout), _VIRTUAL_INCLUDES_DIR), label.name)
+    virtual_include_dir = paths.join(paths.join(package_source_root(label.repo_name, label.package, is_sibling_repository_layout), _VIRTUAL_INCLUDES_DIR), label.name)
     for original_header in public_headers_artifacts:
         repo_relative_path = _repo_relative_path(original_header)
         if not repo_relative_path.startswith(strip_prefix):
@@ -144,7 +148,7 @@ def _generates_header_module(feature_configuration, public_headers, private_head
            generate_action
 
 def _header_module_artifact(actions, label, is_sibling_repository_layout, suffix, extension):
-    object_dir = paths.join(paths.join(cc_helper.package_source_root(label.workspace_name, label.package, is_sibling_repository_layout), "_objs"), label.name)
+    object_dir = paths.join(paths.join(package_source_root(label.repo_name, label.package, is_sibling_repository_layout), "_objs"), label.name)
     base_name = label.name.split("/")[-1]
     output_path = paths.join(object_dir, base_name + suffix + extension)
     return actions.declare_shareable_artifact(output_path)
@@ -218,8 +222,8 @@ def _init_cc_compilation_context(
     # before the genfilesFragment to preferably pick up source files. Otherwise
     # we might pick up stale generated files.
     sibling_repo_layout = config.is_sibling_repository_layout()
-    repo_name = label.workspace_name
-    repo_path = cc_helper.repository_exec_path(repo_name, sibling_repo_layout)
+    repo_name = label.repo_name
+    repo_path = repository_exec_path(repo_name, sibling_repo_layout)
     gen_include_dir = _include_dir(genfiles_dir, repo_path, sibling_repo_layout)
     bin_include_dir = _include_dir(binfiles_dir, repo_path, sibling_repo_layout)
     quote_include_dirs_for_context = [repo_path, gen_include_dir, bin_include_dir] + quote_include_dirs
@@ -297,9 +301,9 @@ def _init_cc_compilation_context(
     header_module = None
     if _enabled(feature_configuration, "module_maps"):
         if not module_map:
-            module_map = cc_common.create_module_map(
+            module_map = cc_common_internal.create_module_map(
                 file = actions.declare_file(label.name + ".cppmap"),
-                name = label.workspace_name + "//" + label.package + ":" + label.name,
+                name = label.repo_name + "//" + label.package + ":" + label.name,
             )
 
         # There are different modes for module compilation:
@@ -389,7 +393,7 @@ def _init_cc_compilation_context(
         dependent_cc_compilation_contexts.append(cc_toolchain_compilation_context)
     dependent_cc_compilation_contexts.extend(deps)
 
-    main_context = cc_common.create_compilation_context(
+    main_context = cc_common_internal.create_compilation_context(
         actions = actions,
         label = label,
         quote_includes = depset(quote_include_dirs_for_context),
@@ -415,10 +419,13 @@ def _init_cc_compilation_context(
         separate_pic_module = separate_pic_module,
         purpose = purpose,
         add_public_headers_to_modular_headers = False,
+        exported_dependent_cc_compilation_contexts = [],
+        headers_checking_mode = "STRICT",
+        loose_hdrs_dirs = [],
     )
     implementation_deps_context = None
     if implementation_deps:
-        implementation_deps_context = cc_common.create_compilation_context(
+        implementation_deps_context = cc_common_internal.create_compilation_context(
             actions = actions,
             label = label,
             quote_includes = depset(quote_include_dirs_for_context),
@@ -444,6 +451,9 @@ def _init_cc_compilation_context(
             separate_pic_module = separate_pic_module,
             purpose = purpose + "_impl",
             add_public_headers_to_modular_headers = False,
+            exported_dependent_cc_compilation_contexts = [],
+            headers_checking_mode = "STRICT",
+            loose_hdrs_dirs = [],
         )
 
     return main_context, implementation_deps_context

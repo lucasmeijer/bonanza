@@ -671,145 +671,6 @@ def _create_compilation_outputs(
         temps = lambda: depset(),
     )
 
-def builtins_internal_cc_common_compile_fork(
-        *,
-        actions,
-        cc_toolchain,
-        feature_configuration,
-        name,
-        additional_exported_hdrs = None,
-        additional_include_scanning_roots = [],
-        additional_inputs = [],
-        additional_module_maps = [],
-        code_coverage_enabled = None,
-        compilation_contexts = [],
-        conly_flags = [],
-        copts_filter = None,
-        cxx_flags = [],
-        defines = [],
-        disallow_nopic_outputs = False,
-        disallow_pic_outputs = False,
-        do_not_generate_module_map = None,
-        framework_includes = [],
-        hdrs_checking_mode = None,
-        implementation_compilation_contexts = [],
-        include_prefix = "",
-        includes = [],
-        language = None,
-        local_defines = [],
-        loose_includes = [],
-        module_interfaces = [],
-        module_map = None,
-        non_compilation_additional_inputs = [],
-        private_hdrs = [],
-        propagate_module_map_to_compile_action = None,
-        public_hdrs = [],
-        purpose = None,
-        quote_includes = [],
-        separate_module_headers = [],
-        srcs = [],
-        strip_include_prefix = "",
-        system_includes = [],
-        textual_hdrs = [],
-        user_compile_flags = [],
-        variables_extension = None):
-    merged_compilation_context = builtins_internal_cc_common_merge_compilation_contexts(
-        compilation_contexts,
-        implementation_compilation_contexts,
-    )
-    common_inputs = depset(
-        direct = [
-            header[0]
-            for header in merged_compilation_context.headers.to_list()
-        ] + [
-            header[0]
-            for header in public_hdrs
-        ] + [
-            header[0]
-            for header in private_hdrs
-        ],
-        transitive = [cc_toolchain._compiler_files],
-    )
-
-    objects = []
-    pic_objects = []
-    for src in srcs:
-        src_file = src[0]
-        src_base = src_file.basename
-        if src_base.endswith(".c"):
-            action_name = "c-compile"
-        elif src_base.endswith(".cc"):
-            action_name = "c++-compile"
-        else:
-            fail(src)
-        object_file_base = "_objs/%s/%s" % (name, src_base.rsplit(".", 1)[0])
-
-        inputs = depset(
-            direct = [src[0]],
-            transitive = [common_inputs],
-        )
-
-        object_file = actions.declare_file(object_file_base + ".o")
-        variables = builtins_internal_cc_common_create_compile_variables(
-            cc_toolchain = cc_toolchain,
-            feature_configuration = feature_configuration,
-            source_file = src_file.path,
-            output_file = object_file.path,
-            user_compile_flags = user_compile_flags,
-            include_directories = merged_compilation_context.includes,
-            quote_include_directories = merged_compilation_context.quote_includes,
-            system_include_directories = merged_compilation_context.system_includes,
-            framework_include_directories = merged_compilation_context.framework_includes,
-            preprocessor_defines = merged_compilation_context.defines,
-            use_pic = False,
-            variables_extension = variables_extension,
-        )
-        actions.run(
-            executable = builtins_internal_cc_common_get_tool_for_action(feature_configuration, action_name),
-            arguments = builtins_internal_cc_common_get_memory_inefficient_command_line(feature_configuration, action_name, variables),
-            inputs = inputs,
-            outputs = [object_file],
-        )
-        objects.append(object_file)
-
-        pic_object_file = actions.declare_file(object_file_base + ".pic.o")
-        pic_variables = builtins_internal_cc_common_create_compile_variables(
-            cc_toolchain = cc_toolchain,
-            feature_configuration = feature_configuration,
-            source_file = src_file.path,
-            output_file = pic_object_file.path,
-            user_compile_flags = user_compile_flags,
-            include_directories = merged_compilation_context.includes,
-            quote_include_directories = merged_compilation_context.quote_includes,
-            system_include_directories = merged_compilation_context.system_includes,
-            framework_include_directories = merged_compilation_context.framework_includes,
-            preprocessor_defines = merged_compilation_context.defines,
-            use_pic = True,
-            variables_extension = variables_extension,
-        )
-        actions.run(
-            executable = builtins_internal_cc_common_get_tool_for_action(feature_configuration, action_name),
-            arguments = builtins_internal_cc_common_get_memory_inefficient_command_line(feature_configuration, action_name, pic_variables),
-            inputs = inputs,
-            outputs = [pic_object_file],
-        )
-        pic_objects.append(pic_object_file)
-
-    # TODO: Fill this in properly.
-    compilation_context = builtins_internal_cc_common_create_compilation_context(
-        headers = depset(public_hdrs),
-    )
-
-    # TODO: Fill this in properly.
-    srcs_compilation_outputs = _create_compilation_outputs(
-        lto_compilation_context = struct(TODO_lto_compilation_context = True),
-        header_tokens = depset(),
-        objects = depset(objects),
-        pic_objects = depset(pic_objects),
-    )
-
-    return compilation_context, srcs_compilation_outputs
-
 def _selectable_get_name(selectable):
     if selectable.type_name == "action_config":
         return selectable.action_name
@@ -1215,6 +1076,115 @@ def _path_relative_to_package(ctx, path):
             )
             if component
         ],
+    )
+
+def builtins_internal_cc_common_create_cc_compile_actions(
+        *,
+        action_construction_context,
+        cc_compilation_context,
+        cc_toolchain,
+        compilation_unit_sources,
+        configuration,
+        copts_filter,
+        cpp_configuration,
+        fdo_context,
+        feature_configuration,
+        generate_no_pic_action,
+        generate_pic_action,
+        is_code_coverage_enabled,
+        label,
+        purpose,
+        additional_compilation_inputs = [],
+        additional_include_scanning_roots = [],
+        conlyopts = [],
+        copts = [],
+        cxxopts = [],
+        language = None,
+        private_headers = [],
+        public_headers = [],
+        separate_module_headers = [],
+        variables_extension = None):
+    common_inputs = depset(
+        direct = public_headers + private_headers,
+        transitive = [
+            cc_toolchain._compiler_files,
+            cc_compilation_context.headers,
+        ],
+    )
+
+    header_tokens = []
+    objects = []
+    pic_objects = []
+    for source in compilation_unit_sources:
+        source_base = source.basename
+        if source_base.endswith(".c"):
+            action_name = "c-compile"
+            user_compile_flags = copts + conlyopts
+        elif source_base.endswith(".cc"):
+            action_name = "c++-compile"
+            user_compile_flags = copts + cxxopts
+        else:
+            fail(source)
+
+        inputs = depset(
+            direct = [source],
+            transitive = [common_inputs],
+        )
+
+        object_file_base = "_objs/%s/%s" % (label.name, source_base.rsplit(".", 1)[0])
+        if generate_no_pic_action:
+            object_file = action_construction_context.actions.declare_file(object_file_base + ".o")
+            variables = builtins_internal_cc_common_create_compile_variables(
+                cc_toolchain = cc_toolchain,
+                feature_configuration = feature_configuration,
+                source_file = source.path,
+                output_file = object_file.path,
+                user_compile_flags = user_compile_flags,
+                include_directories = cc_compilation_context.includes,
+                quote_include_directories = cc_compilation_context.quote_includes,
+                system_include_directories = cc_compilation_context.system_includes,
+                framework_include_directories = cc_compilation_context.framework_includes,
+                preprocessor_defines = cc_compilation_context.defines,
+                use_pic = False,
+                variables_extension = variables_extension,
+            )
+            action_construction_context.actions.run(
+                executable = builtins_internal_cc_common_get_tool_for_action(feature_configuration, action_name),
+                arguments = builtins_internal_cc_common_get_memory_inefficient_command_line(feature_configuration, action_name, variables),
+                inputs = inputs,
+                outputs = [object_file],
+            )
+            objects.append(object_file)
+
+        if generate_pic_action:
+            pic_object_file = action_construction_context.actions.declare_file(object_file_base + ".pic.o")
+            pic_variables = builtins_internal_cc_common_create_compile_variables(
+                cc_toolchain = cc_toolchain,
+                feature_configuration = feature_configuration,
+                source_file = source.path,
+                output_file = pic_object_file.path,
+                user_compile_flags = user_compile_flags,
+                include_directories = cc_compilation_context.includes,
+                quote_include_directories = cc_compilation_context.quote_includes,
+                system_include_directories = cc_compilation_context.system_includes,
+                framework_include_directories = cc_compilation_context.framework_includes,
+                preprocessor_defines = cc_compilation_context.defines,
+                use_pic = True,
+                variables_extension = variables_extension,
+            )
+            action_construction_context.actions.run(
+                executable = builtins_internal_cc_common_get_tool_for_action(feature_configuration, action_name),
+                arguments = builtins_internal_cc_common_get_memory_inefficient_command_line(feature_configuration, action_name, pic_variables),
+                inputs = inputs,
+                outputs = [pic_object_file],
+            )
+            pic_objects.append(pic_object_file)
+
+    return _create_compilation_outputs(
+        lto_compilation_context = _create_lto_compilation_context(),
+        header_tokens = depset(header_tokens),
+        objects = depset(objects),
+        pic_objects = depset(pic_objects),
     )
 
 def builtins_internal_cc_common_create_cc_toolchain_config_info(
@@ -2104,10 +2074,11 @@ def _create_compilation_context(
     return struct(
         additional_inputs = lambda: additional_inputs,
         defines = defines,
+        exporting_module_maps = lambda: [],
         framework_includes = framework_includes,
         headers = headers,
         includes = includes,
-        module_map = module_map,
+        module_map = lambda: module_map,
         quote_includes = quote_includes,
         system_includes = system_includes,
         transitive_modules = transitive_modules,
@@ -2289,11 +2260,14 @@ def builtins_internal_cc_common_create_linking_context(
         linker_inputs = linker_inputs or depset(),
     )
 
+def builtins_internal_cc_common_create_lto_compilation_context(*, objects = {}):
+    return struct(__todo_lto_compilation_context = True)
+
 def builtins_internal_cc_common_create_module_map(
         *,
         file,
         name,
-        umbrella_header):
+        umbrella_header = None):
     return struct(
         file = lambda: file,
         umbrella_header = lambda: umbrella_header,
@@ -2679,6 +2653,14 @@ def builtins_internal_cc_internal_create_cc_launcher_info(*, cc_info, compilatio
         compilation_outputs = lambda: compilation_outputs,
     )
 
+def builtins_internal_cc_internal_create_cpp_source(*, label, source, type):
+    return struct(__todo_is_cpp_source = True)
+
+def builtins_internal_cc_internal_create_copts_filter(copts_filter = None):
+    if copts_filter:
+        fail("TODO: Support filtering")
+    return struct(__todo_is_copts_filter = True)
+
 def library_to_link_disable_whole_archive(lib):
     disable_whole_archive = lib._disable_whole_archive
     return lambda: lib._disable_whole_archive
@@ -2718,6 +2700,25 @@ def builtins_internal_cc_internal_create_library_to_link(library_to_link):
         # Notice "resolve_" instead of "resolved_".
         resolved_symlink_interface_library = getattr(library_to_link, "resolve_symlink_interface_library", None),
         static_library = getattr(library_to_link, "static_library", None),
+    )
+
+def builtins_internal_cc_internal_create_module_map_action(
+        *,
+        actions,
+        additional_exported_headers,
+        compiled_module,
+        dependent_module_maps,
+        feature_configuration,
+        generate_submodules,
+        module_map_home_is_cwd,
+        module_map,
+        private_headers,
+        public_headers,
+        separate_module_headers,
+        without_extern_dependencies):
+    actions.run(
+        executable = "false",
+        outputs = [module_map.file()],
     )
 
 def builtins_internal_cc_internal_create_shared_non_lto_artifacts(
@@ -2983,8 +2984,8 @@ exported_toplevels["_builtins"] = struct(
             CcToolchainInfo = CcToolchainInfo,
             action_is_enabled = builtins_internal_cc_common_action_is_enabled,
             check_private_api = builtins_internal_cc_common_check_private_api,
-            compile_fork = builtins_internal_cc_common_compile_fork,
             configure_features = builtins_internal_cc_common_configure_features,
+            create_cc_compile_actions = builtins_internal_cc_common_create_cc_compile_actions,
             create_cc_toolchain_config_info = builtins_internal_cc_common_create_cc_toolchain_config_info,
             create_compilation_context = builtins_internal_cc_common_create_compilation_context,
             create_compilation_outputs = builtins_internal_cc_common_create_compilation_outputs,
@@ -2992,6 +2993,7 @@ exported_toplevels["_builtins"] = struct(
             create_debug_context = builtins_internal_cc_common_create_debug_context,
             create_linker_input = builtins_internal_cc_common_create_linker_input,
             create_linking_context = builtins_internal_cc_common_create_linking_context,
+            create_lto_compilation_context = builtins_internal_cc_common_create_lto_compilation_context,
             create_module_map = builtins_internal_cc_common_create_module_map,
             do_not_use_tools_cpp_compiler_present = None,
             get_environment_variables = builtins_internal_cc_common_get_environment_variables,
@@ -3012,7 +3014,10 @@ exported_toplevels["_builtins"] = struct(
             collect_libraries_to_link = builtins_internal_cc_internal_collect_libraries_to_link,
             convert_library_to_link_list_to_linker_input_list = builtins_internal_cc_internal_convert_library_to_link_list_to_linker_input_list,
             create_cc_launcher_info = builtins_internal_cc_internal_create_cc_launcher_info,
+            create_cpp_source = builtins_internal_cc_internal_create_cpp_source,
+            create_copts_filter = builtins_internal_cc_internal_create_copts_filter,
             create_library_to_link = builtins_internal_cc_internal_create_library_to_link,
+            create_module_map_action = builtins_internal_cc_internal_create_module_map_action,
             create_shared_non_lto_artifacts = builtins_internal_cc_internal_create_shared_non_lto_artifacts,
             dynamic_library_soname = builtins_internal_cc_internal_dynamic_library_soname,
             empty_compilation_outputs = builtins_internal_cc_internal_empty_compilation_outputs,
