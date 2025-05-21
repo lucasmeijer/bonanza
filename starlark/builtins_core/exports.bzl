@@ -840,7 +840,7 @@ def builtins_internal_cc_common_configure_features(
 
     if (
         language not in ["objc", "objc++"] and
-        not cc_toolchain._cc_info.compilation_context.module_map
+        not cc_toolchain._cc_info.compilation_context.module_map()
     ):
         unsupported_features_builder.add("module_maps")
 
