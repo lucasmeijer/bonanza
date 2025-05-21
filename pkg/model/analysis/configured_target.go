@@ -3016,6 +3016,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doSymlink(thread *starlark
 	var targetPath path.Parser
 	isExecutable := false
 	progressMessage := ""
+	useExecRootForSource := false
 	rc := rca.ruleContext
 	if err := starlark.UnpackArgs(
 		b.Name(), args, kwargs,
@@ -3024,8 +3025,13 @@ func (rca *ruleContextActions[TReference, TMetadata]) doSymlink(thread *starlark
 		"target_path?", unpack.Bind(thread, &targetPath, unpack.PathParser(path.UNIXFormat)),
 		"is_executable?", unpack.Bind(thread, &isExecutable, unpack.Bool),
 		"progress_message?", unpack.Bind(thread, &progressMessage, unpack.IfNotNone(unpack.String)),
+		"use_exec_root_for_source?", unpack.Bind(thread, &useExecRootForSource, unpack.Bool),
 	); err != nil {
 		return nil, err
+	}
+
+	if useExecRootForSource {
+		return nil, errors.New("this implementation does not support use_exec_root_for_source=True")
 	}
 
 	if targetFile != nil {
