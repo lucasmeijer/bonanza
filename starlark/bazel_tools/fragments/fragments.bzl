@@ -65,7 +65,7 @@ def _configuration_fragment_impl(ctx):
         # TODO: Have a helper rule that checks whether the exec platform
         # is Windows.
         host_path_separator = ":",
-        is_sibling_repository_layout = lambda: True,
+        is_sibling_repository_layout = lambda: False,
         is_tool_configuration = lambda: is_exec_configuration,
         stamp_binaries = lambda: stamp,
     )]
