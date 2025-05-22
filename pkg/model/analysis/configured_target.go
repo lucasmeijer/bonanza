@@ -1780,12 +1780,12 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 	case "coverage_instrumented":
 		return starlark.NewBuiltin("ctx.coverage_instrumented", rc.doCoverageInstrumented), nil
 	case "bin_dir":
-		configurationComponent, err := model_starlark.ConfigurationReferenceToComponent(rc.configurationReference)
+		binDir, err := rc.getBinDir()
 		if err != nil {
 			return nil, err
 		}
 		return model_starlark.NewStructFromDict[TReference, TMetadata](nil, map[string]any{
-			"path": starlark.String(model_starlark.ComponentStrBazelOut + "/" + configurationComponent + "/" + model_starlark.ComponentStrBin),
+			"path": starlark.String(binDir),
 		}), nil
 	case "disabled_features":
 		return starlark.NewList(nil), nil
@@ -1892,6 +1892,14 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 	default:
 		return nil, nil
 	}
+}
+
+func (rc *ruleContext[TReference, TMetadata]) getBinDir() (string, error) {
+	configurationComponent, err := model_starlark.ConfigurationReferenceToComponent(rc.configurationReference)
+	if err != nil {
+		return "", err
+	}
+	return model_starlark.ComponentStrBazelOut + "/" + configurationComponent + "/" + model_starlark.ComponentStrBin, nil
 }
 
 func (rc *ruleContext[TReference, TMetadata]) getFragment(name string) (starlark.Value, error) {
@@ -2318,19 +2326,48 @@ func (rca *ruleContextActions[TReference, TMetadata]) doDeclareFile(thread *star
 }
 
 func (rca *ruleContextActions[TReference, TMetadata]) doDeclareShareableArtifact(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	var path label.TargetName
-	var artifactRoot starlark.Value
+	var path string
+	var artifactRoot *string
 	rc := rca.ruleContext
 	if err := starlark.UnpackArgs(
 		b.Name(), args, kwargs,
-		"path", unpack.Bind(thread, &path, unpack.TargetName),
-		"artifact_root?", &artifactRoot,
+		"path", unpack.Bind(thread, &path, unpack.String),
+		"artifact_root?", unpack.Bind(thread, &artifactRoot, unpack.Pointer(unpack.String)),
 	); err != nil {
 		return nil, err
 	}
 
-	// TODO: This ignores the artifact root entirely.
-	return rc.outputRegistrar.registerOutput(path, nil, model_starlark_pb.File_FILE)
+	// Bazel's ctx.actions.declare_shareable_artifact() allows
+	// declaring artifacts under different roots, repos and
+	// packages. However, for the use cases we want to support we
+	// only care about being able to declare artifacts under the
+	// current package. Supporting anything more flexible would
+	// increase overhead significantly,
+	if artifactRoot != nil {
+		binDir, err := rc.getBinDir()
+		if err != nil {
+			return nil, err
+		}
+		if *artifactRoot != binDir {
+			return nil, fmt.Errorf("artifact_root %#v is not equal to ctx.bin_dir %#v, which is not supported by this implementation", *artifactRoot, binDir)
+		}
+	}
+
+	targetPackage := rc.targetLabel.GetCanonicalPackage()
+	expectedPathPrefix := model_starlark.ComponentStrExternal + "/" + targetPackage.GetCanonicalRepo().String() + "/"
+	if packagePath := targetPackage.GetPackagePath(); packagePath != "" {
+		expectedPathPrefix += packagePath + "/"
+	}
+	filenameStr, ok := strings.CutPrefix(path, expectedPathPrefix)
+	if !ok {
+		return nil, fmt.Errorf("path %#v does not start with %#v, which is not supported by this implementation", path, expectedPathPrefix)
+	}
+	filename, err := label.NewTargetName(filenameStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid filename %#v: %w", filenameStr, err)
+	}
+
+	return rc.outputRegistrar.registerOutput(filename, nil, model_starlark_pb.File_FILE)
 }
 
 func (rca *ruleContextActions[TReference, TMetadata]) doDeclareSymlink(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
