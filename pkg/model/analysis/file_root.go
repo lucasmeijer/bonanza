@@ -410,7 +410,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 			equalComponentsBytes := 0
 			for i := 0; i < len(symlinkPath) && i < len(targetPath) && symlinkPath[i] == targetPath[i]; i++ {
 				if symlinkPath[i] == '/' {
-					equalComponentsBytes = i
+					equalComponentsBytes = i + 1
 				}
 			}
 			relativeTargetPath := strings.Repeat("../", strings.Count(symlinkPath[equalComponentsBytes:], "/")) + targetPath[equalComponentsBytes:]
