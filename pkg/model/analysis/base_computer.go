@@ -379,7 +379,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeBuildResultValue(ctx contex
 	if missingDependencies {
 		return PatchedBuildResultValue{}, evaluation.ErrMissingDependency
 	}
-	return model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](&model_analysis_pb.BuildResult_Value{}), nil
+
+	return PatchedBuildResultValue{}, errors.New("TODO: report build results in a meaningful way")
 }
 
 func (c *baseComputer[TReference, TMetadata]) ComputeBuildSpecificationValue(ctx context.Context, key *model_analysis_pb.BuildSpecification_Key, e BuildSpecificationEnvironment[TReference, TMetadata]) (PatchedBuildSpecificationValue, error) {
