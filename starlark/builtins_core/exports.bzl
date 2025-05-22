@@ -320,7 +320,7 @@ def _genrule_impl(ctx):
         if part
     ])
     additional_substitutions = {
-        "@D": ctx.attr.outs[0].path.rsplit("/", 1)[0] if len(ctx.attr.outs) == 1 else ruledir,
+        "@D": ctx.outputs.outs[0].path.rsplit("/", 1)[0] if len(ctx.outputs.outs) == 1 else ruledir,
         "RULEDIR": ruledir,
         "SRCS": " ".join([src.path for src in ctx.files.srcs]),
     }
@@ -343,10 +343,14 @@ def _genrule_impl(ctx):
             else:
                 command += c
         elif state == 1:
-            if c == "(":
+            if c == "$":
+                command += "$"
+                state = 0
+            elif c == "(":
                 state = 2
             elif c == "@" or c == "<" or c == "^":
                 command += get_value(c)
+                state = 0
             else:
                 fail("unknown sequence $%s" % c)
         elif state == 2:
