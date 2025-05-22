@@ -357,7 +357,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 			// the target and add a symlink to it.
 			directoryCreationParameters, gotDirectoryCreationParameters := e.GetDirectoryCreationParametersObjectValue(&model_analysis_pb.DirectoryCreationParametersObject_Key{})
 			directoryReaders, gotDirectoryReaders := e.GetDirectoryReadersValue(&model_analysis_pb.DirectoryReaders_Key{})
-			patchedSymlinkTargetFile := model_core.Patch(e, model_core.Nested(output, source.Symlink))
+			symlinkTargetFile := model_core.Nested(output, source.Symlink)
+			patchedSymlinkTargetFile := model_core.Patch(e, symlinkTargetFile)
 			symlinkTarget := e.GetFileRootValue(
 				model_core.NewPatchedMessage(
 					&model_analysis_pb.FileRoot_Key{
@@ -397,8 +398,25 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 			if r.TerminalName == nil {
 				return PatchedFileRootValue{}, fmt.Errorf("%#v does not resolve to a file", symlinkPath)
 			}
+
+			// Make the target of the symlink relative to
+			// the directory in which it is contained.
+			// Remove leading components of the target that
+			// are equal to those of the symlink's path.
+			targetPath, err := model_starlark.FileGetPath(symlinkTargetFile)
+			if err != nil {
+				return PatchedFileRootValue{}, err
+			}
+			equalComponentsBytes := 0
+			for i := 0; i < len(symlinkPath) && i < len(targetPath) && symlinkPath[i] == targetPath[i]; i++ {
+				if symlinkPath[i] == '/' {
+					equalComponentsBytes = i
+				}
+			}
+			relativeTargetPath := strings.Repeat("../", strings.Count(symlinkPath[equalComponentsBytes:], "/")) + targetPath[equalComponentsBytes:]
+
 			d := r.stack.Peek()
-			if err := d.setSymlink(loadOptions, *r.TerminalName, path.UNIXFormat.NewParser("TODO_SYMLINK_TARGET")); err != nil {
+			if err := d.setSymlink(loadOptions, *r.TerminalName, path.UNIXFormat.NewParser(relativeTargetPath)); err != nil {
 				return PatchedFileRootValue{}, fmt.Errorf("failed to create symlink at %#v: %w", symlinkPath, err)
 			}
 
