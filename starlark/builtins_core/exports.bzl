@@ -1124,7 +1124,7 @@ def builtins_internal_cc_common_create_cc_compile_actions(
         if source_base.endswith(".c"):
             action_name = "c-compile"
             user_compile_flags = copts + conlyopts
-        elif source_base.endswith(".cc"):
+        elif source_base.endswith(".cc") or source_base.endswith(".cpp"):
             action_name = "c++-compile"
             user_compile_flags = copts + cxxopts
         else:
