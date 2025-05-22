@@ -77,7 +77,7 @@ local statePath = std.extVar('STATE_PATH');
       hiddenFilesPattern: '^\\._|^\\.nfs\\.[0-9a-f]{8}\\.[0-9a-f]{4}$',
       maximumExecutionTimeoutCompensation: '3600s',
       maximumWritableFileUploadDelay: '60s',
-      maximumFilePoolFileCount: 10000,
+      maximumFilePoolFileCount: 1e5,
       maximumFilePoolSizeBytes: 1e9,
       workerId: { host: 'localhost' },
     }],
