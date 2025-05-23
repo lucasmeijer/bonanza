@@ -123,6 +123,11 @@ func stringDictToStructFields(in starlark.StringDict) map[string]any {
 	return out
 }
 
+var (
+	fragmentsAttrIdentifier = pg_label.MustNewStarlarkIdentifier("_ctx_fragments")
+	fragmentsPackage        = pg_label.MustNewCanonicalPackage("@@bazel_tools+//fragments")
+)
+
 func GetBuiltins[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata]() (starlark.StringDict, starlark.StringDict) {
 	providersListUnpackerInto := unpack.Or([]unpack.UnpackerInto[[][]*Provider[TReference, TMetadata]]{
 		unpack.Singleton(unpack.List(unpack.Type[*Provider[TReference, TMetadata]]("provider"))),
@@ -1226,7 +1231,7 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 				execGroups := map[string]*ExecGroup[TReference, TMetadata]{}
 				executable := false
 				var execCompatibleWith []pg_label.ResolvedLabel
-				var fragments []string
+				var fragments []pg_label.TargetName
 				var hostFragments []string
 				var initializer *NamedFunction[TReference, TMetadata]
 				outputs := map[pg_label.StarlarkIdentifier]string{}
@@ -1248,7 +1253,7 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 					"executable?", unpack.Bind(thread, &executable, unpack.Bool),
 					"exec_compatible_with?", unpack.Bind(thread, &execCompatibleWith, unpack.List(NewLabelOrStringUnpackerInto[TReference, TMetadata](CurrentFilePackage(thread, 1)))),
 					"exec_groups?", unpack.Bind(thread, &execGroups, unpack.Dict(unpack.String, unpack.Type[*ExecGroup[TReference, TMetadata]]("exec_group"))),
-					"fragments?", unpack.Bind(thread, &fragments, unpack.List(unpack.String)),
+					"fragments?", unpack.Bind(thread, &fragments, unpack.List(unpack.TargetName)),
 					"host_fragments?", unpack.Bind(thread, &hostFragments, unpack.List(unpack.String)),
 					"initializer?", unpack.Bind(thread, &initializer, unpack.IfNotNone(unpack.Pointer(namedFunctionUnpackerInto))),
 					"outputs?", unpack.Bind(thread, &outputs, unpack.Dict(unpack.StarlarkIdentifier, unpack.String)),
@@ -1285,6 +1290,28 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 						return nil, fmt.Errorf("predeclared output %#v has the same name as existing attr", name)
 					}
 					attrs[name] = NewAttr[TReference, TMetadata](NewOutputAttrType[TReference, TMetadata](template), starlark.String(template))
+				}
+
+				// Fragments are emulated by depending
+				// on targets provide a FragmentInfo.
+				// The ctx wrapper is responsible for
+				// exposing these providers through
+				// ctx.fragments.
+				if _, ok := attrs[fragmentsAttrIdentifier]; ok {
+					return nil, fmt.Errorf("attr %#v cannot be declared explicitly", fragmentsAttrIdentifier.String())
+				}
+				if len(fragments) > 0 {
+					fragmentsLabels := make([]starlark.Value, 0, len(fragments))
+					for _, fragment := range fragments {
+						fragmentsLabels = append(
+							fragmentsLabels,
+							NewLabel[TReference, TMetadata](fragmentsPackage.AppendTargetName(fragment).AsResolved()),
+						)
+					}
+					attrs[fragmentsAttrIdentifier] = NewAttr[TReference, TMetadata](
+						NewLabelListAttrType[TReference, TMetadata](glob.NFAMatchingNothing.Bytes(), targetTransitionDefinition),
+						starlark.NewList(fragmentsLabels),
+					)
 				}
 
 				return NewRule(nil, NewStarlarkRuleDefinition(

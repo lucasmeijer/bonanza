@@ -76,4 +76,14 @@ def wrap_ctx(ctx):
     if "" in ctx.exec_groups:
         ctx_fields["toolchains"] = ctx.exec_groups[""].toolchains
 
+    # If the rule depends on one or more fragments, an attribute with
+    # name "_ctx_fragments" of type attr.label_list() is injected. The
+    # default value of this attribute will refer to targets offering a
+    # FragmentInfo. Make these available through ctx.fragments.
+    if hasattr(ctx.attr, "_ctx_fragments"):
+        ctx_fields["fragments"] = struct(**{
+            fragment.label.name: fragment[FragmentInfo]
+            for fragment in ctx.attr._ctx_fragments
+        })
+
     return WrappedCtx(**ctx_fields)

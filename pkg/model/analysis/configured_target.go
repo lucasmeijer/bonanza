@@ -43,7 +43,7 @@ import (
 var (
 	constraintValueInfoProviderIdentifier      = label.MustNewCanonicalStarlarkIdentifier("@@builtins_core+//:exports.bzl%ConstraintValueInfo")
 	defaultInfoProviderIdentifier              = label.MustNewCanonicalStarlarkIdentifier("@@builtins_core+//:exports.bzl%DefaultInfo")
-	fragmentInfoProviderIdentifier             = label.MustNewCanonicalStarlarkIdentifier("@@bazel_tools+//fragments:fragments.bzl%FragmentInfo")
+	fragmentInfoProviderIdentifier             = label.MustNewCanonicalStarlarkIdentifier("@@bazel_tools+//fragments:fragment_info.bzl%FragmentInfo")
 	fragmentsPackage                           = label.MustNewCanonicalPackage("@@bazel_tools+//fragments")
 	packageSpecificationInfoProviderIdentifier = label.MustNewCanonicalStarlarkIdentifier("@@builtins_core+//:exports.bzl%PackageSpecificationInfo")
 	toolchainInfoProviderIdentifier            = label.MustNewCanonicalStarlarkIdentifier("@@builtins_core+//:exports.bzl%ToolchainInfo")
@@ -1945,7 +1945,6 @@ var ruleContextAttrNames = []string{
 	"executable",
 	"file",
 	"files",
-	"fragments",
 	"info_file",
 	"label",
 	"outputs",

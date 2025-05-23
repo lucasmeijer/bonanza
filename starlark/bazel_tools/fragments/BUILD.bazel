@@ -10,6 +10,8 @@ load(
     "py_fragment",
 )
 
+package(default_visibility = ["//visibility:public"])
+
 apple_fragment(name = "apple")
 
 bazel_py_fragment(name = "bazel_py")

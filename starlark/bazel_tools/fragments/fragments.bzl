@@ -1,6 +1,5 @@
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
-
-FragmentInfo = provider()
+load(":fragment_info.bzl", "FragmentInfo")
 
 def _apple_fragment_impl(ctx):
     return [FragmentInfo(
