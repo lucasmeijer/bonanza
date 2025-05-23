@@ -1846,19 +1846,6 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 		return rc.splitAttr, nil
 	case "target_platform_has_constraint":
 		return starlark.NewBuiltin("ctx.target_platform_has_constraint", rc.doTargetPlatformHasConstraint), nil
-	case "toolchains":
-		execGroups := rc.ruleDefinition.Message.ExecGroups
-		execGroupIndex, ok := sort.Find(
-			len(execGroups),
-			func(i int) int { return strings.Compare("", execGroups[i].Name) },
-		)
-		if !ok {
-			return nil, errors.New("rule does not have a default exec group")
-		}
-		return &toolchainContext[TReference, TMetadata]{
-			ruleContext:    rc,
-			execGroupIndex: execGroupIndex,
-		}, nil
 	case "var":
 		if rc.varDict == nil {
 			configurationReference := model_core.Patch(
@@ -1966,7 +1953,6 @@ var ruleContextAttrNames = []string{
 	"label",
 	"runfiles",
 	"split_attr",
-	"toolchains",
 	"var",
 	"version_file",
 }
@@ -3093,8 +3079,12 @@ func (rca *ruleContextExecGroups[TReference, TMetadata]) Get(thread *starlark.Th
 	if !ok {
 		return nil, false, fmt.Errorf("rule does not have an exec group with name %#v", execGroupName)
 	}
-
-	return nil, true, fmt.Errorf("TODO: use exec group with index %d", execGroupIndex)
+	return model_starlark.NewStructFromDict[TReference, TMetadata](nil, map[string]any{
+		"toolchains": &toolchainContext[TReference, TMetadata]{
+			ruleContext:    rc,
+			execGroupIndex: execGroupIndex,
+		},
+	}), true, nil
 }
 
 type ruleContextFragments[TReference object.BasicReference, TMetadata BaseComputerReferenceMetadata] struct {

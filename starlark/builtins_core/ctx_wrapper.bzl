@@ -75,11 +75,15 @@ def wrap_ctx(ctx):
         "version_file": ctx.version_file,
         "workspace_name": "_main",
     }
-    if "" in ctx.exec_groups:
-        # TODO: make ctx.exec_groups work, so we can write this:
-        # ctx_fields["toolchains"] = ctx.exec_groups[""].toolchain
-        ctx_fields["toolchains"] = ctx.toolchains
+
+    # Build settings are only available for rules for which
+    # build_setting was set.
     if hasattr(ctx, "build_setting_value"):
         ctx_fields["build_setting_value"] = ctx.build_setting_value
+
+    # If the rule has a default exec group, expose its toolchains
+    # through ctx.toolchains.
+    if "" in ctx.exec_groups:
+        ctx_fields["toolchains"] = ctx.exec_groups[""].toolchains
 
     return WrappedCtx(**ctx_fields)
