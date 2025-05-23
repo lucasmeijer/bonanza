@@ -92,9 +92,11 @@ common:bonanza --builtins_module=builtins_bzl
 # The ctx object that is provided to rule implementations contains
 # various legacy features, such as ctx.expand_make_variables(),
 # ctx.genfiles_dir, and ctx.workspace_name. Bonanza doesn't provide
-# these by default. Instead, it offers a hook for wrapping instances of
-# ctx, so that any such features can be added within Starlark.
-common:bonanza --ctx_wrapper_identifier=@@builtins_core+//:ctx_wrapper.bzl%wrap_ctx
+# these by default. Instead, it offers a hook for wrapping the execution
+# of rule and subrule implementation functions. We use these to augment
+# the ctx arguments.
+common:bonanza --rule_implementation_wrapper_identifier=@@builtins_core+//:wrappers.bzl%invoke_rule
+common:bonanza --subrule_implementation_wrapper_identifier=@@builtins_core+//:wrappers.bzl%invoke_subrule
 
 # bonanza_builder does not launch any subprocesses, meaning that it is
 # incapable of running any repository rules itself. It uses remote

@@ -1,6 +1,6 @@
 load("@bazel_tools//fragments:fragment_info.bzl", "FragmentInfo")
 
-def wrap_actions(actions, bin_dir, label):
+def _wrap_actions(actions, bin_dir, label):
     def actions_declare_shareable_artifact(path, artifact_root = None):
         if artifact_root and artifact_root != bin_dir:
             fail("artifact_root %s is not equal to bin_dir %s, which is not supported by this implementation" % (artifact_root, bin_dir))
@@ -43,7 +43,7 @@ WrappedCtx = provider(
     },
 )
 
-def wrap_ctx(ctx):
+def _wrap_ctx(ctx):
     def ctx_coverage_instrumented(target = None):
         return False
 
@@ -58,7 +58,7 @@ def wrap_ctx(ctx):
         if field not in ["configuration", "var"]
     } | {
         "_real_ctx": ctx,
-        "actions": wrap_actions(ctx.actions, ctx.bin_dir, ctx.label),
+        "actions": _wrap_actions(ctx.actions, ctx.bin_dir, ctx.label),
         "coverage_instrumented": ctx_coverage_instrumented,
         "disabled_features": [],
         "expand_location": ctx_expand_location,
@@ -87,3 +87,9 @@ def wrap_ctx(ctx):
         })
 
     return WrappedCtx(**ctx_fields)
+
+def invoke_rule(fn, ctx):
+    return fn(_wrap_ctx(ctx))
+
+def invoke_subrule(fn, ctx, *args, **kwargs):
+    return fn(ctx, *args, **kwargs)

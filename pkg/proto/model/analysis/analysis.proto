@@ -573,10 +573,6 @@ message ConfiguredTarget {
   }
 }
 
-message CtxWrapper {
-  message Key {}
-}
-
 message DirectoryAccessParameters {
   message Key {}
 
@@ -1459,6 +1455,10 @@ message RootModule {
     // file of modules other than the root module.
     bool ignore_root_module_dev_dependencies = 2;
   }
+}
+
+message RuleImplementationWrappers {
+  message Key {}
 }
 
 message Select {

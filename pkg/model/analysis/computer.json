@@ -125,31 +125,19 @@
             "CompiledBzlFileFunctionFactory",
             "CompiledBzlFileGlobal",
             "ConfiguredTarget",
-            "CtxWrapper",
             "DirectoryCreationParametersObject",
             "FileCreationParametersObject",
             "ExecTransition",
             "MakeVariables",
             "ResolvedToolchains",
             "RootModule",
+            "RuleImplementationWrappers",
             "Select",
             "Target",
             "UserDefinedTransition",
             "VisibleTarget"
          ],
          "keyContainsReferences": true
-      },
-      "CtxWrapper": {
-         "dependsOn": [
-            "BuildSpecification",
-            "CompiledBzlFileGlobal"
-         ],
-         "nativeValueType": {
-            "imports": {
-               "starlark": "go.starlark.net/starlark"
-            },
-            "type": "starlark.Value"
-         }
       },
       "DirectoryAccessParameters": {
          "dependsOn": [
@@ -519,6 +507,15 @@
          "dependsOn": [
             "BuildSpecification"
          ]
+      },
+      "RuleImplementationWrappers": {
+         "dependsOn": [
+            "BuildSpecification",
+            "CompiledBzlFileGlobal"
+         ],
+         "nativeValueType": {
+            "type": "*RuleImplementationWrappers"
+         }
       },
       "Select": {
          "dependsOn": [

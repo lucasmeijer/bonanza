@@ -311,16 +311,17 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 	// modules and contains all of the flags to instruct what needs
 	// to be built.
 	buildSpecification := model_build_pb.BuildSpecification{
-		RootModuleName:                  rootModuleName.String(),
-		TargetPatterns:                  args.Arguments,
-		DirectoryCreationParameters:     directoryParametersMessage,
-		FileCreationParameters:          fileParametersMessage,
-		IgnoreRootModuleDevDependencies: args.CommonFlags.IgnoreDevDependency,
-		BuiltinsModuleNames:             args.CommonFlags.BuiltinsModule,
-		RepoPlatform:                    args.CommonFlags.RepoPlatform,
-		CommandEncoders:                 defaultEncoders,
-		TargetPlatforms:                 targetPlatforms,
-		CtxWrapperIdentifier:            args.CommonFlags.CtxWrapperIdentifier,
+		RootModuleName:                         rootModuleName.String(),
+		TargetPatterns:                         args.Arguments,
+		DirectoryCreationParameters:            directoryParametersMessage,
+		FileCreationParameters:                 fileParametersMessage,
+		IgnoreRootModuleDevDependencies:        args.CommonFlags.IgnoreDevDependency,
+		BuiltinsModuleNames:                    args.CommonFlags.BuiltinsModule,
+		RepoPlatform:                           args.CommonFlags.RepoPlatform,
+		CommandEncoders:                        defaultEncoders,
+		TargetPlatforms:                        targetPlatforms,
+		RuleImplementationWrapperIdentifier:    args.CommonFlags.RuleImplementationWrapperIdentifier,
+		SubruleImplementationWrapperIdentifier: args.CommonFlags.SubruleImplementationWrapperIdentifier,
 	}
 	switch args.CommonFlags.LockfileMode {
 	case arguments.LockfileMode_Off:

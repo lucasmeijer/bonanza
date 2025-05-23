@@ -106,10 +106,17 @@ message BuildSpecification {
   // built.
   repeated string target_platforms = 12;
 
-  // If set, name of the Starlark function to invoke to wrap instances
-  // of ctx. This can be used to decorate ctx to contain fields that are
-  // either deprecated, or trivially implementable in pure Starlark.
-  string ctx_wrapper_identifier = 13;
+  // If set, name of the Starlark function to invoke to wrap the
+  // execution of rule implementation functions. This can be used to
+  // decorate ctx to contain fields that are either deprecated, or
+  // trivially implementable in pure Starlark.
+  string rule_implementation_wrapper_identifier = 13;
+
+  // If set, name of the Starlark function to invoke to wrap the
+  // execution of subrule implementation functions. This can be used to
+  // decorate subrule_ctx to contain fields that are either deprecated,
+  // or trivially implementable in pure Starlark.
+  string subrule_implementation_wrapper_identifier = 14;
 }
 
 message Action {

@@ -584,13 +584,18 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 
 		allBuiltinsModulesNames := e.GetBuiltinsModuleNamesValue(&model_analysis_pb.BuiltinsModuleNames_Key{})
 		commandEncoder, gotCommandEncoder := e.GetCommandEncoderObjectValue(&model_analysis_pb.CommandEncoderObject_Key{})
-		ctxWrapper, gotCtxWrapper := e.GetCtxWrapperValue(&model_analysis_pb.CtxWrapper_Key{})
 		directoryCreationParameters, gotDirectoryCreationParameters := e.GetDirectoryCreationParametersObjectValue(&model_analysis_pb.DirectoryCreationParametersObject_Key{})
 		fileCreationParameters, gotFileCreationParameters := e.GetFileCreationParametersObjectValue(&model_analysis_pb.FileCreationParametersObject_Key{})
 		ruleValue := e.GetCompiledBzlFileGlobalValue(&model_analysis_pb.CompiledBzlFileGlobal_Key{
 			Identifier: ruleIdentifier.String(),
 		})
-		if !allBuiltinsModulesNames.IsSet() || !gotCommandEncoder || !gotCtxWrapper || !gotDirectoryCreationParameters || !gotFileCreationParameters || !ruleValue.IsSet() {
+		ruleImplementationWrappers, gotRuleImplementationWrappers := e.GetRuleImplementationWrappersValue(&model_analysis_pb.RuleImplementationWrappers_Key{})
+		if !allBuiltinsModulesNames.IsSet() ||
+			!gotCommandEncoder ||
+			!gotDirectoryCreationParameters ||
+			!gotFileCreationParameters ||
+			!ruleValue.IsSet() ||
+			!gotRuleImplementationWrappers {
 			return PatchedConfiguredTargetValue{}, evaluation.ErrMissingDependency
 		}
 		v, ok := ruleValue.Message.Global.GetKind().(*model_starlark_pb.Value_Rule)
@@ -1270,6 +1275,11 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 
 			implementationArgs := append(
 				starlark.Tuple{
+					model_starlark.NewNamedFunction(
+						model_starlark.NewProtoNamedFunctionDefinition[TReference, TMetadata](
+							model_core.Nested(subruleDefinition, subruleDefinition.Message.Implementation),
+						),
+					),
 					&subruleContext[TReference, TMetadata]{ruleContext: rc},
 				},
 				args...,
@@ -1316,44 +1326,47 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 
 			return starlark.Call(
 				thread,
-				model_starlark.NewNamedFunction(
-					model_starlark.NewProtoNamedFunctionDefinition[TReference, TMetadata](
-						model_core.Nested(subruleDefinition, subruleDefinition.Message.Implementation),
-					),
-				),
+				ruleImplementationWrappers.Subrule,
 				implementationArgs,
 				implementationKwargs,
 			)
 		})
 
-		// Invoke the ctx wrapper function for obtaining the
-		// real ctx to provide to the rule implementation
-		// function.
-		wrappedCtx, err := starlark.Call(
-			thread,
-			ctxWrapper,
-			/* args = */ starlark.Tuple{rc},
-			/* kwargs = */ nil,
-		)
-		if err != nil {
-			if !errors.Is(err, evaluation.ErrMissingDependency) {
-				var evalErr *starlark.EvalError
-				if errors.As(err, &evalErr) {
-					return PatchedConfiguredTargetValue{}, errors.New(evalErr.Backtrace())
-				}
-			}
-			return PatchedConfiguredTargetValue{}, err
-		}
-		thread.SetLocal(model_starlark.CurrentCtxKey, wrappedCtx)
-
+		// Invoke the rule implementation function. Instead of
+		// calling it directly, we call the rule implementation
+		// wrapper function, having both the actual
+		// implementation function and ctx as arguments.
 		returnValue, err := starlark.Call(
 			thread,
-			model_starlark.NewNamedFunction(
-				model_starlark.NewProtoNamedFunctionDefinition[TReference, TMetadata](
-					model_core.Nested(ruleDefinition, ruleDefinition.Message.Implementation),
-				),
-			),
-			/* args = */ starlark.Tuple{wrappedCtx},
+			ruleImplementationWrappers.Rule,
+			/* args = */ starlark.Tuple{
+				starlark.NewBuiltin("current_ctx_capturer", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+					// The rule implementation wrapper
+					// function may augment ctx. Capture
+					// it, so that we can let
+					// native.current_ctx() return it.
+					var currentCtx starlark.Value
+					if err := starlark.UnpackArgs(
+						b.Name(), args, kwargs,
+						"ctx", &currentCtx,
+					); err != nil {
+						return nil, err
+					}
+					thread.SetLocal(model_starlark.CurrentCtxKey, currentCtx)
+
+					return starlark.Call(
+						thread,
+						model_starlark.NewNamedFunction(
+							model_starlark.NewProtoNamedFunctionDefinition[TReference, TMetadata](
+								model_core.Nested(ruleDefinition, ruleDefinition.Message.Implementation),
+							),
+						),
+						args,
+						kwargs,
+					)
+				}),
+				rc,
+			},
 			/* kwargs = */ nil,
 		)
 		if err != nil {
