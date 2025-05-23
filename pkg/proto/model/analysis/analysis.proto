@@ -573,6 +573,10 @@ message ConfiguredTarget {
   }
 }
 
+message CtxWrapper {
+  message Key {}
+}
+
 message DirectoryAccessParameters {
   message Key {}
 

@@ -105,6 +105,11 @@ message BuildSpecification {
   // Apparent labels of the platform()s for which targets need to be
   // built.
   repeated string target_platforms = 12;
+
+  // If set, name of the Starlark function to invoke to wrap instances
+  // of ctx. This can be used to decorate ctx to contain fields that are
+  // either deprecated, or trivially implementable in pure Starlark.
+  string ctx_wrapper_identifier = 13;
 }
 
 message Action {

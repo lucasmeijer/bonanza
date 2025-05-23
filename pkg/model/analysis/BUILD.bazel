@@ -21,6 +21,7 @@ go_library(
         "compiled_bzl_file.go",
         "computer.go",
         "configured_target.go",
+        "ctx_wrapper.go",
         "directory_creation_parameters.go",
         "directory_readers.go",
         "exec_transition.go",

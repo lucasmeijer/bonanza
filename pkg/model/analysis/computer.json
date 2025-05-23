@@ -125,6 +125,7 @@
             "CompiledBzlFileFunctionFactory",
             "CompiledBzlFileGlobal",
             "ConfiguredTarget",
+            "CtxWrapper",
             "DirectoryCreationParametersObject",
             "FileCreationParametersObject",
             "ExecTransition",
@@ -137,6 +138,18 @@
             "VisibleTarget"
          ],
          "keyContainsReferences": true
+      },
+      "CtxWrapper": {
+         "dependsOn": [
+            "BuildSpecification",
+            "CompiledBzlFileGlobal"
+         ],
+         "nativeValueType": {
+            "imports": {
+               "starlark": "go.starlark.net/starlark"
+            },
+            "type": "starlark.Value"
+         }
       },
       "DirectoryAccessParameters": {
          "dependsOn": [

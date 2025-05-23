@@ -320,6 +320,7 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 		RepoPlatform:                    args.CommonFlags.RepoPlatform,
 		CommandEncoders:                 defaultEncoders,
 		TargetPlatforms:                 targetPlatforms,
+		CtxWrapperIdentifier:            args.CommonFlags.CtxWrapperIdentifier,
 	}
 	switch args.CommonFlags.LockfileMode {
 	case arguments.LockfileMode_Off:

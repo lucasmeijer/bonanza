@@ -93,6 +93,11 @@ var commonFlags = []flag{
 		},
 	},
 	{
+		longName:    "ctx_wrapper_identifier",
+		description: "Name of the Starlark function to invoke to wrap instances of ctx. This can be used to decorate ctx to contain fields that are either deprecated, or trivially implementable in pure Starlark.",
+		flagType:    stringFlagType{},
+	},
+	{
 		longName:    "ignore_dev_dependency",
 		description: "If true, Bazel ignores `bazel_dep` and `use_extension` declared as `dev_dependency` in the MODULE.bazel of the root module. Note that, those dev dependencies are always ignored in the MODULE.bazel if it's not the root module regardless of the value of this flag.",
 		flagType: boolFlagType{
