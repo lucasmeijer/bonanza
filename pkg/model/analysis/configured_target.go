@@ -1742,6 +1742,14 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 		}, nil
 	case "attr":
 		return rc.attr, nil
+	case "bin_dir":
+		binDir, err := rc.getBinDir()
+		if err != nil {
+			return nil, err
+		}
+		return model_starlark.NewStructFromDict[TReference, TMetadata](nil, map[string]any{
+			"path": starlark.String(binDir),
+		}), nil
 	case "build_setting_value":
 		if rc.buildSettingValue == nil {
 			buildSettingDefault := rc.ruleTarget.Message.BuildSettingDefault
@@ -1797,29 +1805,18 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 		// Implement ctx.configuration as if it is a specially
 		// named fragment.
 		return rc.getFragment("configuration")
-	case "coverage_instrumented":
-		return starlark.NewBuiltin("ctx.coverage_instrumented", rc.doCoverageInstrumented), nil
-	case "bin_dir":
-		binDir, err := rc.getBinDir()
-		if err != nil {
-			return nil, err
-		}
-		return model_starlark.NewStructFromDict[TReference, TMetadata](nil, map[string]any{
-			"path": starlark.String(binDir),
-		}), nil
 	case "exec_groups":
 		return &ruleContextExecGroups[TReference, TMetadata]{
 			ruleContext: rc,
 		}, nil
 	case "executable":
 		return rc.executable, nil
-	case "expand_location":
-		return starlark.NewBuiltin("ctx.expand_location", rc.doExpandLocation), nil
 	case "file":
 		return rc.file, nil
 	case "files":
 		return rc.files, nil
 	case "fragments":
+		// TODO: Remove this once ctx.configuration no longer uses this.
 		return &ruleContextFragments[TReference, TMetadata]{
 			ruleContext: rc,
 		}, nil
@@ -1943,7 +1940,7 @@ func (rc *ruleContext[TReference, TMetadata]) getFragment(name string) (starlark
 var ruleContextAttrNames = []string{
 	"actions",
 	"attr",
-	"build_setting_value",
+	"bin_dir",
 	"exec_groups",
 	"executable",
 	"file",
@@ -1951,33 +1948,20 @@ var ruleContextAttrNames = []string{
 	"fragments",
 	"info_file",
 	"label",
+	"outputs",
 	"runfiles",
 	"split_attr",
+	"target_platform_has_constraint",
 	"var",
 	"version_file",
 }
 
-func (ruleContext[TReference, TMetadata]) AttrNames() []string {
-	return ruleContextAttrNames
-}
-
-func (ruleContext[TReference, TMetadata]) doCoverageInstrumented(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	return starlark.False, nil
-}
-
-func (ruleContext[TReference, TMetadata]) doExpandLocation(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	var input string
-	var targets []*model_starlark.TargetReference[TReference, TMetadata]
-	if err := starlark.UnpackArgs(
-		b.Name(), args, kwargs,
-		"input", unpack.Bind(thread, &input, unpack.String),
-		"targets?", unpack.Bind(thread, &targets, unpack.List(unpack.Type[*model_starlark.TargetReference[TReference, TMetadata]]("Target"))),
-	); err != nil {
-		return nil, err
+func (rc *ruleContext[TReference, TMetadata]) AttrNames() []string {
+	attrNames := append([]string(nil), ruleContextAttrNames...)
+	if rc.buildSettingValue != nil {
+		attrNames = append(attrNames, "build_setting_value")
 	}
-
-	// TODO: Actually expand $(location) tags.
-	return starlark.String(input), nil
+	return attrNames
 }
 
 func toSymlinkEntryDepset[TReference object.BasicReference, TMetadata BaseComputerReferenceMetadata](v any) *model_starlark.Depset[TReference, TMetadata] {

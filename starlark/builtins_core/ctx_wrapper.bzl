@@ -1,3 +1,35 @@
+load("@bazel_tools//fragments:fragment_info.bzl", "FragmentInfo")
+
+def wrap_actions(actions, bin_dir, label):
+    def actions_declare_shareable_artifact(path, artifact_root = None):
+        if artifact_root and artifact_root != bin_dir:
+            fail("artifact_root %s is not equal to bin_dir %s, which is not supported by this implementation" % (artifact_root, bin_dir))
+
+        expected_path_prefix = label.workspace_root + "/"
+        if label.package:
+            expected_path_prefix += label.package
+            expected_path_prefix += "/"
+        if not path.startswith(expected_path_prefix):
+            fail("path %s does not start with %s, which is not supported by this implementation" % (path, expected_path_prefix))
+
+        return actions.declare_file(path.removeprefix(expected_path_prefix))
+
+    def actions_run_shell(*, command, **kwargs):
+        actions.run(
+            executable = "/bin/bash",
+            arguments = ["-c", command],
+            **kwargs
+        )
+
+    actions_fields = {
+        field: getattr(actions, field)
+        for field in dir(actions)
+    } | {
+        "declare_shareable_artifact": actions_declare_shareable_artifact,
+        "run_shell": actions_run_shell,
+    }
+    return struct(**actions_fields)
+
 def wrapped_ctx_configuration(ctx):
     return ctx._real_ctx.fragments.configuration
 
@@ -12,26 +44,6 @@ WrappedCtx = provider(
 )
 
 def wrap_ctx(ctx):
-    def ctx_actions_declare_shareable_artifact(path, artifact_root = None):
-        if artifact_root and artifact_root != ctx.bin_dir:
-            fail("artifact_root %s is not equal to ctx.bin_dir %s, which is not supported by this implementation" % (artifact_root, ctx.bin_dir))
-
-        expected_path_prefix = ctx.label.workspace_root + "/"
-        if ctx.label.package:
-            expected_path_prefix += ctx.label.package
-            expected_path_prefix += "/"
-        if not path.startswith(expected_path_prefix):
-            fail("path %s does not start with %s, which is not supported by this implementation" % (path, expected_path_prefix))
-
-        return ctx.actions.declare_file(path.removeprefix(expected_path_prefix))
-
-    def ctx_actions_run_shell(*, command, **kwargs):
-        ctx.actions.run(
-            executable = "/bin/bash",
-            arguments = ["-c", command],
-            **kwargs
-        )
-
     def ctx_coverage_instrumented(target = None):
         return False
 
@@ -39,40 +51,18 @@ def wrap_ctx(ctx):
         # TODO: Actually expand locations!
         return input
 
-    actions = ctx.actions
     ctx_fields = {
+        field: getattr(ctx, field)
+        for field in dir(ctx)
+        # TODO: Remove this once they are gone.
+        if field not in ["configuration", "var"]
+    } | {
         "_real_ctx": ctx,
-        "actions": struct(
-            args = actions.args,
-            declare_directory = actions.declare_directory,
-            declare_file = actions.declare_file,
-            declare_shareable_artifact = ctx_actions_declare_shareable_artifact,
-            declare_symlink = actions.declare_symlink,
-            expand_template = actions.expand_template,
-            run = actions.run,
-            run_shell = ctx_actions_run_shell,
-            symlink = actions.symlink,
-            transform_info_file = actions.transform_info_file,
-            transform_version_file = actions.transform_version_file,
-            write = actions.write,
-        ),
-        "attr": ctx.attr,
-        "bin_dir": ctx.bin_dir,
+        "actions": wrap_actions(ctx.actions, ctx.bin_dir, ctx.label),
         "coverage_instrumented": ctx_coverage_instrumented,
         "disabled_features": [],
-        "exec_groups": ctx.exec_groups,
-        "executable": ctx.executable,
         "expand_location": ctx_expand_location,
         "features": [],
-        "file": ctx.file,
-        "files": ctx.files,
-        "fragments": ctx.fragments,
-        "info_file": ctx.info_file,
-        "label": ctx.label,
-        "outputs": ctx.outputs,
-        "runfiles": ctx.runfiles,
-        "target_platform_has_constraint": ctx.target_platform_has_constraint,
-        "version_file": ctx.version_file,
         "workspace_name": "_main",
     }
 
