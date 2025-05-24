@@ -58,6 +58,10 @@ def _wrap_rule_ctx(ctx):
         # TODO: Actually expand locations!
         return input
 
+    def ctx_expand_make_variables(attribute_name, command, additional_substitutions):
+        # TODO: Actually expand variables!
+        return command
+
     ctx_fields = {
         field: getattr(ctx, field)
         for field in dir(ctx)
@@ -66,9 +70,11 @@ def _wrap_rule_ctx(ctx):
     } | {
         "_real_ctx": ctx,
         "actions": _wrap_actions(ctx.actions, ctx.bin_dir, ctx.label),
+        "build_file_path": ctx.label.package + "/BUILD",
         "coverage_instrumented": ctx_coverage_instrumented,
         "disabled_features": [],
         "expand_location": ctx_expand_location,
+        "expand_make_variables": ctx_expand_make_variables,
         "features": [],
         "workspace_name": "_main",
     }
