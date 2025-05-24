@@ -126,6 +126,10 @@ func stringDictToStructFields(in starlark.StringDict) map[string]any {
 var (
 	fragmentsAttrIdentifier = pg_label.MustNewStarlarkIdentifier("__fragments")
 	fragmentsPackage        = pg_label.MustNewCanonicalPackage("@@bazel_tools+//fragments")
+
+	defaultMakeVariablesLabel       = pg_label.MustNewCanonicalLabel("@@bazel_tools+//tools/make:default_make_variables")
+	defaultToolchainsAttrIdentifier = pg_label.MustNewStarlarkIdentifier("__default_toolchains")
+	toolchainsAttrIdentifier        = pg_label.MustNewStarlarkIdentifier("toolchains")
 )
 
 // convertFragmentsToAttr converts a list of fragment dependencies of a
@@ -168,6 +172,17 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 	noneTransitionDefinition := NewReferenceTransitionDefinition[TReference, TMetadata](&NoneTransitionReference)
 	targetTransitionDefinition := NewReferenceTransitionDefinition[TReference, TMetadata](&TargetTransitionReference)
 	unconfiguredTransitionDefinition := NewReferenceTransitionDefinition[TReference, TMetadata](&UnconfiguredTransitionReference)
+
+	defaultToolchainsAttr := NewAttr[TReference, TMetadata](
+		NewLabelListAttrType[TReference, TMetadata](glob.NFAMatchingNothing.Bytes(), targetTransitionDefinition),
+		starlark.NewList([]starlark.Value{
+			NewLabel[TReference, TMetadata](defaultMakeVariablesLabel.AsResolved()),
+		}),
+	)
+	toolchainsAttr := NewAttr[TReference, TMetadata](
+		NewLabelListAttrType[TReference, TMetadata](glob.NFAMatchingNothing.Bytes(), targetTransitionDefinition),
+		starlark.NewList(nil),
+	)
 
 	bzlFileBuiltins := starlark.StringDict{
 		"analysis_test_transition": starlark.NewBuiltin(
@@ -1250,6 +1265,7 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 				if len(args) > 1 {
 					return nil, fmt.Errorf("%s: got %d positional arguments, want at most 1", b.Name(), len(args))
 				}
+				currentFilePackage := CurrentFilePackage(thread, 1)
 				var implementation NamedFunction[TReference, TMetadata]
 				attrs := map[pg_label.StarlarkIdentifier]*Attr[TReference, TMetadata]{}
 				var buildSetting *BuildSetting
@@ -1261,6 +1277,7 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 				var execCompatibleWith []pg_label.ResolvedLabel
 				var fragments []pg_label.TargetName
 				var initializer *NamedFunction[TReference, TMetadata]
+				needsMakeVariables := currentFilePackage.GetCanonicalRepo().String() != "bazel_skylib+"
 				outputs := map[pg_label.StarlarkIdentifier]string{}
 				var provides []*Provider[TReference, TMetadata]
 				var subrules []*Subrule[TReference, TMetadata]
@@ -1278,11 +1295,12 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 					"default_exec_group?", unpack.Bind(thread, &defaultExecGroup, unpack.Bool),
 					"doc?", unpack.Bind(thread, &doc, unpack.String),
 					"executable?", unpack.Bind(thread, &executable, unpack.Bool),
-					"exec_compatible_with?", unpack.Bind(thread, &execCompatibleWith, unpack.List(NewLabelOrStringUnpackerInto[TReference, TMetadata](CurrentFilePackage(thread, 1)))),
+					"exec_compatible_with?", unpack.Bind(thread, &execCompatibleWith, unpack.List(NewLabelOrStringUnpackerInto[TReference, TMetadata](currentFilePackage))),
 					"exec_groups?", unpack.Bind(thread, &execGroups, unpack.Dict(unpack.String, unpack.Type[*ExecGroup[TReference, TMetadata]]("exec_group"))),
 					"fragments?", unpack.Bind(thread, &fragments, unpack.List(unpack.TargetName)),
 					"initializer?", unpack.Bind(thread, &initializer, unpack.IfNotNone(unpack.Pointer(namedFunctionUnpackerInto))),
 					"outputs?", unpack.Bind(thread, &outputs, unpack.Dict(unpack.StarlarkIdentifier, unpack.String)),
+					"needs_make_variables?", unpack.Bind(thread, &needsMakeVariables, unpack.Bool),
 					"provides?", unpack.Bind(thread, &provides, unpack.List(unpack.Type[*Provider[TReference, TMetadata]]("provider"))),
 					"subrules?", unpack.Bind(thread, &subrules, unpack.List(unpack.Type[*Subrule[TReference, TMetadata]]("subrule"))),
 					"test?", unpack.Bind(thread, &test, unpack.Bool),
@@ -1320,6 +1338,24 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 
 				if err := convertFragmentsToAttr(fragments, attrs, targetTransitionDefinition); err != nil {
 					return nil, err
+				}
+
+				// Implicitly add "__default_toolchains" and
+				// "toolchains" attributes. These point to
+				// targets providing TemplateVariableInfo,
+				// which is used to populate ctx.var.
+				//
+				// To prevent dependency cyles, we shouldn't
+				// add these to rules that opt out.
+				if _, ok := attrs[defaultToolchainsAttrIdentifier]; ok {
+					return nil, fmt.Errorf("attr %#v cannot be declared explicitly", defaultToolchainsAttrIdentifier.String())
+				}
+				if _, ok := attrs[toolchainsAttrIdentifier]; ok {
+					return nil, fmt.Errorf("attr %#v cannot be declared explicitly", toolchainsAttrIdentifier.String())
+				}
+				if needsMakeVariables {
+					attrs[defaultToolchainsAttrIdentifier] = defaultToolchainsAttr
+					attrs[toolchainsAttrIdentifier] = toolchainsAttr
 				}
 
 				return NewRule(nil, NewStarlarkRuleDefinition(

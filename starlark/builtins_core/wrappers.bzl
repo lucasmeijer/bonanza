@@ -1,4 +1,5 @@
 load("@bazel_tools//fragments:fragment_info.bzl", "FragmentInfo")
+load("//:exports.bzl", "TemplateVariableInfo")
 
 def _wrap_actions(actions, bin_dir, label):
     def actions_declare_shareable_artifact(path, artifact_root = None):
@@ -33,13 +34,9 @@ def _wrap_actions(actions, bin_dir, label):
 def _wrapped_ctx_configuration(ctx):
     return ctx._real_ctx.configuration
 
-def _wrapped_ctx_var(ctx):
-    return ctx._real_ctx.var
-
 _WrappedCtx = provider(
     computed_fields = {
         "configuration": _wrapped_ctx_configuration,
-        "var": _wrapped_ctx_var,
     },
 )
 
@@ -66,7 +63,7 @@ def _wrap_rule_ctx(ctx):
         field: getattr(ctx, field)
         for field in dir(ctx)
         # TODO: Remove this once they are gone.
-        if field not in ["configuration", "var"]
+        if field != "configuration"
     } | {
         "_real_ctx": ctx,
         "actions": _wrap_actions(ctx.actions, ctx.bin_dir, ctx.label),
@@ -94,6 +91,18 @@ def _wrap_rule_ctx(ctx):
     # through ctx.toolchains.
     if "" in ctx.exec_groups:
         ctx_fields["toolchains"] = ctx.exec_groups[""].toolchains
+
+    # If the rule has attributes "__default_toolchains" and
+    # "toolchains", we should add ctx.var containing all make variables
+    # such as BINDIR and COMPILATION_MODE. This field is used by
+    # ctx.expand_make_variables().
+    if hasattr(ctx.attr, "__default_toolchains"):
+        var = {}
+        for toolchain in ctx.attr.__default_toolchains:
+            var |= toolchain[TemplateVariableInfo].variables
+        for toolchain in ctx.attr.toolchains:
+            var |= toolchain[TemplateVariableInfo].variables
+        ctx_fields["var"] = var
 
     return _WrappedCtx(**ctx_fields)
 

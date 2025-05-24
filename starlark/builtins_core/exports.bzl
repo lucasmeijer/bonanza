@@ -85,6 +85,7 @@ def _cc_libc_top_alias_impl(ctx):
 cc_libc_top_alias = rule(
     implementation = _cc_libc_top_alias_impl,
     default_exec_group = False,
+    needs_make_variables = False,
 )
 
 def _cc_proto_library_impl(ctx):
@@ -96,6 +97,7 @@ cc_proto_library = rule(
         "deps": attr.label_list(),
     },
     default_exec_group = False,
+    needs_make_variables = False,
 )
 
 def cc_toolchain_suite(**kwargs):
@@ -158,6 +160,7 @@ config_setting = rule(
     },
     default_exec_group = False,
     initializer = _config_setting_init,
+    needs_make_variables = False,
     provides = [ConfigSettingInfo],
 )
 
@@ -242,6 +245,7 @@ constraint_setting = rule(
         ),
     },
     default_exec_group = False,
+    needs_make_variables = False,
     provides = [ConstraintSettingInfo],
 )
 
@@ -272,6 +276,7 @@ constraint_value = rule(
         ),
     },
     default_exec_group = False,
+    needs_make_variables = False,
     provides = [ConfigSettingInfo, ConstraintValueInfo],
 )
 
@@ -310,6 +315,7 @@ filegroup = rule(
         "srcs": attr.label_list(allow_files = True),
     },
     default_exec_group = False,
+    needs_make_variables = False,
 )
 
 def _genrule_impl(ctx):
@@ -403,6 +409,7 @@ def _java_plugins_flag_alias_impl(ctx):
 java_plugins_flag_alias = rule(
     implementation = _java_plugins_flag_alias_impl,
     default_exec_group = False,
+    needs_make_variables = False,
 )
 
 def _java_proto_library_impl(ctx):
@@ -414,6 +421,7 @@ java_proto_library = rule(
         "deps": attr.label_list(),
     },
     default_exec_group = False,
+    needs_make_variables = False,
 )
 
 def licenses(license_types):
@@ -534,6 +542,7 @@ platform = rule(
         ),
     },
     default_exec_group = False,
+    needs_make_variables = False,
     provides = [PlatformInfo],
 )
 
@@ -548,6 +557,7 @@ sh_test = rule(
         "srcs": attr.label_list(allow_files = True),
     },
     default_exec_group = False,
+    needs_make_variables = False,
     test = True,
 )
 
@@ -560,6 +570,7 @@ test_suite = rule(
         "tests": attr.string_list(),
     },
     default_exec_group = False,
+    needs_make_variables = False,
 )
 
 def _toolchain_impl(ctx):

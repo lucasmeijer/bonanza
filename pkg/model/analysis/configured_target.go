@@ -1717,7 +1717,6 @@ type ruleContext[TReference object.BasicReference, TMetadata BaseComputerReferen
 	outputs                     starlark.Value
 	execGroups                  []ruleContextExecGroupState
 	tags                        *starlark.List
-	varDict                     *starlark.Dict
 	fragments                   map[string]*model_starlark.Struct[TReference, TMetadata]
 	outputRegistrar             *targetOutputRegistrar[TReference, TMetadata]
 	commandEncoder              model_encoding.BinaryEncoder
@@ -1851,36 +1850,6 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 		return rc.splitAttr, nil
 	case "target_platform_has_constraint":
 		return starlark.NewBuiltin("ctx.target_platform_has_constraint", rc.doTargetPlatformHasConstraint), nil
-	case "var":
-		if rc.varDict == nil {
-			configurationReference := model_core.Patch(
-				rc.environment,
-				rc.configurationReference,
-			)
-			makeVariables := rc.environment.GetMakeVariablesValue(
-				model_core.NewPatchedMessage(
-					&model_analysis_pb.MakeVariables_Key{
-						FromPackage:            rc.targetLabel.GetCanonicalPackage().String(),
-						ConfigurationReference: configurationReference.Message,
-						Toolchains:             rc.ruleTarget.Message.Toolchains,
-					},
-					model_core.MapReferenceMetadataToWalkers(configurationReference.Patcher),
-				),
-			)
-			if !makeVariables.IsSet() {
-				return nil, evaluation.ErrMissingDependency
-			}
-
-			d := starlark.NewDict(len(makeVariables.Message.Variables))
-			for _, variable := range makeVariables.Message.Variables {
-				if err := d.SetKey(thread, starlark.String(variable.Key), starlark.String(variable.Value)); err != nil {
-					return nil, err
-				}
-			}
-			d.Freeze()
-			rc.varDict = d
-		}
-		return rc.varDict, nil
 	case "version_file":
 		// TODO: Fill all of this in properly.
 		return model_starlark.NewFile[TReference, TMetadata](
@@ -1959,7 +1928,6 @@ var ruleContextAttrNames = []string{
 	"runfiles",
 	"split_attr",
 	"target_platform_has_constraint",
-	"var",
 	"version_file",
 }
 

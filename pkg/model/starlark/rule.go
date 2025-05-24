@@ -108,7 +108,7 @@ func (r *rule[TReference, TMetadata]) CallInternal(thread *starlark.Thread, args
 			case "applicable_licenses", "deprecation",
 				"exec_compatible_with", "features", "name",
 				"package_metadata", "tags", "target_compatible_with",
-				"testonly", "toolchains", "visibility":
+				"testonly", "visibility":
 				return nil, fmt.Errorf("rule uses attribute with reserved name %#v", nameStr)
 			case "build_setting_default":
 				if buildSetting != nil {
@@ -161,7 +161,6 @@ func (r *rule[TReference, TMetadata]) CallInternal(thread *starlark.Thread, args
 	var tags []string
 	var targetCompatibleWith *Select[TReference, TMetadata]
 	testOnly := defaultInheritableAttrs.Testonly
-	var toolchains []string
 	var visibility []pg_label.ResolvedLabel
 	labelUnpackerInto := NewLabelOrStringUnpackerInto[TReference, TMetadata](currentPackage)
 	labelStringListUnpackerInto := unpack.List(unpack.Stringer(labelUnpackerInto))
@@ -175,7 +174,6 @@ func (r *rule[TReference, TMetadata]) CallInternal(thread *starlark.Thread, args
 		"tags?", unpack.Bind(thread, &tags, unpack.IfNotNone(unpack.List(unpack.String))),
 		"target_compatible_with?", unpack.Bind(thread, &targetCompatibleWith, NewSelectUnpackerInto[TReference, TMetadata](unpack.Canonicalize(unpack.List(labelUnpackerInto)))),
 		"testonly?", unpack.Bind(thread, &testOnly, unpack.IfNotNone(sloppyBoolUnpackerInto{})),
-		"toolchains?", unpack.Bind(thread, &toolchains, labelStringListUnpackerInto),
 		"visibility?", unpack.Bind(thread, &visibility, unpack.IfNotNone(unpack.List(labelUnpackerInto))),
 	)
 
@@ -394,7 +392,6 @@ func (r *rule[TReference, TMetadata]) CallInternal(thread *starlark.Thread, args
 
 	sort.Strings(execCompatibleWith)
 	sort.Strings(tags)
-	sort.Strings(toolchains)
 
 	visibilityPackageGroup, err := targetRegistrar.getVisibilityPackageGroup(visibility)
 	if err != nil {
@@ -420,7 +417,6 @@ func (r *rule[TReference, TMetadata]) CallInternal(thread *starlark.Thread, args
 							Visibility:      visibilityPackageGroup.Message,
 						},
 						BuildSettingDefault: encodedBuildSettingDefault.Message,
-						Toolchains:          toolchains,
 					},
 				},
 			},
