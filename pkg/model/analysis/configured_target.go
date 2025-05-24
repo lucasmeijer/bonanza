@@ -1828,11 +1828,6 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 		return rc.file, nil
 	case "files":
 		return rc.files, nil
-	case "fragments":
-		// TODO: Remove this once ctx.configuration no longer uses this.
-		return &ruleContextFragments[TReference, TMetadata]{
-			ruleContext: rc,
-		}, nil
 	case "info_file":
 		// TODO: Fill all of this in properly.
 		return model_starlark.NewFile[TReference, TMetadata](
@@ -3083,40 +3078,6 @@ func (rca *ruleContextExecGroups[TReference, TMetadata]) Get(thread *starlark.Th
 	}), true, nil
 }
 
-type ruleContextFragments[TReference object.BasicReference, TMetadata BaseComputerReferenceMetadata] struct {
-	ruleContext *ruleContext[TReference, TMetadata]
-}
-
-var _ starlark.HasAttrs = (*ruleContextFragments[object.GlobalReference, BaseComputerReferenceMetadata])(nil)
-
-func (ruleContextFragments[TReference, TMetadata]) String() string {
-	return "<ctx.fragments>"
-}
-
-func (ruleContextFragments[TReference, TMetadata]) Type() string {
-	return "ctx.fragments"
-}
-
-func (ruleContextFragments[TReference, TMetadata]) Freeze() {
-}
-
-func (ruleContextFragments[TReference, TMetadata]) Truth() starlark.Bool {
-	return starlark.True
-}
-
-func (ruleContextFragments[TReference, TMetadata]) Hash(thread *starlark.Thread) (uint32, error) {
-	return 0, errors.New("ctx.fragments cannot be hashed")
-}
-
-func (rcf *ruleContextFragments[TReference, TMetadata]) Attr(thread *starlark.Thread, name string) (starlark.Value, error) {
-	return rcf.ruleContext.getFragment(name)
-}
-
-func (ruleContextFragments[TReference, TMetadata]) AttrNames() []string {
-	// TODO: implement.
-	return nil
-}
-
 type toolchainContext[TReference object.BasicReference, TMetadata BaseComputerReferenceMetadata] struct {
 	ruleContext    *ruleContext[TReference, TMetadata]
 	execGroupIndex int
@@ -3719,19 +3680,23 @@ func (subruleContext[TReference, TMetadata]) Hash(thread *starlark.Thread) (uint
 }
 
 func (sc *subruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name string) (starlark.Value, error) {
+	// TODO: Add subrule_ctx.toolchains.
 	rc := sc.ruleContext
 	switch name {
-	case "fragments":
-		return &ruleContextFragments[TReference, TMetadata]{
+	case "actions":
+		return &ruleContextActions[TReference, TMetadata]{
 			ruleContext: rc,
 		}, nil
+	case "label":
+		return model_starlark.NewLabel[TReference, TMetadata](rc.targetLabel.AsResolved()), nil
 	default:
 		return nil, nil
 	}
 }
 
 var subruleContextAttrNames = []string{
-	"fragments",
+	"actions",
+	"label",
 }
 
 func (subruleContext[TReference, TMetadata]) AttrNames() []string {

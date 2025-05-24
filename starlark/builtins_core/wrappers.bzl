@@ -30,20 +30,27 @@ def _wrap_actions(actions, bin_dir, label):
     }
     return struct(**actions_fields)
 
-def wrapped_ctx_configuration(ctx):
-    return ctx._real_ctx.fragments.configuration
+def _wrapped_ctx_configuration(ctx):
+    return ctx._real_ctx.configuration
 
-def wrapped_ctx_var(ctx):
+def _wrapped_ctx_var(ctx):
     return ctx._real_ctx.var
 
-WrappedCtx = provider(
+_WrappedCtx = provider(
     computed_fields = {
-        "configuration": wrapped_ctx_configuration,
-        "var": wrapped_ctx_var,
+        "configuration": _wrapped_ctx_configuration,
+        "var": _wrapped_ctx_var,
     },
 )
 
-def _wrap_ctx(ctx):
+def _maybe_add_ctx_fragments(ctx_fields, fragments):
+    if fragments:
+        ctx_fields["fragments"] = struct(**{
+            fragment.label.name: fragment[FragmentInfo]
+            for fragment in fragments
+        })
+
+def _wrap_rule_ctx(ctx):
     def ctx_coverage_instrumented(target = None):
         return False
 
@@ -71,25 +78,33 @@ def _wrap_ctx(ctx):
     if hasattr(ctx, "build_setting_value"):
         ctx_fields["build_setting_value"] = ctx.build_setting_value
 
+    # If the rule depends on one or more fragments, an attribute with
+    # name "__fragments" of type attr.label_list() is injected. The
+    # default value of this attribute will refer to targets offering a
+    # FragmentInfo. Make these available through ctx.fragments.
+    _maybe_add_ctx_fragments(ctx_fields, getattr(ctx.attr, "__fragments", []))
+
     # If the rule has a default exec group, expose its toolchains
     # through ctx.toolchains.
     if "" in ctx.exec_groups:
         ctx_fields["toolchains"] = ctx.exec_groups[""].toolchains
 
-    # If the rule depends on one or more fragments, an attribute with
-    # name "_ctx_fragments" of type attr.label_list() is injected. The
-    # default value of this attribute will refer to targets offering a
-    # FragmentInfo. Make these available through ctx.fragments.
-    if hasattr(ctx.attr, "_ctx_fragments"):
-        ctx_fields["fragments"] = struct(**{
-            fragment.label.name: fragment[FragmentInfo]
-            for fragment in ctx.attr._ctx_fragments
-        })
-
-    return WrappedCtx(**ctx_fields)
+    return _WrappedCtx(**ctx_fields)
 
 def invoke_rule(fn, ctx):
-    return fn(_wrap_ctx(ctx))
+    return fn(_wrap_rule_ctx(ctx))
 
-def invoke_subrule(fn, ctx, *args, **kwargs):
-    return fn(ctx, *args, **kwargs)
+def _wrap_subrule_ctx(ctx, fragments):
+    ctx_fields = {
+        field: getattr(ctx, field)
+        for field in dir(ctx)
+    } | {
+        "actions": _wrap_actions(ctx.actions, None, ctx.label),
+    }
+
+    _maybe_add_ctx_fragments(ctx_fields, fragments)
+
+    return struct(**ctx_fields)
+
+def invoke_subrule(fn, ctx, *args, __fragments = [], **kwargs):
+    return fn(_wrap_subrule_ctx(ctx, __fragments), *args, **kwargs)
