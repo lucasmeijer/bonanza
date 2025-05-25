@@ -319,62 +319,43 @@ filegroup = rule(
 )
 
 def _genrule_impl(ctx):
-    command_template = ctx.attr.cmd_bash or ctx.attr.cmd
+    # Determine Make variables specific to genrule().
+    outs = [out.path for out in ctx.outputs.outs]
     ruledir = "/".join([
         part
         for part in [ctx.bin_dir.path, ctx.label.workspace_root, ctx.label.package]
         if part
     ])
+    srcs = [src.path for src in ctx.files.srcs]
     additional_substitutions = {
         "@D": ctx.outputs.outs[0].path.rsplit("/", 1)[0] if len(ctx.outputs.outs) == 1 else ruledir,
+        "OUTS": " ".join(outs),
         "RULEDIR": ruledir,
-        "SRCS": " ".join([src.path for src in ctx.files.srcs]),
+        "SRCS": " ".join(srcs),
     }
-    location_targets = ctx.attr.srcs + ctx.attr.tools
+    if len(outs) == 1:
+        additional_substitutions["@"] = outs[0]
+    if len(srcs) == 1:
+        additional_substitutions["<"] = srcs[0]
 
-    def get_value(variable_name):
-        if variable_name in additional_substitutions:
-            return additional_substitutions[variable_name]
-        if variable_name in ctx.var:
-            return ctx.var[variable_name]
-        return ctx.expand_location("$(%s)" % variable_name, location_targets)
-
-    command = "source %s; " % ctx.file._genrule_setup.path
-    state = 0
-    variable_name = ""
-    for c in command_template.elems():
-        if state == 0:
-            if c == "$":
-                state = 1
-            else:
-                command += c
-        elif state == 1:
-            if c == "$":
-                command += "$"
-                state = 0
-            elif c == "(":
-                state = 2
-            elif c == "@" or c == "<" or c == "^":
-                command += get_value(c)
-                state = 0
-            else:
-                fail("unknown sequence $%s" % c)
-        elif state == 2:
-            if c == ")":
-                command += get_value(variable_name)
-                variable_name = ""
-                state = 0
-            else:
-                variable_name += c
-        else:
-            fail("bad state")
-    if state != 0:
-        fail("command terminates in the middle of a \"$\" directive")
-
-    # TODO: Make this implementation more accurate.
     ctx.actions.run(
         executable = "/bin/bash",
-        arguments = ["-c", command],
+        arguments = [
+            "-c",
+            ("source %s; " % ctx.file._genrule_setup.path) +
+            ctx.expand_make_variables(
+                "cmd",
+                ctx.expand_location(
+                    ctx.attr.cmd_bash or ctx.attr.cmd,
+                    [
+                        target
+                        for attr in [ctx.attr.srcs, ctx.attr.tools]
+                        for target in attr
+                    ],
+                ),
+                additional_substitutions,
+            ),
+        ],
         inputs = [ctx.file._genrule_setup] + ctx.files.srcs,
         tools = ctx.files.tools,
         outputs = ctx.outputs.outs,
