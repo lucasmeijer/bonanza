@@ -52,12 +52,40 @@ def _wrap_rule_ctx(ctx):
         return False
 
     def ctx_expand_location(input, targets = []):
-        # TODO: Actually expand locations!
-        return input
+        all_targets = {}
+        for target in targets:
+            executable = target.files_to_run.executable
+            files = target.files.to_list()
+            all_targets[target.label] = [executable] if executable and len(files) != 1 else files
 
-    def ctx_expand_make_variables(attribute_name, command, additional_substitutions):
-        # TODO: Actually expand variables!
-        return command
+        result = ""
+        result_until_start_of_directive = ""
+        state = 0
+        directive = ""
+        for c in input.elems():
+            if c == "$":
+                result_until_start_of_directive = result
+                result += c
+                state = 1
+            elif c == "(" and state == 1:
+                directive = ""
+                result += c
+                state = 2
+            elif c == ")" and state == 2:
+                if directive.startswith("execpath ") or directive.startswith("location "):
+                    l = ctx.label.relative(directive[9:])
+                    targets = all_targets[l]
+                    if len(targets) != 1:
+                        fail(directive, "expands to multiple files")
+                    result = result_until_start_of_directive + targets[0].path
+                else:
+                    result += c
+                state = 0
+            else:
+                directive += c
+                result += c
+
+        return result
 
     def ctx_runfiles(files = [], transitive_files = None, collect_data = False, collect_default = False, symlinks = {}, root_symlinks = {}):
         direct = ctx.runfiles(
@@ -83,7 +111,6 @@ def _wrap_rule_ctx(ctx):
         "coverage_instrumented": ctx_coverage_instrumented,
         "disabled_features": [],
         "expand_location": ctx_expand_location,
-        "expand_make_variables": ctx_expand_make_variables,
         "features": [],
         "runfiles": ctx_runfiles,
         "workspace_name": "_main",
@@ -102,14 +129,54 @@ def _wrap_rule_ctx(ctx):
 
     # If the rule has attributes "__default_toolchains" and
     # "toolchains", we should add ctx.var containing all make variables
-    # such as BINDIR and COMPILATION_MODE. This field is used by
-    # ctx.expand_make_variables().
+    # such as BINDIR and COMPILATION_MODE. With those variables in
+    # place, we may also provide ctx.expand_make_variables().
     if hasattr(ctx.attr, "__default_toolchains"):
         var = {}
         for toolchain in ctx.attr.__default_toolchains:
             var |= toolchain[TemplateVariableInfo].variables
         for toolchain in ctx.attr.toolchains:
             var |= toolchain[TemplateVariableInfo].variables
+
+        def ctx_expand_make_variables(attribute_name, command, additional_substitutions):
+            def get_value(variable_name):
+                if variable_name in additional_substitutions:
+                    return additional_substitutions[variable_name]
+                return var[variable_name]
+
+            result = ""
+            state = 0
+            variable_name = ""
+            for c in command.elems():
+                if state == 0:
+                    if c == "$":
+                        state = 1
+                    else:
+                        result += c
+                elif state == 1:
+                    if c == "(":
+                        state = 2
+                    elif c == "$":
+                        result += c
+                        state = 0
+                    else:
+                        result += get_value(c)
+                        state = 0
+                elif state == 2:
+                    if c == ")":
+                        result += get_value(variable_name)
+                        variable_name = ""
+                        state = 0
+                    else:
+                        variable_name += c
+                else:
+                    fail("bad state")
+
+            if state != 0:
+                fail("command terminates in the middle of a $ sequence")
+            return result
+
+        ctx_fields["expand_make_variables"] = ctx_expand_make_variables
         ctx_fields["var"] = var
 
     return _WrappedCtx(**ctx_fields)
