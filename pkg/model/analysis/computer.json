@@ -128,7 +128,6 @@
             "DirectoryCreationParametersObject",
             "FileCreationParametersObject",
             "ExecTransition",
-            "MakeVariables",
             "ResolvedToolchains",
             "RootModule",
             "RuleImplementationWrappers",
@@ -268,13 +267,6 @@
          "dependsOn": [
             "FileCreationParametersObject"
          ]
-      },
-      "MakeVariables": {
-         "dependsOn": [
-            "ConfiguredTarget",
-            "VisibleTarget"
-         ],
-         "keyContainsReferences": true
       },
       "ModuleDotBazelContents": {
          "dependsOn": [
