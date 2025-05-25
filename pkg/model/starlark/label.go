@@ -55,6 +55,35 @@ func (l Label[TReference, TMetadata]) Attr(thread *starlark.Thread, name string)
 		return starlark.String(l.value.GetTargetName().String()), nil
 	case "package":
 		return starlark.String(l.value.GetPackagePath()), nil
+	case "relative":
+		// Even though Bazel documents this function as being
+		// deprecated, we provide it regardless. Functions like
+		// ctx.expand_location() need to resolve labels relative
+		// to ctx.label. native.package_relative_label() would
+		// be an obvious fit for this, but it is explicitly
+		// documented that this function cannot be called from a
+		// rule implementation function.
+		return starlark.NewBuiltin(
+			"Label.relative",
+			func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+				canonicalLabel, err := l.value.AsCanonical()
+				if err != nil {
+					return nil, err
+				}
+
+				if len(args) != 1 {
+					return nil, fmt.Errorf("%s: got %d positional arguments, want 1", b.Name(), len(args))
+				}
+				var relName pg_label.ResolvedLabel
+				if err := starlark.UnpackArgs(
+					b.Name(), args, kwargs,
+					"relName", unpack.Bind(thread, &relName, NewLabelOrStringUnpackerInto[TReference, TMetadata](canonicalLabel.GetCanonicalPackage())),
+				); err != nil {
+					return nil, err
+				}
+				return NewLabel[TReference, TMetadata](relName), nil
+			},
+		), nil
 	case "repo_name":
 		canonicalLabel, err := l.value.AsCanonical()
 		if err != nil {
@@ -93,6 +122,7 @@ func (l Label[TReference, TMetadata]) Attr(thread *starlark.Thread, name string)
 var labelAttrNames = []string{
 	"name",
 	"package",
+	"relative",
 	"repo_name",
 	"same_package_label",
 	"workspace_root",
