@@ -1933,7 +1933,7 @@ var ruleContextAttrNames = []string{
 
 func (rc *ruleContext[TReference, TMetadata]) AttrNames() []string {
 	attrNames := append([]string(nil), ruleContextAttrNames...)
-	if rc.buildSettingValue != nil {
+	if rc.ruleTarget.Message.BuildSettingDefault != nil {
 		attrNames = append(attrNames, "build_setting_value")
 	}
 	return attrNames

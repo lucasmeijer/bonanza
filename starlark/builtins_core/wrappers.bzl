@@ -76,11 +76,6 @@ def _wrap_rule_ctx(ctx):
         "workspace_name": "_main",
     }
 
-    # Build settings are only available for rules for which
-    # build_setting was set.
-    if hasattr(ctx, "build_setting_value"):
-        ctx_fields["build_setting_value"] = ctx.build_setting_value
-
     # If the rule depends on one or more fragments, an attribute with
     # name "__fragments" of type attr.label_list() is injected. The
     # default value of this attribute will refer to targets offering a
