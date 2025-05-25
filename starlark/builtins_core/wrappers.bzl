@@ -59,6 +59,18 @@ def _wrap_rule_ctx(ctx):
         # TODO: Actually expand variables!
         return command
 
+    def ctx_runfiles(files = [], transitive_files = None, collect_data = False, collect_default = False, symlinks = {}, root_symlinks = {}):
+        direct = ctx.runfiles(
+            files = files,
+            transitive_files = transitive_files,
+            symlinks = symlinks,
+            root_symlinks = root_symlinks,
+        )
+        if collect_data or collect_default:
+            # TODO: Implement this feature!
+            pass
+        return direct
+
     ctx_fields = {
         field: getattr(ctx, field)
         for field in dir(ctx)
@@ -73,6 +85,7 @@ def _wrap_rule_ctx(ctx):
         "expand_location": ctx_expand_location,
         "expand_make_variables": ctx_expand_make_variables,
         "features": [],
+        "runfiles": ctx_runfiles,
         "workspace_name": "_main",
     }
 

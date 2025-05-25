@@ -1965,8 +1965,6 @@ func toSymlinkEntryDepset[TReference object.BasicReference, TMetadata BaseComput
 func (ruleContext[TReference, TMetadata]) doRunfiles(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var files []starlark.Value
 	var transitiveFiles *model_starlark.Depset[TReference, TMetadata]
-	collectData := false
-	collectDefault := false
 	var symlinks any
 	var rootSymlinks any
 	symlinksUnpackerInto := unpack.Or([]unpack.UnpackerInto[any]{
@@ -1977,8 +1975,6 @@ func (ruleContext[TReference, TMetadata]) doRunfiles(thread *starlark.Thread, b 
 		b.Name(), args, kwargs,
 		"files?", unpack.Bind(thread, &files, unpack.List(unpack.Canonicalize(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File")))),
 		"transitive_files?", unpack.Bind(thread, &transitiveFiles, unpack.IfNotNone(unpack.Type[*model_starlark.Depset[TReference, TMetadata]]("depset"))),
-		"collect_data?", unpack.Bind(thread, &collectData, unpack.Bool),
-		"collect_default?", unpack.Bind(thread, &collectDefault, unpack.Bool),
 		"symlinks?", unpack.Bind(thread, &symlinks, symlinksUnpackerInto),
 		"root_symlinks?", unpack.Bind(thread, &rootSymlinks, symlinksUnpackerInto),
 	); err != nil {
@@ -1997,10 +1993,6 @@ func (ruleContext[TReference, TMetadata]) doRunfiles(thread *starlark.Thread, b 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create files depset: %w", err)
 	}
-
-	// TODO: Handle collect_data and collect_default. Or should we
-	// deprecate these options entirely and require that the caller
-	// uses merge_all() properly?
 
 	return model_starlark.NewRunfiles(
 		filesDepset,
