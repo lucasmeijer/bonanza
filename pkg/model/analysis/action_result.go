@@ -19,6 +19,7 @@ import (
 	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
 	remoteexecution_pb "github.com/buildbarn/bonanza/pkg/proto/remoteexecution"
 	"github.com/buildbarn/bonanza/pkg/storage/dag"
+	"github.com/buildbarn/bonanza/pkg/storage/object"
 
 	"google.golang.org/grpc/status"
 )
@@ -103,22 +104,24 @@ func (c *baseComputer[TReference, TMetadata]) ComputeActionResultValue(ctx conte
 	return model_core.NewPatchedMessage(result, patcher), nil
 }
 
-func (c *baseComputer[TReference, TMetadata]) convertDictToEnvironmentVariableList(environment map[string]string, commandEncoder model_encoding.BinaryEncoder) (model_core.PatchedMessage[[]*model_command_pb.EnvironmentVariableList_Element, dag.ObjectContentsWalker], error) {
+func convertDictToEnvironmentVariableList[TMetadata model_core.ReferenceMetadata](
+	environment map[string]string,
+	commandEncoder model_encoding.BinaryEncoder,
+	referenceFormat object.ReferenceFormat,
+	capturer model_core.CreatedObjectCapturer[TMetadata],
+) (model_core.PatchedMessage[[]*model_command_pb.EnvironmentVariableList_Element, TMetadata], error) {
 	environmentVariablesBuilder := btree.NewSplitProllyBuilder(
 		1<<16,
 		1<<18,
 		btree.NewObjectCreatingNodeMerger(
 			commandEncoder,
-			c.getReferenceFormat(),
-			/* parentNodeComputer = */ func(createdObject model_core.Decodable[model_core.CreatedObject[dag.ObjectContentsWalker]], childNodes []*model_command_pb.EnvironmentVariableList_Element) (model_core.PatchedMessage[*model_command_pb.EnvironmentVariableList_Element, dag.ObjectContentsWalker], error) {
-				patcher := model_core.NewReferenceMessagePatcher[dag.ObjectContentsWalker]()
+			referenceFormat,
+			/* parentNodeComputer = */ func(createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]], childNodes []*model_command_pb.EnvironmentVariableList_Element) (model_core.PatchedMessage[*model_command_pb.EnvironmentVariableList_Element, TMetadata], error) {
+				patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
 				return model_core.NewPatchedMessage(
 					&model_command_pb.EnvironmentVariableList_Element{
 						Level: &model_command_pb.EnvironmentVariableList_Element_Parent{
-							Parent: patcher.CaptureAndAddDecodableReference(
-								createdObject,
-								model_core.WalkableCreatedObjectCapturer,
-							),
+							Parent: patcher.CaptureAndAddDecodableReference(createdObject, capturer),
 						},
 					},
 					patcher,
@@ -128,7 +131,7 @@ func (c *baseComputer[TReference, TMetadata]) convertDictToEnvironmentVariableLi
 	)
 	for _, name := range slices.Sorted(maps.Keys(environment)) {
 		if err := environmentVariablesBuilder.PushChild(
-			model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](&model_command_pb.EnvironmentVariableList_Element{
+			model_core.NewSimplePatchedMessage[TMetadata](&model_command_pb.EnvironmentVariableList_Element{
 				Level: &model_command_pb.EnvironmentVariableList_Element_Leaf_{
 					Leaf: &model_command_pb.EnvironmentVariableList_Element_Leaf{
 						Name:  name,
@@ -137,7 +140,7 @@ func (c *baseComputer[TReference, TMetadata]) convertDictToEnvironmentVariableLi
 				},
 			}),
 		); err != nil {
-			return model_core.PatchedMessage[[]*model_command_pb.EnvironmentVariableList_Element, dag.ObjectContentsWalker]{}, err
+			return model_core.PatchedMessage[[]*model_command_pb.EnvironmentVariableList_Element, TMetadata]{}, err
 		}
 	}
 	return environmentVariablesBuilder.FinalizeList()

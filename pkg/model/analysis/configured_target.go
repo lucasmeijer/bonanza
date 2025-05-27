@@ -2579,6 +2579,16 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 		return nil, err
 	}
 
+	envList, err := convertDictToEnvironmentVariableList(
+		env,
+		rc.commandEncoder,
+		valueEncodingOptions.ObjectReferenceFormat,
+		rc.environment,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	execGroups := rc.ruleDefinition.Message.ExecGroups
 	execGroupIndex, ok := sort.Find(
 		len(execGroups),
@@ -2708,6 +2718,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 					externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
 				) {
 					actionDefinition.Message.PlatformPkixPublicKey = rc.execGroups[execGroupIndex].platformPkixPublicKey
+					actionDefinition.Message.UseDefaultShellEnv = useDefaultShellEnv
 				},
 			},
 			// Fields that can be stored externally if needed.
@@ -2723,6 +2734,21 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 					// TODO: This should push out the
 					// arguments if they get too big.
 					actionDefinition.Message.Arguments = argsList.Message
+				},
+			},
+			{
+				ExternalMessage: model_core.NewPatchedMessage(
+					(proto.Message)(nil),
+					envList.Patcher,
+				),
+				ParentAppender: func(
+					actionDefinition model_core.PatchedMessage[*model_analysis_pb.TargetActionDefinition, TMetadata],
+					externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
+				) {
+					// TODO: This should push out the
+					// environment variables if they get
+					// too big.
+					actionDefinition.Message.Env = envList.Message
 				},
 			},
 			{

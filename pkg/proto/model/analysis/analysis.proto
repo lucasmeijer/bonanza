@@ -434,6 +434,16 @@ message TargetActionDefinition {
   // write to output file "a/b.txt", the initial output directory will
   // contain an empty directory named "a".
   bonanza.model.filesystem.Directory initial_output_directory = 6;
+
+  // Additional environments that need to be present when executing the
+  // action. These have a higher precedence than the ones provided by
+  // use_default_shell_env or configured on workers.
+  repeated bonanza.model.command.EnvironmentVariableList.Element env = 7;
+
+  // If set, use the default shell environment, which consists of a few
+  // operating system dependent variables as well as variables set via
+  // --action_env.
+  bool use_default_shell_env = 8;
 }
 
 message ConfiguredTarget {

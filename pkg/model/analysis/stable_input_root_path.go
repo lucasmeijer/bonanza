@@ -43,12 +43,17 @@ func (c *baseComputer[TReference, TMetadata]) ComputeStableInputRootPathValue(ct
 	for _, environmentVariable := range repoPlatform.Message.RepositoryOsEnviron {
 		environment[environmentVariable.Name] = environmentVariable.Value
 	}
-	environmentVariableList, err := c.convertDictToEnvironmentVariableList(environment, commandEncoder)
+	referenceFormat := c.getReferenceFormat()
+	environmentVariableList, err := convertDictToEnvironmentVariableList(
+		environment,
+		commandEncoder,
+		referenceFormat,
+		model_core.WalkableCreatedObjectCapturer,
+	)
 	if err != nil {
 		return PatchedStableInputRootPathValue{}, err
 	}
 
-	referenceFormat := c.getReferenceFormat()
 	createdCommand, err := model_core.MarshalAndEncodePatchedMessage(
 		model_core.NewPatchedMessage(
 			&model_command_pb.Command{

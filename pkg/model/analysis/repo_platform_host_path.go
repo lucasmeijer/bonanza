@@ -46,7 +46,12 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRepoPlatformHostPathValue(c
 		}
 	}
 	referenceFormat := c.getReferenceFormat()
-	environmentVariableList, err := c.convertDictToEnvironmentVariableList(environment, commandEncoder)
+	environmentVariableList, err := convertDictToEnvironmentVariableList(
+		environment,
+		commandEncoder,
+		referenceFormat,
+		model_core.WalkableCreatedObjectCapturer,
+	)
 	if err != nil {
 		return PatchedRepoPlatformHostPathValue{}, err
 	}

@@ -1732,7 +1732,12 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 		return nil, err
 	}
 
-	environmentVariableList, err := mrc.computer.convertDictToEnvironmentVariableList(environment, mrc.commandEncoder)
+	environmentVariableList, err := convertDictToEnvironmentVariableList(
+		environment,
+		mrc.commandEncoder,
+		referenceFormat,
+		model_core.WalkableCreatedObjectCapturer,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -2125,7 +2130,12 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doRead(thread *star
 		}
 	}
 	referenceFormat := mrc.computer.getReferenceFormat()
-	environmentVariableList, err := mrc.computer.convertDictToEnvironmentVariableList(environment, mrc.commandEncoder)
+	environmentVariableList, err := convertDictToEnvironmentVariableList(
+		environment,
+		mrc.commandEncoder,
+		referenceFormat,
+		model_core.WalkableCreatedObjectCapturer,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -2262,12 +2272,17 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doWhich(thread *sta
 	for _, environmentVariable := range mrc.repoPlatform.Message.RepositoryOsEnviron {
 		environment[environmentVariable.Name] = environmentVariable.Value
 	}
-	environmentVariableList, err := mrc.computer.convertDictToEnvironmentVariableList(environment, mrc.commandEncoder)
+	referenceFormat := mrc.computer.getReferenceFormat()
+	environmentVariableList, err := convertDictToEnvironmentVariableList(
+		environment,
+		mrc.commandEncoder,
+		referenceFormat,
+		model_core.WalkableCreatedObjectCapturer,
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	referenceFormat := mrc.computer.getReferenceFormat()
 	createdCommand, err := model_core.MarshalAndEncodePatchedMessage(
 		model_core.NewPatchedMessage(
 			&model_command_pb.Command{
@@ -2441,7 +2456,12 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) Exists(p *model_sta
 		}
 	}
 	referenceFormat := mrc.computer.getReferenceFormat()
-	environmentVariableList, err := mrc.computer.convertDictToEnvironmentVariableList(environment, mrc.commandEncoder)
+	environmentVariableList, err := convertDictToEnvironmentVariableList(
+		environment,
+		mrc.commandEncoder,
+		referenceFormat,
+		model_core.WalkableCreatedObjectCapturer,
+	)
 	if err != nil {
 		return false, err
 	}
@@ -2569,7 +2589,12 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) Readdir(p *model_st
 		}
 	}
 	referenceFormat := mrc.computer.getReferenceFormat()
-	environmentVariableList, err := mrc.computer.convertDictToEnvironmentVariableList(environment, mrc.commandEncoder)
+	environmentVariableList, err := convertDictToEnvironmentVariableList(
+		environment,
+		mrc.commandEncoder,
+		referenceFormat,
+		model_core.WalkableCreatedObjectCapturer,
+	)
 	if err != nil {
 		return nil, err
 	}
