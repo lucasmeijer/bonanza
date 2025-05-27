@@ -73,6 +73,44 @@ func Patch[
 	)
 }
 
+// PatchList is identical to Patch(), except that it patches a list of
+// messages.
+func PatchList[
+	TMessage any,
+	TMessagePtr interface {
+		*TMessage
+		proto.Message
+	},
+	TMetadata ReferenceMetadata,
+	TReference object.BasicReference,
+](
+	capturer ExistingObjectCapturer[TReference, TMetadata],
+	existingList Message[[]*TMessage, TReference],
+) PatchedMessage[[]*TMessage, TMetadata] {
+	patcher := NewReferenceMessagePatcher[TMetadata]()
+	if existingList.OutgoingReferences.GetDegree() == 0 {
+		return NewPatchedMessage(existingList.Message, patcher)
+	}
+
+	a := referenceMessageAdder[TMetadata, TReference]{
+		patcher:            patcher,
+		outgoingReferences: existingList.OutgoingReferences,
+		createMetadata: func(index int) TMetadata {
+			return capturer.CaptureExistingObject(
+				existingList.OutgoingReferences.GetOutgoingReference(index),
+			)
+		},
+	}
+
+	newList := make([]*TMessage, 0, len(existingList.Message))
+	for _, element := range existingList.Message {
+		clonedElement := proto.Clone(TMessagePtr(element))
+		a.addReferenceMessagesRecursively(clonedElement.ProtoReflect())
+		newList = append(newList, clonedElement.(TMessagePtr))
+	}
+	return NewPatchedMessage(newList, patcher)
+}
+
 type ObjectReferencer[TReference, TMetadata any] interface {
 	ReferenceObject(object.LocalReference, TMetadata) TReference
 }

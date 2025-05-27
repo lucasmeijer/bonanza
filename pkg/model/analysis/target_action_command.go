@@ -480,6 +480,9 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionCommandValue(ct
 		return PatchedTargetActionCommandValue{}, err
 	}
 
+	// TODO: Also respect use_default_shell_env.
+	environmentVariablesList := model_core.PatchList(e, model_core.Nested(action, actionDefinition.Env))
+
 	// The provided output path pattern is relative to the output
 	// directory of the current configuration and package. Prepend
 	// pathname components to make it relative to the input root.
@@ -559,6 +562,21 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionCommandValue(ct
 					// TODO: This should push out the
 					// arguments if they get too big.
 					command.Message.Arguments = argumentsList.Message
+				},
+			},
+			{
+				ExternalMessage: model_core.NewPatchedMessage(
+					(proto.Message)(nil),
+					environmentVariablesList.Patcher,
+				),
+				ParentAppender: func(
+					command model_core.PatchedMessage[*model_command_pb.Command, TMetadata],
+					externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
+				) {
+					// TODO: This should push out
+					// the environment variables if
+					// they get too big.
+					command.Message.EnvironmentVariables = environmentVariablesList.Message
 				},
 			},
 			{
