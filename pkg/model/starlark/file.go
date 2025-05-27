@@ -176,26 +176,18 @@ func (f *File[TReference, TMetadata]) Attr(thread *starlark.Thread, name string)
 		}
 		return starlark.String(p), nil
 	case "root":
-		canonicalLabel, err := pg_label.NewCanonicalLabel(d.Label)
-		if err != nil {
-			return nil, fmt.Errorf("invalid canonical label %#v: %w", d.Label, err)
-		}
 		parts, err := appendFileOwnerToPath(f.definition, make([]string, 0, 6))
 		if err != nil {
 			return nil, err
 		}
+		rootPath := ""
+		if len(parts) > 0 {
+			rootPath = go_path.Join(parts...)
+		}
 		return newStructFromLists[TReference, TMetadata](
 			nil,
 			[]string{"path"},
-			[]any{
-				starlark.String(go_path.Join(
-					append(
-						parts,
-						ComponentStrExternal,
-						canonicalLabel.GetCanonicalRepo().String(),
-					)...,
-				)),
-			},
+			[]any{starlark.String(rootPath)},
 		), nil
 	case "short_path":
 		canonicalLabel, err := pg_label.NewCanonicalLabel(d.Label)
