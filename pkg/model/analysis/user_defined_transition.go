@@ -287,7 +287,7 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 				c.discardingObjectCapturer,
 				expectedOutput.defaultValue,
 			).SortAndSetReferences()
-			if !model_core.MessagesEqual(sortedEncodedValue, sortedDefaultValue) {
+			if !model_core.TopLevelMessagesEqual(sortedEncodedValue, sortedDefaultValue) {
 				treeBuilder.PushChild(
 					model_core.NewPatchedMessage(
 						&model_analysis_pb.BuildSettingOverride{

@@ -103,10 +103,10 @@ func UnmarshalTopLevelMessage[
 	return NewTopLevelMessage(TMessagePtr(&m), outgoingReferences), nil
 }
 
-// MessagesEqual returns true if two top-level messages contain the same
-// data. This function can only be called against top-level messages, as
-// only those consistently number any outgoing references.
-func MessagesEqual[
+// TopLevelMessagesEqual returns true if two top-level messages contain
+// the same data. This function can only be called against top-level
+// messages, as only those consistently number any outgoing references.
+func TopLevelMessagesEqual[
 	TMessage proto.Message,
 	TReference1, TReference2 object.BasicReference,
 ](m1 TopLevelMessage[TMessage, TReference1], m2 TopLevelMessage[TMessage, TReference2]) bool {

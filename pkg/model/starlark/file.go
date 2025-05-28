@@ -77,7 +77,7 @@ func (f *File[TReference, TMetadata]) equals(other *File[TReference, TMetadata])
 		capturer := model_core.NewDiscardingObjectCapturer[TReference]()
 		f1, _ := model_core.Patch(capturer, f.definition).SortAndSetReferences()
 		f2, _ := model_core.Patch(capturer, other.definition).SortAndSetReferences()
-		if !model_core.MessagesEqual(f1, f2) {
+		if !model_core.TopLevelMessagesEqual(f1, f2) {
 			return false
 		}
 	}
