@@ -218,25 +218,28 @@ func (d *changeTrackingDirectory[TReference, TMetadata]) mergeContents(contents 
 			return fmt.Errorf("directory %#v has an invalid name", directory.Name)
 		}
 
+		newDirectory := model_core.Nested(contents, directory.Directory)
 		if _, ok := d.files[name]; ok {
 			return fmt.Errorf("directory %#v conflicts with an existing file", name.String())
 		} else if _, ok := d.symlinks[name]; ok {
 			return fmt.Errorf("directory %#v conflicts with an existing symbolic link", name.String())
 		} else if child, ok := d.directories[name]; ok {
-			childMessage, err := model_filesystem.DirectoryGetContents(
-				options.context,
-				options.directoryContentsReader,
-				model_core.Nested(contents, directory.Directory),
-			)
-			if err != nil {
-				return err
-			}
-			if err := child.mergeContents(childMessage, options); err != nil {
-				return err
+			// Recurse into the already existing directory
+			// to merge their contents. We can skip this if
+			// the existing directory is backed by the same
+			// message contents.
+			if !child.unmodifiedDirectory.IsSet() || !model_core.MessagesEqual(child.unmodifiedDirectory, newDirectory) {
+				childMessage, err := model_filesystem.DirectoryGetContents(options.context, options.directoryContentsReader, newDirectory)
+				if err != nil {
+					return err
+				}
+				if err := child.mergeContents(childMessage, options); err != nil {
+					return err
+				}
 			}
 		} else {
 			d.setDirectorySimple(name, &changeTrackingDirectory[TReference, TMetadata]{
-				unmodifiedDirectory: model_core.Nested(contents, directory.Directory),
+				unmodifiedDirectory: newDirectory,
 			})
 		}
 	}

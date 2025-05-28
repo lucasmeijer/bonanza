@@ -162,3 +162,22 @@ func UnmarshalAnyNew[TReference any](m Message[*model_core_pb.Any, TReference]) 
 	}
 	return UnmarshalTopLevelAnyNew(flattened)
 }
+
+// MessagesEqual returns true if two messages contain the same data.
+//
+// Nested messages belonging to different objects may contain the same
+// data, but use different reference numbers. This function therefore
+// needs to convert the provided messages to top-level messages, which
+// is expensive. We therefore compare the message size first.
+func MessagesEqual[
+	TMessage proto.Message,
+	TReference1, TReference2 object.BasicReference,
+](m1 Message[TMessage, TReference1], m2 Message[TMessage, TReference2]) bool {
+	if marshalOptions.Size(m1.Message) != marshalOptions.Size(m2.Message) {
+		return false
+	}
+
+	tlm1, _ := Patch(NewDiscardingObjectCapturer[TReference1](), m1).SortAndSetReferences()
+	tlm2, _ := Patch(NewDiscardingObjectCapturer[TReference2](), m2).SortAndSetReferences()
+	return TopLevelMessagesEqual(tlm1, tlm2)
+}
