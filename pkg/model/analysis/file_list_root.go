@@ -74,7 +74,7 @@ func addFilesToChangeTrackingDirectory[TReference object.BasicReference, TMetada
 			return errors.New("invalid list level type")
 		}
 		if err := out.mergeContents(root, loadOptions); err != nil {
-			return fmt.Errorf("failed to merge child %d", i)
+			return fmt.Errorf("list element at index %d: %w", i, err)
 		}
 	}
 	if missingDependencies {
