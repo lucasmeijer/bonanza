@@ -1755,12 +1755,12 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 	case "attr":
 		return rc.attr, nil
 	case "bin_dir":
-		binDir, err := rc.getBinDir()
+		configurationComponent, err := model_starlark.ConfigurationReferenceToComponent(rc.configurationReference)
 		if err != nil {
 			return nil, err
 		}
 		return model_starlark.NewStructFromDict[TReference, TMetadata](nil, map[string]any{
-			"path": starlark.String(binDir),
+			"path": starlark.String(model_starlark.ComponentStrBazelOut + "/" + configurationComponent + "/" + model_starlark.ComponentStrBin),
 		}), nil
 	case "build_setting_value":
 		if rc.buildSettingValue == nil {
@@ -1864,14 +1864,6 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 	default:
 		return nil, nil
 	}
-}
-
-func (rc *ruleContext[TReference, TMetadata]) getBinDir() (string, error) {
-	configurationComponent, err := model_starlark.ConfigurationReferenceToComponent(rc.configurationReference)
-	if err != nil {
-		return "", err
-	}
-	return model_starlark.ComponentStrBazelOut + "/" + configurationComponent + "/" + model_starlark.ComponentStrBin, nil
 }
 
 func (rc *ruleContext[TReference, TMetadata]) getFragment(name string) (starlark.Value, error) {
