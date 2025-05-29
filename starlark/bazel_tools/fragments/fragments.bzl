@@ -35,6 +35,7 @@ apple_fragment = rule(
         "_watchos_sdk_version": attr.label(default = "//command_line_option:watchos_sdk_version"),
         "_xcode_version": attr.label(default = "//command_line_option:xcode_version"),
     },
+    needs = [],
 )
 
 def _bazel_py_fragment_impl(ctx):
@@ -49,6 +50,7 @@ bazel_py_fragment = rule(
         "_python_import_all_repositories": attr.label(default = "//command_line_option:experimental_python_import_all_repositories"),
         "_python_path": attr.label(default = "//command_line_option:python_path"),
     },
+    needs = [],
 )
 
 def _configuration_fragment_impl(ctx):
@@ -76,6 +78,7 @@ configuration_fragment = rule(
         "_merge_genfiles_directory": attr.label(default = "//command_line_option:incompatible_merge_genfiles_directory"),
         "_stamp": attr.label(default = "//command_line_option:stamp"),
     },
+    needs = [],
 )
 
 def _cpp_fragment_impl(ctx):
@@ -173,6 +176,7 @@ cpp_fragment = rule(
         "_stripopt": attr.label(default = "//command_line_option:stripopt"),
         "_use_specific_tool_files": attr.label(default = "//command_line_option:incompatible_use_specific_tool_files"),
     },
+    needs = [],
 )
 
 def _java_fragment_impl(ctx):
@@ -192,6 +196,7 @@ java_fragment = rule(
         "_disallow_java_import_exports": attr.label(default = "//command_line_option:incompatible_disallow_java_import_exports"),
         "_use_ijars": attr.label(default = "//command_line_option:use_ijars"),
     },
+    needs = [],
 )
 
 def _platform_fragment_impl(ctx):
@@ -212,6 +217,7 @@ platform_fragment = rule(
             default = "//command_line_option:platforms",
         ),
     },
+    needs = ["default_exec_group"],
 )
 
 def _proto_fragment_impl(ctx):
@@ -224,6 +230,7 @@ proto_fragment = rule(
     attrs = {
         "_protocopt": attr.label(default = "//command_line_option:protocopt"),
     },
+    needs = [],
 )
 
 def _py_fragment_impl(ctx):
@@ -240,4 +247,5 @@ py_fragment = rule(
         "_default_to_explicit_init_py": attr.label(default = "//command_line_option:incompatible_default_to_explicit_init_py"),
         "_use_python_toolchains": attr.label(default = "//command_line_option:incompatible_use_python_toolchains"),
     },
+    needs = [],
 )

@@ -13,5 +13,5 @@ default_make_variables = rule(
         "_compilation_mode": attr.label(default = "//command_line_option:compilation_mode"),
         "_cpu": attr.label(default = "//command_line_option:cpu"),
     },
-    needs_make_variables = False,
+    needs = [],
 )

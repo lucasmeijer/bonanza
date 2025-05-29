@@ -6,33 +6,25 @@ def _simple_impl(ctx):
 bool_flag = rule(
     implementation = _simple_impl,
     build_setting = config.bool(flag = True),
-    needs_default_exec_group = False,
-    needs_make_variables = False,
-    needs_target_platform = False,
+    needs = [],
 )
 
 int_flag = rule(
     implementation = _simple_impl,
     build_setting = config.int(flag = True),
-    needs_default_exec_group = False,
-    needs_make_variables = False,
-    needs_target_platform = False,
+    needs = [],
 )
 
 label_list_flag = rule(
     implementation = _simple_impl,
     build_setting = config.label_list(flag = True),
-    needs_default_exec_group = False,
-    needs_make_variables = False,
-    needs_target_platform = False,
+    needs = [],
 )
 
 string_list_flag = rule(
     implementation = _simple_impl,
     build_setting = config.string_list(flag = True),
-    needs_default_exec_group = False,
-    needs_make_variables = False,
-    needs_target_platform = False,
+    needs = [],
 )
 
 def _string_impl(ctx):
@@ -46,7 +38,5 @@ string_flag = rule(
         "values": attr.string_list(),
     },
     build_setting = config.string(flag = True),
-    needs_default_exec_group = False,
-    needs_make_variables = False,
-    needs_target_platform = False,
+    needs = [],
 )

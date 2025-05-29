@@ -84,9 +84,7 @@ def _cc_libc_top_alias_impl(ctx):
 
 cc_libc_top_alias = rule(
     implementation = _cc_libc_top_alias_impl,
-    needs_default_exec_group = False,
-    needs_make_variables = False,
-    needs_target_platform = False,
+    needs = [],
 )
 
 def _cc_proto_library_impl(ctx):
@@ -97,9 +95,7 @@ cc_proto_library = rule(
     attrs = {
         "deps": attr.label_list(),
     },
-    needs_default_exec_group = False,
-    needs_make_variables = False,
-    needs_target_platform = False,
+    needs = [],
 )
 
 def cc_toolchain_suite(**kwargs):
@@ -161,9 +157,7 @@ config_setting = rule(
         "values": attr.string_dict(),
     },
     initializer = _config_setting_init,
-    needs_default_exec_group = False,
-    needs_make_variables = False,
-    needs_target_platform = False,
+    needs = [],
     provides = [ConfigSettingInfo],
 )
 
@@ -247,9 +241,7 @@ constraint_setting = rule(
             providers = [ConstraintValueInfo],
         ),
     },
-    needs_default_exec_group = False,
-    needs_make_variables = False,
-    needs_target_platform = False,
+    needs = [],
     provides = [ConstraintSettingInfo],
 )
 
@@ -279,9 +271,7 @@ constraint_value = rule(
             providers = [ConstraintSettingInfo],
         ),
     },
-    needs_default_exec_group = False,
-    needs_make_variables = False,
-    needs_target_platform = False,
+    needs = [],
     provides = [ConfigSettingInfo, ConstraintValueInfo],
 )
 
@@ -319,9 +309,7 @@ filegroup = rule(
         "output_group": attr.string(),
         "srcs": attr.label_list(allow_files = True),
     },
-    needs_default_exec_group = False,
-    needs_make_variables = False,
-    needs_target_platform = False,
+    needs = [],
 )
 
 def _genrule_impl(ctx):
@@ -388,6 +376,10 @@ genrule = rule(
             default = "@bazel_tools//tools/genrule:genrule-setup.sh",
         ),
     },
+    needs = [
+        "default_exec_group",
+        "make_variables",
+    ],
 )
 
 def _java_plugins_flag_alias_impl(ctx):
@@ -395,9 +387,7 @@ def _java_plugins_flag_alias_impl(ctx):
 
 java_plugins_flag_alias = rule(
     implementation = _java_plugins_flag_alias_impl,
-    needs_default_exec_group = False,
-    needs_make_variables = False,
-    needs_target_platform = False,
+    needs = [],
 )
 
 def _java_proto_library_impl(ctx):
@@ -408,9 +398,7 @@ java_proto_library = rule(
     attrs = {
         "deps": attr.label_list(),
     },
-    needs_default_exec_group = False,
-    needs_make_variables = False,
-    needs_target_platform = False,
+    needs = [],
 )
 
 def licenses(license_types):
@@ -530,9 +518,7 @@ platform = rule(
             """,
         ),
     },
-    needs_default_exec_group = False,
-    needs_make_variables = False,
-    needs_target_platform = False,
+    needs = [],
     provides = [PlatformInfo],
 )
 
@@ -546,9 +532,7 @@ sh_test = rule(
         "deps": attr.label_list(),
         "srcs": attr.label_list(allow_files = True),
     },
-    needs_default_exec_group = False,
-    needs_make_variables = False,
-    needs_target_platform = False,
+    needs = [],
     test = True,
 )
 
@@ -560,9 +544,7 @@ test_suite = rule(
     attrs = {
         "tests": attr.string_list(),
     },
-    needs_default_exec_group = False,
-    needs_make_variables = False,
-    needs_target_platform = False,
+    needs = [],
 )
 
 def _toolchain_impl(ctx):
@@ -592,9 +574,7 @@ toolchain = rule(
             providers = [ToolchainTypeInfo],
         ),
     },
-    needs_default_exec_group = False,
-    needs_make_variables = False,
-    needs_target_platform = False,
+    needs = [],
     provides = [DeclaredToolchainInfo],
 )
 
@@ -605,9 +585,7 @@ def _toolchain_type_impl(ctx):
 
 toolchain_type = rule(
     implementation = _toolchain_type_impl,
-    needs_default_exec_group = False,
-    needs_make_variables = False,
-    needs_target_platform = False,
+    needs = [],
     provides = [ToolchainTypeInfo],
 )
 

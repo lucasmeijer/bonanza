@@ -43,8 +43,6 @@ import (
 var (
 	constraintValueInfoProviderIdentifier      = label.MustNewCanonicalStarlarkIdentifier("@@builtins_core+//:exports.bzl%ConstraintValueInfo")
 	defaultInfoProviderIdentifier              = label.MustNewCanonicalStarlarkIdentifier("@@builtins_core+//:exports.bzl%DefaultInfo")
-	fragmentInfoProviderIdentifier             = label.MustNewCanonicalStarlarkIdentifier("@@bazel_tools+//fragments:fragment_info.bzl%FragmentInfo")
-	fragmentsPackage                           = label.MustNewCanonicalPackage("@@bazel_tools+//fragments")
 	packageSpecificationInfoProviderIdentifier = label.MustNewCanonicalStarlarkIdentifier("@@builtins_core+//:exports.bzl%PackageSpecificationInfo")
 	toolchainInfoProviderIdentifier            = label.MustNewCanonicalStarlarkIdentifier("@@builtins_core+//:exports.bzl%ToolchainInfo")
 	filesToRunProviderIdentifier               = label.MustNewCanonicalStarlarkIdentifier("@@builtins_core+//:exports.bzl%FilesToRunProvider")
@@ -1237,7 +1235,6 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 			files:                       model_starlark.NewStructFromDict[TReference, TMetadata](nil, filesValues),
 			outputs:                     model_starlark.NewStructFromDict[TReference, TMetadata](nil, outputsValues),
 			execGroups:                  execGroups,
-			fragments:                   map[string]*model_starlark.Struct[TReference, TMetadata]{},
 			outputRegistrar:             &outputRegistrar,
 			commandEncoder:              commandEncoder,
 			directoryCreationParameters: directoryCreationParameters,
@@ -1717,7 +1714,6 @@ type ruleContext[TReference object.BasicReference, TMetadata BaseComputerReferen
 	outputs                     starlark.Value
 	execGroups                  []ruleContextExecGroupState
 	tags                        *starlark.List
-	fragments                   map[string]*model_starlark.Struct[TReference, TMetadata]
 	outputRegistrar             *targetOutputRegistrar[TReference, TMetadata]
 	commandEncoder              model_encoding.BinaryEncoder
 	directoryCreationParameters *model_filesystem.DirectoryCreationParameters
@@ -1813,10 +1809,6 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 			rc.buildSettingValue = value
 		}
 		return rc.buildSettingValue, nil
-	case "configuration":
-		// Implement ctx.configuration as if it is a specially
-		// named fragment.
-		return rc.getFragment("configuration")
 	case "exec_groups":
 		return &ruleContextExecGroups[TReference, TMetadata]{
 			ruleContext: rc,
@@ -1864,44 +1856,6 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 	default:
 		return nil, nil
 	}
-}
-
-func (rc *ruleContext[TReference, TMetadata]) getFragment(name string) (starlark.Value, error) {
-	fragmentInfo, ok := rc.fragments[name]
-	if !ok {
-		targetName, err := label.NewTargetName(name)
-		if err != nil {
-			return nil, fmt.Errorf("invalid target name %#v: %w", name, err)
-		}
-		encodedFragmentInfo, err := getProviderFromConfiguredTarget(
-			rc.environment,
-			fragmentsPackage.AppendTargetName(targetName).String(),
-			model_core.Patch(
-				rc.environment,
-				rc.configurationReference,
-			),
-			fragmentInfoProviderIdentifier,
-		)
-		if err != nil {
-			return nil, err
-		}
-		fragmentInfo, err = model_starlark.DecodeStruct[TReference, TMetadata](
-			model_core.Nested(encodedFragmentInfo, &model_starlark_pb.Struct{
-				ProviderInstanceProperties: &model_starlark_pb.Provider_InstanceProperties{
-					ProviderIdentifier: fragmentInfoProviderIdentifier.String(),
-				},
-				Fields: encodedFragmentInfo.Message,
-			}),
-			rc.computer.getValueDecodingOptions(rc.context, func(resolvedLabel label.ResolvedLabel) (starlark.Value, error) {
-				return model_starlark.NewLabel[TReference, TMetadata](resolvedLabel), nil
-			}),
-		)
-		if err != nil {
-			return nil, err
-		}
-		rc.fragments[name] = fragmentInfo
-	}
-	return fragmentInfo, nil
 }
 
 var ruleContextAttrNames = []string{

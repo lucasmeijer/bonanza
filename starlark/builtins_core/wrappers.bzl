@@ -31,15 +31,6 @@ def _wrap_actions(actions, bin_dir, label):
     }
     return struct(**actions_fields)
 
-def _wrapped_ctx_configuration(ctx):
-    return ctx._real_ctx.configuration
-
-_WrappedCtx = provider(
-    computed_fields = {
-        "configuration": _wrapped_ctx_configuration,
-    },
-)
-
 def _maybe_add_ctx_fragments(ctx_fields, fragments):
     if fragments:
         ctx_fields["fragments"] = struct(**{
@@ -102,10 +93,7 @@ def _wrap_rule_ctx(ctx):
     ctx_fields = {
         field: getattr(ctx, field)
         for field in dir(ctx)
-        # TODO: Remove this once they are gone.
-        if field != "configuration"
     } | {
-        "_real_ctx": ctx,
         "actions": _wrap_actions(ctx.actions, ctx.bin_dir, ctx.label),
         "build_file_path": ctx.label.package + "/BUILD",
         "coverage_instrumented": ctx_coverage_instrumented,
@@ -119,7 +107,10 @@ def _wrap_rule_ctx(ctx):
     # If the rule depends on one or more fragments, an attribute with
     # name "__fragments" of type attr.label_list() is injected. The
     # default value of this attribute will refer to targets offering a
-    # FragmentInfo. Make these available through ctx.fragments.
+    # FragmentInfo. Make these available through ctx.configuration and
+    # ctx.fragments.
+    if hasattr(ctx.attr, "__configuration"):
+        ctx_fields["configuration"] = ctx.attr.__configuration[FragmentInfo]
     _maybe_add_ctx_fragments(ctx_fields, getattr(ctx.attr, "__fragments", []))
 
     # If the rule has a default exec group, expose its toolchains
@@ -183,16 +174,16 @@ def _wrap_rule_ctx(ctx):
     # indirect way (e.g., through toolchain resolution), only rules that
     # call ctx.target_platform_has_constraint() depend on the actual
     # definition of the target platform.
-    if hasattr(ctx.attr, "__target_platforms"):
+    if hasattr(ctx.attr, "__target_platform"):
         def ctx_target_platform_has_constraint(constraintValue):
-            return ctx.attr.__target_platforms[0][PlatformInfo].constraints.get(
+            return ctx.attr.__target_platform[PlatformInfo].constraints.get(
                 constraintValue.constraint.label,
                 constraintValue.constraint.default_constraint_value,
             ) == constraintValue.label
 
         ctx_fields["target_platform_has_constraint"] = ctx_target_platform_has_constraint
 
-    return _WrappedCtx(**ctx_fields)
+    return struct(**ctx_fields)
 
 def invoke_rule(fn, ctx):
     return fn(_wrap_rule_ctx(ctx))

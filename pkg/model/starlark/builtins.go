@@ -124,13 +124,15 @@ func stringDictToStructFields(in starlark.StringDict) map[string]any {
 }
 
 var (
-	fragmentsAttrIdentifier = pg_label.MustNewStarlarkIdentifier("__fragments")
-	fragmentsPackage        = pg_label.MustNewCanonicalPackage("@@bazel_tools+//fragments")
+	configurationAttrIdentifier = pg_label.MustNewStarlarkIdentifier("__configuration")
+	configurationFragmentLabel  = pg_label.MustNewCanonicalLabel("@@bazel_tools+//fragments:configuration")
+	fragmentsAttrIdentifier     = pg_label.MustNewStarlarkIdentifier("__fragments")
+	fragmentsPackage            = pg_label.MustNewCanonicalPackage("@@bazel_tools+//fragments")
 
 	defaultMakeVariablesLabel       = pg_label.MustNewCanonicalLabel("@@bazel_tools+//tools/make:default_make_variables")
 	defaultToolchainsAttrIdentifier = pg_label.MustNewStarlarkIdentifier("__default_toolchains")
 	toolchainsAttrIdentifier        = pg_label.MustNewStarlarkIdentifier("toolchains")
-	targetPlatformsAttrIdentifier   = pg_label.MustNewStarlarkIdentifier("__target_platforms")
+	targetPlatformAttrIdentifier    = pg_label.MustNewStarlarkIdentifier("__target_platform")
 	commandLineOptionPlatformsLabel = pg_label.MustNewCanonicalLabel("@@bazel_tools+//command_line_option:platforms")
 )
 
@@ -175,6 +177,10 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 	targetTransitionDefinition := NewReferenceTransitionDefinition[TReference, TMetadata](&TargetTransitionReference)
 	unconfiguredTransitionDefinition := NewReferenceTransitionDefinition[TReference, TMetadata](&UnconfiguredTransitionReference)
 
+	configurationAttr := NewAttr[TReference, TMetadata](
+		NewLabelAttrType[TReference, TMetadata](false, false, false, glob.NFAMatchingNothing.Bytes(), targetTransitionDefinition),
+		NewLabel[TReference, TMetadata](configurationFragmentLabel.AsResolved()),
+	)
 	defaultToolchainsAttr := NewAttr[TReference, TMetadata](
 		NewLabelListAttrType[TReference, TMetadata](glob.NFAMatchingNothing.Bytes(), targetTransitionDefinition),
 		starlark.NewList([]starlark.Value{
@@ -186,10 +192,8 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 		starlark.NewList(nil),
 	)
 	targetPlatformAttr := NewAttr[TReference, TMetadata](
-		NewLabelListAttrType[TReference, TMetadata](glob.NFAMatchingNothing.Bytes(), targetTransitionDefinition),
-		starlark.NewList([]starlark.Value{
-			NewLabel[TReference, TMetadata](commandLineOptionPlatformsLabel.AsResolved()),
-		}),
+		NewLabelAttrType[TReference, TMetadata](false, false, false, glob.NFAMatchingNothing.Bytes(), targetTransitionDefinition),
+		NewLabel[TReference, TMetadata](commandLineOptionPlatformsLabel.AsResolved()),
 	)
 
 	bzlFileBuiltins := starlark.StringDict{
@@ -1284,9 +1288,7 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 				var execCompatibleWith []pg_label.ResolvedLabel
 				var fragments []pg_label.TargetName
 				var initializer *NamedFunction[TReference, TMetadata]
-				needsDefaultExecGroup := true
-				needsMakeVariables := true
-				needsTargetPlatform := true
+				var needs []string
 				outputs := map[pg_label.StarlarkIdentifier]string{}
 				var provides []*Provider[TReference, TMetadata]
 				var subrules []*Subrule[TReference, TMetadata]
@@ -1308,9 +1310,7 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 					"fragments?", unpack.Bind(thread, &fragments, unpack.List(unpack.TargetName)),
 					"initializer?", unpack.Bind(thread, &initializer, unpack.IfNotNone(unpack.Pointer(namedFunctionUnpackerInto))),
 					"outputs?", unpack.Bind(thread, &outputs, unpack.Dict(unpack.StarlarkIdentifier, unpack.String)),
-					"needs_default_exec_group?", unpack.Bind(thread, &needsDefaultExecGroup, unpack.Bool),
-					"needs_make_variables?", unpack.Bind(thread, &needsMakeVariables, unpack.Bool),
-					"needs_target_platform?", unpack.Bind(thread, &needsTargetPlatform, unpack.Bool),
+					"needs?", unpack.Bind(thread, &needs, unpack.IfNotNone(unpack.List(unpack.String))),
 					"provides?", unpack.Bind(thread, &provides, unpack.List(unpack.Type[*Provider[TReference, TMetadata]]("provider"))),
 					"subrules?", unpack.Bind(thread, &subrules, unpack.List(unpack.Type[*Subrule[TReference, TMetadata]]("subrule"))),
 					"test?", unpack.Bind(thread, &test, unpack.Bool),
@@ -1318,6 +1318,33 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 					"_skylark_testable?", unpack.Bind(thread, &skylarkTestable, unpack.Bool),
 				); err != nil {
 					return nil, err
+				}
+
+				needsConfiguration := needs == nil
+				needsDefaultExecGroup := needs == nil
+				needsMakeVariables := needs == nil
+				needsTargetPlatform := needs == nil
+				for _, need := range needs {
+					switch need {
+					case "configuration":
+						needsConfiguration = true
+					case "default_exec_group":
+						needsDefaultExecGroup = true
+					case "make_variables":
+						needsMakeVariables = true
+					case "targetPlatform":
+						needsTargetPlatform = true
+					default:
+						return nil, fmt.Errorf("unknown \"needs\" option %#v", need)
+					}
+				}
+
+				// Whether or not to provide ctx.configuration.
+				if _, ok := attrs[configurationAttrIdentifier]; ok {
+					return nil, fmt.Errorf("attr %#v cannot be declared explicitly", configurationAttrIdentifier.String())
+				}
+				if needsConfiguration {
+					attrs[configurationAttrIdentifier] = configurationAttr
 				}
 
 				// Some of the core rules like config_setting(),
@@ -1370,11 +1397,11 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 
 				// Implicitly add "__target_platforms" for
 				// ctx.target_platform_has_constraint().
-				if _, ok := attrs[targetPlatformsAttrIdentifier]; ok {
-					return nil, fmt.Errorf("attr %#v cannot be declared explicitly", targetPlatformsAttrIdentifier.String())
+				if _, ok := attrs[targetPlatformAttrIdentifier]; ok {
+					return nil, fmt.Errorf("attr %#v cannot be declared explicitly", targetPlatformAttrIdentifier.String())
 				}
 				if needsTargetPlatform {
-					attrs[targetPlatformsAttrIdentifier] = targetPlatformAttr
+					attrs[targetPlatformAttrIdentifier] = targetPlatformAttr
 				}
 
 				return NewRule(nil, NewStarlarkRuleDefinition(
