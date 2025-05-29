@@ -164,23 +164,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRepoPlatformHostPathValue(c
 		// contains any more symlinks that point to locations
 		// outside this directory. If so, invoke
 		// RepoPlatformHostPath recursively.
-		capturedDirectory, err := model_filesystem.DirectoryGetContents(
-			ctx,
-			directoryReaders.DirectoryContents,
-			model_core.Nested(outputs, directories[index].Directory),
-		)
-		if err != nil {
-			return PatchedRepoPlatformHostPathValue{}, err
-		}
-
-		var rootDirectory changeTrackingDirectory[TReference, TMetadata]
-		loadOptions := changeTrackingDirectoryLoadOptions[TReference]{
-			context:                 ctx,
-			directoryContentsReader: directoryReaders.DirectoryContents,
-			leavesReader:            directoryReaders.Leaves,
-		}
-		if err := rootDirectory.setContents(capturedDirectory, &loadOptions); err != nil {
-			return PatchedRepoPlatformHostPathValue{}, err
+		rootDirectory := changeTrackingDirectory[TReference, TMetadata]{
+			unmodifiedDirectory: model_core.Nested(outputs, directories[index].Directory),
 		}
 
 		virtualRootScopeWalkerFactory, err := path.NewVirtualRootScopeWalkerFactory(path.UNIXFormat.NewParser(key.AbsolutePath), nil)
@@ -188,9 +173,13 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRepoPlatformHostPathValue(c
 			return PatchedRepoPlatformHostPathValue{}, err
 		}
 		sr := changeTrackingDirectorySymlinksRelativizer[TReference, TMetadata]{
-			context:                       ctx,
-			environment:                   e,
-			directoryLoadOptions:          &loadOptions,
+			context:     ctx,
+			environment: e,
+			directoryLoadOptions: &changeTrackingDirectoryLoadOptions[TReference]{
+				context:                 ctx,
+				directoryContentsReader: directoryReaders.DirectoryContents,
+				leavesReader:            directoryReaders.Leaves,
+			},
 			virtualRootScopeWalkerFactory: virtualRootScopeWalkerFactory,
 		}
 		if err := sr.relativizeSymlinksRecursively(
@@ -429,14 +418,16 @@ func (sr *changeTrackingDirectorySymlinksRelativizer[TReference, TMetadata]) rel
 					}
 					d.setFileSimple(name, f)
 				case *model_analysis_pb.RepoPlatformHostPath_Value_Directory:
-					var dReplacement changeTrackingDirectory[TReference, TMetadata]
-					if err := dReplacement.setContents(
-						model_core.Nested(replacement, capturedPath.Directory),
-						sr.directoryLoadOptions,
-					); err != nil {
-						return err
-					}
-					d.setDirectorySimple(name, &dReplacement)
+					d.setDirectorySimple(
+						name,
+						&changeTrackingDirectory[TReference, TMetadata]{
+							unmodifiedDirectory: model_core.Nested(replacement, &model_filesystem_pb.Directory{
+								Contents: &model_filesystem_pb.Directory_ContentsInline{
+									ContentsInline: capturedPath.Directory,
+								},
+							}),
+						},
+					)
 				default:
 					return errors.New("captured host path has an unknown type")
 				}

@@ -1915,12 +1915,12 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 	// The command may have mutated the repo's contents. Extract the
 	// repo directory contents from the results and copy it into the
 	// input root.
-	var outputRootDirectory changeTrackingDirectory[TReference, model_core.FileBackedObjectLocation]
-	if err := outputRootDirectory.setContents(
-		model_core.Nested(outputs, outputs.Message.GetOutputRoot()),
-		mrc.directoryLoadOptions,
-	); err != nil {
-		return nil, fmt.Errorf("failed load output root: %w", err)
+	outputRootDirectory := changeTrackingDirectory[TReference, model_core.FileBackedObjectLocation]{
+		unmodifiedDirectory: model_core.Nested(outputs, &model_filesystem_pb.Directory{
+			Contents: &model_filesystem_pb.Directory_ContentsInline{
+				ContentsInline: outputs.Message.GetOutputRoot(),
+			},
+		}),
 	}
 	inputRepoDirectory := mrc.inputRootDirectory
 	outputRepoDirectory := &outputRootDirectory

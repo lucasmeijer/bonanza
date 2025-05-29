@@ -371,22 +371,22 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 				return PatchedFileRootValue{}, evaluation.ErrMissingDependency
 			}
 
-			var rootDirectory changeTrackingDirectory[TReference, TMetadata]
-			loadOptions := &changeTrackingDirectoryLoadOptions[TReference]{
-				context:                 ctx,
-				directoryContentsReader: directoryReaders.DirectoryContents,
-				leavesReader:            directoryReaders.Leaves,
-			}
-			if err := rootDirectory.setContents(
-				model_core.Nested(symlinkTarget, symlinkTarget.Message.RootDirectory),
-				loadOptions,
-			); err != nil {
-				return PatchedFileRootValue{}, err
+			rootDirectory := changeTrackingDirectory[TReference, TMetadata]{
+				unmodifiedDirectory: model_core.Nested(symlinkTarget, &model_filesystem_pb.Directory{
+					Contents: &model_filesystem_pb.Directory_ContentsInline{
+						ContentsInline: symlinkTarget.Message.RootDirectory,
+					},
+				}),
 			}
 
 			symlinkPath, err := model_starlark.FileGetPath(f)
 			if err != nil {
 				return PatchedFileRootValue{}, err
+			}
+			loadOptions := &changeTrackingDirectoryLoadOptions[TReference]{
+				context:                 ctx,
+				directoryContentsReader: directoryReaders.DirectoryContents,
+				leavesReader:            directoryReaders.Leaves,
 			}
 			r := &changeTrackingDirectoryNewFileResolver[TReference, TMetadata]{
 				loadOptions: loadOptions,
