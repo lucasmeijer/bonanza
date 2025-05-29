@@ -130,6 +130,8 @@ var (
 	defaultMakeVariablesLabel       = pg_label.MustNewCanonicalLabel("@@bazel_tools+//tools/make:default_make_variables")
 	defaultToolchainsAttrIdentifier = pg_label.MustNewStarlarkIdentifier("__default_toolchains")
 	toolchainsAttrIdentifier        = pg_label.MustNewStarlarkIdentifier("toolchains")
+	targetPlatformsAttrIdentifier   = pg_label.MustNewStarlarkIdentifier("__target_platforms")
+	commandLineOptionPlatformsLabel = pg_label.MustNewCanonicalLabel("@@bazel_tools+//command_line_option:platforms")
 )
 
 // convertFragmentsToAttr converts a list of fragment dependencies of a
@@ -182,6 +184,12 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 	toolchainsAttr := NewAttr[TReference, TMetadata](
 		NewLabelListAttrType[TReference, TMetadata](glob.NFAMatchingNothing.Bytes(), targetTransitionDefinition),
 		starlark.NewList(nil),
+	)
+	targetPlatformAttr := NewAttr[TReference, TMetadata](
+		NewLabelListAttrType[TReference, TMetadata](glob.NFAMatchingNothing.Bytes(), targetTransitionDefinition),
+		starlark.NewList([]starlark.Value{
+			NewLabel[TReference, TMetadata](commandLineOptionPlatformsLabel.AsResolved()),
+		}),
 	)
 
 	bzlFileBuiltins := starlark.StringDict{
@@ -1270,14 +1278,15 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 				attrs := map[pg_label.StarlarkIdentifier]*Attr[TReference, TMetadata]{}
 				var buildSetting *BuildSetting
 				var cfg *Transition[TReference, TMetadata]
-				defaultExecGroup := true
 				doc := ""
 				execGroups := map[string]*ExecGroup[TReference, TMetadata]{}
 				executable := false
 				var execCompatibleWith []pg_label.ResolvedLabel
 				var fragments []pg_label.TargetName
 				var initializer *NamedFunction[TReference, TMetadata]
-				needsMakeVariables := currentFilePackage.GetCanonicalRepo().String() != "bazel_skylib+"
+				needsDefaultExecGroup := true
+				needsMakeVariables := true
+				needsTargetPlatform := true
 				outputs := map[pg_label.StarlarkIdentifier]string{}
 				var provides []*Provider[TReference, TMetadata]
 				var subrules []*Subrule[TReference, TMetadata]
@@ -1292,7 +1301,6 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 					"attrs?", unpack.Bind(thread, &attrs, unpack.Dict(unpack.StarlarkIdentifier, unpack.Type[*Attr[TReference, TMetadata]]("attr.*"))),
 					"build_setting?", unpack.Bind(thread, &buildSetting, unpack.IfNotNone(unpack.Type[*BuildSetting]("config.*"))),
 					"cfg?", unpack.Bind(thread, &cfg, unpack.IfNotNone(unpack.Type[*Transition[TReference, TMetadata]]("transition"))),
-					"default_exec_group?", unpack.Bind(thread, &defaultExecGroup, unpack.Bool),
 					"doc?", unpack.Bind(thread, &doc, unpack.String),
 					"executable?", unpack.Bind(thread, &executable, unpack.Bool),
 					"exec_compatible_with?", unpack.Bind(thread, &execCompatibleWith, unpack.List(NewLabelOrStringUnpackerInto[TReference, TMetadata](currentFilePackage))),
@@ -1300,7 +1308,9 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 					"fragments?", unpack.Bind(thread, &fragments, unpack.List(unpack.TargetName)),
 					"initializer?", unpack.Bind(thread, &initializer, unpack.IfNotNone(unpack.Pointer(namedFunctionUnpackerInto))),
 					"outputs?", unpack.Bind(thread, &outputs, unpack.Dict(unpack.StarlarkIdentifier, unpack.String)),
+					"needs_default_exec_group?", unpack.Bind(thread, &needsDefaultExecGroup, unpack.Bool),
 					"needs_make_variables?", unpack.Bind(thread, &needsMakeVariables, unpack.Bool),
+					"needs_target_platform?", unpack.Bind(thread, &needsTargetPlatform, unpack.Bool),
 					"provides?", unpack.Bind(thread, &provides, unpack.List(unpack.Type[*Provider[TReference, TMetadata]]("provider"))),
 					"subrules?", unpack.Bind(thread, &subrules, unpack.List(unpack.Type[*Subrule[TReference, TMetadata]]("subrule"))),
 					"test?", unpack.Bind(thread, &test, unpack.Bool),
@@ -1317,7 +1327,7 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 				// would cause cyclic dependencies during
 				// evaluation. Omit the default exec group for
 				// such rules.
-				if defaultExecGroup {
+				if needsDefaultExecGroup {
 					if _, ok := execGroups[""]; ok {
 						return nil, errors.New("cannot explicitly declare exec_group with name \"\"")
 					}
@@ -1356,6 +1366,15 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 				if needsMakeVariables {
 					attrs[defaultToolchainsAttrIdentifier] = defaultToolchainsAttr
 					attrs[toolchainsAttrIdentifier] = toolchainsAttr
+				}
+
+				// Implicitly add "__target_platforms" for
+				// ctx.target_platform_has_constraint().
+				if _, ok := attrs[targetPlatformsAttrIdentifier]; ok {
+					return nil, fmt.Errorf("attr %#v cannot be declared explicitly", targetPlatformsAttrIdentifier.String())
+				}
+				if needsTargetPlatform {
+					attrs[targetPlatformsAttrIdentifier] = targetPlatformAttr
 				}
 
 				return NewRule(nil, NewStarlarkRuleDefinition(

@@ -1,11 +1,11 @@
 load(
-    "@bazel_skylib//rules:common_settings.bzl",
+    ":settings.bzl",
     "bool_flag",
     "int_flag",
+    "label_list_flag",
     "string_flag",
     "string_list_flag",
 )
-load(":settings.bzl", "label_list_flag")
 
 package(default_visibility = ["//visibility:public"])
 

@@ -1,5 +1,5 @@
 load("@bazel_tools//fragments:fragment_info.bzl", "FragmentInfo")
-load("//:exports.bzl", "TemplateVariableInfo")
+load("//:exports.bzl", "PlatformInfo", "TemplateVariableInfo")
 
 def _wrap_actions(actions, bin_dir, label):
     def actions_declare_shareable_artifact(path, artifact_root = None):
@@ -178,6 +178,19 @@ def _wrap_rule_ctx(ctx):
 
         ctx_fields["expand_make_variables"] = ctx_expand_make_variables
         ctx_fields["var"] = var
+
+    # Even though most rules depend on the target platform in an
+    # indirect way (e.g., through toolchain resolution), only rules that
+    # call ctx.target_platform_has_constraint() depend on the actual
+    # definition of the target platform.
+    if hasattr(ctx.attr, "__target_platforms"):
+        def ctx_target_platform_has_constraint(constraintValue):
+            return ctx.attr.__target_platforms[0][PlatformInfo].constraints.get(
+                constraintValue.constraint.label,
+                constraintValue.constraint.default_constraint_value,
+            ) == constraintValue.label
+
+        ctx_fields["target_platform_has_constraint"] = ctx_target_platform_has_constraint
 
     return _WrappedCtx(**ctx_fields)
 
