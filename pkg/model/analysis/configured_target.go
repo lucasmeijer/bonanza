@@ -3336,7 +3336,7 @@ func (a *args[TReference, TMetadata]) doAddAll(thread *starlark.Thread, b *starl
 	formatEach := "%s"
 	var beforeEachStr *string
 	omitIfEmpty := true
-	uniquify := true
+	uniquify := false
 	expandDirectories := true
 	var terminateWithStr *string
 	allowClosure := false
@@ -3402,7 +3402,7 @@ func (a *args[TReference, TMetadata]) doAddJoined(thread *starlark.Thread, b *st
 	formatEach := "%s"
 	formatJoined := "%s"
 	omitIfEmpty := true
-	uniquify := true
+	uniquify := false
 	expandDirectories := true
 	allowClosure := false
 	if err := starlark.UnpackArgs(
