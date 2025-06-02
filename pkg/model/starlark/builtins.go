@@ -850,7 +850,17 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 				default:
 					return nil, fmt.Errorf("unknown order %#v", order)
 				}
-				return NewDepset(thread, direct, transitive, orderValue)
+
+				identifierGenerator := thread.Local(ReferenceEqualIdentifierGeneratorKey)
+				if identifierGenerator == nil {
+					return nil, errors.New("depsets cannot be created from within this context")
+				}
+
+				dc, err := NewDepsetContents(thread, direct, transitive, orderValue)
+				if err != nil {
+					return nil, err
+				}
+				return NewDepset(dc, identifierGenerator.(ReferenceEqualIdentifierGenerator)), nil
 			},
 		),
 		"exec_group": starlark.NewBuiltin(

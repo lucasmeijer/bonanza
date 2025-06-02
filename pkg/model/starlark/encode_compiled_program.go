@@ -862,7 +862,14 @@ func decodeDepset[TReference object.BasicReference, TMetadata model_core.Cloneab
 	for _, element := range depset.Message.Elements {
 		children = append(children, model_core.Nested(depset, element))
 	}
-	return NewDepsetFromList[TReference, TMetadata](children, depset.Message.Order)
+	identifier := depset.Message.Identifier
+	return NewDepset(
+		NewDepsetContentsFromList[TReference, TMetadata](
+			children,
+			depset.Message.Order,
+		),
+		func() []byte { return identifier },
+	)
 }
 
 func decodeProviderInstanceProperties[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](m model_core.Message[*model_starlark_pb.Provider_InstanceProperties, TReference]) (*ProviderInstanceProperties[TReference, TMetadata], error) {

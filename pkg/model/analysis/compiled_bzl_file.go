@@ -3,6 +3,7 @@ package analysis
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"strings"
@@ -14,9 +15,45 @@ import (
 	model_starlark "github.com/buildbarn/bonanza/pkg/model/starlark"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
 
+	"google.golang.org/protobuf/proto"
+
 	"go.starlark.net/starlark"
 	"go.starlark.net/syntax"
 )
+
+// getReferenceEqualIdentifierGenerator creates an identifier generator
+// for Starlark values that provide reference equality, such as depsets.
+//
+// As these identifiers end up getting written to storage, we want to
+// use a deterministic process. We therefore hand out these identifiers
+// sequentially, using a cryptographic hash of the current key as the
+// initial offset.
+func (c *baseComputer[TReference, TMetadata]) getReferenceEqualIdentifierGenerator(key model_core.Message[proto.Message, TReference]) (model_starlark.ReferenceEqualIdentifierGenerator, error) {
+	topLevelKey, _ := model_core.Patch(c.discardingObjectCapturer, key).SortAndSetReferences()
+	anyKey, err := model_core.MarshalTopLevelAny(topLevelKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal key for creating an identifier generator for reference equal values: %w", err)
+	}
+	marshaledKey, err := model_core.MarshalTopLevelMessage(anyKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal key for creating an identifier generator for reference equal values: %w", err)
+	}
+	hashedKey := sha256.Sum256(marshaledKey)
+
+	var nextIdentifier [16]byte
+	copy(nextIdentifier[:], hashedKey[:])
+
+	return func() []byte {
+		identifier := append([]byte(nil), nextIdentifier[:]...)
+		for i := 0; i < len(nextIdentifier); i++ {
+			nextIdentifier[i]++
+			if nextIdentifier[i] != 0 {
+				break
+			}
+		}
+		return identifier
+	}, nil
+}
 
 func (c *baseComputer[TReference, TMetadata]) ComputeCompiledBzlFileValue(ctx context.Context, key *model_analysis_pb.CompiledBzlFile_Key, e CompiledBzlFileEnvironment[TReference, TMetadata]) (PatchedCompiledBzlFileValue, error) {
 	canonicalLabel, err := label.NewCanonicalLabel(key.Label)
@@ -79,6 +116,12 @@ func (c *baseComputer[TReference, TMetadata]) ComputeCompiledBzlFileValue(ctx co
 	if err := c.preloadBzlGlobals(e, canonicalPackage, program, key.BuiltinsModuleNames); err != nil {
 		return PatchedCompiledBzlFileValue{}, err
 	}
+
+	identifierGenerator, err := c.getReferenceEqualIdentifierGenerator(model_core.NewSimpleMessage[TReference](proto.Message(key)))
+	if err != nil {
+		return PatchedCompiledBzlFileValue{}, err
+	}
+	thread.SetLocal(model_starlark.ReferenceEqualIdentifierGeneratorKey, identifierGenerator)
 
 	globals, err := program.Init(thread, bzlFileBuiltins)
 	if err != nil {
@@ -144,6 +187,12 @@ func (c *baseComputer[TReference, TMetadata]) ComputeCompiledBzlFileFunctionFact
 	if bzlFileBuiltinsErr != nil {
 		return nil, bzlFileBuiltinsErr
 	}
+
+	identifierGenerator, err := c.getReferenceEqualIdentifierGenerator(model_core.NewSimpleMessage[TReference](proto.Message(key)))
+	if err != nil {
+		return nil, err
+	}
+	thread.SetLocal(model_starlark.ReferenceEqualIdentifierGeneratorKey, identifierGenerator)
 
 	program, err := starlark.CompiledProgram(bytes.NewBuffer(compiledBzlFile.Message.CompiledProgram.GetCode()))
 	if err != nil {

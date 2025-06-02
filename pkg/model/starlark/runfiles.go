@@ -109,7 +109,13 @@ func (r *Runfiles[TReference, TMetadata]) Attr(thread *starlark.Thread, name str
 		// TODO: There seems to be no way to actually set empty
 		// filenames from within Starlark. Does this mean it's
 		// valid to always return an empty set?
-		return NewDepset[TReference, TMetadata](thread, nil, nil, model_starlark_pb.Depset_DEFAULT)
+		return NewDepset(
+			NewDepsetContentsFromList[TReference, TMetadata](
+				/* children = */ nil,
+				model_starlark_pb.Depset_DEFAULT,
+			),
+			/* identifierGenerator = */ nil,
+		), nil
 	case "files":
 		return r.files, nil
 	case "merge":
@@ -138,20 +144,28 @@ func (Runfiles[TReference, TMetadata]) AttrNames() []string {
 	return runfilesAttrNames
 }
 
-func mergeRunfiles[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](thread *starlark.Thread, allFiles, allRootSymlinks, allSymlinks []*Depset[TReference, TMetadata]) (starlark.Value, error) {
-	files, err := NewDepset(thread, nil, allFiles, model_starlark_pb.Depset_DEFAULT)
+func mergeRunfiles[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](
+	thread *starlark.Thread,
+	allFiles, allRootSymlinks, allSymlinks []*Depset[TReference, TMetadata],
+	identifierGenerator ReferenceEqualIdentifierGenerator,
+) (starlark.Value, error) {
+	files, err := NewDepsetContents(thread, nil, allFiles, model_starlark_pb.Depset_DEFAULT)
 	if err != nil {
 		return nil, fmt.Errorf("failed to merge files: %w", err)
 	}
-	rootSymlinks, err := NewDepset(thread, nil, allRootSymlinks, model_starlark_pb.Depset_DEFAULT)
+	rootSymlinks, err := NewDepsetContents(thread, nil, allRootSymlinks, model_starlark_pb.Depset_DEFAULT)
 	if err != nil {
 		return nil, fmt.Errorf("failed to merge root symlinks: %w", err)
 	}
-	symlinks, err := NewDepset(thread, nil, allSymlinks, model_starlark_pb.Depset_DEFAULT)
+	symlinks, err := NewDepsetContents(thread, nil, allSymlinks, model_starlark_pb.Depset_DEFAULT)
 	if err != nil {
 		return nil, fmt.Errorf("failed to merge symlinks: %w", err)
 	}
-	return NewRunfiles[TReference, TMetadata](files, rootSymlinks, symlinks), nil
+	return NewRunfiles[TReference, TMetadata](
+		NewDepset(files, identifierGenerator),
+		NewDepset(rootSymlinks, identifierGenerator),
+		NewDepset(symlinks, identifierGenerator),
+	), nil
 }
 
 func (r *Runfiles[TReference, TMetadata]) doMerge(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -163,11 +177,17 @@ func (r *Runfiles[TReference, TMetadata]) doMerge(thread *starlark.Thread, b *st
 		return nil, err
 	}
 
+	identifierGenerator := thread.Local(ReferenceEqualIdentifierGeneratorKey)
+	if identifierGenerator == nil {
+		return nil, errors.New("depsets cannot be created from within this context")
+	}
+
 	return mergeRunfiles(
 		thread,
 		[]*Depset[TReference, TMetadata]{r.files, other.files},
 		[]*Depset[TReference, TMetadata]{r.rootSymlinks, other.rootSymlinks},
 		[]*Depset[TReference, TMetadata]{r.symlinks, other.symlinks},
+		identifierGenerator.(ReferenceEqualIdentifierGenerator),
 	)
 }
 
@@ -180,6 +200,11 @@ func (r *Runfiles[TReference, TMetadata]) doMergeAll(thread *starlark.Thread, b 
 		return nil, err
 	}
 
+	identifierGenerator := thread.Local(ReferenceEqualIdentifierGeneratorKey)
+	if identifierGenerator == nil {
+		return nil, errors.New("depsets cannot be created from within this context")
+	}
+
 	transitiveFiles := append(make([]*Depset[TReference, TMetadata], 0, len(other)+1), r.files)
 	transitiveRootSymlinks := append(make([]*Depset[TReference, TMetadata], 0, len(other)+1), r.rootSymlinks)
 	transitiveSymlinks := append(make([]*Depset[TReference, TMetadata], 0, len(other)+1), r.symlinks)
@@ -188,7 +213,13 @@ func (r *Runfiles[TReference, TMetadata]) doMergeAll(thread *starlark.Thread, b 
 		transitiveRootSymlinks = append(transitiveRootSymlinks, o.rootSymlinks)
 		transitiveSymlinks = append(transitiveSymlinks, o.symlinks)
 	}
-	return mergeRunfiles(thread, transitiveFiles, transitiveRootSymlinks, transitiveSymlinks)
+	return mergeRunfiles(
+		thread,
+		transitiveFiles,
+		transitiveRootSymlinks,
+		transitiveSymlinks,
+		identifierGenerator.(ReferenceEqualIdentifierGenerator),
+	)
 }
 
 func (r *Runfiles[TReference, TMetadata]) EncodeValue(path map[starlark.Value]struct{}, currentIdentifier *pg_label.CanonicalStarlarkIdentifier, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.Value, TMetadata], bool, error) {

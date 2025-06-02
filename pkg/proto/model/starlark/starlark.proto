@@ -272,6 +272,18 @@ message Depset {
   // The order that was used to construct combine the direct and
   // transitive elements.
   Order order = 2;
+
+  // Unique identifier of the instance of the depset.
+  //
+  // As depsets use reference equality, they are only equal to
+  // themselves. Bazel implements this by comparing the memory addresses
+  // of the depsets. This does not work for Bonanza, as Starlark values
+  // can be written to, and read from storage. We therefore need to give
+  // each depset its own identifier.
+  //
+  // This field is left empty for empty depsets. This ensures that all
+  // empty depsets are equal to each other.
+  bytes identifier = 3;
 }
 
 message Dict {

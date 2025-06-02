@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"iter"
-	"math/rand/v2"
 	"slices"
 
 	pg_label "github.com/buildbarn/bonanza/pkg/label"
@@ -16,18 +15,6 @@ import (
 
 	"go.starlark.net/starlark"
 	"go.starlark.net/syntax"
-)
-
-type Depset[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata] struct {
-	children any
-	order    model_starlark_pb.Depset_Order
-	hash     uint32
-}
-
-var (
-	_ EncodableValue[object.LocalReference, model_core.CloneableReferenceMetadata] = (*Depset[object.LocalReference, model_core.CloneableReferenceMetadata])(nil)
-	_ starlark.Comparable                                                          = (*Depset[object.LocalReference, model_core.CloneableReferenceMetadata])(nil)
-	_ starlark.HasAttrs                                                            = (*Depset[object.LocalReference, model_core.CloneableReferenceMetadata])(nil)
 )
 
 func deduplicateAndAddDirect(thread *starlark.Thread, children *[]any, direct iter.Seq2[int, starlark.Value], valuesSeen *valueSet) error {
@@ -88,7 +75,28 @@ func deduplicateAndAddTransitive[TReference object.BasicReference, TMetadata mod
 	return nil
 }
 
-func NewDepset[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](thread *starlark.Thread, direct []starlark.Value, transitive []*Depset[TReference, TMetadata], order model_starlark_pb.Depset_Order) (*Depset[TReference, TMetadata], error) {
+// DepsetContents holds the elements contained in a Starlark depset
+// object.
+//
+// This type is not directly usable as a Starlark value type. The reason
+// being that Bazel requires depsets to provide reference equality. This
+// is provided by the Depset type, which embeds DepsetContents and a
+// unique identifier.
+type DepsetContents[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata] struct {
+	children any
+	order    model_starlark_pb.Depset_Order
+}
+
+// NewDepsetContents takes lists of Starlark values and depsets and
+// returns a DepsetContents that corresponds to the union of all values.
+// This function can be used to implement the depset() constructor
+// function.
+func NewDepsetContents[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](
+	thread *starlark.Thread,
+	direct []starlark.Value,
+	transitive []*Depset[TReference, TMetadata],
+	order model_starlark_pb.Depset_Order,
+) (*DepsetContents[TReference, TMetadata], error) {
 	var directIter iter.Seq2[int, starlark.Value]
 	var transitiveIter iter.Seq2[int, *Depset[TReference, TMetadata]]
 	preorder := false
@@ -130,66 +138,30 @@ func NewDepset[TReference object.BasicReference, TMetadata model_core.CloneableR
 		}
 	}
 
-	return NewDepsetFromList[TReference, TMetadata](children, order), nil
+	return NewDepsetContentsFromList[TReference, TMetadata](children, order), nil
 }
 
-func NewDepsetFromList[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](children []any, order model_starlark_pb.Depset_Order) *Depset[TReference, TMetadata] {
-	// As depsets only provide reference equality, give each
-	// instance a random hash.
+// NewDepsetContentsFromList constructs a DepsetContents, given a single
+// list of decoded values (starlark.Value) or lists of encoded values
+// (model_core.Message[*model_starlark_pb.List_Element, TReference]).
+// This function can be used to construct depsets that are (partially)
+// backed by storage.
+func NewDepsetContentsFromList[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](
+	children []any,
+	order model_starlark_pb.Depset_Order,
+) *DepsetContents[TReference, TMetadata] {
 	switch len(children) {
 	case 0:
-		return &Depset[TReference, TMetadata]{}
+		return &DepsetContents[TReference, TMetadata]{}
 	case 1:
-		return &Depset[TReference, TMetadata]{
+		return &DepsetContents[TReference, TMetadata]{
 			children: children[0],
-			hash:     rand.Uint32(),
 		}
 	default:
-		return &Depset[TReference, TMetadata]{
+		return &DepsetContents[TReference, TMetadata]{
 			children: children,
 			order:    order,
-			hash:     rand.Uint32(),
 		}
-	}
-}
-
-func (Depset[TReference, TMetadata]) String() string {
-	return "<depset>"
-}
-
-// Type returns the name of the type of a depset value.
-func (Depset[TReference, TMetadata]) Type() string {
-	return "depset"
-}
-
-// Freeze the contents of the depset. As we assume that all values
-// contained in the depset are hashable and therefore immutable, this
-// method does nothing.
-func (Depset[TReference, TMetadata]) Freeze() {}
-
-// Truth returns whether a depset value evaluates to true or false if
-// implicitly converted to a Boolean value. Only non-empty depsets
-// evaluate to true.
-func (d *Depset[TReference, TMetadata]) Truth() starlark.Bool {
-	return starlark.Bool(d.children != nil)
-}
-
-// Hash a depset value. As depsets only offer reference equality, the
-// hash value provides little value.
-func (d *Depset[TReference, TMetadata]) Hash(thread *starlark.Thread) (uint32, error) {
-	return d.hash, nil
-}
-
-// CompareSameType can be used to compare depsets for equality. Depsets
-// only offer reference equality.
-func (d *Depset[TReference, TMetadata]) CompareSameType(thread *starlark.Thread, op syntax.Token, other starlark.Value, depth int) (bool, error) {
-	switch op {
-	case syntax.EQL:
-		return d == other.(*Depset[TReference, TMetadata]), nil
-	case syntax.NEQ:
-		return d != other.(*Depset[TReference, TMetadata]), nil
-	default:
-		return false, errors.New("depsets cannot be compared for inequality")
 	}
 }
 
@@ -273,7 +245,7 @@ func (e *depsetChildrenEncoder[TReference, TMetadata]) encode(children any) erro
 // of a (non-deduplicated) list. This method is identical to Encode(),
 // except that can be used in cases where only the elements need to be
 // retained, and the "order" field of the depset is of no importance.
-func (d *Depset[TReference, TMetadata]) EncodeList(path map[starlark.Value]struct{}, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[[]*model_starlark_pb.List_Element, TMetadata], bool, error) {
+func (dc *DepsetContents[TReference, TMetadata]) EncodeList(path map[starlark.Value]struct{}, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[[]*model_starlark_pb.List_Element, TMetadata], bool, error) {
 	e := depsetChildrenEncoder[TReference, TMetadata]{
 		path:         path,
 		options:      options,
@@ -281,7 +253,7 @@ func (d *Depset[TReference, TMetadata]) EncodeList(path map[starlark.Value]struc
 		elementsSeen: map[string]struct{}{},
 		depsetsSeen:  map[*any]struct{}{},
 	}
-	if err := e.encode(d.children); err != nil {
+	if err := e.encode(dc.children); err != nil {
 		return model_core.PatchedMessage[[]*model_starlark_pb.List_Element, TMetadata]{}, false, err
 	}
 
@@ -290,6 +262,81 @@ func (d *Depset[TReference, TMetadata]) EncodeList(path map[starlark.Value]struc
 		return model_core.PatchedMessage[[]*model_starlark_pb.List_Element, TMetadata]{}, false, err
 	}
 	return elements, e.needsCode, nil
+}
+
+// ToList extracts all elements contained in the depset and returns them
+// as a list. If the depset contains duplicate elements, only the first
+// occurrence is retained.
+func (dc *DepsetContents[TReference, TMetadata]) ToList(thread *starlark.Thread) ([]starlark.Value, error) {
+	dlc := depsetToListConverter[TReference, TMetadata]{
+		thread:           thread,
+		encodedListsSeen: map[model_core.Decodable[object.LocalReference]]struct{}{},
+		depsetsSeen:      map[*any]struct{}{},
+	}
+	if dc.children != nil {
+		if err := dlc.appendChildren(dc.children); err != nil {
+			return nil, err
+		}
+		if dc.order == model_starlark_pb.Depset_TOPOLOGICAL {
+			// Undo reversal caused by insertion in opposite
+			// direction.
+			slices.Reverse(dlc.list)
+		}
+	}
+	return dlc.list, nil
+}
+
+// Depset is an order preserving set type for Starlark values that
+// supports fast union operations.
+type Depset[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata] struct {
+	referenceEqual
+	DepsetContents[TReference, TMetadata]
+}
+
+var (
+	_ EncodableValue[object.LocalReference, model_core.CloneableReferenceMetadata] = (*Depset[object.LocalReference, model_core.CloneableReferenceMetadata])(nil)
+	_ starlark.Comparable                                                          = (*Depset[object.LocalReference, model_core.CloneableReferenceMetadata])(nil)
+	_ starlark.HasAttrs                                                            = (*Depset[object.LocalReference, model_core.CloneableReferenceMetadata])(nil)
+)
+
+// NewDepset creates a Starlark depset object that holds the provided
+// contents. If the depset is non-empty, it attaches a unique identifier
+// to it. This ensures that when depsets provide reference equality.
+func NewDepset[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](contents *DepsetContents[TReference, TMetadata], identifierGenerator ReferenceEqualIdentifierGenerator) *Depset[TReference, TMetadata] {
+	d := &Depset[TReference, TMetadata]{
+		DepsetContents: *contents,
+	}
+	if contents.children != nil {
+		d.identifier = identifierGenerator()
+	}
+	return d
+}
+
+func (Depset[TReference, TMetadata]) String() string {
+	return "<depset>"
+}
+
+// Type returns the name of the type of a depset value.
+func (Depset[TReference, TMetadata]) Type() string {
+	return "depset"
+}
+
+// Freeze the contents of the depset. As we assume that all values
+// contained in the depset are hashable and therefore immutable, this
+// method does nothing.
+func (Depset[TReference, TMetadata]) Freeze() {}
+
+// Truth returns whether a depset value evaluates to true or false if
+// implicitly converted to a Boolean value. Only non-empty depsets
+// evaluate to true.
+func (d *Depset[TReference, TMetadata]) Truth() starlark.Bool {
+	return starlark.Bool(d.children != nil)
+}
+
+// CompareSameType can be used to compare depsets for equality. Depsets
+// only offer reference equality.
+func (d *Depset[TReference, TMetadata]) CompareSameType(thread *starlark.Thread, op syntax.Token, other starlark.Value, depth int) (bool, error) {
+	return d.referenceEqual.compareSameType(op, &other.(*Depset[TReference, TMetadata]).referenceEqual)
 }
 
 // Encode a depset value to a Protobuf message. This method is identical
@@ -302,8 +349,9 @@ func (d *Depset[TReference, TMetadata]) Encode(path map[starlark.Value]struct{},
 	}
 	return model_core.NewPatchedMessage(
 		&model_starlark_pb.Depset{
-			Elements: elements.Message,
-			Order:    d.order,
+			Elements:   elements.Message,
+			Order:      d.order,
+			Identifier: d.referenceEqual.identifier,
 		},
 		elements.Patcher,
 	), needsCode, nil
@@ -422,28 +470,6 @@ func (dlc *depsetToListConverter[TReference, TMetadata]) appendChildren(children
 	return nil
 }
 
-// ToList extracts all elements contained in the depset and returns them
-// as a list. If the depset contains duplicate elements, only the first
-// occurrence is retained.
-func (d *Depset[TReference, TMetadata]) ToList(thread *starlark.Thread) ([]starlark.Value, error) {
-	dlc := depsetToListConverter[TReference, TMetadata]{
-		thread:           thread,
-		encodedListsSeen: map[model_core.Decodable[object.LocalReference]]struct{}{},
-		depsetsSeen:      map[*any]struct{}{},
-	}
-	if d.children != nil {
-		if err := dlc.appendChildren(d.children); err != nil {
-			return nil, err
-		}
-		if d.order == model_starlark_pb.Depset_TOPOLOGICAL {
-			// Undo reversal caused by insertion in opposite
-			// direction.
-			slices.Reverse(dlc.list)
-		}
-	}
-	return dlc.list, nil
-}
-
 func (d *Depset[TReference, TMetadata]) doToList(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	if err := starlark.UnpackArgs(b.Name(), args, kwargs); err != nil {
 		return nil, err
@@ -545,11 +571,16 @@ func (ui *listToDepsetUnpackerInto[TReference, TMetadata]) UnpackInto(thread *st
 		return err
 	}
 
-	d, err := NewDepset[TReference, TMetadata](thread, list, nil, model_starlark_pb.Depset_DEFAULT)
+	identifierGenerator := thread.Local(ReferenceEqualIdentifierGeneratorKey)
+	if identifierGenerator == nil {
+		return errors.New("depsets cannot be created from within this context")
+	}
+
+	dc, err := NewDepsetContents[TReference, TMetadata](thread, list, nil, model_starlark_pb.Depset_DEFAULT)
 	if err != nil {
 		return err
 	}
-	*dst = d
+	*dst = NewDepset(dc, identifierGenerator.(ReferenceEqualIdentifierGenerator))
 	return nil
 }
 

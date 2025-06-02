@@ -212,7 +212,10 @@ var emptyRunfilesValue = &model_starlark_pb.Value{
 	},
 }
 
-func getSingleFileConfiguredTargetValue[TMetadata model_core.WalkableReferenceMetadata](file model_core.PatchedMessage[*model_starlark_pb.File, TMetadata]) PatchedConfiguredTargetValue {
+func getSingleFileConfiguredTargetValue[TMetadata model_core.WalkableReferenceMetadata](
+	file model_core.PatchedMessage[*model_starlark_pb.File, TMetadata],
+	identifierGenerator model_starlark.ReferenceEqualIdentifierGenerator,
+) PatchedConfiguredTargetValue {
 	fileValue := &model_starlark_pb.Value{
 		Kind: &model_starlark_pb.Value_File{
 			File: file.Message,
@@ -252,6 +255,7 @@ func getSingleFileConfiguredTargetValue[TMetadata model_core.WalkableReferenceMe
 													Leaf: fileValue,
 												},
 											}},
+											Identifier: identifierGenerator(),
 										},
 									},
 								},
@@ -559,6 +563,11 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 		), nil
 	case *model_starlark_pb.Target_Definition_PredeclaredOutputFileTarget:
 		// Handcraft a DefaultInfo provider for this source file.
+		identifierGenerator, err := c.getReferenceEqualIdentifierGenerator(model_core.Nested(key, proto.Message(key.Message)))
+		if err != nil {
+			return PatchedConfiguredTargetValue{}, err
+		}
+
 		configurationReference := model_core.Patch(e, model_core.Nested(key, key.Message.ConfigurationReference))
 		return getSingleFileConfiguredTargetValue(
 			model_core.NewPatchedMessage(
@@ -572,6 +581,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 				},
 				configurationReference.Patcher,
 			),
+			identifierGenerator,
 		), nil
 	case *model_starlark_pb.Target_Definition_RuleTarget:
 		ruleTarget := targetKind.RuleTarget
@@ -1193,8 +1203,10 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 					splitAttrValues[namedAttr.Name] = splitAttrValue
 				}
 
-				filesDepset := model_starlark.NewDepsetFromList[TReference, TMetadata](filesDepsetElements, model_starlark_pb.Depset_DEFAULT)
-				filesElements, err := filesDepset.ToList(thread)
+				filesElements, err := model_starlark.NewDepsetContentsFromList[TReference, TMetadata](
+					filesDepsetElements,
+					model_starlark_pb.Depset_DEFAULT,
+				).ToList(thread)
 				if err != nil {
 					return PatchedConfiguredTargetValue{}, fmt.Errorf("converting files depset to list: %w", err)
 				}
@@ -1329,6 +1341,12 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 			)
 		})
 
+		identifierGenerator, err := c.getReferenceEqualIdentifierGenerator(model_core.Nested(key, proto.Message(key.Message)))
+		if err != nil {
+			return PatchedConfiguredTargetValue{}, err
+		}
+		thread.SetLocal(model_starlark.ReferenceEqualIdentifierGeneratorKey, identifierGenerator)
+
 		// Invoke the rule implementation function. Instead of
 		// calling it directly, we call the rule implementation
 		// wrapper function, having both the actual
@@ -1403,6 +1421,13 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 			providerInstancesByIdentifier[providerIdentifier] = providerInstance
 		}
 
+		emptyDepset := model_starlark.NewDepset(
+			model_starlark.NewDepsetContentsFromList[TReference, TMetadata](
+				/* children = */ nil,
+				model_starlark_pb.Depset_DEFAULT,
+			),
+			/* identifierGenerator = */ nil,
+		)
 		defaultInfoProviderInstanceProperties := model_starlark.NewProviderInstanceProperties[TReference, TMetadata](&defaultInfoProviderIdentifier, false, nil)
 		if defaultInfo, ok := providerInstancesByIdentifier[defaultInfoProviderIdentifier]; ok {
 			// Rule returned DefaultInfo. Make sure that
@@ -1422,15 +1447,11 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 				switch attrName {
 				case "data_runfiles", "default_runfiles":
 					if attrValue == starlark.None {
-						attrValue = model_starlark.NewRunfiles(
-							model_starlark.NewDepsetFromList[TReference, TMetadata](nil, model_starlark_pb.Depset_DEFAULT),
-							model_starlark.NewDepsetFromList[TReference, TMetadata](nil, model_starlark_pb.Depset_DEFAULT),
-							model_starlark.NewDepsetFromList[TReference, TMetadata](nil, model_starlark_pb.Depset_DEFAULT),
-						)
+						attrValue = model_starlark.NewRunfiles(emptyDepset, emptyDepset, emptyDepset)
 					}
 				case "files":
 					if attrValue == starlark.None {
-						attrValue = model_starlark.NewDepsetFromList[TReference, TMetadata](nil, model_starlark_pb.Depset_DEFAULT)
+						attrValue = emptyDepset
 					}
 				}
 				newAttrs[attrName] = attrValue
@@ -1442,17 +1463,9 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 			providerInstancesByIdentifier[defaultInfoProviderIdentifier] = model_starlark.NewStructFromDict[TReference, TMetadata](
 				defaultInfoProviderInstanceProperties,
 				map[string]any{
-					"data_runfiles": model_starlark.NewRunfiles[TReference](
-						model_starlark.NewDepsetFromList[TReference, TMetadata](nil, model_starlark_pb.Depset_DEFAULT),
-						model_starlark.NewDepsetFromList[TReference, TMetadata](nil, model_starlark_pb.Depset_DEFAULT),
-						model_starlark.NewDepsetFromList[TReference, TMetadata](nil, model_starlark_pb.Depset_DEFAULT),
-					),
-					"default_runfiles": model_starlark.NewRunfiles[TReference](
-						model_starlark.NewDepsetFromList[TReference, TMetadata](nil, model_starlark_pb.Depset_DEFAULT),
-						model_starlark.NewDepsetFromList[TReference, TMetadata](nil, model_starlark_pb.Depset_DEFAULT),
-						model_starlark.NewDepsetFromList[TReference, TMetadata](nil, model_starlark_pb.Depset_DEFAULT),
-					),
-					"files": model_starlark.NewDepsetFromList[TReference, TMetadata](nil, model_starlark_pb.Depset_DEFAULT),
+					"data_runfiles":    model_starlark.NewRunfiles[TReference](emptyDepset, emptyDepset, emptyDepset),
+					"default_runfiles": model_starlark.NewRunfiles[TReference](emptyDepset, emptyDepset, emptyDepset),
+					"files":            emptyDepset,
 					"files_to_run": model_starlark.NewStructFromDict[TReference, TMetadata](
 						model_starlark.NewProviderInstanceProperties[TReference, TMetadata](&filesToRunProviderIdentifier, false, nil),
 						map[string]any{
@@ -1596,6 +1609,10 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 		), nil
 	case *model_starlark_pb.Target_Definition_SourceFileTarget:
 		// Handcraft a DefaultInfo provider for this source file.
+		identifierGenerator, err := c.getReferenceEqualIdentifierGenerator(model_core.Nested(key, proto.Message(key.Message)))
+		if err != nil {
+			return PatchedConfiguredTargetValue{}, err
+		}
 		return getSingleFileConfiguredTargetValue(
 			model_core.NewSimplePatchedMessage[TMetadata](
 				&model_starlark_pb.File{
@@ -1603,6 +1620,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 					Type:  model_starlark_pb.File_FILE,
 				},
 			),
+			identifierGenerator,
 		), nil
 	default:
 		return PatchedConfiguredTargetValue{}, errors.New("only source file targets and rule targets can be configured")
@@ -1882,12 +1900,13 @@ func (rc *ruleContext[TReference, TMetadata]) AttrNames() []string {
 	return attrNames
 }
 
-func toSymlinkEntryDepset[TReference object.BasicReference, TMetadata BaseComputerReferenceMetadata](v any) *model_starlark.Depset[TReference, TMetadata] {
+func toSymlinkEntryDepset[TReference object.BasicReference, TMetadata BaseComputerReferenceMetadata](v any, identifierGenerator model_starlark.ReferenceEqualIdentifierGenerator) *model_starlark.Depset[TReference, TMetadata] {
+	var entries []any
 	switch typedV := v.(type) {
 	case *model_starlark.Depset[TReference, TMetadata]:
 		return typedV
 	case map[string]string:
-		entries := make([]any, 0, len(typedV))
+		entries = make([]any, 0, len(typedV))
 		for _, path := range slices.Sorted(maps.Keys(typedV)) {
 			entries = append(entries, model_starlark.NewStructFromDict[TReference, TMetadata](
 				nil,
@@ -1897,12 +1916,15 @@ func toSymlinkEntryDepset[TReference object.BasicReference, TMetadata BaseComput
 				},
 			))
 		}
-		return model_starlark.NewDepsetFromList[TReference, TMetadata](entries, model_starlark_pb.Depset_DEFAULT)
 	case nil:
-		return model_starlark.NewDepsetFromList[TReference, TMetadata](nil, model_starlark_pb.Depset_DEFAULT)
+		// Return an empty depset.
 	default:
 		panic("unknown type")
 	}
+	return model_starlark.NewDepset(
+		model_starlark.NewDepsetContentsFromList[TReference, TMetadata](entries, model_starlark_pb.Depset_DEFAULT),
+		identifierGenerator,
+	)
 }
 
 func (ruleContext[TReference, TMetadata]) doRunfiles(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -1924,10 +1946,19 @@ func (ruleContext[TReference, TMetadata]) doRunfiles(thread *starlark.Thread, b 
 		return nil, err
 	}
 
-	if transitiveFiles == nil {
-		transitiveFiles = model_starlark.NewDepsetFromList[TReference, TMetadata](nil, model_starlark_pb.Depset_DEFAULT)
+	identifierGeneratorValue := thread.Local(model_starlark.ReferenceEqualIdentifierGeneratorKey)
+	if identifierGeneratorValue == nil {
+		return nil, errors.New("depsets cannot be created from within this context")
 	}
-	filesDepset, err := model_starlark.NewDepset(
+	identifierGenerator := identifierGeneratorValue.(model_starlark.ReferenceEqualIdentifierGenerator)
+
+	if transitiveFiles == nil {
+		transitiveFiles = model_starlark.NewDepset(
+			model_starlark.NewDepsetContentsFromList[TReference, TMetadata](nil, model_starlark_pb.Depset_DEFAULT),
+			nil,
+		)
+	}
+	filesDepsetContents, err := model_starlark.NewDepsetContents(
 		thread,
 		files,
 		[]*model_starlark.Depset[TReference, TMetadata]{transitiveFiles},
@@ -1938,9 +1969,9 @@ func (ruleContext[TReference, TMetadata]) doRunfiles(thread *starlark.Thread, b 
 	}
 
 	return model_starlark.NewRunfiles(
-		filesDepset,
-		toSymlinkEntryDepset[TReference, TMetadata](rootSymlinks),
-		toSymlinkEntryDepset[TReference, TMetadata](symlinks),
+		model_starlark.NewDepset(filesDepsetContents, identifierGenerator),
+		toSymlinkEntryDepset[TReference, TMetadata](rootSymlinks, identifierGenerator),
+		toSymlinkEntryDepset[TReference, TMetadata](symlinks, identifierGenerator),
 	), nil
 }
 
@@ -2535,7 +2566,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 		}
 	}
 
-	mergedInputs, err := model_starlark.NewDepset(thread, inputsDirect, inputsTransitive, model_starlark_pb.Depset_DEFAULT)
+	mergedInputs, err := model_starlark.NewDepsetContents(thread, inputsDirect, inputsTransitive, model_starlark_pb.Depset_DEFAULT)
 	if err != nil {
 		return nil, err
 	}
@@ -2544,7 +2575,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 		return nil, err
 	}
 
-	mergedTools, err := model_starlark.NewDepset[TReference, TMetadata](thread, toolsDirect, nil, model_starlark_pb.Depset_DEFAULT)
+	mergedTools, err := model_starlark.NewDepsetContents[TReference, TMetadata](thread, toolsDirect, nil, model_starlark_pb.Depset_DEFAULT)
 	if err != nil {
 		return nil, err
 	}
