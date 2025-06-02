@@ -370,7 +370,7 @@ genrule = rule(
         "output_to_bindir": attr.bool(),
         "outs": attr.output_list(mandatory = True),
         "srcs": attr.label_list(allow_files = True),
-        "tools": attr.label_list(allow_files = True),
+        "tools": attr.label_list(allow_files = True, cfg = "exec"),
         "_genrule_setup": attr.label(
             allow_single_file = True,
             default = "@bazel_tools//tools/genrule:genrule-setup.sh",
