@@ -1209,6 +1209,7 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 				dictLike := false
 				var fields any
 				var init *NamedFunction[TReference, TMetadata]
+				typeName := ""
 				if err := starlark.UnpackArgs(
 					b.Name(), args, kwargs,
 					// Positional arguments.
@@ -1221,6 +1222,7 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 						unpack.Decay(unpack.List(unpack.String)),
 					}))),
 					"init?", unpack.Bind(thread, &init, unpack.Pointer(namedFunctionUnpackerInto)),
+					"type_name?", unpack.Bind(thread, &typeName, unpack.String),
 				); err != nil {
 					return nil, err
 				}
@@ -1238,7 +1240,7 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 				sort.Strings(fieldNames)
 				fieldNames = slices.Compact(fieldNames)
 
-				instanceProperties := NewProviderInstanceProperties(nil, dictLike, computedFields)
+				instanceProperties := NewProviderInstanceProperties(nil, dictLike, computedFields, typeName)
 
 				// If an init function is provided, we're
 				// supposed to return both the provider with

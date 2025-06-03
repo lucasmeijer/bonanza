@@ -84,6 +84,7 @@ runfiles, _runfiles_raw = provider(
         "merge_all": _runfiles_merge_all,
     },
     init = _runfiles_init,
+    type_name = "runfiles",
 )
 
 _runfiles = runfiles

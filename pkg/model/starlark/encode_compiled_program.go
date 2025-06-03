@@ -881,7 +881,7 @@ func decodeProviderInstanceProperties[TReference object.BasicReference, TMetadat
 		)
 	}
 
-	return NewProviderInstanceProperties(&providerIdentifier, m.Message.DictLike, computedFields), nil
+	return NewProviderInstanceProperties(&providerIdentifier, m.Message.DictLike, computedFields, m.Message.TypeName), nil
 }
 
 func decodeToolchainType[TReference any, TMetadata model_core.CloneableReferenceMetadata](toolchainType *model_starlark_pb.ToolchainType) (*ToolchainType[TReference, TMetadata], error) {

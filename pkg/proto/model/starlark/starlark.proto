@@ -564,6 +564,9 @@ message Provider {
     // the struct itself. This is needed to properly implement types
     // such as LibraryToLink.
     repeated ComputedField computed_fields = 3;
+
+    // If non-empty, let type(v) return the provided string value.
+    string type_name = 4;
   }
 
   // Properties that affect the behavior of structs that are created

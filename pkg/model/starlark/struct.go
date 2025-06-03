@@ -99,11 +99,13 @@ func (s *Struct[TReference, TMetadata]) String() string {
 }
 
 // Type returns the name of the type of a Starlark struct value.
-//
-// Even though we could implement this function so that it returns the
-// name of the provider for provider instances, this is not what Bazel
-// does.
-func (Struct[TReference, TMetadata]) Type() string {
+func (s *Struct[TReference, TMetadata]) Type() string {
+	if s.providerInstanceProperties != nil && s.providerInstanceProperties.typeName != "" {
+		// Type that in this implementation is written in pure
+		// Starlark, but in Bazel is implemented in Java as a
+		// custom type.
+		return s.providerInstanceProperties.typeName
+	}
 	return "struct"
 }
 

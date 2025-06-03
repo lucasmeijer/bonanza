@@ -20,6 +20,7 @@ type ProviderInstanceProperties[TReference any, TMetadata model_core.CloneableRe
 	LateNamedValue
 	dictLike       bool
 	computedFields map[string]NamedFunction[TReference, TMetadata]
+	typeName       string
 }
 
 func (pip *ProviderInstanceProperties[TReference, TMetadata]) Encode(path map[starlark.Value]struct{}, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.Provider_InstanceProperties, TMetadata], bool, error) {
@@ -48,18 +49,20 @@ func (pip *ProviderInstanceProperties[TReference, TMetadata]) Encode(path map[st
 			ProviderIdentifier: pip.Identifier.String(),
 			DictLike:           pip.dictLike,
 			ComputedFields:     computedFields,
+			TypeName:           pip.typeName,
 		},
 		patcher,
 	), needsCode, nil
 }
 
-func NewProviderInstanceProperties[TReference any, TMetadata model_core.CloneableReferenceMetadata](identifier *pg_label.CanonicalStarlarkIdentifier, dictLike bool, computedFields map[string]NamedFunction[TReference, TMetadata]) *ProviderInstanceProperties[TReference, TMetadata] {
+func NewProviderInstanceProperties[TReference any, TMetadata model_core.CloneableReferenceMetadata](identifier *pg_label.CanonicalStarlarkIdentifier, dictLike bool, computedFields map[string]NamedFunction[TReference, TMetadata], typeName string) *ProviderInstanceProperties[TReference, TMetadata] {
 	return &ProviderInstanceProperties[TReference, TMetadata]{
 		LateNamedValue: LateNamedValue{
 			Identifier: identifier,
 		},
 		dictLike:       dictLike,
 		computedFields: computedFields,
+		typeName:       typeName,
 	}
 }
 
