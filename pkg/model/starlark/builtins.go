@@ -830,10 +830,10 @@ func GetBuiltins[TReference object.BasicReference, TMetadata model_core.Cloneabl
 				if err := starlark.UnpackArgs(
 					b.Name(), args, kwargs,
 					// Positional arguments.
-					"direct?", unpack.Bind(thread, &direct, unpack.List(unpack.Any)),
+					"direct?", unpack.Bind(thread, &direct, unpack.IfNotNone(unpack.List(unpack.Any))),
 					// Keyword arguments.
 					"order?", unpack.Bind(thread, &order, unpack.String),
-					"transitive?", unpack.Bind(thread, &transitive, unpack.List(unpack.Type[*Depset[TReference, TMetadata]]("depset"))),
+					"transitive?", unpack.Bind(thread, &transitive, unpack.IfNotNone(unpack.List(unpack.Type[*Depset[TReference, TMetadata]]("depset")))),
 				); err != nil {
 					return nil, err
 				}

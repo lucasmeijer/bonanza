@@ -117,7 +117,7 @@ func (p *Provider[TReference, TMetadata]) Name() string {
 	return "provider"
 }
 
-func (p *Provider[TReference, TMetadata]) CallInternal(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+func (p *Provider[TReference, TMetadata]) Instantiate(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (*Struct[TReference, TMetadata], error) {
 	var fields map[string]any
 	if p.initFunction == nil {
 		// Trivially constructible provider.
@@ -158,6 +158,10 @@ func (p *Provider[TReference, TMetadata]) CallInternal(thread *starlark.Thread, 
 	}
 
 	return NewStructFromDict[TReference, TMetadata](p.ProviderInstanceProperties, fields), nil
+}
+
+func (p *Provider[TReference, TMetadata]) CallInternal(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	return p.Instantiate(thread, args, kwargs)
 }
 
 func (p *Provider[TReference, TMetadata]) EncodeValue(path map[starlark.Value]struct{}, currentIdentifier *pg_label.CanonicalStarlarkIdentifier, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.Value, TMetadata], bool, error) {

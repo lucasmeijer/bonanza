@@ -1,5 +1,11 @@
 load("@bazel_tools//fragments:fragment_info.bzl", "FragmentInfo")
-load("//:exports.bzl", "PlatformInfo", "TemplateVariableInfo")
+load(
+    "//:exports.bzl",
+    "PlatformInfo",
+    "SymlinkEntry",
+    "TemplateVariableInfo",
+    "runfiles",
+)
 
 def _wrap_actions(actions, bin_dir, label):
     def actions_declare_shareable_artifact(path, artifact_root = None):
@@ -37,6 +43,17 @@ def _maybe_add_ctx_fragments(ctx_fields, fragments):
             fragment.label.name: fragment[FragmentInfo]
             for fragment in fragments
         })
+
+def _to_symlink_entry_depset(v):
+    if type(v) != "depset":
+        return depset([
+            SymlinkEntry(
+                path = path,
+                target_file = target_file,
+            )
+            for path, target_file in v.items()
+        ])
+    return v
 
 def _wrap_rule_ctx(ctx):
     def ctx_coverage_instrumented(target = None):
@@ -79,11 +96,10 @@ def _wrap_rule_ctx(ctx):
         return result
 
     def ctx_runfiles(files = [], transitive_files = None, collect_data = False, collect_default = False, symlinks = {}, root_symlinks = {}):
-        direct = ctx.runfiles(
-            files = files,
-            transitive_files = transitive_files,
-            symlinks = symlinks,
-            root_symlinks = root_symlinks,
+        direct = runfiles(
+            files = depset(direct = files, transitive = [transitive_files] if transitive_files else []),
+            symlinks = _to_symlink_entry_depset(symlinks),
+            root_symlinks = _to_symlink_entry_depset(root_symlinks),
         )
         if collect_data or collect_default:
             # TODO: Implement this feature!

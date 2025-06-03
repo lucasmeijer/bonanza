@@ -609,6 +609,16 @@ message DirectoryReaders {
   message Key {}
 }
 
+message EmptyDefaultInfo {
+  message Key {}
+
+  message Value {
+    // An instance of DefaultInfo that has all of its fields set to
+    // their default values.
+    bonanza.model.starlark.Struct default_info = 1;
+  }
+}
+
 message ExecTransition {
   message Key {
     // The label of the platform that was resolved for the exec group

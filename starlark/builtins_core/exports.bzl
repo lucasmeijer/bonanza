@@ -19,6 +19,7 @@ PlatformInfo = provider()
 ProguardSpecProvider = provider()
 PyInfo = provider()
 StaticallyLinkedMarkerProvider = provider()
+SymlinkEntry = provider()
 ToolchainInfo = provider()
 ToolchainTypeInfo = provider()
 
@@ -47,6 +48,44 @@ def _cc_native_library_info_init(*, libraries_to_link = None):
 
 CcNativeLibraryInfo, _CcNativeLibraryInfoRaw = provider(init = _cc_native_library_info_init)
 
+def _runfiles_init(*, files = None, root_symlinks = None, symlinks = None):
+    return {
+        "empty_filenames": depset(),
+        "files": files or depset(),
+        "root_symlinks": root_symlinks or depset(),
+        "symlinks": symlinks or depset(),
+    }
+
+def _runfiles_merge(r):
+    def merge(other):
+        return runfiles(
+            files = depset(transitive = [r.files, other.files]),
+            root_symlinks = depset(transitive = [r.root_symlinks, other.root_symlinks]),
+            symlinks = depset(transitive = [r.symlinks, other.symlinks]),
+        )
+
+    return merge
+
+def _runfiles_merge_all(r):
+    def merge_all(other):
+        return runfiles(
+            files = depset(transitive = [r.files] + [o.files for o in other]),
+            root_symlinks = depset(transitive = [r.root_symlinks] + [o.root_symlinks for o in other]),
+            symlinks = depset(transitive = [r.symlinks] + [o.symlinks for o in other]),
+        )
+
+    return merge_all
+
+runfiles, _runfiles_raw = provider(
+    computed_fields = {
+        "merge": _runfiles_merge,
+        "merge_all": _runfiles_merge_all,
+    },
+    init = _runfiles_init,
+)
+
+_runfiles = runfiles
+
 def _default_info_init(*, data_runfiles = None, default_runfiles = None, executable = None, files = None, runfiles = None):
     if runfiles:
         if data_runfiles or default_runfiles:
@@ -54,9 +93,9 @@ def _default_info_init(*, data_runfiles = None, default_runfiles = None, executa
         default_runfiles = runfiles
 
     return {
-        "data_runfiles": data_runfiles,
-        "default_runfiles": default_runfiles,
-        "files": files,
+        "data_runfiles": data_runfiles or _runfiles(),
+        "default_runfiles": default_runfiles or _runfiles(),
+        "files": files or depset(),
         "files_to_run": FilesToRunProvider(
             executable = executable,
             repo_mapping_manifest = None,

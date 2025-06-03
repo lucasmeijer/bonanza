@@ -14,6 +14,39 @@ import (
 )
 
 // AllListLeafElementsDeduplicatingParents walks over a list and returns
+// all leaf elements contained within.
+func AllListLeafElements[TReference object.BasicReference](
+	ctx context.Context,
+	reader model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[[]*model_starlark_pb.List_Element, TReference]],
+	rootList model_core.Message[[]*model_starlark_pb.List_Element, TReference],
+	errOut *error,
+) iter.Seq[model_core.Message[*model_starlark_pb.Value, TReference]] {
+	allLeaves := btree.AllLeaves(
+		ctx,
+		reader,
+		rootList,
+		func(element model_core.Message[*model_starlark_pb.List_Element, TReference]) (*model_core_pb.DecodableReference, error) {
+			if level, ok := element.Message.Level.(*model_starlark_pb.List_Element_Parent_); ok {
+				return level.Parent.Reference, nil
+			}
+			return nil, nil
+		},
+		errOut,
+	)
+	return func(yield func(model_core.Message[*model_starlark_pb.Value, TReference]) bool) {
+		allLeaves(func(entry model_core.Message[*model_starlark_pb.List_Element, TReference]) bool {
+			switch level := entry.Message.Level.(type) {
+			case *model_starlark_pb.List_Element_Leaf:
+				return yield(model_core.Nested(entry, level.Leaf))
+			default:
+				*errOut = errors.New("not a valid leaf entry")
+				return false
+			}
+		})
+	}
+}
+
+// AllListLeafElementsDeduplicatingParents walks over a list and returns
 // all leaf elements contained within. In the process, it records which
 // parent elements are encountered and skips duplicates.
 //

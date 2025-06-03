@@ -33,7 +33,6 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"go.starlark.net/starlark"
@@ -154,120 +153,142 @@ func (c *baseComputer[TReference, TMetadata]) constraintValuesToConstraints(ctx 
 	return sortedConstraints, nil
 }
 
-func getDefaultInfoSimpleFilesToRun(executable *model_starlark_pb.Value) *model_starlark_pb.List_Element {
-	return &model_starlark_pb.List_Element{
-		Level: &model_starlark_pb.List_Element_Leaf{
-			Leaf: &model_starlark_pb.Value{
-				Kind: &model_starlark_pb.Value_Struct{
-					Struct: &model_starlark_pb.Struct{
-						ProviderInstanceProperties: &model_starlark_pb.Provider_InstanceProperties{
-							ProviderIdentifier: filesToRunProviderIdentifier.String(),
+// mapStructFields creates a struct that has the same provider type and
+// fields as an originally provided struct, but has its fields mapped to
+// potentially different values.
+func (c *baseComputer[TReference, TMetadata]) mapStructFields(
+	ctx context.Context,
+	e ConfiguredTargetEnvironment[TReference, TMetadata],
+	in model_core.Message[*model_starlark_pb.Struct, TReference],
+	fieldMapper func(name string, value model_core.Message[*model_starlark_pb.Value, TReference]) (any, error),
+) (model_core.PatchedMessage[*model_starlark_pb.Struct, TMetadata], error) {
+	fields := map[string]any{}
+	var errIter error
+	for name, value := range model_starlark.AllStructFields(
+		ctx,
+		c.valueReaders.List,
+		model_core.Nested(in, in.Message.GetFields()),
+		&errIter,
+	) {
+		mappedValue, err := fieldMapper(name, value)
+		if err != nil {
+			return model_core.PatchedMessage[*model_starlark_pb.Struct, TMetadata]{}, fmt.Errorf("field %#v: %w", name, err)
+		}
+		fields[name] = mappedValue
+	}
+	if errIter != nil {
+		return model_core.PatchedMessage[*model_starlark_pb.Struct, TMetadata]{}, errIter
+	}
+
+	encodedFields, _, err := model_starlark.NewStructFromDict[TReference, TMetadata](nil, fields).
+		EncodeStructFields(map[starlark.Value]struct{}{}, c.getValueEncodingOptions(e, nil))
+	if err != nil {
+		return model_core.PatchedMessage[*model_starlark_pb.Struct, TMetadata]{}, err
+	}
+
+	providerInstanceProperties := model_core.Patch(e, model_core.Nested(in, in.Message.GetProviderInstanceProperties()))
+	patcher := encodedFields.Patcher
+	patcher.Merge(providerInstanceProperties.Patcher)
+	return model_core.NewPatchedMessage(
+		&model_starlark_pb.Struct{
+			ProviderInstanceProperties: providerInstanceProperties.Message,
+			Fields:                     encodedFields.Message,
+		},
+		patcher,
+	), nil
+}
+
+// getSingleFileConfiguredTargetValue creates a DefaultInfo that
+// references a single file. This is used to create the DefaultInfo
+// instances of source files and predeclared output files.
+func (c *baseComputer[TReference, TMetadata]) getSingleFileConfiguredTargetValue(
+	ctx context.Context,
+	e ConfiguredTargetEnvironment[TReference, TMetadata],
+	emptyDefaultInfo model_core.Message[*model_starlark_pb.Struct, TReference],
+	file model_core.Message[*model_starlark_pb.File, TReference],
+	identifierGenerator model_starlark.ReferenceEqualIdentifierGenerator,
+) (PatchedConfiguredTargetValue, error) {
+	newDefaultInfo, err := c.mapStructFields(
+		ctx,
+		e,
+		emptyDefaultInfo,
+		func(name string, value model_core.Message[*model_starlark_pb.Value, TReference]) (any, error) {
+			switch name {
+			case "files":
+				return model_starlark.NewDepset(
+					model_starlark.NewDepsetContentsFromList[TReference, TMetadata](
+						[]any{
+							model_core.Nested(
+								file,
+								&model_starlark_pb.List_Element{
+									Level: &model_starlark_pb.List_Element_Leaf{
+										Leaf: &model_starlark_pb.Value{
+											Kind: &model_starlark_pb.Value_File{
+												File: file.Message,
+											},
+										},
+									},
+								},
+							),
 						},
-						Fields: &model_starlark_pb.Struct_Fields{
-							Keys: []string{
-								"executable",
-								"repo_mapping_manifest",
-								"runfiles_manifest",
-							},
-							Values: []*model_starlark_pb.List_Element{
-								{
-									Level: &model_starlark_pb.List_Element_Leaf{
-										Leaf: executable,
+						model_starlark_pb.Depset_DEFAULT,
+					),
+					identifierGenerator,
+				), nil
+			case "files_to_run":
+				filesToRun, ok := value.Message.Kind.(*model_starlark_pb.Value_Struct)
+				if !ok {
+					return nil, errors.New("not a FilesToRunProvider")
+				}
+				patchedFilesToRun, err := c.mapStructFields(
+					ctx,
+					e,
+					model_core.Nested(value, filesToRun.Struct),
+					func(name string, value model_core.Message[*model_starlark_pb.Value, TReference]) (any, error) {
+						switch name {
+						case "executable":
+							return model_core.Nested(
+								file,
+								&model_starlark_pb.Value{
+									Kind: &model_starlark_pb.Value_File{
+										File: file.Message,
 									},
 								},
-								{
-									Level: &model_starlark_pb.List_Element_Leaf{
-										Leaf: &model_starlark_pb.Value{
-											Kind: &model_starlark_pb.Value_None{
-												None: &emptypb.Empty{},
-											},
-										},
-									},
-								},
-								{
-									Level: &model_starlark_pb.List_Element_Leaf{
-										Leaf: &model_starlark_pb.Value{
-											Kind: &model_starlark_pb.Value_None{
-												None: &emptypb.Empty{},
-											},
-										},
-									},
-								},
-							},
+							), nil
+						default:
+							return value, nil
+						}
+					},
+				)
+				if err != nil {
+					return nil, err
+				}
+				newFilesToRun := model_core.Unpatch(e, patchedFilesToRun)
+				return model_core.Nested(
+					newFilesToRun,
+					&model_starlark_pb.Value{
+						Kind: &model_starlark_pb.Value_Struct{
+							Struct: newFilesToRun.Message,
 						},
 					},
-				},
-			},
+				), nil
+			default:
+				return value, nil
+			}
 		},
+	)
+	if err != nil {
+		return PatchedConfiguredTargetValue{}, err
 	}
-}
 
-var emptyRunfilesValue = &model_starlark_pb.Value{
-	Kind: &model_starlark_pb.Value_Runfiles{
-		Runfiles: &model_starlark_pb.Runfiles{
-			Files:        &model_starlark_pb.Depset{},
-			RootSymlinks: &model_starlark_pb.Depset{},
-			Symlinks:     &model_starlark_pb.Depset{},
-		},
-	},
-}
-
-func getSingleFileConfiguredTargetValue[TMetadata model_core.WalkableReferenceMetadata](
-	file model_core.PatchedMessage[*model_starlark_pb.File, TMetadata],
-	identifierGenerator model_starlark.ReferenceEqualIdentifierGenerator,
-) PatchedConfiguredTargetValue {
-	fileValue := &model_starlark_pb.Value{
-		Kind: &model_starlark_pb.Value_File{
-			File: file.Message,
-		},
-	}
 	return model_core.NewPatchedMessage(
 		&model_analysis_pb.ConfiguredTarget_Value{
-			ProviderInstances: []*model_starlark_pb.Struct{{
-				ProviderInstanceProperties: &model_starlark_pb.Provider_InstanceProperties{
-					ProviderIdentifier: defaultInfoProviderIdentifier.String(),
-				},
-				Fields: &model_starlark_pb.Struct_Fields{
-					Keys: []string{
-						"data_runfiles",
-						"default_runfiles",
-						"files",
-						"files_to_run",
-					},
-					Values: []*model_starlark_pb.List_Element{
-						{
-							Level: &model_starlark_pb.List_Element_Leaf{
-								Leaf: emptyRunfilesValue,
-							},
-						},
-						{
-							Level: &model_starlark_pb.List_Element_Leaf{
-								Leaf: emptyRunfilesValue,
-							},
-						},
-						{
-							Level: &model_starlark_pb.List_Element_Leaf{
-								Leaf: &model_starlark_pb.Value{
-									Kind: &model_starlark_pb.Value_Depset{
-										Depset: &model_starlark_pb.Depset{
-											Elements: []*model_starlark_pb.List_Element{{
-												Level: &model_starlark_pb.List_Element_Leaf{
-													Leaf: fileValue,
-												},
-											}},
-											Identifier: identifierGenerator(),
-										},
-									},
-								},
-							},
-						},
-						getDefaultInfoSimpleFilesToRun(fileValue),
-					},
-				},
-			}},
+			ProviderInstances: []*model_starlark_pb.Struct{
+				newDefaultInfo.Message,
+			},
 		},
-		model_core.MapReferenceMetadataToWalkers(file.Patcher),
-	)
+		model_core.MapReferenceMetadataToWalkers(newDefaultInfo.Patcher),
+	), nil
 }
 
 func getAttrValueParts[TReference object.BasicReference, TMetadata model_core.WalkableReferenceMetadata](
@@ -501,57 +522,22 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 	if err != nil {
 		return PatchedConfiguredTargetValue{}, fmt.Errorf("invalid target label: %w", err)
 	}
+	emptyDefaultInfoValue := e.GetEmptyDefaultInfoValue(&model_analysis_pb.EmptyDefaultInfo_Key{})
 	targetValue := e.GetTargetValue(&model_analysis_pb.Target_Key{
 		Label: targetLabel.String(),
 	})
-	if !targetValue.IsSet() {
+	if !emptyDefaultInfoValue.IsSet() || !targetValue.IsSet() {
 		return PatchedConfiguredTargetValue{}, evaluation.ErrMissingDependency
 	}
 
+	emptyDefaultInfo := model_core.Nested(emptyDefaultInfoValue, emptyDefaultInfoValue.Message.DefaultInfo)
 	switch targetKind := targetValue.Message.Definition.GetKind().(type) {
 	case *model_starlark_pb.Target_Definition_PackageGroup:
-		return model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](
+		patchedDefaultInfo := model_core.Patch(e, emptyDefaultInfo)
+		return model_core.NewPatchedMessage(
 			&model_analysis_pb.ConfiguredTarget_Value{
 				ProviderInstances: []*model_starlark_pb.Struct{
-					{
-						ProviderInstanceProperties: &model_starlark_pb.Provider_InstanceProperties{
-							ProviderIdentifier: defaultInfoProviderIdentifier.String(),
-						},
-						Fields: &model_starlark_pb.Struct_Fields{
-							Keys: []string{
-								"data_runfiles",
-								"default_runfiles",
-								"files",
-								"files_to_run",
-							},
-							Values: []*model_starlark_pb.List_Element{
-								{
-									Level: &model_starlark_pb.List_Element_Leaf{
-										Leaf: emptyRunfilesValue,
-									},
-								},
-								{
-									Level: &model_starlark_pb.List_Element_Leaf{
-										Leaf: emptyRunfilesValue,
-									},
-								},
-								{
-									Level: &model_starlark_pb.List_Element_Leaf{
-										Leaf: &model_starlark_pb.Value{
-											Kind: &model_starlark_pb.Value_Depset{
-												Depset: &model_starlark_pb.Depset{},
-											},
-										},
-									},
-								},
-								getDefaultInfoSimpleFilesToRun(&model_starlark_pb.Value{
-									Kind: &model_starlark_pb.Value_None{
-										None: &emptypb.Empty{},
-									},
-								}),
-							},
-						},
-					},
+					patchedDefaultInfo.Message,
 					{
 						ProviderInstanceProperties: &model_starlark_pb.Provider_InstanceProperties{
 							ProviderIdentifier: packageSpecificationInfoProviderIdentifier.String(),
@@ -560,6 +546,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 					},
 				},
 			},
+			model_core.MapReferenceMetadataToWalkers(patchedDefaultInfo.Patcher),
 		), nil
 	case *model_starlark_pb.Target_Definition_PredeclaredOutputFileTarget:
 		// Handcraft a DefaultInfo provider for this source file.
@@ -568,21 +555,23 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 			return PatchedConfiguredTargetValue{}, err
 		}
 
-		configurationReference := model_core.Patch(e, model_core.Nested(key, key.Message.ConfigurationReference))
-		return getSingleFileConfiguredTargetValue(
-			model_core.NewPatchedMessage(
+		return c.getSingleFileConfiguredTargetValue(
+			ctx,
+			e,
+			emptyDefaultInfo,
+			model_core.Nested(
+				key,
 				&model_starlark_pb.File{
 					Owner: &model_starlark_pb.File_Owner{
-						ConfigurationReference: configurationReference.Message,
+						ConfigurationReference: key.Message.ConfigurationReference,
 						TargetName:             targetKind.PredeclaredOutputFileTarget.OwnerTargetName,
 					},
 					Label: targetLabel.String(),
 					Type:  model_starlark_pb.File_FILE,
 				},
-				configurationReference.Patcher,
 			),
 			identifierGenerator,
-		), nil
+		)
 	case *model_starlark_pb.Target_Definition_RuleTarget:
 		ruleTarget := targetKind.RuleTarget
 		ruleIdentifier, err := label.NewCanonicalStarlarkIdentifier(ruleTarget.RuleIdentifier)
@@ -1409,91 +1398,41 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 
 		// Convert list of providers to a map where the provider
 		// identifier is the key.
-		providerInstancesByIdentifier := make(map[label.CanonicalStarlarkIdentifier]*model_starlark.Struct[TReference, TMetadata], len(providerInstances))
+		providersSeen := make(map[label.CanonicalStarlarkIdentifier]struct{}, len(providerInstances))
+		encodedProviderInstances := make([]*model_starlark_pb.Struct, 0, len(providerInstances)+1)
+		patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
 		for i, providerInstance := range providerInstances {
 			providerIdentifier, err := providerInstance.GetProviderIdentifier()
 			if err != nil {
 				return PatchedConfiguredTargetValue{}, fmt.Errorf("struct returned at index %d: %w", i, err)
 			}
-			if _, ok := providerInstancesByIdentifier[providerIdentifier]; ok {
+			if _, ok := providersSeen[providerIdentifier]; ok {
 				return PatchedConfiguredTargetValue{}, fmt.Errorf("implementation function returned multiple structs for provider %#v", providerIdentifier.String())
 			}
-			providerInstancesByIdentifier[providerIdentifier] = providerInstance
-		}
+			providersSeen[providerIdentifier] = struct{}{}
 
-		emptyDepset := model_starlark.NewDepset(
-			model_starlark.NewDepsetContentsFromList[TReference, TMetadata](
-				/* children = */ nil,
-				model_starlark_pb.Depset_DEFAULT,
-			),
-			/* identifierGenerator = */ nil,
-		)
-		defaultInfoProviderInstanceProperties := model_starlark.NewProviderInstanceProperties[TReference, TMetadata](&defaultInfoProviderIdentifier, false, nil)
-		if defaultInfo, ok := providerInstancesByIdentifier[defaultInfoProviderIdentifier]; ok {
-			// Rule returned DefaultInfo. Make sure that
-			// "data_runfiles", "default_runfiles" and
-			// "files" are not set to None.
-			//
-			// Ideally we'd do this as part of DefaultInfo's
-			// init function, but runfiles objects can only
-			// be constructed via ctx.
-			attrNames := defaultInfo.AttrNames()
-			newAttrs := make(map[string]any, len(attrNames))
-			for _, attrName := range attrNames {
-				attrValue, err := defaultInfo.Attr(thread, attrName)
-				if err != nil {
-					return PatchedConfiguredTargetValue{}, err
-				}
-				switch attrName {
-				case "data_runfiles", "default_runfiles":
-					if attrValue == starlark.None {
-						attrValue = model_starlark.NewRunfiles(emptyDepset, emptyDepset, emptyDepset)
-					}
-				case "files":
-					if attrValue == starlark.None {
-						attrValue = emptyDepset
-					}
-				}
-				newAttrs[attrName] = attrValue
-			}
-			providerInstancesByIdentifier[defaultInfoProviderIdentifier] = model_starlark.NewStructFromDict[TReference, TMetadata](defaultInfoProviderInstanceProperties, newAttrs)
-		} else {
-			// Rule did not return DefaultInfo. Return an
-			// empty one.
-			providerInstancesByIdentifier[defaultInfoProviderIdentifier] = model_starlark.NewStructFromDict[TReference, TMetadata](
-				defaultInfoProviderInstanceProperties,
-				map[string]any{
-					"data_runfiles":    model_starlark.NewRunfiles[TReference](emptyDepset, emptyDepset, emptyDepset),
-					"default_runfiles": model_starlark.NewRunfiles[TReference](emptyDepset, emptyDepset, emptyDepset),
-					"files":            emptyDepset,
-					"files_to_run": model_starlark.NewStructFromDict[TReference, TMetadata](
-						model_starlark.NewProviderInstanceProperties[TReference, TMetadata](&filesToRunProviderIdentifier, false, nil),
-						map[string]any{
-							"executable":            starlark.None,
-							"repo_mapping_manifest": starlark.None,
-							"runfiles_manifest":     starlark.None,
-						},
-					),
-				},
-			)
-		}
-
-		encodedProviderInstances := make([]*model_starlark_pb.Struct, 0, len(providerInstancesByIdentifier))
-		patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
-		for _, providerIdentifier := range slices.SortedFunc(
-			maps.Keys(providerInstancesByIdentifier),
-			func(a, b label.CanonicalStarlarkIdentifier) int {
-				return strings.Compare(a.String(), b.String())
-			},
-		) {
-			v, _, err := providerInstancesByIdentifier[providerIdentifier].
-				Encode(map[starlark.Value]struct{}{}, c.getValueEncodingOptions(e, nil))
+			v, _, err := providerInstance.Encode(map[starlark.Value]struct{}{}, c.getValueEncodingOptions(e, nil))
 			if err != nil {
 				return PatchedConfiguredTargetValue{}, err
 			}
 			encodedProviderInstances = append(encodedProviderInstances, v.Message)
 			patcher.Merge(v.Patcher)
 		}
+
+		// If the rule did not return an instance of
+		// DefaultInfo, inject an empty instance.
+		if _, ok := providersSeen[defaultInfoProviderIdentifier]; !ok {
+			patchedDefaultInfo := model_core.Patch(e, emptyDefaultInfo)
+			encodedProviderInstances = append(encodedProviderInstances, patchedDefaultInfo.Message)
+			patcher.Merge(patchedDefaultInfo.Patcher)
+		}
+
+		slices.SortFunc(encodedProviderInstances, func(a, b *model_starlark_pb.Struct) int {
+			return strings.Compare(
+				a.ProviderInstanceProperties.ProviderIdentifier,
+				b.ProviderInstanceProperties.ProviderIdentifier,
+			)
+		})
 
 		// Construct list of outputs of the target.
 		outputsTreeBuilder := btree.NewSplitProllyBuilder(
@@ -1613,15 +1552,18 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 		if err != nil {
 			return PatchedConfiguredTargetValue{}, err
 		}
-		return getSingleFileConfiguredTargetValue(
-			model_core.NewSimplePatchedMessage[TMetadata](
+		return c.getSingleFileConfiguredTargetValue(
+			ctx,
+			e,
+			emptyDefaultInfo,
+			model_core.NewSimpleMessage[TReference](
 				&model_starlark_pb.File{
 					Label: targetLabel.String(),
 					Type:  model_starlark_pb.File_FILE,
 				},
 			),
 			identifierGenerator,
-		), nil
+		)
 	default:
 		return PatchedConfiguredTargetValue{}, errors.New("only source file targets and rule targets can be configured")
 	}
@@ -1854,8 +1796,6 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 		return model_starlark.NewLabel[TReference, TMetadata](rc.targetLabel.AsResolved()), nil
 	case "outputs":
 		return rc.outputs, nil
-	case "runfiles":
-		return starlark.NewBuiltin("ctx.runfiles", rc.doRunfiles), nil
 	case "split_attr":
 		return rc.splitAttr, nil
 	case "version_file":
@@ -1887,7 +1827,6 @@ var ruleContextAttrNames = []string{
 	"info_file",
 	"label",
 	"outputs",
-	"runfiles",
 	"split_attr",
 	"version_file",
 }
@@ -1925,54 +1864,6 @@ func toSymlinkEntryDepset[TReference object.BasicReference, TMetadata BaseComput
 		model_starlark.NewDepsetContentsFromList[TReference, TMetadata](entries, model_starlark_pb.Depset_DEFAULT),
 		identifierGenerator,
 	)
-}
-
-func (ruleContext[TReference, TMetadata]) doRunfiles(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	var files []starlark.Value
-	var transitiveFiles *model_starlark.Depset[TReference, TMetadata]
-	var symlinks any
-	var rootSymlinks any
-	symlinksUnpackerInto := unpack.Or([]unpack.UnpackerInto[any]{
-		unpack.Decay(unpack.Dict(unpack.String, unpack.String)),
-		unpack.Decay(unpack.Type[*model_starlark.Depset[TReference, TMetadata]]("depset")),
-	})
-	if err := starlark.UnpackArgs(
-		b.Name(), args, kwargs,
-		"files?", unpack.Bind(thread, &files, unpack.List(unpack.Canonicalize(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File")))),
-		"transitive_files?", unpack.Bind(thread, &transitiveFiles, unpack.IfNotNone(unpack.Type[*model_starlark.Depset[TReference, TMetadata]]("depset"))),
-		"symlinks?", unpack.Bind(thread, &symlinks, symlinksUnpackerInto),
-		"root_symlinks?", unpack.Bind(thread, &rootSymlinks, symlinksUnpackerInto),
-	); err != nil {
-		return nil, err
-	}
-
-	identifierGeneratorValue := thread.Local(model_starlark.ReferenceEqualIdentifierGeneratorKey)
-	if identifierGeneratorValue == nil {
-		return nil, errors.New("depsets cannot be created from within this context")
-	}
-	identifierGenerator := identifierGeneratorValue.(model_starlark.ReferenceEqualIdentifierGenerator)
-
-	if transitiveFiles == nil {
-		transitiveFiles = model_starlark.NewDepset(
-			model_starlark.NewDepsetContentsFromList[TReference, TMetadata](nil, model_starlark_pb.Depset_DEFAULT),
-			nil,
-		)
-	}
-	filesDepsetContents, err := model_starlark.NewDepsetContents(
-		thread,
-		files,
-		[]*model_starlark.Depset[TReference, TMetadata]{transitiveFiles},
-		model_starlark_pb.Depset_DEFAULT,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create files depset: %w", err)
-	}
-
-	return model_starlark.NewRunfiles(
-		model_starlark.NewDepset(filesDepsetContents, identifierGenerator),
-		toSymlinkEntryDepset[TReference, TMetadata](rootSymlinks, identifierGenerator),
-		toSymlinkEntryDepset[TReference, TMetadata](symlinks, identifierGenerator),
-	), nil
 }
 
 func (rc *ruleContext[TReference, TMetadata]) setOutputToStaticDirectory(output *targetOutput[TMetadata], capturableDirectory model_filesystem.CapturableDirectory[TMetadata, TMetadata]) error {

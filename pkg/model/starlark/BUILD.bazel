@@ -26,7 +26,6 @@ go_library(
         "repo_registrar.go",
         "repository_rule.go",
         "rule.go",
-        "runfiles.go",
         "select.go",
         "struct.go",
         "subrule.go",

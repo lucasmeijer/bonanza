@@ -127,6 +127,7 @@
             "ConfiguredTarget",
             "DirectoryCreationParametersObject",
             "FileCreationParametersObject",
+            "EmptyDefaultInfo",
             "ExecTransition",
             "ResolvedToolchains",
             "RootModule",
@@ -166,6 +167,16 @@
          "nativeValueType": {
             "type": "*DirectoryReaders[TReference]"
          }
+      },
+      "EmptyDefaultInfo": {
+         "dependsOn": [
+            "BuiltinsModuleNames",
+            "CanonicalRepoName",
+            "CompiledBzlFileDecodedGlobals",
+            "CompiledBzlFileFunctionFactory",
+            "CompiledBzlFileGlobal",
+            "RootModule"
+         ]
       },
       "ExecTransition": {
          "dependsOn": [

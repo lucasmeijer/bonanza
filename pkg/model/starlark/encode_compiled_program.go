@@ -18,7 +18,6 @@ import (
 	"github.com/buildbarn/bonanza/pkg/model/core/btree"
 	model_encoding "github.com/buildbarn/bonanza/pkg/model/encoding"
 	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
-	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
 	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 
@@ -550,26 +549,7 @@ func DecodeValue[TReference object.BasicReference, TMetadata model_core.Cloneabl
 		}
 		return options.LabelCreator(resolvedLabel)
 	case *model_starlark_pb.Value_Provider:
-		instanceProperties := typedValue.Provider.InstanceProperties
-		if instanceProperties == nil {
-			return nil, errors.New("provider instance properties are missing")
-		}
-		providerInstanceProperties, err := decodeProviderInstanceProperties[TReference, TMetadata](model_core.Nested(encodedValue, instanceProperties))
-		if err != nil {
-			return nil, err
-		}
-		var initFunction *NamedFunction[TReference, TMetadata]
-		if typedValue.Provider.InitFunction != nil {
-			f := NewNamedFunction(NewProtoNamedFunctionDefinition[TReference, TMetadata](
-				model_core.Nested(encodedValue, typedValue.Provider.InitFunction),
-			))
-			initFunction = &f
-		}
-		return NewProvider[TReference](
-			providerInstanceProperties,
-			typedValue.Provider.Fields,
-			initFunction,
-		), nil
+		return DecodeProvider[TReference, TMetadata](model_core.Nested(encodedValue, typedValue.Provider))
 	case *model_starlark_pb.Value_List:
 		list := starlark.NewList(nil)
 		if err := decodeList_Elements[TReference, TMetadata](
@@ -623,15 +603,6 @@ func DecodeValue[TReference object.BasicReference, TMetadata model_core.Cloneabl
 		default:
 			return nil, errors.New("encoded rule does not have a reference or definition")
 		}
-	case *model_starlark_pb.Value_Runfiles:
-		if typedValue.Runfiles.Files == nil || typedValue.Runfiles.RootSymlinks == nil || typedValue.Runfiles.Symlinks == nil {
-			return nil, errors.New("runfiles is missing one or more depsets")
-		}
-		return NewRunfiles(
-			decodeDepset[TReference, TMetadata](model_core.Nested(encodedValue, typedValue.Runfiles.Files)),
-			decodeDepset[TReference, TMetadata](model_core.Nested(encodedValue, typedValue.Runfiles.RootSymlinks)),
-			decodeDepset[TReference, TMetadata](model_core.Nested(encodedValue, typedValue.Runfiles.Symlinks)),
-		), nil
 	case *model_starlark_pb.Value_Select:
 		if len(typedValue.Select.Groups) < 1 {
 			return nil, errors.New("select does not contain any groups")
@@ -872,6 +843,29 @@ func decodeDepset[TReference object.BasicReference, TMetadata model_core.Cloneab
 	)
 }
 
+func DecodeProvider[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](m model_core.Message[*model_starlark_pb.Provider, TReference]) (*Provider[TReference, TMetadata], error) {
+	instanceProperties := m.Message.InstanceProperties
+	if instanceProperties == nil {
+		return nil, errors.New("provider instance properties are missing")
+	}
+	providerInstanceProperties, err := decodeProviderInstanceProperties[TReference, TMetadata](model_core.Nested(m, instanceProperties))
+	if err != nil {
+		return nil, err
+	}
+	var initFunction *NamedFunction[TReference, TMetadata]
+	if m.Message.InitFunction != nil {
+		f := NewNamedFunction(NewProtoNamedFunctionDefinition[TReference, TMetadata](
+			model_core.Nested(m, m.Message.InitFunction),
+		))
+		initFunction = &f
+	}
+	return NewProvider[TReference](
+		providerInstanceProperties,
+		m.Message.Fields,
+		initFunction,
+	), nil
+}
+
 func decodeProviderInstanceProperties[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](m model_core.Message[*model_starlark_pb.Provider_InstanceProperties, TReference]) (*ProviderInstanceProperties[TReference, TMetadata], error) {
 	providerIdentifier, err := pg_label.NewCanonicalStarlarkIdentifier(m.Message.ProviderIdentifier)
 	if err != nil {
@@ -971,24 +965,14 @@ type listElementsDecodingOptions[TReference any] struct {
 
 func decodeList_Elements[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](in model_core.Message[*model_starlark_pb.List, TReference], options *listElementsDecodingOptions[TReference]) error {
 	var errIter error
-	for element := range btree.AllLeaves(
+	for element := range AllListLeafElements(
 		options.valueDecodingOptions.Context,
 		options.valueDecodingOptions.Readers.List,
 		model_core.Nested(in, in.Message.Elements),
-		func(element model_core.Message[*model_starlark_pb.List_Element, TReference]) (*model_core_pb.DecodableReference, error) {
-			if level, ok := element.Message.Level.(*model_starlark_pb.List_Element_Parent_); ok {
-				return level.Parent.Reference, nil
-			}
-			return nil, nil
-		},
 		&errIter,
 	) {
-		level, ok := element.Message.Level.(*model_starlark_pb.List_Element_Leaf)
-		if !ok {
-			return errors.New("not a valid leaf entry")
-		}
 		value, err := DecodeValue[TReference, TMetadata](
-			model_core.Nested(element, level.Leaf),
+			element,
 			nil,
 			options.valueDecodingOptions,
 		)

@@ -33,7 +33,6 @@ message Value {
     Provider provider = 16;
     RepositoryRule repository_rule = 17;
     Rule rule = 18;
-    Runfiles runfiles = 19;
     Select select = 20;
     Set set = 21;
     string str = 22;
@@ -756,18 +755,6 @@ message RuleTarget {
   // default value if the build setting is not set explicitly is
   // provided.
   Value build_setting_default = 7;
-}
-
-message Runfiles {
-  // Files to place in the runfiles directory.
-  Depset files = 1;
-
-  // Symbolic links to place in the root of the runfiles directory.
-  Depset root_symlinks = 2;
-
-  // Symbolic links to place in the subdirectory inside the runfiles
-  // directory belonging to the root module.
-  Depset symlinks = 3;
 }
 
 message Select {
