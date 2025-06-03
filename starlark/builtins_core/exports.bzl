@@ -68,6 +68,8 @@ def _runfiles_merge(r):
 
 def _runfiles_merge_all(r):
     def merge_all(other):
+        if not other:
+            return r
         return runfiles(
             files = depset(transitive = [r.files] + [o.files for o in other]),
             root_symlinks = depset(transitive = [r.root_symlinks] + [o.root_symlinks for o in other]),
@@ -87,14 +89,16 @@ runfiles, _runfiles_raw = provider(
 _runfiles = runfiles
 
 def _default_info_init(*, data_runfiles = None, default_runfiles = None, executable = None, files = None, runfiles = None):
-    if runfiles:
-        if data_runfiles or default_runfiles:
-            fail("cannot specify \"runfiles\" together with \"data_runfiles\" or \"default_runfiles\"")
-        default_runfiles = runfiles
-
     return {
-        "data_runfiles": data_runfiles or _runfiles(),
-        "default_runfiles": default_runfiles or _runfiles(),
+        # Bazel documents DefaultInfo(data_runfiles, default_runfiles)
+        # and DefaultInfo.data_runfiles as features to avoid. The
+        # distinction between "data" and "default" runfiles is only
+        # maintained for legacy reasons. Keep this implementation simple
+        # by only storing a single copy of the runfiles.
+        "default_runfiles": (runfiles or _runfiles()).merge_all(
+            ([default_runfiles] if default_runfiles else []) +
+            ([data_runfiles] if data_runfiles else []),
+        ),
         "files": files or depset(),
         "files_to_run": FilesToRunProvider(
             executable = executable,
@@ -103,7 +107,15 @@ def _default_info_init(*, data_runfiles = None, default_runfiles = None, executa
         ),
     }
 
-DefaultInfo, _DefaultInfoRaw = provider(init = _default_info_init)
+def _default_info_data_runfiles(r):
+    return r.default_runfiles
+
+DefaultInfo, _DefaultInfoRaw = provider(
+    computed_fields = {
+        "data_runfiles": _default_info_data_runfiles,
+    },
+    init = _default_info_init,
+)
 
 def _run_environment_info_init(environment = {}, inherited_environment = []):
     return {
