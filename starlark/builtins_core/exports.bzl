@@ -91,29 +91,34 @@ _runfiles = runfiles
 
 def _default_info_init(*, data_runfiles = None, default_runfiles = None, executable = None, files = None, runfiles = None):
     return {
-        # Bazel documents DefaultInfo(data_runfiles, default_runfiles)
-        # and DefaultInfo.data_runfiles as features to avoid. The
-        # distinction between "data" and "default" runfiles is only
-        # maintained for legacy reasons. Keep this implementation simple
-        # by only storing a single copy of the runfiles.
-        "default_runfiles": (runfiles or _runfiles()).merge_all(
-            ([default_runfiles] if default_runfiles else []) +
-            ([data_runfiles] if data_runfiles else []),
-        ),
         "files": files or depset(),
         "files_to_run": FilesToRunProvider(
+            # According to the Bazel documentation, only the runfiles
+            # parameter should be used. Calling DefaultInfo() with
+            # data_runfiles or default_runfiles is deprecated. In this
+            # implementation we simply merge all of the runfiles
+            # together.
+            _runfiles = (runfiles or _runfiles()).merge_all(
+                ([data_runfiles] if data_runfiles else []) +
+                ([default_runfiles] if default_runfiles else []),
+            ),
             executable = executable,
             repo_mapping_manifest = None,
             runfiles_manifest = None,
         ),
     }
 
-def _default_info_data_runfiles(r):
-    return r.default_runfiles
+def _default_info_runfiles(r):
+    # There is no point in storing the runfiles both in DefaultInfo and
+    # the FilesToRunProvider contained within. Simply let
+    # DefaultInfo.{data,default}_runfiles return the runfiles object
+    # contained in the FilesToRunProvider.
+    return r.files_to_run._runfiles
 
 DefaultInfo, _DefaultInfoRaw = provider(
     computed_fields = {
-        "data_runfiles": _default_info_data_runfiles,
+        "data_runfiles": _default_info_runfiles,
+        "default_runfiles": _default_info_runfiles,
     },
     init = _default_info_init,
 )
