@@ -406,9 +406,9 @@ message TargetActionDefinition {
   // Depset of File objects of the input files of the action.
   repeated bonanza.model.starlark.List.Element inputs = 1;
 
-  // Depset of File objects of the tools used by the action. This field
-  // is identical to "inputs", except that it also causes the runfiles
-  // directories of these files to be created.
+  // Depset of FilesToRunProvider objects of the tools used by the
+  // action. For each of these tools, the executable and a corresponding
+  // runfiles directory needs to be added to the input root.
   repeated bonanza.model.starlark.List.Element tools = 2;
 
   // The X25519 public key that identifies the platform that should be

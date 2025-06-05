@@ -85,14 +85,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionInputRootValue(
 	}
 
 	// Add tools.
-	// TODO: We need to add runfiles for the tools!
-	if err := addFilesToChangeTrackingDirectory(
-		e,
-		model_core.Nested(action, actionDefinition.Tools),
-		&rootDirectory,
-		loadOptions,
-	); err != nil {
-		return PatchedTargetActionInputRootValue{}, fmt.Errorf("failed to add tools to input root: %w", err)
+	if len(actionDefinition.Tools) > 0 {
+		return PatchedTargetActionInputRootValue{}, fmt.Errorf("TODO: ADD TOOLS TO INPUT ROOT!")
 	}
 
 	group, groupCtx := errgroup.WithContext(ctx)

@@ -891,7 +891,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 
 		// Last but not least, get the values of label attr.
 		executableValues := map[string]any{}
-		fileIsInCtxExecutable := map[*model_starlark.File[TReference, TMetadata]]struct{}{}
+		executableFileToFilesToRun := map[*model_starlark.File[TReference, TMetadata]]model_core.Message[*model_starlark_pb.Struct, TReference]{}
 		fileValues := map[string]any{}
 		filesValues := map[string]any{}
 		splitAttrValues := map[string]any{}
@@ -1114,14 +1114,15 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 								if err != nil {
 									return nil, fmt.Errorf("failed to obtain field \"files\" of DefaultInfo provider of target with label %#v: %w", resolvedLabelStr, err)
 								}
-								filesToRunStruct, ok := filesToRun.Message.Kind.(*model_starlark_pb.Value_Struct)
+								filesToRunStructValue, ok := filesToRun.Message.Kind.(*model_starlark_pb.Value_Struct)
 								if !ok {
 									return nil, fmt.Errorf("field \"files_to_run\" of DefaultInfo provider of target with label %#v is not a struct", resolvedLabelStr)
 								}
+								filesToRunStruct := model_core.Nested(filesToRun, filesToRunStructValue.Struct)
 								executableField, err := model_starlark.GetStructFieldValue(
 									ctx,
 									c.valueReaders.List,
-									model_core.Nested(filesToRun, filesToRunStruct.Struct.Fields),
+									model_core.Nested(filesToRunStruct, filesToRunStruct.Message.Fields),
 									"executable",
 								)
 								if err != nil {
@@ -1142,7 +1143,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 									return nil, fmt.Errorf("field \"files_to_run.executable\" of DefaultInfo provider of target with label %#v is not a File", resolvedLabelStr)
 								}
 								executableValues[namedAttr.Name] = typedExecutable
-								fileIsInCtxExecutable[typedExecutable] = struct{}{}
+								executableFileToFilesToRun[typedExecutable] = filesToRunStruct
 							}
 
 							return model_starlark.NewTargetReference[TReference, TMetadata](canonicalLabel.AsResolved(), providerInstances), nil
@@ -1231,7 +1232,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 			attr:                        model_starlark.NewStructFromDict[TReference, TMetadata](nil, attrValues),
 			splitAttr:                   model_starlark.NewStructFromDict[TReference, TMetadata](nil, splitAttrValues),
 			executable:                  model_starlark.NewStructFromDict[TReference, TMetadata](nil, executableValues),
-			fileIsInCtxExecutable:       fileIsInCtxExecutable,
+			executableFileToFilesToRun:  executableFileToFilesToRun,
 			file:                        model_starlark.NewStructFromDict[TReference, TMetadata](nil, fileValues),
 			files:                       model_starlark.NewStructFromDict[TReference, TMetadata](nil, filesValues),
 			outputs:                     model_starlark.NewStructFromDict[TReference, TMetadata](nil, outputsValues),
@@ -1668,7 +1669,7 @@ type ruleContext[TReference object.BasicReference, TMetadata BaseComputerReferen
 	splitAttr                   starlark.Value
 	buildSettingValue           starlark.Value
 	executable                  starlark.Value
-	fileIsInCtxExecutable       map[*model_starlark.File[TReference, TMetadata]]struct{}
+	executableFileToFilesToRun  map[*model_starlark.File[TReference, TMetadata]]model_core.Message[*model_starlark_pb.Struct, TReference]
 	file                        starlark.Value
 	files                       starlark.Value
 	outputs                     starlark.Value
@@ -1897,33 +1898,33 @@ func (rc *ruleContext[TReference, TMetadata]) setOutputToStaticDirectory(output 
 	)
 }
 
-// getFileFromFileOrFilesToRunProvider takes a File or a
-// FilesToRunProvider and returns the File that corresponds to the
-// executable. In addition to that, it returns whether the resulting
-// File should be treated as a tool dependency. Namely, whether its
-// runfiles directory should be included in any input roots that have
-// this File listed as part of ctx.actions.run(tools=[...]).
-func (rc *ruleContext[TReference, TMetadata]) getFileFromFileOrFilesToRunProvider(thread *starlark.Thread, file any) (*model_starlark.File[TReference, TMetadata], bool, error) {
-	switch typedFile := file.(type) {
+// getFileOrFilesToRunProvider takes a File or a FilesToRunProvider and
+// returns it as a typed value.
+func (rc *ruleContext[TReference, TMetadata]) getFileOrFilesToRunProvider(thread *starlark.Thread, value any) (*model_starlark.File[TReference, TMetadata], *model_starlark.Struct[TReference, TMetadata], error) {
+	switch typedValue := value.(type) {
 	case *model_starlark.File[TReference, TMetadata]:
-		// Plain File objects only have their runfiles directory
-		// added if they are obtained through a label attribute
-		// marked executable=True.
-		_, isTool := rc.fileIsInCtxExecutable[typedFile]
-		return typedFile, isTool, nil
+		if filesToRun, ok := rc.executableFileToFilesToRun[typedValue]; ok {
+			// File originated from ctx.executable. return the
+			// FilesToRunProvider from which it originated
+			// instead. This is done so that if such a File is
+			// provided to ctx.actions.run(tools=[...]), its
+			// runfiles are added to the input root as well.
+			decodedFilesToRun, err := model_starlark.DecodeStruct[TReference, TMetadata](
+				filesToRun,
+				rc.computer.getValueDecodingOptions(rc.context, func(resolvedLabel label.ResolvedLabel) (starlark.Value, error) {
+					return model_starlark.NewLabel[TReference, TMetadata](resolvedLabel), nil
+				}),
+			)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to decode FilesToRunProvider: %w", err)
+			}
+			return nil, decodedFilesToRun, nil
+		}
+		return typedValue, nil, nil
 	case *model_starlark.Struct[TReference, TMetadata]:
-		// Executables extracted from FilesToRunProvider
-		executable, err := typedFile.Attr(thread, "executable")
-		if err != nil {
-			return nil, false, fmt.Errorf("failed to get field \"executable\" of FilesToRunProvider: %w", err)
-		}
-		executableFile, ok := executable.(*model_starlark.File[TReference, TMetadata])
-		if !ok {
-			return nil, false, errors.New("field \"executable\" of FilesToRunProvider is not a File")
-		}
-		return executableFile, true, nil
+		return nil, typedValue, nil
 	default:
-		panic("not a file or FilesToRunProvider")
+		panic("not a File or FilesToRunProvider")
 	}
 }
 
@@ -2212,18 +2213,27 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 	var toolsDirect []starlark.Value
 	argv0, ok := executable.(string)
 	if !ok {
-		executableFile, isTool, err := rc.getFileFromFileOrFilesToRunProvider(thread, executable)
+		executableFile, executableFilesToRun, err := rc.getFileOrFilesToRunProvider(thread, executable)
 		if err != nil {
 			return nil, fmt.Errorf("executable: %w", err)
 		}
+
+		if executableFile != nil {
+			inputsDirect = append(inputsDirect, executableFile)
+		} else {
+			executableFileValue, err := executableFilesToRun.Attr(thread, "executable")
+			if err != nil {
+				return nil, err
+			}
+			if err := unpack.Type[*model_starlark.File[TReference, TMetadata]]("File").UnpackInto(thread, executableFileValue, &executableFile); err != nil {
+				return nil, err
+			}
+			toolsDirect = append(toolsDirect, executableFilesToRun)
+		}
+
 		argv0, err = model_starlark.FileGetPath(executableFile.GetDefinition())
 		if err != nil {
 			return nil, err
-		}
-		if isTool {
-			toolsDirect = append(toolsDirect, executableFile)
-		} else {
-			inputsDirect = append(inputsDirect, executableFile)
 		}
 	}
 
@@ -2447,12 +2457,12 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 		if d, ok := tool.(*model_starlark.Depset[TReference, TMetadata]); ok {
 			inputsTransitive = append(inputsTransitive, d)
 		} else {
-			if toolFile, isTool, err := rc.getFileFromFileOrFilesToRunProvider(thread, tool); err != nil {
+			if toolFile, toolFilesToRun, err := rc.getFileOrFilesToRunProvider(thread, tool); err != nil {
 				return nil, fmt.Errorf("tool at index %d: %w", i, err)
-			} else if isTool {
-				toolsDirect = append(toolsDirect, toolFile)
-			} else {
+			} else if toolFile != nil {
 				inputsDirect = append(inputsDirect, toolFile)
+			} else {
+				toolsDirect = append(toolsDirect, toolFilesToRun)
 			}
 		}
 	}
