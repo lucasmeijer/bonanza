@@ -22,25 +22,25 @@ import (
 type addFilesToChangeTrackingDirectoryEnvironment[TReference, TMetadata any] interface {
 	model_core.ExistingObjectCapturer[TReference, TMetadata]
 
-	GetFileListRootValue(key model_core.PatchedMessage[*model_analysis_pb.FileListRoot_Key, dag.ObjectContentsWalker]) model_core.Message[*model_analysis_pb.FileListRoot_Value, TReference]
+	GetFilesRootValue(key model_core.PatchedMessage[*model_analysis_pb.FilesRoot_Key, dag.ObjectContentsWalker]) model_core.Message[*model_analysis_pb.FilesRoot_Value, TReference]
 	GetFileRootValue(key model_core.PatchedMessage[*model_analysis_pb.FileRoot_Key, dag.ObjectContentsWalker]) model_core.Message[*model_analysis_pb.FileRoot_Value, TReference]
 }
 
 func addFilesToChangeTrackingDirectory[TReference object.BasicReference, TMetadata model_core.WalkableReferenceMetadata](
 	e addFilesToChangeTrackingDirectoryEnvironment[TReference, TMetadata],
-	fileList model_core.Message[[]*model_starlark_pb.List_Element, TReference],
+	files model_core.Message[[]*model_starlark_pb.List_Element, TReference],
 	out *changeTrackingDirectory[TReference, TMetadata],
 	loadOptions *changeTrackingDirectoryLoadOptions[TReference],
 ) error {
 	missingDependencies := false
-	for i, element := range fileList.Message {
+	for i, element := range files.Message {
 		var root model_core.Message[*model_filesystem_pb.DirectoryContents, TReference]
 		switch level := element.Level.(type) {
 		case *model_starlark_pb.List_Element_Parent_:
-			patchedReference := model_core.Patch(e, model_core.Nested(fileList, level.Parent.Reference))
-			v := e.GetFileListRootValue(
+			patchedReference := model_core.Patch(e, model_core.Nested(files, level.Parent.Reference))
+			v := e.GetFilesRootValue(
 				model_core.NewPatchedMessage(
-					&model_analysis_pb.FileListRoot_Key{
+					&model_analysis_pb.FilesRoot_Key{
 						ListReference: patchedReference.Message,
 					},
 					model_core.MapReferenceMetadataToWalkers(patchedReference.Patcher),
@@ -56,7 +56,7 @@ func addFilesToChangeTrackingDirectory[TReference object.BasicReference, TMetada
 			if !ok {
 				return fmt.Errorf("element at index %d is not a file", i)
 			}
-			patchedFile := model_core.Patch(e, model_core.Nested(fileList, file.File))
+			patchedFile := model_core.Patch(e, model_core.Nested(files, file.File))
 			v := e.GetFileRootValue(
 				model_core.NewPatchedMessage(
 					&model_analysis_pb.FileRoot_Key{
@@ -83,22 +83,22 @@ func addFilesToChangeTrackingDirectory[TReference object.BasicReference, TMetada
 	return nil
 }
 
-func (c *baseComputer[TReference, TMetadata]) ComputeFileListRootValue(ctx context.Context, key model_core.Message[*model_analysis_pb.FileListRoot_Key, TReference], e FileListRootEnvironment[TReference, TMetadata]) (PatchedFileListRootValue, error) {
+func (c *baseComputer[TReference, TMetadata]) ComputeFilesRootValue(ctx context.Context, key model_core.Message[*model_analysis_pb.FilesRoot_Key, TReference], e FilesRootEnvironment[TReference, TMetadata]) (PatchedFilesRootValue, error) {
 	directoryCreationParameters, gotDirectoryCreationParameters := e.GetDirectoryCreationParametersObjectValue(&model_analysis_pb.DirectoryCreationParametersObject_Key{})
 	directoryReaders, gotDirectoryReaders := e.GetDirectoryReadersValue(&model_analysis_pb.DirectoryReaders_Key{})
 	if !gotDirectoryCreationParameters || !gotDirectoryReaders {
-		return PatchedFileListRootValue{}, evaluation.ErrMissingDependency
+		return PatchedFilesRootValue{}, evaluation.ErrMissingDependency
 	}
 
-	filesList, err := model_parser.Dereference(ctx, c.valueReaders.List, model_core.Nested(key, key.Message.ListReference))
+	files, err := model_parser.Dereference(ctx, c.valueReaders.List, model_core.Nested(key, key.Message.ListReference))
 	if err != nil {
-		return PatchedFileListRootValue{}, err
+		return PatchedFilesRootValue{}, err
 	}
 
 	var rootDirectory changeTrackingDirectory[TReference, TMetadata]
 	if err := addFilesToChangeTrackingDirectory(
 		e,
-		filesList,
+		files,
 		&rootDirectory,
 		&changeTrackingDirectoryLoadOptions[TReference]{
 			context:                 ctx,
@@ -106,7 +106,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileListRootValue(ctx conte
 			leavesReader:            directoryReaders.Leaves,
 		},
 	); err != nil {
-		return PatchedFileListRootValue{}, err
+		return PatchedFilesRootValue{}, err
 	}
 
 	group, groupCtx := errgroup.WithContext(ctx)
@@ -130,11 +130,11 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileListRootValue(ctx conte
 		)
 	})
 	if err := group.Wait(); err != nil {
-		return PatchedFileListRootValue{}, err
+		return PatchedFilesRootValue{}, err
 	}
 
 	return model_core.NewPatchedMessage(
-		&model_analysis_pb.FileListRoot_Value{
+		&model_analysis_pb.FilesRoot_Value{
 			RootDirectory: createdRootDirectory.Message.Message,
 		},
 		model_core.MapReferenceMetadataToWalkers(createdRootDirectory.Message.Patcher),

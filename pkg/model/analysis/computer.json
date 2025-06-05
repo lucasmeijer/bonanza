@@ -213,15 +213,6 @@
             "type": "*model_filesystem.FileCreationParameters"
          }
       },
-      "FileListRoot": {
-         "dependsOn": [
-            "DirectoryCreationParametersObject",
-            "DirectoryReaders",
-            "FileListRoot",
-            "FileRoot"
-         ],
-         "keyContainsReferences": true
-      },
       "FileProperties": {
          "dependsOn": [
             "DirectoryReaders",
@@ -259,6 +250,15 @@
             "DirectoryReaders",
             "Repo"
          ]
+      },
+      "FilesRoot": {
+         "dependsOn": [
+            "DirectoryCreationParametersObject",
+            "DirectoryReaders",
+            "FilesRoot",
+            "FileRoot"
+         ],
+         "keyContainsReferences": true
       },
       "Glob": {
          "dependsOn": [
@@ -581,8 +581,8 @@
             "DirectoryCreationParameters",
             "DirectoryCreationParametersObject",
             "FileCreationParameters",
-            "FileListRoot",
             "FileRoot",
+            "FilesRoot",
             "RootModule",
             "TargetAction"
          ],
@@ -593,8 +593,8 @@
             "DirectoryCreationParametersObject",
             "DirectoryReaders",
             "FileCreationParameters",
-            "FileListRoot",
             "FileRoot",
+            "FilesRoot",
             "TargetAction"
          ],
          "keyContainsReferences": true

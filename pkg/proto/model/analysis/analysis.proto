@@ -688,24 +688,6 @@ message FileReader {
   message Key {}
 }
 
-message FileListRoot {
-  message Key {
-    // Reference to a Starlark list containing files.
-    bonanza.model.core.DecodableReference list_reference = 1
-        [(bonanza.model.core.object_format) = {
-          message_list_type_name:
-            "bonanza.model.starlark.List.Element";
-        }];
-  }
-
-  message Value {
-    // A directory hierarchy that contains all of the files contained in
-    // the list, placed at the location they would appear inside the
-    // input root of an action that depends on them.
-    bonanza.model.filesystem.DirectoryContents root_directory = 1;
-  }
-}
-
 message FileRoot {
   message Key {
     // The source file or output file's contents that are being requested.
@@ -734,6 +716,24 @@ message FilesInPackage {
     // belong to nested packages. Furthermore, file contents are
     // removed, thereby making all files empty.
     bonanza.model.filesystem.DirectoryContents directory = 1;
+  }
+}
+
+message FilesRoot {
+  message Key {
+    // Reference to a Starlark list containing files.
+    bonanza.model.core.DecodableReference list_reference = 1
+        [(bonanza.model.core.object_format) = {
+          message_list_type_name:
+            "bonanza.model.starlark.List.Element";
+        }];
+  }
+
+  message Value {
+    // A directory hierarchy that contains all of the files contained in
+    // the list, placed at the location they would appear inside the
+    // input root of an action that depends on them.
+    bonanza.model.filesystem.DirectoryContents root_directory = 1;
   }
 }
 
