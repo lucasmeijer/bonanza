@@ -198,10 +198,7 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 		c.buildSettingOverrideReader,
 		getBuildSettingOverridesFromReference(configurationReference),
 		func(override model_core.Message[*model_analysis_pb.BuildSettingOverride, TReference]) (*model_core_pb.DecodableReference, error) {
-			if level, ok := override.Message.Level.(*model_analysis_pb.BuildSettingOverride_Parent_); ok {
-				return level.Parent.Reference, nil
-			}
-			return nil, nil
+			return override.Message.GetParent().GetReference(), nil
 		},
 		&errIter,
 	))

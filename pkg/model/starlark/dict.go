@@ -23,10 +23,7 @@ func AllDictLeafEntries[TReference any](
 		reader,
 		model_core.Nested(rootDict, rootDict.Message.Entries),
 		func(entry model_core.Message[*model_starlark_pb.Dict_Entry, TReference]) (*model_core_pb.DecodableReference, error) {
-			if parent, ok := entry.Message.Level.(*model_starlark_pb.Dict_Entry_Parent_); ok {
-				return parent.Parent.Reference, nil
-			}
-			return nil, nil
+			return entry.Message.GetParent().GetReference(), nil
 		},
 		errOut,
 	)

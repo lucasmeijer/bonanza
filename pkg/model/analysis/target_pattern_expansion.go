@@ -53,10 +53,7 @@ func (c *baseComputer[TReference, TMetadata]) expandCanonicalTargetPattern(
 			c.targetPatternExpansionValueTargetLabelReader,
 			model_core.Nested(targetPatternExpansion, targetPatternExpansion.Message.TargetLabels),
 			func(entry model_core.Message[*model_analysis_pb.TargetPatternExpansion_Value_TargetLabel, TReference]) (*model_core_pb.DecodableReference, error) {
-				if level, ok := entry.Message.Level.(*model_analysis_pb.TargetPatternExpansion_Value_TargetLabel_Parent_); ok {
-					return level.Parent.Reference, nil
-				}
-				return nil, nil
+				return entry.Message.GetParent().GetReference(), nil
 			},
 			errOut,
 		) {

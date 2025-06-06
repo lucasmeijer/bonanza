@@ -251,10 +251,7 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 		),
 		model_core.Nested(command, command.Message.Arguments),
 		func(element model_core.Message[*model_command_pb.ArgumentList_Element, object.LocalReference]) (*model_core_pb.DecodableReference, error) {
-			if level, ok := element.Message.Level.(*model_command_pb.ArgumentList_Element_Parent); ok {
-				return level.Parent, nil
-			}
-			return nil, nil
+			return element.Message.GetParent(), nil
 		},
 		&errIter,
 	) {
@@ -284,10 +281,7 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 		),
 		model_core.Nested(command, command.Message.EnvironmentVariables),
 		func(entry model_core.Message[*model_command_pb.EnvironmentVariableList_Element, object.LocalReference]) (*model_core_pb.DecodableReference, error) {
-			if level, ok := entry.Message.Level.(*model_command_pb.EnvironmentVariableList_Element_Parent); ok {
-				return level.Parent, nil
-			}
-			return nil, nil
+			return entry.Message.GetParent(), nil
 		},
 		&errIter,
 	) {

@@ -771,10 +771,7 @@ func (s *BrowserService) doEvaluation(w http.ResponseWriter, r *http.Request) (g
 				dependencyListReader,
 				model_core.Nested(evaluation, dependencies),
 				func(element model_core.Message[*model_evaluation_pb.Dependency, object.LocalReference]) (*model_core_pb.DecodableReference, error) {
-					if level, ok := element.Message.Level.(*model_evaluation_pb.Dependency_Parent_); ok {
-						return level.Parent.Reference, nil
-					}
-					return nil, nil
+					return element.Message.GetParent().GetReference(), nil
 				},
 				&errIter,
 			) {

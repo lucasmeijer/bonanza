@@ -166,10 +166,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionCommandValue(ct
 		c.argsReader,
 		model_core.Nested(action, actionDefinition.Arguments),
 		/* traverser = */ func(element model_core.Message[*model_analysis_pb.Args, TReference]) (*model_core_pb.DecodableReference, error) {
-			if level, ok := element.Message.Level.(*model_analysis_pb.Args_Parent_); ok {
-				return level.Parent.Reference, nil
-			}
-			return nil, nil
+			return element.Message.GetParent().GetReference(), nil
 		},
 		&errIterArgs,
 	) {
@@ -183,10 +180,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionCommandValue(ct
 			c.argsAddReader,
 			model_core.Nested(args, argsLeaf.Leaf.Adds),
 			/* traverser = */ func(element model_core.Message[*model_analysis_pb.Args_Leaf_Add, TReference]) (*model_core_pb.DecodableReference, error) {
-				if level, ok := element.Message.Level.(*model_analysis_pb.Args_Leaf_Add_Parent_); ok {
-					return level.Parent.Reference, nil
-				}
-				return nil, nil
+				return element.Message.GetParent().GetReference(), nil
 			},
 			&errIterAdd,
 		) {

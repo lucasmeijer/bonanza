@@ -26,10 +26,7 @@ func AllListLeafElements[TReference object.BasicReference](
 		reader,
 		rootList,
 		func(element model_core.Message[*model_starlark_pb.List_Element, TReference]) (*model_core_pb.DecodableReference, error) {
-			if level, ok := element.Message.Level.(*model_starlark_pb.List_Element_Parent_); ok {
-				return level.Parent.Reference, nil
-			}
-			return nil, nil
+			return element.Message.GetParent().GetReference(), nil
 		},
 		errOut,
 	)
