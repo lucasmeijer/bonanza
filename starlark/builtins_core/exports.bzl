@@ -90,18 +90,23 @@ runfiles, _runfiles_raw = provider(
 _runfiles = runfiles
 
 def _default_info_init(*, data_runfiles = None, default_runfiles = None, executable = None, files = None, runfiles = None):
+    # According to the Bazel documentation, only the runfiles parameter
+    # should be used. Calling DefaultInfo() with data_runfiles or
+    # default_runfiles is deprecated. In this implementation we simply
+    # merge all of the runfiles together.
+    merged_runfiles = (runfiles or _runfiles()).merge_all(
+        ([data_runfiles] if data_runfiles else []) +
+        ([default_runfiles] if default_runfiles else []),
+    )
     return {
         "files": files or depset(),
         "files_to_run": FilesToRunProvider(
-            # According to the Bazel documentation, only the runfiles
-            # parameter should be used. Calling DefaultInfo() with
-            # data_runfiles or default_runfiles is deprecated. In this
-            # implementation we simply merge all of the runfiles
-            # together.
-            _runfiles = (runfiles or _runfiles()).merge_all(
-                ([data_runfiles] if data_runfiles else []) +
-                ([default_runfiles] if default_runfiles else []),
-            ),
+            # Copy fields instead of embedding the runfiles object into
+            # FilesToRunProvider. This reduces the size of DefaultInfo
+            # significantly.
+            _runfiles_files = merged_runfiles.files,
+            _runfiles_symlinks = merged_runfiles.symlinks,
+            _runfiles_root_symlinks = merged_runfiles.root_symlinks,
             executable = executable,
             repo_mapping_manifest = None,
             runfiles_manifest = None,
@@ -111,9 +116,13 @@ def _default_info_init(*, data_runfiles = None, default_runfiles = None, executa
 def _default_info_runfiles(r):
     # There is no point in storing the runfiles both in DefaultInfo and
     # the FilesToRunProvider contained within. Simply let
-    # DefaultInfo.{data,default}_runfiles return the runfiles object
-    # contained in the FilesToRunProvider.
-    return r.files_to_run._runfiles
+    # DefaultInfo.{data,default}_runfiles return the runfiles contained
+    # in the FilesToRunProvider.
+    return runfiles(
+        files = r.files_to_run._runfiles_files,
+        symlinks = r.files_to_run._runfiles_symlinks,
+        root_symlinks = r.files_to_run._runfiles_root_symlinks,
+    )
 
 DefaultInfo, _DefaultInfoRaw = provider(
     computed_fields = {
