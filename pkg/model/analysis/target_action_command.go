@@ -100,7 +100,8 @@ func (c *baseComputer[TReference, TMetadata]) expandFileIfDirectory(e expandFile
 	fileRoot := e.GetFileRootValue(
 		model_core.NewPatchedMessage(
 			&model_analysis_pb.FileRoot_Key{
-				File: patchedFile.Message,
+				File:            patchedFile.Message,
+				DirectoryLayout: model_analysis_pb.DirectoryLayout_INPUT_ROOT,
 			},
 			model_core.MapReferenceMetadataToWalkers(patchedFile.Patcher),
 		),

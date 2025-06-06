@@ -20,6 +20,8 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
+var componentMainWorkspaceName = path.MustNewComponent("_main")
+
 func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionInputRootValue(ctx context.Context, key model_core.Message[*model_analysis_pb.TargetActionInputRoot_Key, TReference], e TargetActionInputRootEnvironment[TReference, TMetadata]) (PatchedTargetActionInputRootValue, error) {
 	id := model_core.Nested(key, key.Message.Id)
 	if id.Message == nil {
@@ -66,6 +68,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionInputRootValue(
 	components, err := getPackageOutputDirectoryComponents(
 		model_core.Nested(id, id.Message.ConfigurationReference),
 		targetLabel.GetCanonicalPackage(),
+		model_analysis_pb.DirectoryLayout_INPUT_ROOT,
 	)
 	if err != nil {
 		return PatchedTargetActionInputRootValue{}, fmt.Errorf("failed to get package output directory: %w", err)
@@ -85,6 +88,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionInputRootValue(
 		model_core.Nested(action, actionDefinition.Inputs),
 		&rootDirectory,
 		loadOptions,
+		model_analysis_pb.DirectoryLayout_INPUT_ROOT,
 	); err != nil {
 		return PatchedTargetActionInputRootValue{}, fmt.Errorf("failed to add input files to input root: %w", err)
 	}
@@ -108,7 +112,13 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionInputRootValue(
 
 		// Add the tool's executable to the input root.
 		executable := model_core.Nested(tool, toolLeaf.Executable)
-		if err := addFileToChangeTrackingDirectory(e, executable, &rootDirectory, loadOptions); err != nil {
+		if err := addFileToChangeTrackingDirectory(
+			e,
+			executable,
+			&rootDirectory,
+			loadOptions,
+			model_analysis_pb.DirectoryLayout_INPUT_ROOT,
+		); err != nil {
 			return PatchedTargetActionInputRootValue{}, fmt.Errorf("failed to add tool executable to input root: %w", err)
 		}
 
@@ -122,12 +132,24 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionInputRootValue(
 			stack:       util.NewNonEmptyStack(&rootDirectory),
 		}
 		if err := path.Resolve(path.UNIXFormat.NewParser(executablePath+".runfiles"), &runfilesDirectoryResolver); err != nil {
-			return PatchedTargetActionInputRootValue{}, fmt.Errorf("failed to create runfiles directory for tool with path %#v: %w", executablePath, err)
+			return PatchedTargetActionInputRootValue{}, fmt.Errorf("failed to create runfiles directory of tool with path %#v: %w", executablePath, err)
+		}
+		runfilesDirectory := runfilesDirectoryResolver.stack.Peek()
+		if err := addFilesToChangeTrackingDirectory(
+			e,
+			model_core.Nested(tool, toolLeaf.RunfilesFiles),
+			runfilesDirectory,
+			loadOptions,
+			model_analysis_pb.DirectoryLayout_RUNFILES,
+		); err != nil {
+			return PatchedTargetActionInputRootValue{}, fmt.Errorf("failed to add runfiles files of tool with path %#v to input root: %w", executablePath, err)
 		}
 
-		if len(toolLeaf.RunfilesFiles) > 0 {
-			return PatchedTargetActionInputRootValue{}, errors.New("TODO: add runfiles files to the input root")
-		}
+		// Create a ctx.workspace_name == "_main" directory.
+		// This is needed to make path lookups of the form
+		// "${RUNFILES_DIR}/_main/../${path}" work.
+		runfilesDirectory.getOrCreateDirectory(componentMainWorkspaceName)
+
 		if len(toolLeaf.RunfilesSymlinks) > 0 {
 			return PatchedTargetActionInputRootValue{}, errors.New("TODO: add runfiles symlinks to the input root")
 		}

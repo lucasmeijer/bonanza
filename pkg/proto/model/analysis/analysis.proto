@@ -726,16 +726,34 @@ message FileReader {
   message Key {}
 }
 
+enum DirectoryLayout {
+  // Failed to provide a directory layout.
+  UNKNOWN = 0;
+
+  // Name source files "external/${repo}/${path}" and output files
+  // "bazel-out/${configuration}/bin/external/${repo}/${path}". This
+  // layout can be used to construct action input roots.
+  INPUT_ROOT = 1;
+
+  // Name source files and output files "${repo}/${path}". This layout
+  // can be used to construct runfiles directories.
+  RUNFILES = 2;
+}
+
 message FileRoot {
   message Key {
     // The source file or output file's contents that are being requested.
     bonanza.model.starlark.File file = 1;
+
+    // The desired naming scheme of files in the resulting root directory.
+    DirectoryLayout directory_layout = 2;
   }
 
   message Value {
     // A directory hierarchy that contains the requested file, placed at
     // the location it would appear inside the input root of an action
-    // that depends on it.
+    // that depends on it, or inside a runfiles directory of a tool that
+    // depends on it.
     //
     // If the requested file is a symlink, its target(s) will also be
     // part of the directory structure.
@@ -765,12 +783,16 @@ message FilesRoot {
           message_list_type_name:
             "bonanza.model.starlark.List.Element";
         }];
+
+    // The desired naming scheme of files in the resulting root directory.
+    DirectoryLayout directory_layout = 2;
   }
 
   message Value {
     // A directory hierarchy that contains all of the files contained in
     // the list, placed at the location they would appear inside the
-    // input root of an action that depends on them.
+    // input root of an action that depends on them, or inside a
+    // runfiles directory of a tool that depends on them.
     bonanza.model.filesystem.DirectoryContents root_directory = 1;
   }
 }

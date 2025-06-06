@@ -47,7 +47,8 @@ func getStarlarkFileProperties[TReference object.BasicReference, TMetadata model
 	targetOutput := e.GetFileRootValue(
 		model_core.NewPatchedMessage(
 			&model_analysis_pb.FileRoot_Key{
-				File: patchedFile.Message,
+				File:            patchedFile.Message,
+				DirectoryLayout: model_analysis_pb.DirectoryLayout_INPUT_ROOT,
 			},
 			model_core.MapReferenceMetadataToWalkers(patchedFile.Patcher),
 		),
@@ -85,20 +86,28 @@ func getStarlarkFileProperties[TReference object.BasicReference, TMetadata model
 	return fileProperties, nil
 }
 
-func getPackageOutputDirectoryComponents[TReference object.BasicReference](configurationReference model_core.Message[*model_core_pb.DecodableReference, TReference], canonicalPackage label.CanonicalPackage) ([]path.Component, error) {
-	// TODO: Add more utility functions to pkg/label, so that we
-	// don't need to call path.MustNewComponent() from here.
-	configurationComponent, err := model_starlark.ConfigurationReferenceToComponent(configurationReference)
-	if err != nil {
-		return nil, err
+func getPackageOutputDirectoryComponents[TReference object.BasicReference](configurationReference model_core.Message[*model_core_pb.DecodableReference, TReference], canonicalPackage label.CanonicalPackage, directoryLayout model_analysis_pb.DirectoryLayout) ([]path.Component, error) {
+	var components []path.Component
+	switch directoryLayout {
+	case model_analysis_pb.DirectoryLayout_INPUT_ROOT:
+		// TODO: Add more utility functions to pkg/label, so that we
+		// don't need to call path.MustNewComponent() from here.
+		configurationComponent, err := model_starlark.ConfigurationReferenceToComponent(configurationReference)
+		if err != nil {
+			return nil, err
+		}
+		components = append(
+			components,
+			model_starlark.ComponentBazelOut,
+			path.MustNewComponent(configurationComponent),
+			model_starlark.ComponentBin,
+			model_starlark.ComponentExternal,
+		)
+	case model_analysis_pb.DirectoryLayout_RUNFILES:
+	default:
+		return nil, errors.New("unknown directory layout")
 	}
-	components := []path.Component{
-		model_starlark.ComponentBazelOut,
-		path.MustNewComponent(configurationComponent),
-		model_starlark.ComponentBin,
-		model_starlark.ComponentExternal,
-		path.MustNewComponent(canonicalPackage.GetCanonicalRepo().String()),
-	}
+	components = append(components, path.MustNewComponent(canonicalPackage.GetCanonicalRepo().String()))
 	for packageComponent := range strings.FieldsFuncSeq(canonicalPackage.GetPackagePath(), func(r rune) bool { return r == '/' }) {
 		components = append(components, path.MustNewComponent(packageComponent))
 	}
@@ -166,6 +175,10 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 
 		switch source := outputLeaf.Leaf.Source.(type) {
 		case *model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_ActionId:
+			if key.Message.DirectoryLayout != model_analysis_pb.DirectoryLayout_INPUT_ROOT {
+				return PatchedFileRootValue{}, errors.New("TODO: Support action outputs with runfiles layout")
+			}
+
 			patchedConfigurationReference := model_core.Patch(e, configurationReference)
 			targetActionResult := e.GetTargetActionResultValue(
 				model_core.NewPatchedMessage(
@@ -265,7 +278,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 				return PatchedFileRootValue{}, err
 			}
 
-			components, err := getPackageOutputDirectoryComponents(configurationReference, fileLabel.GetCanonicalPackage())
+			components, err := getPackageOutputDirectoryComponents(configurationReference, fileLabel.GetCanonicalPackage(), key.Message.DirectoryLayout)
 			if err != nil {
 				return PatchedFileRootValue{}, err
 			}
@@ -321,7 +334,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 				return PatchedFileRootValue{}, evaluation.ErrMissingDependency
 			}
 
-			components, err := getPackageOutputDirectoryComponents(configurationReference, fileLabel.GetCanonicalPackage())
+			components, err := getPackageOutputDirectoryComponents(configurationReference, fileLabel.GetCanonicalPackage(), key.Message.DirectoryLayout)
 			if err != nil {
 				return PatchedFileRootValue{}, err
 			}
@@ -353,6 +366,10 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 				model_core.MapReferenceMetadataToWalkers(createdDirectory.Message.Patcher),
 			), nil
 		case *model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_Symlink:
+			if key.Message.DirectoryLayout != model_analysis_pb.DirectoryLayout_INPUT_ROOT {
+				return PatchedFileRootValue{}, errors.New("TODO: Support symlinks with runfiles layout")
+			}
+
 			// Symlink to another file. Obtain the root of
 			// the target and add a symlink to it.
 			directoryCreationParameters, gotDirectoryCreationParameters := e.GetDirectoryCreationParametersObjectValue(&model_analysis_pb.DirectoryCreationParametersObject_Key{})
@@ -362,7 +379,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 			symlinkTarget := e.GetFileRootValue(
 				model_core.NewPatchedMessage(
 					&model_analysis_pb.FileRoot_Key{
-						File: patchedSymlinkTargetFile.Message,
+						File:            patchedSymlinkTargetFile.Message,
+						DirectoryLayout: key.Message.DirectoryLayout,
 					},
 					model_core.MapReferenceMetadataToWalkers(patchedSymlinkTargetFile.Patcher),
 				),
@@ -481,16 +499,22 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 		return PatchedFileRootValue{}, err
 	}
 
-	return createFileRootFromChangeTrackingDirectory(
-		ctx,
-		e,
-		directoryCreationParameters,
-		&changeTrackingDirectory[TReference, TMetadata]{
+	// Prepend "external" depending on whether this needs to go into
+	// the input root or the runfiles directory.
+	var rootDirectory *changeTrackingDirectory[TReference, TMetadata]
+	switch key.Message.DirectoryLayout {
+	case model_analysis_pb.DirectoryLayout_INPUT_ROOT:
+		rootDirectory = &changeTrackingDirectory[TReference, TMetadata]{
 			directories: map[path.Component]*changeTrackingDirectory[TReference, TMetadata]{
 				model_starlark.ComponentExternal: &externalDirectory,
 			},
-		},
-	)
+		}
+	case model_analysis_pb.DirectoryLayout_RUNFILES:
+		rootDirectory = &externalDirectory
+	default:
+		return PatchedFileRootValue{}, errors.New("unknown directory layout")
+	}
+	return createFileRootFromChangeTrackingDirectory(ctx, e, directoryCreationParameters, rootDirectory)
 }
 
 func createFileRootFromChangeTrackingDirectory[TReference object.BasicReference, TMetadata model_core.WalkableReferenceMetadata](

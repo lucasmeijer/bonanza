@@ -30,6 +30,7 @@ func addFilesToChangeTrackingDirectory[TReference object.BasicReference, TMetada
 	files model_core.Message[[]*model_starlark_pb.List_Element, TReference],
 	out *changeTrackingDirectory[TReference, TMetadata],
 	loadOptions *changeTrackingDirectoryLoadOptions[TReference],
+	directoryLayout model_analysis_pb.DirectoryLayout,
 ) error {
 	missingDependencies := false
 	for i, element := range files.Message {
@@ -39,7 +40,8 @@ func addFilesToChangeTrackingDirectory[TReference object.BasicReference, TMetada
 			v := e.GetFilesRootValue(
 				model_core.NewPatchedMessage(
 					&model_analysis_pb.FilesRoot_Key{
-						ListReference: patchedReference.Message,
+						ListReference:   patchedReference.Message,
+						DirectoryLayout: directoryLayout,
 					},
 					model_core.MapReferenceMetadataToWalkers(patchedReference.Patcher),
 				),
@@ -56,7 +58,7 @@ func addFilesToChangeTrackingDirectory[TReference object.BasicReference, TMetada
 			if !ok {
 				return fmt.Errorf("element at index %d is not a file", i)
 			}
-			if err := addFileToChangeTrackingDirectory(e, model_core.Nested(files, file.File), out, loadOptions); err != nil {
+			if err := addFileToChangeTrackingDirectory(e, model_core.Nested(files, file.File), out, loadOptions, directoryLayout); err != nil {
 				if errors.Is(err, evaluation.ErrMissingDependency) {
 					missingDependencies = true
 					continue
@@ -78,12 +80,14 @@ func addFileToChangeTrackingDirectory[TReference object.BasicReference, TMetadat
 	file model_core.Message[*model_starlark_pb.File, TReference],
 	out *changeTrackingDirectory[TReference, TMetadata],
 	loadOptions *changeTrackingDirectoryLoadOptions[TReference],
+	directoryLayout model_analysis_pb.DirectoryLayout,
 ) error {
 	patchedFile := model_core.Patch(e, file)
 	v := e.GetFileRootValue(
 		model_core.NewPatchedMessage(
 			&model_analysis_pb.FileRoot_Key{
-				File: patchedFile.Message,
+				File:            patchedFile.Message,
+				DirectoryLayout: directoryLayout,
 			},
 			model_core.MapReferenceMetadataToWalkers(patchedFile.Patcher),
 		),
@@ -119,6 +123,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFilesRootValue(ctx context.
 			directoryContentsReader: directoryReaders.DirectoryContents,
 			leavesReader:            directoryReaders.Leaves,
 		},
+		key.Message.DirectoryLayout,
 	); err != nil {
 		return PatchedFilesRootValue{}, err
 	}
