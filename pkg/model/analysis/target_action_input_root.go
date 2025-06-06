@@ -5,11 +5,16 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bonanza/pkg/evaluation"
 	"github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
+	"github.com/buildbarn/bonanza/pkg/model/core/btree"
 	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
+	model_starlark "github.com/buildbarn/bonanza/pkg/model/starlark"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
+	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
 
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
@@ -85,8 +90,53 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionInputRootValue(
 	}
 
 	// Add tools.
-	if len(actionDefinition.Tools) > 0 {
-		return PatchedTargetActionInputRootValue{}, fmt.Errorf("TODO: ADD TOOLS TO INPUT ROOT!")
+	var errIter error
+	for tool := range btree.AllLeaves(
+		ctx,
+		c.filesToRunProviderReader,
+		model_core.Nested(action, actionDefinition.Tools),
+		func(element model_core.Message[*model_analysis_pb.FilesToRunProvider, TReference]) (*model_core_pb.DecodableReference, error) {
+			return element.Message.GetParent().GetReference(), nil
+		},
+		&errIter,
+	) {
+		toolLevel, ok := tool.Message.Level.(*model_analysis_pb.FilesToRunProvider_Leaf_)
+		if !ok {
+			return PatchedTargetActionInputRootValue{}, errors.New("not a valid leaf entry for tool")
+		}
+		toolLeaf := toolLevel.Leaf
+
+		// Add the tool's executable to the input root.
+		executable := model_core.Nested(tool, toolLeaf.Executable)
+		if err := addFileToChangeTrackingDirectory(e, executable, &rootDirectory, loadOptions); err != nil {
+			return PatchedTargetActionInputRootValue{}, fmt.Errorf("failed to add tool executable to input root: %w", err)
+		}
+
+		// Create the tool's runfiles directory.
+		executablePath, err := model_starlark.FileGetPath(executable)
+		if err != nil {
+			return PatchedTargetActionInputRootValue{}, fmt.Errorf("failed to get path of tool executable: %w", err)
+		}
+		runfilesDirectoryResolver := changeTrackingDirectoryNewDirectoryResolver[TReference, TMetadata]{
+			loadOptions: loadOptions,
+			stack:       util.NewNonEmptyStack(&rootDirectory),
+		}
+		if err := path.Resolve(path.UNIXFormat.NewParser(executablePath+".runfiles"), &runfilesDirectoryResolver); err != nil {
+			return PatchedTargetActionInputRootValue{}, fmt.Errorf("failed to create runfiles directory for tool with path %#v: %w", executablePath, err)
+		}
+
+		if len(toolLeaf.RunfilesFiles) > 0 {
+			return PatchedTargetActionInputRootValue{}, errors.New("TODO: add runfiles files to the input root")
+		}
+		if len(toolLeaf.RunfilesSymlinks) > 0 {
+			return PatchedTargetActionInputRootValue{}, errors.New("TODO: add runfiles symlinks to the input root")
+		}
+		if len(toolLeaf.RunfilesRootSymlinks) > 0 {
+			return PatchedTargetActionInputRootValue{}, errors.New("TODO: add runfiles root symlinks to the input root")
+		}
+	}
+	if errIter != nil {
+		return PatchedTargetActionInputRootValue{}, errIter
 	}
 
 	group, groupCtx := errgroup.WithContext(ctx)

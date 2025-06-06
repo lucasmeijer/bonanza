@@ -58,6 +58,7 @@ type baseComputer[TReference object.BasicReference, TMetadata BaseComputerRefere
 	commandOutputsReader                         model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_command_pb.Outputs, TReference]]
 	configuredTargetActionReader                 model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[[]*model_analysis_pb.ConfiguredTarget_Value_Action, TReference]]
 	configuredTargetOutputReader                 model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[[]*model_analysis_pb.ConfiguredTarget_Value_Output, TReference]]
+	filesToRunProviderReader                     model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[[]*model_analysis_pb.FilesToRunProvider, TReference]]
 	moduleExtensionReposValueRepoReader          model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[[]*model_analysis_pb.ModuleExtensionRepos_Value_Repo, TReference]]
 	packageValueTargetReader                     model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[[]*model_analysis_pb.Package_Value_Target, TReference]]
 	targetPatternExpansionValueTargetLabelReader model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[[]*model_analysis_pb.TargetPatternExpansion_Value_TargetLabel, TReference]]
@@ -131,6 +132,10 @@ func NewBaseComputer[TReference object.BasicReference, TMetadata BaseComputerRef
 		configuredTargetActionReader: model_parser.LookupParsedObjectReader(
 			parsedObjectPoolIngester,
 			model_parser.NewMessageListObjectParser[TReference, model_analysis_pb.ConfiguredTarget_Value_Action](),
+		),
+		filesToRunProviderReader: model_parser.LookupParsedObjectReader(
+			parsedObjectPoolIngester,
+			model_parser.NewMessageListObjectParser[TReference, model_analysis_pb.FilesToRunProvider](),
 		),
 		moduleExtensionReposValueRepoReader: model_parser.LookupParsedObjectReader(
 			parsedObjectPoolIngester,

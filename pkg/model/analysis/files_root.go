@@ -10,7 +10,6 @@ import (
 	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
 	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
-	model_filesystem_pb "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
 	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
 	"github.com/buildbarn/bonanza/pkg/storage/dag"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
@@ -34,7 +33,6 @@ func addFilesToChangeTrackingDirectory[TReference object.BasicReference, TMetada
 ) error {
 	missingDependencies := false
 	for i, element := range files.Message {
-		var root model_core.Message[*model_filesystem_pb.DirectoryContents, TReference]
 		switch level := element.Level.(type) {
 		case *model_starlark_pb.List_Element_Parent_:
 			patchedReference := model_core.Patch(e, model_core.Nested(files, level.Parent.Reference))
@@ -50,35 +48,51 @@ func addFilesToChangeTrackingDirectory[TReference object.BasicReference, TMetada
 				missingDependencies = true
 				continue
 			}
-			root = model_core.Nested(v, v.Message.RootDirectory)
+			if err := out.mergeContents(model_core.Nested(v, v.Message.RootDirectory), loadOptions); err != nil {
+				return fmt.Errorf("list element at index %d: %w", i, err)
+			}
 		case *model_starlark_pb.List_Element_Leaf:
 			file, ok := level.Leaf.Kind.(*model_starlark_pb.Value_File)
 			if !ok {
 				return fmt.Errorf("element at index %d is not a file", i)
 			}
-			patchedFile := model_core.Patch(e, model_core.Nested(files, file.File))
-			v := e.GetFileRootValue(
-				model_core.NewPatchedMessage(
-					&model_analysis_pb.FileRoot_Key{
-						File: patchedFile.Message,
-					},
-					model_core.MapReferenceMetadataToWalkers(patchedFile.Patcher),
-				),
-			)
-			if !v.IsSet() {
-				missingDependencies = true
-				continue
+			if err := addFileToChangeTrackingDirectory(e, model_core.Nested(files, file.File), out, loadOptions); err != nil {
+				if errors.Is(err, evaluation.ErrMissingDependency) {
+					missingDependencies = true
+					continue
+				}
+				return fmt.Errorf("file at index %d: %w", i, err)
 			}
-			root = model_core.Nested(v, v.Message.RootDirectory)
 		default:
 			return errors.New("invalid list level type")
-		}
-		if err := out.mergeContents(root, loadOptions); err != nil {
-			return fmt.Errorf("list element at index %d: %w", i, err)
 		}
 	}
 	if missingDependencies {
 		return evaluation.ErrMissingDependency
+	}
+	return nil
+}
+
+func addFileToChangeTrackingDirectory[TReference object.BasicReference, TMetadata model_core.WalkableReferenceMetadata](
+	e addFilesToChangeTrackingDirectoryEnvironment[TReference, TMetadata],
+	file model_core.Message[*model_starlark_pb.File, TReference],
+	out *changeTrackingDirectory[TReference, TMetadata],
+	loadOptions *changeTrackingDirectoryLoadOptions[TReference],
+) error {
+	patchedFile := model_core.Patch(e, file)
+	v := e.GetFileRootValue(
+		model_core.NewPatchedMessage(
+			&model_analysis_pb.FileRoot_Key{
+				File: patchedFile.Message,
+			},
+			model_core.MapReferenceMetadataToWalkers(patchedFile.Patcher),
+		),
+	)
+	if !v.IsSet() {
+		return evaluation.ErrMissingDependency
+	}
+	if err := out.mergeContents(model_core.Nested(v, v.Message.RootDirectory), loadOptions); err != nil {
+		return err
 	}
 	return nil
 }
