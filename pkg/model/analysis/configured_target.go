@@ -2148,6 +2148,109 @@ func promoteStringArgumentsToArgs[TMetadata model_core.ReferenceMetadata](
 	)
 }
 
+// newFilesToRunProviderFromStruct converts a Starlark
+// FilesToRunProvider object to a Protobuf message, so that it may be
+// embedded in a target action definition.
+func (rc *ruleContext[TReference, TMetadata]) newFilesToRunProviderFromStruct(thread *starlark.Thread, s *model_starlark.Struct[TReference, TMetadata]) (model_core.PatchedMessage[*model_analysis_pb.FilesToRunProvider_Leaf, TMetadata], *model_starlark.File[TReference, TMetadata], error) {
+	// Unpack individual struct fields.
+	type filesToRunProviderFields struct {
+		executable           *model_starlark.File[TReference, TMetadata]
+		runfilesFiles        *model_starlark.Depset[TReference, TMetadata]
+		runfilesSymlinks     *model_starlark.Depset[TReference, TMetadata]
+		runfilesRootSymlinks *model_starlark.Depset[TReference, TMetadata]
+	}
+	var fields filesToRunProviderFields
+	if err := unpack.Attrs(
+		func(thread *starlark.Thread, fields *filesToRunProviderFields) []unpack.AttrUnpacker {
+			return []unpack.AttrUnpacker{
+				{"executable", unpack.Bind(thread, &fields.executable, unpack.Type[*model_starlark.File[TReference, TMetadata]]("File"))},
+				{"_runfiles_files", unpack.Bind(thread, &fields.runfilesFiles, unpack.Type[*model_starlark.Depset[TReference, TMetadata]]("depset"))},
+				{"_runfiles_symlinks", unpack.Bind(thread, &fields.runfilesSymlinks, unpack.Type[*model_starlark.Depset[TReference, TMetadata]]("depset"))},
+				{"_runfiles_root_symlinks", unpack.Bind(thread, &fields.runfilesRootSymlinks, unpack.Type[*model_starlark.Depset[TReference, TMetadata]]("depset"))},
+			}
+		},
+	).UnpackInto(thread, s, &fields); err != nil {
+		return model_core.PatchedMessage[*model_analysis_pb.FilesToRunProvider_Leaf, TMetadata]{}, nil, err
+	}
+
+	// Encode individual fields.
+	valueEncodingOptions := rc.computer.getValueEncodingOptions(rc.environment, nil)
+	executable := model_core.Patch(rc.environment, fields.executable.GetDefinition())
+	runfilesFiles, _, err := fields.runfilesFiles.EncodeList(map[starlark.Value]struct{}{}, valueEncodingOptions)
+	if err != nil {
+		return model_core.PatchedMessage[*model_analysis_pb.FilesToRunProvider_Leaf, TMetadata]{}, nil, fmt.Errorf("runfiles files: %w", err)
+	}
+	runfilesSymlinks, _, err := fields.runfilesSymlinks.EncodeList(map[starlark.Value]struct{}{}, valueEncodingOptions)
+	if err != nil {
+		return model_core.PatchedMessage[*model_analysis_pb.FilesToRunProvider_Leaf, TMetadata]{}, nil, fmt.Errorf("runfiles symlinks: %w", err)
+	}
+	runfilesRootSymlinks, _, err := fields.runfilesRootSymlinks.EncodeList(map[starlark.Value]struct{}{}, valueEncodingOptions)
+	if err != nil {
+		return model_core.PatchedMessage[*model_analysis_pb.FilesToRunProvider_Leaf, TMetadata]{}, nil, fmt.Errorf("runfiles root symlinks: %w", err)
+	}
+
+	patchedFilesToRunProvider, err := inlinedtree.Build(
+		inlinedtree.CandidateList[*model_analysis_pb.FilesToRunProvider_Leaf, TMetadata]{
+			// Fields that should always be inlined into the
+			// FilesToRunProvider.
+			{
+				ExternalMessage: model_core.NewPatchedMessage((proto.Message)(nil), executable.Patcher),
+				ParentAppender: func(
+					filesToRunProvider model_core.PatchedMessage[*model_analysis_pb.FilesToRunProvider_Leaf, TMetadata],
+					externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
+				) {
+					filesToRunProvider.Message.Executable = executable.Message
+				},
+			},
+			// Fields that can be stored externally if needed.
+			{
+				ExternalMessage: model_core.NewPatchedMessage(
+					(proto.Message)(nil),
+					runfilesFiles.Patcher,
+				),
+				ParentAppender: func(
+					filesToRunProvider model_core.PatchedMessage[*model_analysis_pb.FilesToRunProvider_Leaf, TMetadata],
+					externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
+				) {
+					// TODO: This should push out the
+					// depset if it gets too big.
+					filesToRunProvider.Message.RunfilesFiles = runfilesFiles.Message
+				},
+			},
+			{
+				ExternalMessage: model_core.NewPatchedMessage(
+					(proto.Message)(nil),
+					runfilesSymlinks.Patcher,
+				),
+				ParentAppender: func(
+					filesToRunProvider model_core.PatchedMessage[*model_analysis_pb.FilesToRunProvider_Leaf, TMetadata],
+					externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
+				) {
+					// TODO: This should push out the
+					// depset if it gets too big.
+					filesToRunProvider.Message.RunfilesSymlinks = runfilesSymlinks.Message
+				},
+			},
+			{
+				ExternalMessage: model_core.NewPatchedMessage(
+					(proto.Message)(nil),
+					runfilesRootSymlinks.Patcher,
+				),
+				ParentAppender: func(
+					filesToRunProvider model_core.PatchedMessage[*model_analysis_pb.FilesToRunProvider_Leaf, TMetadata],
+					externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
+				) {
+					// TODO: This should push out the
+					// depset if it gets too big.
+					filesToRunProvider.Message.RunfilesRootSymlinks = runfilesRootSymlinks.Message
+				},
+			},
+		},
+		rc.computer.getInlinedTreeOptions(),
+	)
+	return patchedFilesToRunProvider, fields.executable, err
+}
+
 func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thread, b *starlark.Builtin, fnArgs starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	if len(fnArgs) != 0 {
 		return nil, fmt.Errorf("%s: got %d positional arguments, want 0", b.Name(), len(fnArgs))
@@ -2206,14 +2309,39 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 		return nil, err
 	}
 
+	valueEncodingOptions := rc.computer.getValueEncodingOptions(rc.environment, nil)
+	var inputsDirect []starlark.Value
+	toolsBuilder := btree.NewSplitProllyBuilder(
+		valueEncodingOptions.ObjectMinimumSizeBytes,
+		valueEncodingOptions.ObjectMaximumSizeBytes,
+		btree.NewObjectCreatingNodeMerger(
+			valueEncodingOptions.ObjectEncoder,
+			valueEncodingOptions.ObjectReferenceFormat,
+			func(createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]], childNodes []*model_analysis_pb.FilesToRunProvider) (model_core.PatchedMessage[*model_analysis_pb.FilesToRunProvider, TMetadata], error) {
+				patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
+				return model_core.NewPatchedMessage(
+					&model_analysis_pb.FilesToRunProvider{
+						Level: &model_analysis_pb.FilesToRunProvider_Parent_{
+							Parent: &model_analysis_pb.FilesToRunProvider_Parent{
+								Reference: patcher.CaptureAndAddDecodableReference(
+									createdObject,
+									valueEncodingOptions.ObjectCapturer,
+								),
+							},
+						},
+					},
+					patcher,
+				), nil
+			},
+		),
+	)
+
 	// Derive argv0 from the executable. Even though it's not
 	// explicitly documented, the executable is also treated as a
 	// tool dependency.
-	var inputsDirect []starlark.Value
-	var toolsDirect []starlark.Value
 	argv0, ok := executable.(string)
 	if !ok {
-		executableFile, executableFilesToRun, err := rc.getFileOrFilesToRunProvider(thread, executable)
+		executableFile, executableFilesToRunProvider, err := rc.getFileOrFilesToRunProvider(thread, executable)
 		if err != nil {
 			return nil, fmt.Errorf("executable: %w", err)
 		}
@@ -2221,19 +2349,28 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 		if executableFile != nil {
 			inputsDirect = append(inputsDirect, executableFile)
 		} else {
-			executableFileValue, err := executableFilesToRun.Attr(thread, "executable")
+			var patchedFilesToRun model_core.PatchedMessage[*model_analysis_pb.FilesToRunProvider_Leaf, TMetadata]
+			patchedFilesToRun, executableFile, err = rc.newFilesToRunProviderFromStruct(thread, executableFilesToRunProvider)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("executable: %w", err)
 			}
-			if err := unpack.Type[*model_starlark.File[TReference, TMetadata]]("File").UnpackInto(thread, executableFileValue, &executableFile); err != nil {
-				return nil, err
+			if err := toolsBuilder.PushChild(
+				model_core.NewPatchedMessage(
+					&model_analysis_pb.FilesToRunProvider{
+						Level: &model_analysis_pb.FilesToRunProvider_Leaf_{
+							Leaf: patchedFilesToRun.Message,
+						},
+					},
+					patchedFilesToRun.Patcher,
+				),
+			); err != nil {
+				return nil, fmt.Errorf("executable: %w", err)
 			}
-			toolsDirect = append(toolsDirect, executableFilesToRun)
 		}
 
 		argv0, err = model_starlark.FileGetPath(executableFile.GetDefinition())
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("executable: %w", err)
 		}
 	}
 
@@ -2256,7 +2393,6 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 	// Promote any runs of string arguments to equivalent Args
 	// objects taking a list. That way, computation of target
 	// actions only needs to process Args objects.
-	valueEncodingOptions := rc.computer.getValueEncodingOptions(rc.environment, nil)
 	stringArgumentsListBuilder := model_starlark.NewListBuilder(valueEncodingOptions)
 	if err := stringArgumentsListBuilder.PushChild(
 		model_core.NewSimplePatchedMessage[TMetadata](
@@ -2457,12 +2593,27 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 		if d, ok := tool.(*model_starlark.Depset[TReference, TMetadata]); ok {
 			inputsTransitive = append(inputsTransitive, d)
 		} else {
-			if toolFile, toolFilesToRun, err := rc.getFileOrFilesToRunProvider(thread, tool); err != nil {
+			if toolFile, toolFilesToRunProvider, err := rc.getFileOrFilesToRunProvider(thread, tool); err != nil {
 				return nil, fmt.Errorf("tool at index %d: %w", i, err)
 			} else if toolFile != nil {
 				inputsDirect = append(inputsDirect, toolFile)
 			} else {
-				toolsDirect = append(toolsDirect, toolFilesToRun)
+				patchedFilesToRun, _, err := rc.newFilesToRunProviderFromStruct(thread, toolFilesToRunProvider)
+				if err != nil {
+					return nil, fmt.Errorf("tool at index %d: %w", i, err)
+				}
+				if err := toolsBuilder.PushChild(
+					model_core.NewPatchedMessage(
+						&model_analysis_pb.FilesToRunProvider{
+							Level: &model_analysis_pb.FilesToRunProvider_Leaf_{
+								Leaf: patchedFilesToRun.Message,
+							},
+						},
+						patchedFilesToRun.Patcher,
+					),
+				); err != nil {
+					return nil, fmt.Errorf("tool at index %d: %w", i, err)
+				}
 			}
 		}
 	}
@@ -2476,11 +2627,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 		return nil, err
 	}
 
-	mergedTools, err := model_starlark.NewDepsetContents[TReference, TMetadata](thread, toolsDirect, nil, model_starlark_pb.Depset_DEFAULT)
-	if err != nil {
-		return nil, err
-	}
-	encodedTools, _, err := mergedTools.EncodeList(map[starlark.Value]struct{}{}, valueEncodingOptions)
+	toolsList, err := toolsBuilder.FinalizeList()
 	if err != nil {
 		return nil, err
 	}
@@ -2546,7 +2693,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 			{
 				ExternalMessage: model_core.NewPatchedMessage(
 					(proto.Message)(nil),
-					encodedTools.Patcher,
+					toolsList.Patcher,
 				),
 				ParentAppender: func(
 					actionDefinition model_core.PatchedMessage[*model_analysis_pb.TargetActionDefinition, TMetadata],
@@ -2554,7 +2701,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 				) {
 					// TODO: This should push out the
 					// tools if they get too big.
-					actionDefinition.Message.Tools = encodedTools.Message
+					actionDefinition.Message.Tools = toolsList.Message
 				},
 			},
 			{

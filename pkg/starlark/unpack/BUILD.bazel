@@ -7,6 +7,7 @@ go_library(
         "apparent_label.go",
         "apparent_repo.go",
         "apparent_target_pattern.go",
+        "attrs.go",
         "bind.go",
         "bool.go",
         "canonicalize.go",

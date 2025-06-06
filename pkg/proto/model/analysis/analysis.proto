@@ -402,14 +402,52 @@ message Args {
   }
 }
 
+message FilesToRunProvider {
+  message Parent {
+    // Reference to the B-tree node containing additional tools to be
+    // placed in an action's input root.
+    bonanza.model.core.DecodableReference reference = 1
+        [(bonanza.model.core.object_format) = {
+          message_list_type_name:
+            "bonanza.model.analysis.FilesToRunProvider";
+        }];
+  }
+
+  message Leaf {
+    // The executable to place inside the action's input root.
+    bonanza.model.starlark.File executable = 1;
+
+    // Depset of Files that need to be placed in the runfiles directory
+    // of the executable.
+    repeated bonanza.model.starlark.List.Element runfiles_files = 2;
+
+    // Depset of SymlinkEntry structs that need to be placed in the
+    // runfiles directory belonging to the main workspace.
+    repeated bonanza.model.starlark.List.Element runfiles_symlinks = 3;
+
+    // Depset of SymlinkEntry structs that need to be placed in the root
+    // of the runfiles directory.
+    repeated bonanza.model.starlark.List.Element runfiles_root_symlinks = 4;
+  }
+
+  oneof level {
+    // A single tool to be placed in an action's input root.
+    Leaf leaf = 1;
+
+    // B-tree node containing additional tools to be placed in an
+    // action's input root.
+    Parent parent = 2;
+  }
+}
+
 message TargetActionDefinition {
   // Depset of File objects of the input files of the action.
   repeated bonanza.model.starlark.List.Element inputs = 1;
 
-  // Depset of FilesToRunProvider objects of the tools used by the
-  // action. For each of these tools, the executable and a corresponding
-  // runfiles directory needs to be added to the input root.
-  repeated bonanza.model.starlark.List.Element tools = 2;
+  // Tools used by the action. For each of these tools, the executable
+  // and a corresponding runfiles directory needs to be added to the
+  // input root.
+  repeated FilesToRunProvider tools = 2;
 
   // The X25519 public key that identifies the platform that should be
   // used to execute the action in PKIX, ASN.1 DER form.
