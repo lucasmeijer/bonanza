@@ -2368,7 +2368,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 			}
 		}
 
-		argv0, err = model_starlark.FileGetPath(executableFile.GetDefinition())
+		argv0, err = model_starlark.FileGetPath(executableFile.GetDefinition(), nil)
 		if err != nil {
 			return nil, fmt.Errorf("executable: %w", err)
 		}

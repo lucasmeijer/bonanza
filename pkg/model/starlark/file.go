@@ -32,7 +32,8 @@ var (
 )
 
 type File[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata] struct {
-	definition model_core.Message[*model_starlark_pb.File, TReference]
+	definition       model_core.Message[*model_starlark_pb.File, TReference]
+	treeRelativePath *bb_path.Trace
 }
 
 var (
@@ -47,8 +48,18 @@ func NewFile[TReference object.BasicReference, TMetadata model_core.CloneableRef
 	}
 }
 
+// WithTreeRelativePath can be used by DirectoryExpander.expand() to
+// convert a File of a directory to an instance that refers to a regular
+// file contained within the directory.
+func (f *File[TReference, TMetadata]) WithTreeRelativePath(treeRelativePath *bb_path.Trace) *File[TReference, TMetadata] {
+	return &File[TReference, TMetadata]{
+		definition:       f.definition,
+		treeRelativePath: treeRelativePath,
+	}
+}
+
 func (f *File[TReference, TMetadata]) String() string {
-	if p, err := FileGetPath(f.definition); err == nil {
+	if p, err := FileGetPath(f.definition, f.treeRelativePath); err == nil {
 		return fmt.Sprintf("<File %s>", p)
 	}
 	return "<File>"
@@ -110,27 +121,38 @@ func ConfigurationReferenceToComponent[TReference object.BasicReference](configu
 	return model_core.DecodableLocalReferenceToString(r), nil
 }
 
+func (f *File[TReference, TMetadata]) getPathEnd() (string, error) {
+	if f.treeRelativePath != nil {
+		return f.treeRelativePath.GetUNIXString(), nil
+	}
+	labelStr := f.definition.Message.Label
+	canonicalLabel, err := pg_label.NewCanonicalLabel(labelStr)
+	if err != nil {
+		return "", fmt.Errorf("invalid canonical label %#v: %w", labelStr, err)
+	}
+	return canonicalLabel.GetTargetName().String(), nil
+}
+
 func (f *File[TReference, TMetadata]) Attr(thread *starlark.Thread, name string) (starlark.Value, error) {
 	d := f.definition.Message
 	switch name {
 	case "basename":
-		canonicalLabel, err := pg_label.NewCanonicalLabel(d.Label)
+		pathEnd, err := f.getPathEnd()
 		if err != nil {
 			return nil, fmt.Errorf("invalid canonical label %#v: %w", d.Label, err)
 		}
-		return starlark.String(go_path.Base(canonicalLabel.GetTargetName().String())), nil
+		return starlark.String(go_path.Base(pathEnd)), nil
 	case "dirname":
-		p, err := FileGetPath(f.definition)
+		p, err := FileGetPath(f.definition, f.treeRelativePath)
 		if err != nil {
 			return nil, err
 		}
 		return starlark.String(go_path.Dir(p)), nil
 	case "extension":
-		canonicalLabel, err := pg_label.NewCanonicalLabel(d.Label)
+		p, err := f.getPathEnd()
 		if err != nil {
 			return nil, fmt.Errorf("invalid canonical label %#v: %w", d.Label, err)
 		}
-		p := canonicalLabel.GetTargetName().String()
 		for i := len(p) - 1; i >= 0 && p[i] != '/' && p[i] != ':'; i-- {
 			if p[i] == '.' {
 				return starlark.String(p[i+1:]), nil
@@ -138,7 +160,10 @@ func (f *File[TReference, TMetadata]) Attr(thread *starlark.Thread, name string)
 		}
 		return starlark.String(""), nil
 	case "is_directory":
-		return starlark.Bool(d.Type == model_starlark_pb.File_DIRECTORY), nil
+		// For files created by DirectoryExpander, the
+		// definition still refers to the directory from which
+		// the files originated.
+		return starlark.Bool(d.Type == model_starlark_pb.File_DIRECTORY && f.treeRelativePath == nil), nil
 	case "is_source":
 		return starlark.Bool(d.Owner == nil), nil
 	case "is_symlink":
@@ -162,7 +187,7 @@ func (f *File[TReference, TMetadata]) Attr(thread *starlark.Thread, name string)
 
 		return NewLabel[TReference, TMetadata](canonicalLabel.AsResolved()), nil
 	case "path":
-		p, err := FileGetPath(f.definition)
+		p, err := FileGetPath(f.definition, f.treeRelativePath)
 		if err != nil {
 			return nil, err
 		}
@@ -192,7 +217,13 @@ func (f *File[TReference, TMetadata]) Attr(thread *starlark.Thread, name string)
 			canonicalPackage.GetCanonicalRepo().String(),
 			canonicalPackage.GetPackagePath(),
 			canonicalLabel.GetTargetName().String(),
+			f.treeRelativePath.GetUNIXString(),
 		)), nil
+	case "tree_relative_path":
+		if f.treeRelativePath == nil {
+			return nil, errors.New("File.tree_relative_path is only available during Args.add_*() directory expansion ")
+		}
+		return starlark.String(f.treeRelativePath.GetUNIXString()), nil
 	default:
 		return nil, nil
 	}
@@ -209,6 +240,7 @@ var fileAttrNames = []string{
 	"path",
 	"root",
 	"short_path",
+	"tree_relative_path",
 }
 
 func (File[TReference, TMetadata]) AttrNames() []string {
@@ -216,6 +248,9 @@ func (File[TReference, TMetadata]) AttrNames() []string {
 }
 
 func (f *File[TReference, TMetadata]) EncodeValue(path map[starlark.Value]struct{}, currentIdentifier *pg_label.CanonicalStarlarkIdentifier, options *ValueEncodingOptions[TReference, TMetadata]) (model_core.PatchedMessage[*model_starlark_pb.Value, TMetadata], bool, error) {
+	if f.treeRelativePath != nil {
+		panic("files with tree relative paths should not be encoded, as they only exist during target action command computation")
+	}
 	d := model_core.Patch(options.ObjectCapturer, f.definition)
 	return model_core.NewPatchedMessage(
 		&model_starlark_pb.Value{
@@ -231,10 +266,14 @@ func (f *File[TReference, TMetadata]) GetDefinition() model_core.Message[*model_
 	return f.definition
 }
 
+func (f *File[TReference, TMetadata]) GetTreeRelativePath() *bb_path.Trace {
+	return f.treeRelativePath
+}
+
 // FileGetPath returns the full input root path corresponding to a File
 // object, similar to accessing the "path" attribute of a File from
 // within Starlark code.
-func FileGetPath[TReference object.BasicReference](f model_core.Message[*model_starlark_pb.File, TReference]) (string, error) {
+func FileGetPath[TReference object.BasicReference](f model_core.Message[*model_starlark_pb.File, TReference], treeRelativePath *bb_path.Trace) (string, error) {
 	canonicalLabel, err := pg_label.NewCanonicalLabel(f.Message.Label)
 	if err != nil {
 		return "", fmt.Errorf("invalid canonical label %#v: %w", f.Message.Label, err)

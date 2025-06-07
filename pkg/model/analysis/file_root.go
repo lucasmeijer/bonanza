@@ -57,7 +57,7 @@ func getStarlarkFileProperties[TReference object.BasicReference, TMetadata model
 		return model_core.Message[*model_filesystem_pb.FileProperties, TReference]{}, evaluation.ErrMissingDependency
 	}
 
-	filePath, err := model_starlark.FileGetPath(f)
+	filePath, err := model_starlark.FileGetPath(f, nil)
 	if err != nil {
 		return model_core.Message[*model_filesystem_pb.FileProperties, TReference]{}, err
 	}
@@ -397,7 +397,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 				}),
 			}
 
-			symlinkPath, err := model_starlark.FileGetPath(f)
+			symlinkPath, err := model_starlark.FileGetPath(f, nil)
 			if err != nil {
 				return PatchedFileRootValue{}, err
 			}
@@ -421,7 +421,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 			// the directory in which it is contained.
 			// Remove leading components of the target that
 			// are equal to those of the symlink's path.
-			targetPath, err := model_starlark.FileGetPath(symlinkTargetFile)
+			targetPath, err := model_starlark.FileGetPath(symlinkTargetFile, nil)
 			if err != nil {
 				return PatchedFileRootValue{}, err
 			}

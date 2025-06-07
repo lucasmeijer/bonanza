@@ -308,7 +308,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionCommandValue(ct
 					case starlark.String:
 						s = string(typedV)
 					case *model_starlark.File[TReference, TMetadata]:
-						s, err = model_starlark.FileGetPath(typedV.GetDefinition())
+						s, err = model_starlark.FileGetPath(typedV.GetDefinition(), typedV.GetTreeRelativePath())
 						if err != nil {
 							return PatchedTargetActionCommandValue{}, err
 						}
