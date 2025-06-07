@@ -197,7 +197,9 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionInputRootValue(
 	patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
 	return model_core.NewPatchedMessage(
 		&model_analysis_pb.TargetActionInputRoot_Value{
-			InputRootReference: patcher.CaptureAndAddDecodableReference(rootDirectoryObject, e),
+			InputRootReference: createdRootDirectory.ToDirectoryReference(
+				patcher.CaptureAndAddDecodableReference(rootDirectoryObject, e),
+			),
 		},
 		model_core.MapReferenceMetadataToWalkers(patcher),
 	), nil

@@ -1628,11 +1628,7 @@ message TargetActionInputRoot {
   }
 
   message Value {
-    bonanza.model.core.DecodableReference input_root_reference = 1
-        [(bonanza.model.core.object_format) = {
-          message_type_name:
-            "bonanza.model.filesystem.DirectoryContents";
-        }];
+    bonanza.model.filesystem.DirectoryReference input_root_reference = 1;
   }
 }
 

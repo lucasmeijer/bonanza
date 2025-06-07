@@ -57,7 +57,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 
 	commandReference := model_core.Patch(e, model_core.Nested(command, command.Message.CommandReference))
 	patcher := commandReference.Patcher
-	inputRootReference := model_core.Patch(e, model_core.Nested(inputRoot, inputRoot.Message.InputRootReference))
+	inputRootReference := model_core.Patch(e, model_core.Nested(inputRoot, inputRoot.Message.InputRootReference.GetReference()))
 	patcher.Merge(inputRootReference.Patcher)
 	actionResult := e.GetSuccessfulActionResultValue(
 		model_core.NewPatchedMessage(
