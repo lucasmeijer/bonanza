@@ -15,10 +15,12 @@ import (
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/model/core/btree"
 	"github.com/buildbarn/bonanza/pkg/model/core/inlinedtree"
+	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
 	model_starlark "github.com/buildbarn/bonanza/pkg/model/starlark"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
 	model_command_pb "github.com/buildbarn/bonanza/pkg/proto/model/command"
 	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
+	model_filesystem_pb "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
 	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
 	"github.com/buildbarn/bonanza/pkg/starlark/unpack"
 	"github.com/buildbarn/bonanza/pkg/storage/dag"
@@ -79,6 +81,101 @@ func splitArgsTemplate(template string) (string, string, error) {
 	return prefix.String(), suffix.String(), nil
 }
 
+// filesUnderDirectoryReporter is used by expandFileIfDirectory to
+// recursively traverse a directory hierarchy and report all files
+// contained within as a File object having a tree relative path.
+type filesUnderDirectoryReporter[TReference object.BasicReference, TMetadata BaseComputerReferenceMetadata] struct {
+	// Immutable fields.
+	context          context.Context
+	directoryReaders *DirectoryReaders[TReference]
+	yield            func(*model_starlark.File[TReference, TMetadata]) bool
+	directoryFile    *model_starlark.File[TReference, TMetadata]
+
+	// Mutable fields.
+	directoriesStack []model_core.Message[*model_filesystem_pb.DirectoryContents, TReference]
+}
+
+func (r *filesUnderDirectoryReporter[TReference, TMetadata]) yieldFilesUnderCurrentDirectory(trace *path.Trace) (bool, error) {
+	currentDirectory := r.directoriesStack[len(r.directoriesStack)-1]
+	for _, entry := range currentDirectory.Message.Directories {
+		name, ok := path.NewComponent(entry.Name)
+		if !ok {
+			return false, fmt.Errorf("invalid name %#v for directory under directory %#v", entry.Name, trace.GetUNIXString())
+		}
+		childTrace := trace.Append(name)
+
+		childDirectory, err := model_filesystem.DirectoryGetContents(
+			r.context,
+			r.directoryReaders.DirectoryContents,
+			model_core.Nested(currentDirectory, entry.Directory),
+		)
+		if err != nil {
+			return false, fmt.Errorf("failed to get contents of directory %#v: %w", childTrace.GetUNIXString(), err)
+		}
+
+		r.directoriesStack = append(r.directoriesStack, childDirectory)
+		if shouldContinue, err := r.yieldFilesUnderCurrentDirectory(childTrace); !shouldContinue {
+			return shouldContinue, err
+		}
+		r.directoriesStack = r.directoriesStack[:len(r.directoriesStack)-1]
+	}
+
+	leaves, err := model_filesystem.DirectoryGetLeaves(
+		r.context,
+		r.directoryReaders.Leaves,
+		currentDirectory,
+	)
+	if err != nil {
+		return false, err
+	}
+
+	for _, entry := range leaves.Message.Files {
+		name, ok := path.NewComponent(entry.Name)
+		if !ok {
+			return false, fmt.Errorf("invalid name %#v for file under directory %#v", entry.Name, trace.GetUNIXString())
+		}
+		childTrace := trace.Append(name)
+
+		if !r.yield(r.directoryFile.WithTreeRelativePath(childTrace)) {
+			return false, nil
+		}
+	}
+
+	for _, entry := range leaves.Message.Symlinks {
+		name, ok := path.NewComponent(entry.Name)
+		if !ok {
+			return false, fmt.Errorf("invalid name %#v for symlink under directory %#v", entry.Name, trace.GetUNIXString())
+		}
+		childTrace := trace.Append(name)
+
+		// To be consistent with how Bazel works, only report
+		// symlinks if they refer to files. If they refer to
+		// directories, we don't recurse into them.
+		directoryComponentWalker := model_filesystem.NewDirectoryComponentWalker(
+			r.context,
+			r.directoryReaders.DirectoryContents,
+			r.directoryReaders.Leaves,
+			func() (path.ComponentWalker, error) {
+				return nil, errors.New("path escapes the input root")
+			},
+			model_core.Message[*model_core_pb.DecodableReference, TReference]{},
+			append([]model_core.Message[*model_filesystem_pb.DirectoryContents, TReference](nil), r.directoriesStack...),
+		)
+		if err := path.Resolve(
+			path.UNIXFormat.NewParser(entry.Target),
+			path.NewRelativeScopeWalker(directoryComponentWalker),
+		); err != nil {
+			return false, fmt.Errorf("failed to resolve symlink %#v: %w", childTrace.GetUNIXString(), err)
+		}
+		if directoryComponentWalker.GetCurrentFileProperties().IsSet() {
+			if !r.yield(r.directoryFile.WithTreeRelativePath(childTrace)) {
+				return false, nil
+			}
+		}
+	}
+	return true, nil
+}
+
 type expandFileIfDirectoryEnvironment[TReference, TMetadata any] interface {
 	model_core.ExistingObjectCapturer[TReference, TMetadata]
 
@@ -88,15 +185,22 @@ type expandFileIfDirectoryEnvironment[TReference, TMetadata any] interface {
 // expandFileIfDirectory checks whether a File provided to Args.add*()
 // corresponds to a directory. If so, it expands it to a sequence of
 // File objects corresponding to its children.
-func (c *baseComputer[TReference, TMetadata]) expandFileIfDirectory(e expandFileIfDirectoryEnvironment[TReference, TMetadata], file *model_starlark.File[TReference, TMetadata], errOut *error) iter.Seq[*model_starlark.File[TReference, TMetadata]] {
-	d := file.GetDefinition()
-	if d.Message.Type != model_starlark_pb.File_DIRECTORY {
+func expandFileIfDirectory[TReference object.BasicReference, TMetadata BaseComputerReferenceMetadata](
+	ctx context.Context,
+	e expandFileIfDirectoryEnvironment[TReference, TMetadata],
+	directoryReaders *DirectoryReaders[TReference],
+	file *model_starlark.File[TReference, TMetadata],
+	errOut *error,
+) iter.Seq[*model_starlark.File[TReference, TMetadata]] {
+	fileDefinition := file.GetDefinition()
+	if fileDefinition.Message.Type != model_starlark_pb.File_DIRECTORY {
 		return func(yield func(*model_starlark.File[TReference, TMetadata]) bool) {
 			yield(file)
 		}
 	}
 
-	patchedFile := model_core.Patch(e, d)
+	// Obtain an input root that only contains the directory.
+	patchedFile := model_core.Patch(e, fileDefinition)
 	fileRoot := e.GetFileRootValue(
 		model_core.NewPatchedMessage(
 			&model_analysis_pb.FileRoot_Key{
@@ -111,8 +215,56 @@ func (c *baseComputer[TReference, TMetadata]) expandFileIfDirectory(e expandFile
 		return func(yield func(*model_starlark.File[TReference, TMetadata]) bool) {}
 	}
 
-	*errOut = errors.New("TODO")
-	return func(yield func(*model_starlark.File[TReference, TMetadata]) bool) {}
+	// Traverse to the root of the directory for which files need to
+	// be reported.
+	directoryPath, err := model_starlark.FileGetPath(fileDefinition, nil)
+	if err != nil {
+		*errOut = err
+		return func(yield func(*model_starlark.File[TReference, TMetadata]) bool) {}
+	}
+	directoryComponentWalker := model_filesystem.NewDirectoryComponentWalker(
+		ctx,
+		directoryReaders.DirectoryContents,
+		directoryReaders.Leaves,
+		func() (path.ComponentWalker, error) {
+			return nil, errors.New("path escapes the input root")
+		},
+		model_core.Message[*model_core_pb.DecodableReference, TReference]{},
+		[]model_core.Message[*model_filesystem_pb.DirectoryContents, TReference]{
+			model_core.Nested(fileRoot, fileRoot.Message.RootDirectory),
+		},
+	)
+	if err := path.Resolve(
+		path.UNIXFormat.NewParser(directoryPath),
+		path.NewRelativeScopeWalker(directoryComponentWalker),
+	); err != nil {
+		*errOut = fmt.Errorf("failed to resolve directory %#v: %w", directoryPath, err)
+		return func(yield func(*model_starlark.File[TReference, TMetadata]) bool) {}
+	}
+	if directoryComponentWalker.GetCurrentFileProperties().IsSet() {
+		*errOut = fmt.Errorf("path %#v resolves to a file, even though it was expected to be a directory", directoryPath)
+		return func(yield func(*model_starlark.File[TReference, TMetadata]) bool) {}
+	}
+
+	directoriesStack, err := directoryComponentWalker.GetCurrentDirectoriesStack()
+	if err != nil {
+		*errOut = err
+		return func(yield func(*model_starlark.File[TReference, TMetadata]) bool) {}
+	}
+
+	return func(yield func(*model_starlark.File[TReference, TMetadata]) bool) {
+		reporter := filesUnderDirectoryReporter[TReference, TMetadata]{
+			context:          ctx,
+			directoryReaders: directoryReaders,
+			yield:            yield,
+			directoryFile:    file,
+
+			directoriesStack: directoriesStack,
+		}
+		if _, err := reporter.yieldFilesUnderCurrentDirectory(nil); err != nil {
+			*errOut = err
+		}
+	}
 }
 
 func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionCommandValue(ctx context.Context, key model_core.Message[*model_analysis_pb.TargetActionCommand_Key, TReference], e TargetActionCommandEnvironment[TReference, TMetadata]) (PatchedTargetActionCommandValue, error) {
@@ -138,12 +290,14 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionCommandValue(ct
 	commandReaders, gotCommandReaders := e.GetCommandReadersValue(&model_analysis_pb.CommandReaders_Key{})
 	allBuiltinsModulesNames := e.GetBuiltinsModuleNamesValue(&model_analysis_pb.BuiltinsModuleNames_Key{})
 	directoryCreationParametersMessage := e.GetDirectoryCreationParametersValue(&model_analysis_pb.DirectoryCreationParameters_Key{})
+	directoryReaders, gotDirectoryReaders := e.GetDirectoryReadersValue(&model_analysis_pb.DirectoryReaders_Key{})
 	fileCreationParametersMessage := e.GetFileCreationParametersValue(&model_analysis_pb.FileCreationParameters_Key{})
 	if !action.IsSet() ||
 		!allBuiltinsModulesNames.IsSet() ||
 		!gotCommandEncoder ||
 		!gotCommandReaders ||
 		!directoryCreationParametersMessage.IsSet() ||
+		!gotDirectoryReaders ||
 		!fileCreationParametersMessage.IsSet() {
 		return PatchedTargetActionCommandValue{}, evaluation.ErrMissingDependency
 	}
@@ -222,7 +376,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionCommandValue(ct
 				for v := range valuesIter {
 					if f, ok := v.(*model_starlark.File[TReference, TMetadata]); ok {
 						var errIter error
-						for child := range c.expandFileIfDirectory(e, f, &errIter) {
+						for child := range expandFileIfDirectory(ctx, e, directoryReaders, f, &errIter) {
 							expandedValues = append(expandedValues, child)
 						}
 						if errIter != nil {
@@ -266,8 +420,9 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionCommandValue(ct
 				case 2:
 					mapEachFuncArgs = make(starlark.Tuple, 2)
 					mapEachFuncArgs[1] = &directoryExpander[TReference, TMetadata]{
-						computer:    c,
-						environment: e,
+						context:          ctx,
+						environment:      e,
+						directoryReaders: directoryReaders,
 					}
 				default:
 					return PatchedTargetActionCommandValue{}, errors.New("map_each function should have 1 or 2 parameters")
@@ -617,8 +772,9 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionCommandValue(ct
 // provided to the "map_each" callback used by Args.add_*(). It provides
 // the ability to expand directories to a list of files.
 type directoryExpander[TReference object.BasicReference, TMetadata BaseComputerReferenceMetadata] struct {
-	computer    *baseComputer[TReference, TMetadata]
-	environment expandFileIfDirectoryEnvironment[TReference, TMetadata]
+	context          context.Context
+	environment      expandFileIfDirectoryEnvironment[TReference, TMetadata]
+	directoryReaders *DirectoryReaders[TReference]
 }
 
 var _ starlark.HasAttrs = (*directoryExpander[object.LocalReference, BaseComputerReferenceMetadata])(nil)
@@ -669,7 +825,13 @@ func (de *directoryExpander[TReference, TMetadata]) doExpand(thread *starlark.Th
 
 	var files []starlark.Value
 	var errIter error
-	for child := range de.computer.expandFileIfDirectory(de.environment, file, &errIter) {
+	for child := range expandFileIfDirectory(
+		de.context,
+		de.environment,
+		de.directoryReaders,
+		file,
+		&errIter,
+	) {
 		files = append(files, child)
 	}
 	if errIter != nil {

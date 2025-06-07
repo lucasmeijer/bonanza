@@ -580,6 +580,7 @@
             "CompiledBzlFileFunctionFactory",
             "DirectoryCreationParameters",
             "DirectoryCreationParametersObject",
+            "DirectoryReaders",
             "FileCreationParameters",
             "FileRoot",
             "FilesRoot",
