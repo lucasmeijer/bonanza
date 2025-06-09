@@ -170,7 +170,7 @@ func TestUploader(t *testing.T) {
 					gomock.Any(),
 					object.GlobalReference{
 						InstanceName:   object.NewInstanceName("hello/world"),
-						LocalReference: contents.GetReference(),
+						LocalReference: contents.GetLocalReference(),
 					},
 					/* contents = */ nil,
 					/* childrenLeases = */ nil,
@@ -199,7 +199,7 @@ func TestUploader(t *testing.T) {
 					gomock.Any(),
 					object.GlobalReference{
 						InstanceName:   object.NewInstanceName("hello/world"),
-						LocalReference: contents.GetReference(),
+						LocalReference: contents.GetLocalReference(),
 					},
 					/* contents = */ nil,
 					[]any{
@@ -222,7 +222,7 @@ func TestUploader(t *testing.T) {
 				ctx,
 				object.GlobalReference{
 					InstanceName:   object.NewInstanceName("hello/world"),
-					LocalReference: contents.GetReference(),
+					LocalReference: contents.GetLocalReference(),
 				},
 				/* contents = */ nil,
 				/* childrenLeases = */ nil,
@@ -271,7 +271,7 @@ func TestUploader(t *testing.T) {
 					gomock.Any(),
 					object.GlobalReference{
 						InstanceName:   object.NewInstanceName("hello/world"),
-						LocalReference: contents.GetReference(),
+						LocalReference: contents.GetLocalReference(),
 					},
 					/* contents = */ nil,
 					/* childrenLeases = */ nil,
@@ -293,7 +293,7 @@ func TestUploader(t *testing.T) {
 					gomock.Any(),
 					object.GlobalReference{
 						InstanceName:   object.NewInstanceName("hello/world"),
-						LocalReference: contents.GetReference(),
+						LocalReference: contents.GetLocalReference(),
 					},
 					/* contents = */ nil,
 					[]any{"Lease"},
@@ -310,7 +310,7 @@ func TestUploader(t *testing.T) {
 				ctx,
 				object.GlobalReference{
 					InstanceName:   object.NewInstanceName("hello/world"),
-					LocalReference: contents.GetReference(),
+					LocalReference: contents.GetLocalReference(),
 				},
 				/* contents = */ nil,
 				/* childrenLeases = */ nil,

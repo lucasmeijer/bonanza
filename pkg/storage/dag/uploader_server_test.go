@@ -538,7 +538,7 @@ func TestUploaderServer(t *testing.T) {
 			objectUploader.EXPECT().
 				UploadObject(gomock.Any(), object.MustNewSHA256V1GlobalReference("hello/world", "64ec88ca00b268e5ba1a35678a1b5316d212f4f366b2477232534a8aeca37f3c", 11, 0, 0, 0), gomock.Any(), gomock.Len(0), false).
 				Do(func(ctx context.Context, reference object.GlobalReference, contents *object.Contents, childrenLeases []any, wantContentsIfIncomplete bool) {
-					require.Equal(t, object.MustNewSHA256V1LocalReference("64ec88ca00b268e5ba1a35678a1b5316d212f4f366b2477232534a8aeca37f3c", 11, 0, 0, 0), contents.GetReference())
+					require.Equal(t, object.MustNewSHA256V1LocalReference("64ec88ca00b268e5ba1a35678a1b5316d212f4f366b2477232534a8aeca37f3c", 11, 0, 0, 0), contents.GetLocalReference())
 					require.Equal(t, []byte("Hello world"), contents.GetPayload())
 				}).
 				Return(object.UploadObjectComplete[any]{Lease: "Lease"}, nil),
@@ -1035,14 +1035,14 @@ func TestUploaderServer(t *testing.T) {
 			objectUploader.EXPECT().
 				UploadObject(gomock.Any(), object.MustNewSHA256V1GlobalReference("hello/world", "bc541a4c77cb127b443ab4a1295c9696c1eabf12b1c03da5af790b7cdb3bf6b3", 3, 0, 0, 0), gomock.Any(), gomock.Len(0), false).
 				Do(func(ctx context.Context, reference object.GlobalReference, contents *object.Contents, childrenLeases []any, wantContentsIfIncomplete bool) {
-					require.Equal(t, object.MustNewSHA256V1LocalReference("bc541a4c77cb127b443ab4a1295c9696c1eabf12b1c03da5af790b7cdb3bf6b3", 3, 0, 0, 0), contents.GetReference())
+					require.Equal(t, object.MustNewSHA256V1LocalReference("bc541a4c77cb127b443ab4a1295c9696c1eabf12b1c03da5af790b7cdb3bf6b3", 3, 0, 0, 0), contents.GetLocalReference())
 					require.Equal(t, []byte("Baz"), contents.GetPayload())
 				}).
 				Return(object.UploadObjectComplete[any]{Lease: "Lease 4"}, nil),
 			objectUploader.EXPECT().
 				UploadObject(gomock.Any(), object.MustNewSHA256V1GlobalReference("hello/world", "0a2df7d623cdddd45c7d8a7fbf804e8f9c80f7b10200e3623406d08d3ef80379", 40, 1, 1, 0), gomock.Any(), []any{"Lease 4"}, false).
 				Do(func(ctx context.Context, reference object.GlobalReference, contents *object.Contents, childrenLeases []any, wantContentsIfIncomplete bool) {
-					require.Equal(t, object.MustNewSHA256V1LocalReference("0a2df7d623cdddd45c7d8a7fbf804e8f9c80f7b10200e3623406d08d3ef80379", 40, 1, 1, 0), contents.GetReference())
+					require.Equal(t, object.MustNewSHA256V1LocalReference("0a2df7d623cdddd45c7d8a7fbf804e8f9c80f7b10200e3623406d08d3ef80379", 40, 1, 1, 0), contents.GetLocalReference())
 					require.Equal(t, object.MustNewSHA256V1LocalReference("bc541a4c77cb127b443ab4a1295c9696c1eabf12b1c03da5af790b7cdb3bf6b3", 3, 0, 0, 0), contents.GetOutgoingReference(0))
 					require.Empty(t, contents.GetPayload())
 				}).
@@ -1056,14 +1056,14 @@ func TestUploaderServer(t *testing.T) {
 			objectUploader.EXPECT().
 				UploadObject(gomock.Any(), object.MustNewSHA256V1GlobalReference("hello/world", "1cbec737f863e4922cee63cc2ebbfaafcd1cff8b790d8cfd2e6a5d550b648afa", 3, 0, 0, 0), gomock.Any(), gomock.Len(0), false).
 				Do(func(ctx context.Context, reference object.GlobalReference, contents *object.Contents, childrenLeases []any, wantContentsIfIncomplete bool) {
-					require.Equal(t, object.MustNewSHA256V1LocalReference("1cbec737f863e4922cee63cc2ebbfaafcd1cff8b790d8cfd2e6a5d550b648afa", 3, 0, 0, 0), contents.GetReference())
+					require.Equal(t, object.MustNewSHA256V1LocalReference("1cbec737f863e4922cee63cc2ebbfaafcd1cff8b790d8cfd2e6a5d550b648afa", 3, 0, 0, 0), contents.GetLocalReference())
 					require.Equal(t, []byte("Foo"), contents.GetPayload())
 				}).
 				Return(object.UploadObjectComplete[any]{Lease: "Lease 5"}, nil),
 			objectUploader.EXPECT().
 				UploadObject(gomock.Any(), object.MustNewSHA256V1GlobalReference("hello/world", "43c478f5ae1c10fc885c62458847e1abc4f99b5fd66e924f42c14bbeaee2cb08", 40, 1, 1, 0), gomock.Any(), []any{"Lease 5"}, false).
 				Do(func(ctx context.Context, reference object.GlobalReference, contents *object.Contents, childrenLeases []any, wantContentsIfIncomplete bool) {
-					require.Equal(t, object.MustNewSHA256V1LocalReference("43c478f5ae1c10fc885c62458847e1abc4f99b5fd66e924f42c14bbeaee2cb08", 40, 1, 1, 0), contents.GetReference())
+					require.Equal(t, object.MustNewSHA256V1LocalReference("43c478f5ae1c10fc885c62458847e1abc4f99b5fd66e924f42c14bbeaee2cb08", 40, 1, 1, 0), contents.GetLocalReference())
 					require.Equal(t, object.MustNewSHA256V1LocalReference("1cbec737f863e4922cee63cc2ebbfaafcd1cff8b790d8cfd2e6a5d550b648afa", 3, 0, 0, 0), contents.GetOutgoingReference(0))
 					require.Empty(t, contents.GetPayload())
 				}).
@@ -1077,14 +1077,14 @@ func TestUploaderServer(t *testing.T) {
 			objectUploader.EXPECT().
 				UploadObject(gomock.Any(), object.MustNewSHA256V1GlobalReference("hello/world", "95d64cacce0f0e5b0d1b843862f0accfadb787a4cabb8a88f7f1694ea232a5fc", 3, 0, 0, 0), gomock.Any(), gomock.Len(0), false).
 				Do(func(ctx context.Context, reference object.GlobalReference, contents *object.Contents, childrenLeases []any, wantContentsIfIncomplete bool) {
-					require.Equal(t, object.MustNewSHA256V1LocalReference("95d64cacce0f0e5b0d1b843862f0accfadb787a4cabb8a88f7f1694ea232a5fc", 3, 0, 0, 0), contents.GetReference())
+					require.Equal(t, object.MustNewSHA256V1LocalReference("95d64cacce0f0e5b0d1b843862f0accfadb787a4cabb8a88f7f1694ea232a5fc", 3, 0, 0, 0), contents.GetLocalReference())
 					require.Equal(t, []byte("Bar"), contents.GetPayload())
 				}).
 				Return(object.UploadObjectComplete[any]{Lease: "Lease 6"}, nil),
 			objectUploader.EXPECT().
 				UploadObject(gomock.Any(), object.MustNewSHA256V1GlobalReference("hello/world", "cc38aaed6ef7403df8e1c7d73bc8c63c0828491a1bf3526fcfbce685cdc3bc45", 40, 1, 1, 0), gomock.Any(), []any{"Lease 6"}, false).
 				Do(func(ctx context.Context, reference object.GlobalReference, contents *object.Contents, childrenLeases []any, wantContentsIfIncomplete bool) {
-					require.Equal(t, object.MustNewSHA256V1LocalReference("cc38aaed6ef7403df8e1c7d73bc8c63c0828491a1bf3526fcfbce685cdc3bc45", 40, 1, 1, 0), contents.GetReference())
+					require.Equal(t, object.MustNewSHA256V1LocalReference("cc38aaed6ef7403df8e1c7d73bc8c63c0828491a1bf3526fcfbce685cdc3bc45", 40, 1, 1, 0), contents.GetLocalReference())
 					require.Equal(t, object.MustNewSHA256V1LocalReference("95d64cacce0f0e5b0d1b843862f0accfadb787a4cabb8a88f7f1694ea232a5fc", 3, 0, 0, 0), contents.GetOutgoingReference(0))
 					require.Empty(t, contents.GetPayload())
 				}).
@@ -1092,7 +1092,7 @@ func TestUploaderServer(t *testing.T) {
 			objectUploader.EXPECT().
 				UploadObject(gomock.Any(), object.MustNewSHA256V1GlobalReference("hello/world", "e82d79bedac841c3659222e8a9e32d1ee30db64c37c7ca7ea244531d334076a5", 120, 2, 3, 40), gomock.Any(), []any{"Lease 1", "Lease 2", "Lease 3"}, false).
 				Do(func(ctx context.Context, reference object.GlobalReference, contents *object.Contents, childrenLeases []any, wantContentsIfIncomplete bool) {
-					require.Equal(t, object.MustNewSHA256V1LocalReference("e82d79bedac841c3659222e8a9e32d1ee30db64c37c7ca7ea244531d334076a5", 120, 2, 3, 40), contents.GetReference())
+					require.Equal(t, object.MustNewSHA256V1LocalReference("e82d79bedac841c3659222e8a9e32d1ee30db64c37c7ca7ea244531d334076a5", 120, 2, 3, 40), contents.GetLocalReference())
 					require.Equal(t, object.MustNewSHA256V1LocalReference("0a2df7d623cdddd45c7d8a7fbf804e8f9c80f7b10200e3623406d08d3ef80379", 40, 1, 1, 0), contents.GetOutgoingReference(0))
 					require.Equal(t, object.MustNewSHA256V1LocalReference("43c478f5ae1c10fc885c62458847e1abc4f99b5fd66e924f42c14bbeaee2cb08", 40, 1, 1, 0), contents.GetOutgoingReference(1))
 					require.Equal(t, object.MustNewSHA256V1LocalReference("cc38aaed6ef7403df8e1c7d73bc8c63c0828491a1bf3526fcfbce685cdc3bc45", 40, 1, 1, 0), contents.GetOutgoingReference(2))
@@ -1274,7 +1274,7 @@ func TestUploaderServer(t *testing.T) {
 			objectUploader.EXPECT().
 				UploadObject(gomock.Any(), object.MustNewSHA256V1GlobalReference("hello/world", "e82d79bedac841c3659222e8a9e32d1ee30db64c37c7ca7ea244531d334076a5", 120, 2, 3, 40), gomock.Any(), []any{"Lease 1", "Lease 2", "Lease 3"}, false).
 				Do(func(ctx context.Context, reference object.GlobalReference, contents *object.Contents, childrenLeases []any, wantContentsIfIncomplete bool) {
-					require.Equal(t, object.MustNewSHA256V1LocalReference("e82d79bedac841c3659222e8a9e32d1ee30db64c37c7ca7ea244531d334076a5", 120, 2, 3, 40), contents.GetReference())
+					require.Equal(t, object.MustNewSHA256V1LocalReference("e82d79bedac841c3659222e8a9e32d1ee30db64c37c7ca7ea244531d334076a5", 120, 2, 3, 40), contents.GetLocalReference())
 					require.Equal(t, object.MustNewSHA256V1LocalReference("0a2df7d623cdddd45c7d8a7fbf804e8f9c80f7b10200e3623406d08d3ef80379", 40, 1, 1, 0), contents.GetOutgoingReference(0))
 					require.Equal(t, object.MustNewSHA256V1LocalReference("43c478f5ae1c10fc885c62458847e1abc4f99b5fd66e924f42c14bbeaee2cb08", 40, 1, 1, 0), contents.GetOutgoingReference(1))
 					require.Equal(t, object.MustNewSHA256V1LocalReference("cc38aaed6ef7403df8e1c7d73bc8c63c0828491a1bf3526fcfbce685cdc3bc45", 40, 1, 1, 0), contents.GetOutgoingReference(2))

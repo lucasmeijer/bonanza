@@ -558,7 +558,7 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 			namespace.ReferenceFormat,
 			directoryEncoder,
 		); err == nil {
-			outputsReference := createdObject.Value.Contents.GetReference()
+			outputsReference := createdObject.Value.Contents.GetLocalReference()
 			if err := dag.UploadDAG(
 				ctx,
 				e.dagUploaderClient,

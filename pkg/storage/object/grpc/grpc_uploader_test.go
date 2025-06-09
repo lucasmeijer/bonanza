@@ -79,7 +79,7 @@ func TestGRPCUploader(t *testing.T) {
 			ctx,
 			object.GlobalReference{
 				InstanceName:   object.NewInstanceName("hello/world"),
-				LocalReference: contents.GetReference(),
+				LocalReference: contents.GetLocalReference(),
 			},
 			contents,
 			[][]byte{
@@ -164,7 +164,7 @@ func TestGRPCUploader(t *testing.T) {
 			ctx,
 			object.GlobalReference{
 				InstanceName:   object.NewInstanceName("hello/world"),
-				LocalReference: contents.GetReference(),
+				LocalReference: contents.GetLocalReference(),
 			},
 			contents,
 			/* outgoingReferencesLeases = */ nil,

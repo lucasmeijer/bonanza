@@ -1100,7 +1100,7 @@ func (rawPayloadRenderer) render(r *http.Request, o model_core.Decodable[*object
 }
 
 func decodeObject(o model_core.Decodable[*object.Contents], encoders []*model_encoding_pb.BinaryEncoder) ([]byte, error) {
-	objectReference := o.Value.GetReference()
+	objectReference := o.Value.GetLocalReference()
 	binaryEncoder, err := model_encoding.NewBinaryEncoderFromProto(
 		encoders,
 		uint32(objectReference.GetReferenceFormat().GetMaximumObjectSizeBytes()),

@@ -243,7 +243,7 @@ func (w *smallFileWalker) GetContents(ctx context.Context) (*object.Contents, []
 	if err != nil {
 		return nil, nil, util.StatusWrapf(err, "Failed to encode %#v", w.pathTrace.GetUNIXString())
 	}
-	if actualReference := contents.Value.GetReference(); actualReference != w.reference {
+	if actualReference := contents.Value.GetLocalReference(); actualReference != w.reference {
 		return nil, nil, status.Errorf(codes.InvalidArgument, "File %#v has reference %s, while %s was expected", w.pathTrace.GetUNIXString(), actualReference, w.reference)
 	}
 	return contents.Value, nil, nil
@@ -345,8 +345,7 @@ func (w *computedConcatenatedFileWalker) GetContents(ctx context.Context) (*obje
 	if err != nil {
 		return nil, nil, util.StatusWrapf(err, "Failed to decode file contents list for file %#v at offset %d", w.options.pathTrace.GetUNIXString(), w.offsetBytes)
 	}
-	reference := w.object.Contents.GetReference()
-	walkers := make([]dag.ObjectContentsWalker, reference.GetDegree())
+	walkers := make([]dag.ObjectContentsWalker, w.object.Contents.GetDegree())
 	offsetBytes := w.offsetBytes
 	for _, part := range fileContentsList {
 		switch level := part.Level.(type) {
@@ -411,7 +410,7 @@ func (w *concatenatedFileChunkWalker) GetContents(ctx context.Context) (*object.
 	if err != nil {
 		return nil, nil, util.StatusWrapf(err, "Failed to encode %#v", w.options.pathTrace.GetUNIXString())
 	}
-	if actualReference := contents.Value.GetReference(); actualReference != w.reference {
+	if actualReference := contents.Value.GetLocalReference(); actualReference != w.reference {
 		return nil, nil, status.Errorf(codes.InvalidArgument, "Chunk at offset %d in file %#v has reference %s, while %s was expected", w.offsetBytes, w.options.pathTrace.GetUNIXString(), actualReference, w.reference)
 	}
 	return contents.Value, nil, nil

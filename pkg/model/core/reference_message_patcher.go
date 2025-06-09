@@ -84,7 +84,7 @@ func (p *ReferenceMessagePatcher[TMetadata]) CaptureAndAddDecodableReference(
 ) *core.DecodableReference {
 	return &core.DecodableReference{
 		Reference: p.AddReference(
-			createdObject.Value.Contents.GetReference(),
+			createdObject.Value.Contents.GetLocalReference(),
 			capturer.CaptureCreatedObject(createdObject.Value),
 		),
 		DecodingParameters: createdObject.GetDecodingParameters(),

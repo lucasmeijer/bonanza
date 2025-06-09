@@ -58,7 +58,7 @@ func TestCreateFileMerkleTree(t *testing.T) {
 		metadata1 := NewMockReferenceMetadata(ctrl)
 		capturer.EXPECT().CaptureChunk(gomock.Any()).
 			DoAndReturn(func(contents *object.Contents) model_core.ReferenceMetadata {
-				require.Equal(t, object.MustNewSHA256V1LocalReference("185f8db32271fe25f561a6fc938b2e264306ec304eda518007d1764826381969", 5, 0, 0, 0), contents.GetReference())
+				require.Equal(t, object.MustNewSHA256V1LocalReference("185f8db32271fe25f561a6fc938b2e264306ec304eda518007d1764826381969", 5, 0, 0, 0), contents.GetLocalReference())
 				return metadata1
 			})
 

@@ -92,7 +92,7 @@ func CreateFileMerkleTree[T model_core.ReferenceMetadata](ctx context.Context, p
 				Level: &model_filesystem_pb.FileContents_ChunkReference{
 					ChunkReference: &model_core_pb.DecodableReference{
 						Reference: patcher.AddReference(
-							decodableContents.Value.GetReference(),
+							decodableContents.Value.GetLocalReference(),
 							capturer.CaptureChunk(decodableContents.Value),
 						),
 						DecodingParameters: decodableContents.GetDecodingParameters(),

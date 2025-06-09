@@ -37,7 +37,7 @@ func (chunkDiscardingFileMerkleTreeCapturer) CaptureFileContentsList(createdObje
 	o := model_core.CreatedObjectTree{
 		Contents: createdObject.Contents,
 	}
-	if createdObject.Contents.GetReference().GetHeight() > 1 {
+	if createdObject.Contents.GetHeight() > 1 {
 		o.Metadata = createdObject.Metadata
 	}
 	return o

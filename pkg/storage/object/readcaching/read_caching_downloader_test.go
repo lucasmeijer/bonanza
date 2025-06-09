@@ -119,7 +119,7 @@ func TestDownloader(t *testing.T) {
 
 		objectContents, err := downloader.DownloadObject(ctx, object.MustNewSHA256V1GlobalReference("example", "796527480ab3eacff7e5fbe0d828527c9a0f06b448a2b200de9774e0efa1bb68", 85, 219, 2, 1306624))
 		require.NoError(t, err)
-		require.Equal(t, object.MustNewSHA256V1LocalReference("796527480ab3eacff7e5fbe0d828527c9a0f06b448a2b200de9774e0efa1bb68", 85, 219, 2, 1306624), objectContents.GetReference())
+		require.Equal(t, object.MustNewSHA256V1LocalReference("796527480ab3eacff7e5fbe0d828527c9a0f06b448a2b200de9774e0efa1bb68", 85, 219, 2, 1306624), objectContents.GetLocalReference())
 		require.Equal(t, object.MustNewSHA256V1LocalReference("94197cddbb0dab095cffd10dc528cb226c20ab8c6e333f50fa767e9de3acec6e", 739169, 155, 10136, 11756), objectContents.GetOutgoingReference(0))
 		require.Equal(t, object.MustNewSHA256V1LocalReference("a512b892a4932793955e7be65c2cb92b27558db71f87a0fa99c06325136d4849", 1280812, 218, 12030, 25536), objectContents.GetOutgoingReference(1))
 		require.Equal(t, []byte("Hello"), objectContents.GetPayload())
@@ -164,7 +164,7 @@ func TestDownloader(t *testing.T) {
 		fastStore.EXPECT().
 			UploadObject(ctx, object.MustNewSHA256V1GlobalReference("example", "16cdd68fd8f9ccc88a1346a7faf8f36cc3935babc8a99d609a9725bf071c6a6f", 85, 0, 0, 0), gomock.Any(), gomock.Len(0), false).
 			DoAndReturn(func(ctx context.Context, reference object.GlobalReference, objectContents *object.Contents, leases []any, wantContentsIfIncomplete bool) (object.UploadObjectResult[any], error) {
-				require.Equal(t, object.MustNewSHA256V1LocalReference("16cdd68fd8f9ccc88a1346a7faf8f36cc3935babc8a99d609a9725bf071c6a6f", 85, 0, 0, 0), objectContents.GetReference())
+				require.Equal(t, object.MustNewSHA256V1LocalReference("16cdd68fd8f9ccc88a1346a7faf8f36cc3935babc8a99d609a9725bf071c6a6f", 85, 0, 0, 0), objectContents.GetLocalReference())
 				require.Equal(t, []byte{
 					// SHA-256 hash.
 					0x40, 0xb4, 0xd3, 0x2b, 0xc0, 0xdf, 0x8e, 0x51,
@@ -226,7 +226,7 @@ func TestDownloader(t *testing.T) {
 		fastStore.EXPECT().
 			UploadObject(ctx, object.MustNewSHA256V1GlobalReference("example", "e0643f027c868b649cba8f131459b5f1217c9897080a11391f1f9f6e53e7aa68", 45, 0, 0, 0), gomock.Any(), gomock.Len(0), false).
 			DoAndReturn(func(ctx context.Context, reference object.GlobalReference, objectContents *object.Contents, leases []any, wantContentsIfIncomplete bool) (object.UploadObjectResult[any], error) {
-				require.Equal(t, object.MustNewSHA256V1LocalReference("e0643f027c868b649cba8f131459b5f1217c9897080a11391f1f9f6e53e7aa68", 45, 0, 0, 0), objectContents.GetReference())
+				require.Equal(t, object.MustNewSHA256V1LocalReference("e0643f027c868b649cba8f131459b5f1217c9897080a11391f1f9f6e53e7aa68", 45, 0, 0, 0), objectContents.GetLocalReference())
 				require.Equal(t, []byte{
 					// SHA-256 hash.
 					0x80, 0x3b, 0x91, 0xe1, 0x10, 0x2b, 0x8e, 0x3b,
@@ -253,7 +253,7 @@ func TestDownloader(t *testing.T) {
 
 		objectContents, err := downloader.DownloadObject(ctx, object.MustNewSHA256V1GlobalReference("example", "e0643f027c868b649cba8f131459b5f1217c9897080a11391f1f9f6e53e7aa68", 45, 2, 1, 50))
 		require.NoError(t, err)
-		require.Equal(t, object.MustNewSHA256V1LocalReference("e0643f027c868b649cba8f131459b5f1217c9897080a11391f1f9f6e53e7aa68", 45, 2, 1, 50), objectContents.GetReference())
+		require.Equal(t, object.MustNewSHA256V1LocalReference("e0643f027c868b649cba8f131459b5f1217c9897080a11391f1f9f6e53e7aa68", 45, 2, 1, 50), objectContents.GetLocalReference())
 		require.Equal(t, object.MustNewSHA256V1LocalReference("803b91e1102b8e3bfbed642ec7b0d6c8669948add8c84584977e2840a813d2b6", 50, 1, 1, 0), objectContents.GetOutgoingReference(0))
 		require.Equal(t, []byte("Hello"), objectContents.GetPayload())
 	})

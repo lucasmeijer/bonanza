@@ -368,7 +368,7 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 				RootDirectoryReference: createdRootDirectory.ToDirectoryReference(
 					&model_core_pb.DecodableReference{
 						Reference: buildSpecificationPatcher.AddReference(
-							createdObject.Value.Contents.GetReference(),
+							createdObject.Value.Contents.GetLocalReference(),
 							model_filesystem.NewCapturedDirectoryWalker(
 								directoryParameters.DirectoryAccessParameters,
 								fileParameters,
@@ -403,7 +403,7 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 
 	logger.Info(formatted.Text("Uploading module sources"))
 	instanceName := object.NewInstanceName(args.CommonFlags.RemoteInstanceName)
-	buildSpecificationReference := createdBuildSpecification.Value.Contents.GetReference()
+	buildSpecificationReference := createdBuildSpecification.Value.Contents.GetLocalReference()
 	if err := dag.UploadDAG(
 		context.Background(),
 		dag_pb.NewUploaderClient(remoteCacheClient),

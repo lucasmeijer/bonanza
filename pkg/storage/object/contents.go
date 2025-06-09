@@ -17,19 +17,22 @@ import (
 
 // Contents of an object read from storage, or to be written to storage.
 type Contents struct {
-	data      []byte
-	reference LocalReference
+	LocalReference
+	data []byte
 }
 
-var _ OutgoingReferences[LocalReference] = (*Contents)(nil)
+var (
+	_ BasicReference                     = (*Contents)(nil)
+	_ OutgoingReferences[LocalReference] = (*Contents)(nil)
+)
 
 // NewContentsFromFullData constructs object contents from raw data that
 // is read from disk or an incoming RPC message. Construction fails if
 // the provided data does not match the expected reference.
 func NewContentsFromFullData(reference LocalReference, data []byte) (*Contents, error) {
 	c := &Contents{
-		data:      data,
-		reference: reference,
+		LocalReference: reference,
+		data:           data,
 	}
 
 	if expectedSizeBytes := reference.GetSizeBytes(); len(c.data) != expectedSizeBytes {
@@ -55,18 +58,6 @@ func MustNewContents(referenceFormatValue object.ReferenceFormat_Value, referenc
 		panic(err)
 	}
 	return contents
-}
-
-// GetReference returns the reference that corresponds to this object's
-// contents.
-func (c *Contents) GetReference() LocalReference {
-	return c.reference
-}
-
-// GetDegree returns the number of outgoing references the object has.
-// This method is provided to satisfy the OutgoingReferences interface.
-func (c *Contents) GetDegree() int {
-	return c.reference.GetDegree()
 }
 
 // GetOutgoingReference returns one of the outgoing references that is
@@ -107,12 +98,12 @@ func (c *Contents) GetPayload() []byte {
 }
 
 func (c *Contents) cloneWithReference(r LocalReference) *Contents {
-	if r == c.reference {
+	if r == c.LocalReference {
 		return c
 	}
 	return &Contents{
-		data:      c.data,
-		reference: r,
+		LocalReference: r,
+		data:           c.data,
 	}
 }
 
@@ -124,13 +115,13 @@ func (c *Contents) cloneWithReference(r LocalReference) *Contents {
 // local cache, we set the height and degree to zero, so that there is
 // no need to track any leases.
 func (c *Contents) Flatten() *Contents {
-	return c.cloneWithReference(c.reference.Flatten())
+	return c.cloneWithReference(c.LocalReference.Flatten())
 }
 
 func (c *Contents) validateOutgoingReferences() error {
 	var rcs referenceStatsComputer
 	degree := c.GetDegree()
-	referenceFormat := c.reference.GetReferenceFormat()
+	referenceFormat := c.GetReferenceFormat()
 	for i := 0; i < degree; i++ {
 		outgoingReference, err := referenceFormat.NewLocalReference(c.data[i*referenceSizeBytes : (i+1)*referenceSizeBytes])
 		if err != nil {
@@ -141,7 +132,7 @@ func (c *Contents) validateOutgoingReferences() error {
 		}
 	}
 
-	if expectedHeight := c.reference.GetHeight(); rcs.height != expectedHeight {
+	if expectedHeight := c.GetHeight(); rcs.height != expectedHeight {
 		return status.Errorf(codes.InvalidArgument, "Object has height %d, while %d was expected", rcs.height, expectedHeight)
 	}
 
@@ -149,7 +140,7 @@ func (c *Contents) validateOutgoingReferences() error {
 	if !ok {
 		panic("maximum total parents size should be computable without overflow")
 	}
-	if expectedMaximumTotalParentsSizeBytes := c.reference.getRawMaximumTotalParentsSizeBytes(); actualMaximumTotalParentsSizeBytes != expectedMaximumTotalParentsSizeBytes {
+	if expectedMaximumTotalParentsSizeBytes := c.getRawMaximumTotalParentsSizeBytes(); actualMaximumTotalParentsSizeBytes != expectedMaximumTotalParentsSizeBytes {
 		return status.Errorf(
 			codes.InvalidArgument,
 			"Object has a maximum total parents size of %d bytes, while %d bytes were expected",
@@ -168,7 +159,7 @@ func (c *Contents) validateOutgoingReferences() error {
 // the local cache, their heights and degrees will be set to zero. This
 // method can be used to undo this transformation.
 func (c *Contents) Unflatten(newReference LocalReference) (*Contents, error) {
-	if *(*[35]byte)(newReference.rawReference[:]) != *(*[35]byte)(c.reference.rawReference[:]) {
+	if *(*[35]byte)(newReference.rawReference[:]) != *(*[35]byte)(c.LocalReference.rawReference[:]) {
 		return nil, status.Error(codes.InvalidArgument, "Hash and size of flattened and unflattened references do not match")
 	}
 	cFlat := c.cloneWithReference(newReference)
