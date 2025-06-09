@@ -9,7 +9,7 @@ import (
 // to ReferenceMessagePatcher.AddReference(), provided in the same order
 // as the outgoing references of the created object.
 type CreatedObject[TMetadata any] struct {
-	Contents *object.Contents
+	*object.Contents
 	Metadata []TMetadata
 }
 
@@ -18,7 +18,10 @@ type CreatedObject[TMetadata any] struct {
 // ReferenceMessagePatcher in memory.
 type CreatedObjectTree CreatedObject[CreatedObjectTree]
 
-var _ CloneableReferenceMetadata = CreatedObjectTree{}
+var (
+	_ object.BasicReference      = CreatedObjectTree{}
+	_ CloneableReferenceMetadata = CreatedObjectTree{}
+)
 
 // Discard any resources owned by the CreatedObjectTree.
 func (CreatedObjectTree) Discard() {}

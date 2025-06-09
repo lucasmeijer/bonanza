@@ -49,13 +49,13 @@ func (c *FileWritingObjectCapturer) CaptureCreatedObject(createdObject CreatedOb
 		return FileBackedObjectLocation{offsetBytes: math.MaxUint64}
 	}
 
-	fullData := createdObject.Contents.GetFullData()
+	fullData := createdObject.GetFullData()
 	if _, err := c.writer.Write(fullData); err != nil {
 		c.savedErr = err
 		return FileBackedObjectLocation{offsetBytes: math.MaxUint64}
 	}
 
-	if len(createdObject.Metadata) != createdObject.Contents.GetDegree() {
+	if len(createdObject.Metadata) != createdObject.GetDegree() {
 		panic("number of children should match the degree")
 	}
 	for _, child := range createdObject.Metadata {

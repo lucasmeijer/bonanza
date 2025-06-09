@@ -423,7 +423,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeHttpArchiveContentsValue(ct
 	merkleTreeNodes = nil
 
 	patcher := model_core.NewReferenceMessagePatcher[dag.ObjectContentsWalker]()
-	rootReference := createdRootDirectoryObject.Value.Contents.GetLocalReference()
+	rootReference := createdRootDirectoryObject.Value.GetLocalReference()
 	return model_core.NewPatchedMessage(
 		&model_analysis_pb.HttpArchiveContents_Value{
 			Exists: &model_analysis_pb.HttpArchiveContents_Value_Exists{

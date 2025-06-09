@@ -140,7 +140,7 @@ func (w *capturedDirectoryWalker) GetContents(ctx context.Context) (*object.Cont
 		return nil, nil, util.StatusWrapf(err, "Failed to decode directory %#v", w.pathTrace.GetUNIXString())
 	}
 
-	walkers := make([]dag.ObjectContentsWalker, w.object.Contents.GetDegree())
+	walkers := make([]dag.ObjectContentsWalker, w.object.GetDegree())
 	if err := w.gatherWalkers(directory, w.pathTrace, walkers); err != nil {
 		return nil, nil, err
 	}
@@ -210,7 +210,7 @@ func (w *capturedLeavesWalker) GetContents(ctx context.Context) (*object.Content
 		return nil, nil, util.StatusWrapf(err, "Failed to decode leaves of directory %#v", w.pathTrace.GetUNIXString())
 	}
 
-	walkers := make([]dag.ObjectContentsWalker, w.object.Contents.GetDegree())
+	walkers := make([]dag.ObjectContentsWalker, w.object.GetDegree())
 	if err := w.options.gatherWalkersForLeaves(model_core.NewMessage(leaves, w.object.Contents), w.pathTrace, walkers); err != nil {
 		return nil, nil, err
 	}
@@ -345,7 +345,7 @@ func (w *computedConcatenatedFileWalker) GetContents(ctx context.Context) (*obje
 	if err != nil {
 		return nil, nil, util.StatusWrapf(err, "Failed to decode file contents list for file %#v at offset %d", w.options.pathTrace.GetUNIXString(), w.offsetBytes)
 	}
-	walkers := make([]dag.ObjectContentsWalker, w.object.Contents.GetDegree())
+	walkers := make([]dag.ObjectContentsWalker, w.object.GetDegree())
 	offsetBytes := w.offsetBytes
 	for _, part := range fileContentsList {
 		switch level := part.Level.(type) {
@@ -356,7 +356,7 @@ func (w *computedConcatenatedFileWalker) GetContents(ctx context.Context) (*obje
 			}
 			walkers[index] = &concatenatedFileChunkWalker{
 				options:            w.options,
-				reference:          w.object.Contents.GetOutgoingReference(index),
+				reference:          w.object.GetOutgoingReference(index),
 				decodingParameters: level.ChunkReference.DecodingParameters,
 				offsetBytes:        offsetBytes,
 				sizeBytes:          uint32(part.TotalSizeBytes),

@@ -3336,7 +3336,7 @@ func (c *baseComputer[TReference, TMetadata]) createMerkleTreeFromChangeTracking
 	merkleTreeNodes = nil
 
 	patcher := model_core.NewReferenceMessagePatcher[dag.ObjectContentsWalker]()
-	rootReference := createdRootDirectoryObject.Value.Contents.GetLocalReference()
+	rootReference := createdRootDirectoryObject.Value.GetLocalReference()
 	return model_core.NewPatchedMessage(
 		createdRootDirectory.ToDirectoryReference(
 			&model_core_pb.DecodableReference{

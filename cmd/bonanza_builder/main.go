@@ -549,7 +549,7 @@ func (e *builderExecutor) Execute(ctx context.Context, action *model_build_pb.Ac
 				},
 			}, 0, remoteworker_pb.CurrentState_Completed_FAILED
 		}
-		createdEvaluationsReference := createdEvaluations.Value.Contents.GetLocalReference()
+		createdEvaluationsReference := createdEvaluations.Value.GetLocalReference()
 		if err := dag.UploadDAG(
 			ctx,
 			e.dagUploaderClient,
