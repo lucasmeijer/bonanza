@@ -219,18 +219,16 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 				case *model_analysis_pb.BuildSettingOverride_Parent_:
 					firstLabel = firstEntry.Parent.FirstLabel
 				}
-				patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
-				return model_core.NewPatchedMessage(
-					&model_analysis_pb.BuildSettingOverride{
+				return model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[TMetadata]) *model_analysis_pb.BuildSettingOverride {
+					return &model_analysis_pb.BuildSettingOverride{
 						Level: &model_analysis_pb.BuildSettingOverride_Parent_{
 							Parent: &model_analysis_pb.BuildSettingOverride_Parent{
 								Reference:  patcher.CaptureAndAddDecodableReference(createdObject, e),
 								FirstLabel: firstLabel,
 							},
 						},
-					},
-					patcher,
-				), nil
+					}
+				}), nil
 			},
 		),
 	)
@@ -323,11 +321,9 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 	if err != nil {
 		return model_core.PatchedMessage[*model_core_pb.DecodableReference, TMetadata]{}, fmt.Errorf("failed to marshal configuration: %w", err)
 	}
-	configurationReferencePatcher := model_core.NewReferenceMessagePatcher[TMetadata]()
-	return model_core.NewPatchedMessage(
-		configurationReferencePatcher.CaptureAndAddDecodableReference(createdConfiguration, e),
-		configurationReferencePatcher,
-	), nil
+	return model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[TMetadata]) *model_core_pb.DecodableReference {
+		return patcher.CaptureAndAddDecodableReference(createdConfiguration, e)
+	}), nil
 }
 
 type getBuildSettingValueEnvironment[TReference any, TMetadata any] interface {

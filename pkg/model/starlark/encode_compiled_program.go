@@ -89,9 +89,8 @@ func NewListBuilder[TReference any, TMetadata model_core.CloneableReferenceMetad
 				}
 			}
 
-			patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
-			return model_core.NewPatchedMessage(
-				&model_starlark_pb.List_Element{
+			return model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[TMetadata]) *model_starlark_pb.List_Element {
+				return &model_starlark_pb.List_Element{
 					Level: &model_starlark_pb.List_Element_Parent_{
 						Parent: &model_starlark_pb.List_Element_Parent{
 							Reference: patcher.CaptureAndAddDecodableReference(
@@ -101,9 +100,8 @@ func NewListBuilder[TReference any, TMetadata model_core.CloneableReferenceMetad
 							Count: count,
 						},
 					},
-				},
-				patcher,
-			), nil
+				}
+			}), nil
 		},
 	)
 }
@@ -211,9 +209,8 @@ func EncodeValue[TReference any, TMetadata model_core.CloneableReferenceMetadata
 				createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]],
 				childNodes []*model_starlark_pb.Dict_Entry,
 			) (model_core.PatchedMessage[*model_starlark_pb.Dict_Entry, TMetadata], error) {
-				patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
-				return model_core.NewPatchedMessage(
-					&model_starlark_pb.Dict_Entry{
+				return model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[TMetadata]) *model_starlark_pb.Dict_Entry {
+					return &model_starlark_pb.Dict_Entry{
 						Level: &model_starlark_pb.Dict_Entry_Parent_{
 							Parent: &model_starlark_pb.Dict_Entry_Parent{
 								Reference: patcher.CaptureAndAddDecodableReference(
@@ -222,9 +219,8 @@ func EncodeValue[TReference any, TMetadata model_core.CloneableReferenceMetadata
 								),
 							},
 						},
-					},
-					patcher,
-				), nil
+					}
+				}), nil
 			},
 		)
 

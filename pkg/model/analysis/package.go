@@ -167,18 +167,16 @@ func (c *baseComputer[TReference, TMetadata]) ComputePackageValue(ctx context.Co
 					case *model_analysis_pb.Package_Value_Target_Parent_:
 						firstName = firstElement.Parent.FirstName
 					}
-					patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
-					return model_core.NewPatchedMessage(
-						&model_analysis_pb.Package_Value_Target{
+					return model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[TMetadata]) *model_analysis_pb.Package_Value_Target {
+						return &model_analysis_pb.Package_Value_Target{
 							Level: &model_analysis_pb.Package_Value_Target_Parent_{
 								Parent: &model_analysis_pb.Package_Value_Target_Parent{
 									Reference: patcher.CaptureAndAddDecodableReference(createdObject, e),
 									FirstName: firstName,
 								},
 							},
-						},
-						patcher,
-					), nil
+						}
+					}), nil
 				},
 			),
 		)

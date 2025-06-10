@@ -44,25 +44,37 @@ func NewPatchedMessageFromExisting[
 	existing Message[TMessage, TReference],
 	createMetadata ReferenceMetadataCreator[TMetadata],
 ) PatchedMessage[TMessage, TMetadata] {
-	patcher := NewReferenceMessagePatcher[TMetadata]()
-	if existing.OutgoingReferences.GetDegree() == 0 {
-		return NewPatchedMessage(existing.Message, patcher)
-	}
+	return BuildPatchedMessage(func(patcher *ReferenceMessagePatcher[TMetadata]) TMessage {
+		if existing.OutgoingReferences.GetDegree() == 0 {
+			return existing.Message
+		}
 
-	clonedMessage := proto.Clone(existing.Message)
-	a := referenceMessageAdder[TMetadata, TReference]{
-		patcher:            patcher,
-		outgoingReferences: existing.OutgoingReferences,
-		createMetadata:     createMetadata,
-	}
-	a.addReferenceMessagesRecursively(clonedMessage.ProtoReflect())
-	return NewPatchedMessage[TMessage, TMetadata](clonedMessage.(TMessage), patcher)
+		clonedMessage := proto.Clone(existing.Message)
+		a := referenceMessageAdder[TMetadata, TReference]{
+			patcher:            patcher,
+			outgoingReferences: existing.OutgoingReferences,
+			createMetadata:     createMetadata,
+		}
+		a.addReferenceMessagesRecursively(clonedMessage.ProtoReflect())
+		return clonedMessage.(TMessage)
+	})
 }
 
 // NewSimplePatchedMessage is a helper function for creating instances
 // of PatchedMessage for messages that don't contain any references.
 func NewSimplePatchedMessage[TMetadata ReferenceMetadata, TMessage any](v TMessage) PatchedMessage[TMessage, TMetadata] {
 	return NewPatchedMessage(v, NewReferenceMessagePatcher[TMetadata]())
+}
+
+// BuildPatchedMessage is a convenience function for constructing
+// PatchedMessage that has a newly created ReferenceMessagePatcher
+// attached to it. A callback is invoked for creating a message that is
+// managed by the ReferenceMessagePatcher.
+func BuildPatchedMessage[TMessage any, TMetadata ReferenceMetadata](
+	builder func(*ReferenceMessagePatcher[TMetadata]) TMessage,
+) PatchedMessage[TMessage, TMetadata] {
+	patcher := NewReferenceMessagePatcher[TMetadata]()
+	return NewPatchedMessage(builder(patcher), patcher)
 }
 
 // IsSet returns true if the PatchedMessage is assigned to a message

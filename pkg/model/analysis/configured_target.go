@@ -1450,18 +1450,16 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 					case *model_analysis_pb.ConfiguredTarget_Value_Output_Parent_:
 						firstPackageRelativePath = firstElement.Parent.FirstPackageRelativePath
 					}
-					patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
-					return model_core.NewPatchedMessage(
-						&model_analysis_pb.ConfiguredTarget_Value_Output{
+					return model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[TMetadata]) *model_analysis_pb.ConfiguredTarget_Value_Output {
+						return &model_analysis_pb.ConfiguredTarget_Value_Output{
 							Level: &model_analysis_pb.ConfiguredTarget_Value_Output_Parent_{
 								Parent: &model_analysis_pb.ConfiguredTarget_Value_Output_Parent{
 									Reference:                patcher.CaptureAndAddDecodableReference(createdObject, e),
 									FirstPackageRelativePath: firstPackageRelativePath,
 								},
 							},
-						},
-						patcher,
-					), nil
+						}
+					}), nil
 				},
 			),
 		)
@@ -1503,18 +1501,16 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 					case *model_analysis_pb.ConfiguredTarget_Value_Action_Parent_:
 						firstID = firstElement.Parent.FirstId
 					}
-					patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
-					return model_core.NewPatchedMessage(
-						&model_analysis_pb.ConfiguredTarget_Value_Action{
+					return model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[TMetadata]) *model_analysis_pb.ConfiguredTarget_Value_Action {
+						return &model_analysis_pb.ConfiguredTarget_Value_Action{
 							Level: &model_analysis_pb.ConfiguredTarget_Value_Action_Parent_{
 								Parent: &model_analysis_pb.ConfiguredTarget_Value_Action_Parent{
 									Reference: patcher.CaptureAndAddDecodableReference(createdObject, e),
 									FirstId:   firstID,
 								},
 							},
-						},
-						patcher,
-					), nil
+						}
+					}), nil
 				},
 			),
 		)
@@ -2318,9 +2314,8 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 			valueEncodingOptions.ObjectEncoder,
 			valueEncodingOptions.ObjectReferenceFormat,
 			func(createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]], childNodes []*model_analysis_pb.FilesToRunProvider) (model_core.PatchedMessage[*model_analysis_pb.FilesToRunProvider, TMetadata], error) {
-				patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
-				return model_core.NewPatchedMessage(
-					&model_analysis_pb.FilesToRunProvider{
+				return model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[TMetadata]) *model_analysis_pb.FilesToRunProvider {
+					return &model_analysis_pb.FilesToRunProvider{
 						Level: &model_analysis_pb.FilesToRunProvider_Parent_{
 							Parent: &model_analysis_pb.FilesToRunProvider_Parent{
 								Reference: patcher.CaptureAndAddDecodableReference(
@@ -2329,9 +2324,8 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 								),
 							},
 						},
-					},
-					patcher,
-				), nil
+					}
+				}), nil
 			},
 		),
 	)
@@ -2416,9 +2410,8 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 			valueEncodingOptions.ObjectEncoder,
 			valueEncodingOptions.ObjectReferenceFormat,
 			func(createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]], childNodes []*model_analysis_pb.Args) (model_core.PatchedMessage[*model_analysis_pb.Args, TMetadata], error) {
-				patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
-				return model_core.NewPatchedMessage(
-					&model_analysis_pb.Args{
+				return model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[TMetadata]) *model_analysis_pb.Args {
+					return &model_analysis_pb.Args{
 						Level: &model_analysis_pb.Args_Parent_{
 							Parent: &model_analysis_pb.Args_Parent{
 								Reference: patcher.CaptureAndAddDecodableReference(
@@ -2427,9 +2420,8 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 								),
 							},
 						},
-					},
-					patcher,
-				), nil
+					}
+				}), nil
 			},
 		),
 	)
@@ -3255,9 +3247,8 @@ func (a *args[TReference, TMetadata]) Encode(path map[starlark.Value]struct{}, o
 			options.ObjectEncoder,
 			options.ObjectReferenceFormat,
 			func(createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]], childNodes []*model_analysis_pb.Args_Leaf_Add) (model_core.PatchedMessage[*model_analysis_pb.Args_Leaf_Add, TMetadata], error) {
-				patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
-				return model_core.NewPatchedMessage(
-					&model_analysis_pb.Args_Leaf_Add{
+				return model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[TMetadata]) *model_analysis_pb.Args_Leaf_Add {
+					return &model_analysis_pb.Args_Leaf_Add{
 						Level: &model_analysis_pb.Args_Leaf_Add_Parent_{
 							Parent: &model_analysis_pb.Args_Leaf_Add_Parent{
 								Reference: patcher.CaptureAndAddDecodableReference(
@@ -3266,9 +3257,8 @@ func (a *args[TReference, TMetadata]) Encode(path map[starlark.Value]struct{}, o
 								),
 							},
 						},
-					},
-					patcher,
-				), nil
+					}
+				}), nil
 			},
 		),
 	)

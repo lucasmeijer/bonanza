@@ -1638,15 +1638,13 @@ func newArgumentsBuilder[TMetadata model_core.ReferenceMetadata](commandEncoder 
 			commandEncoder,
 			referenceFormat,
 			/* parentNodeComputer = */ func(createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]], childNodes []*model_command_pb.ArgumentList_Element) (model_core.PatchedMessage[*model_command_pb.ArgumentList_Element, TMetadata], error) {
-				patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
-				return model_core.NewPatchedMessage(
-					&model_command_pb.ArgumentList_Element{
+				return model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[TMetadata]) *model_command_pb.ArgumentList_Element {
+					return &model_command_pb.ArgumentList_Element{
 						Level: &model_command_pb.ArgumentList_Element_Parent{
 							Parent: patcher.CaptureAndAddDecodableReference(createdObject, objectCapturer),
 						},
-					},
-					patcher,
-				), nil
+					}
+				}), nil
 			},
 		),
 	)
@@ -2336,25 +2334,23 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doWhich(thread *sta
 	}
 
 	// Invoke command.
-	keyPatcher := model_core.NewReferenceMessagePatcher[dag.ObjectContentsWalker]()
 	actionResult := mrc.environment.GetActionResultValue(
-		model_core.NewPatchedMessage(
-			&model_analysis_pb.ActionResult_Key{
+		model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[dag.ObjectContentsWalker]) *model_analysis_pb.ActionResult_Key {
+			return &model_analysis_pb.ActionResult_Key{
 				Action: &model_analysis_pb.Action{
 					PlatformPkixPublicKey: mrc.repoPlatform.Message.ExecPkixPublicKey,
-					CommandReference: keyPatcher.CaptureAndAddDecodableReference(
+					CommandReference: patcher.CaptureAndAddDecodableReference(
 						createdCommand,
 						model_core.WalkableCreatedObjectCapturer,
 					),
-					InputRootReference: keyPatcher.CaptureAndAddDecodableReference(
+					InputRootReference: patcher.CaptureAndAddDecodableReference(
 						createdInputRoot,
 						model_core.WalkableCreatedObjectCapturer,
 					),
 					ExecutionTimeout: &durationpb.Duration{Seconds: 60},
 				},
-			},
-			keyPatcher,
-		),
+			}
+		}),
 	)
 	if !actionResult.IsSet() {
 		return nil, evaluation.ErrMissingDependency
@@ -3335,10 +3331,9 @@ func (c *baseComputer[TReference, TMetadata]) createMerkleTreeFromChangeTracking
 	defer objectContentsWalkerFactory.Release()
 	merkleTreeNodes = nil
 
-	patcher := model_core.NewReferenceMessagePatcher[dag.ObjectContentsWalker]()
 	rootReference := createdRootDirectoryObject.Value.GetLocalReference()
-	return model_core.NewPatchedMessage(
-		createdRootDirectory.ToDirectoryReference(
+	return model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[dag.ObjectContentsWalker]) *model_filesystem_pb.DirectoryReference {
+		return createdRootDirectory.ToDirectoryReference(
 			&model_core_pb.DecodableReference{
 				Reference: patcher.AddReference(
 					rootReference,
@@ -3346,9 +3341,8 @@ func (c *baseComputer[TReference, TMetadata]) createMerkleTreeFromChangeTracking
 				),
 				DecodingParameters: createdRootDirectoryObject.GetDecodingParameters(),
 			},
-		),
-		patcher,
-	), nil
+		)
+	}), nil
 }
 
 func (c *baseComputer[TReference, TMetadata]) returnRepoMerkleTree(

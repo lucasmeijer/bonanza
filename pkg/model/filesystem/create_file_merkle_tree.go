@@ -45,9 +45,8 @@ func CreateFileMerkleTree[T model_core.ReferenceMetadata](ctx context.Context, p
 					totalSizeBytes += childNode.TotalSizeBytes
 				}
 
-				patcher := model_core.NewReferenceMessagePatcher[T]()
-				return model_core.NewPatchedMessage(
-					&model_filesystem_pb.FileContents{
+				return model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[T]) *model_filesystem_pb.FileContents {
+					return &model_filesystem_pb.FileContents{
 						Level: &model_filesystem_pb.FileContents_FileContentsListReference{
 							FileContentsListReference: patcher.CaptureAndAddDecodableReference(
 								createdObject,
@@ -55,9 +54,8 @@ func CreateFileMerkleTree[T model_core.ReferenceMetadata](ctx context.Context, p
 							),
 						},
 						TotalSizeBytes: totalSizeBytes,
-					},
-					patcher,
-				), nil
+					}
+				}), nil
 			},
 		),
 	)
@@ -86,22 +84,22 @@ func CreateFileMerkleTree[T model_core.ReferenceMetadata](ctx context.Context, p
 		}
 
 		// Insert a FileContents message for it into the B-tree.
-		patcher := model_core.NewReferenceMessagePatcher[T]()
-		if err := treeBuilder.PushChild(model_core.NewPatchedMessage(
-			&model_filesystem_pb.FileContents{
-				Level: &model_filesystem_pb.FileContents_ChunkReference{
-					ChunkReference: &model_core_pb.DecodableReference{
-						Reference: patcher.AddReference(
-							decodableContents.Value.GetLocalReference(),
-							capturer.CaptureChunk(decodableContents.Value),
-						),
-						DecodingParameters: decodableContents.GetDecodingParameters(),
+		if err := treeBuilder.PushChild(
+			model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[T]) *model_filesystem_pb.FileContents {
+				return &model_filesystem_pb.FileContents{
+					Level: &model_filesystem_pb.FileContents_ChunkReference{
+						ChunkReference: &model_core_pb.DecodableReference{
+							Reference: patcher.AddReference(
+								decodableContents.Value.GetLocalReference(),
+								capturer.CaptureChunk(decodableContents.Value),
+							),
+							DecodingParameters: decodableContents.GetDecodingParameters(),
+						},
 					},
-				},
-				TotalSizeBytes: uint64(len(chunk)),
-			},
-			patcher,
-		)); err != nil {
+					TotalSizeBytes: uint64(len(chunk)),
+				}
+			}),
+		); err != nil {
 			return model_core.PatchedMessage[*model_filesystem_pb.FileContents, T]{}, err
 		}
 	}

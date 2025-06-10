@@ -93,25 +93,23 @@ func (c *baseComputer[TReference, TMetadata]) ComputeStableInputRootPathValue(ct
 	}
 
 	// Invoke "pwd".
-	keyPatcher := model_core.NewReferenceMessagePatcher[dag.ObjectContentsWalker]()
 	actionResult := e.GetSuccessfulActionResultValue(
-		model_core.NewPatchedMessage(
-			&model_analysis_pb.SuccessfulActionResult_Key{
+		model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[dag.ObjectContentsWalker]) *model_analysis_pb.SuccessfulActionResult_Key {
+			return &model_analysis_pb.SuccessfulActionResult_Key{
 				Action: &model_analysis_pb.Action{
 					PlatformPkixPublicKey: repoPlatform.Message.ExecPkixPublicKey,
-					CommandReference: keyPatcher.CaptureAndAddDecodableReference(
+					CommandReference: patcher.CaptureAndAddDecodableReference(
 						createdCommand,
 						model_core.WalkableCreatedObjectCapturer,
 					),
-					InputRootReference: keyPatcher.CaptureAndAddDecodableReference(
+					InputRootReference: patcher.CaptureAndAddDecodableReference(
 						createdInputRoot,
 						model_core.WalkableCreatedObjectCapturer,
 					),
 					ExecutionTimeout: &durationpb.Duration{Seconds: 60},
 				},
-			},
-			keyPatcher,
-		),
+			}
+		}),
 	)
 	if !actionResult.IsSet() {
 		return PatchedStableInputRootPathValue{}, evaluation.ErrMissingDependency

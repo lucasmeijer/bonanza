@@ -422,10 +422,9 @@ func (c *baseComputer[TReference, TMetadata]) ComputeHttpArchiveContentsValue(ct
 	defer objectContentsWalkerFactory.Release()
 	merkleTreeNodes = nil
 
-	patcher := model_core.NewReferenceMessagePatcher[dag.ObjectContentsWalker]()
 	rootReference := createdRootDirectoryObject.Value.GetLocalReference()
-	return model_core.NewPatchedMessage(
-		&model_analysis_pb.HttpArchiveContents_Value{
+	return model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[dag.ObjectContentsWalker]) *model_analysis_pb.HttpArchiveContents_Value {
+		return &model_analysis_pb.HttpArchiveContents_Value{
 			Exists: &model_analysis_pb.HttpArchiveContents_Value_Exists{
 				Contents: createdRootDirectory.ToDirectoryReference(
 					&model_core_pb.DecodableReference{
@@ -438,7 +437,6 @@ func (c *baseComputer[TReference, TMetadata]) ComputeHttpArchiveContentsValue(ct
 				),
 				Sha256: httpFileContentsValue.Message.Exists.Sha256,
 			},
-		},
-		patcher,
-	), nil
+		}
+	}), nil
 }

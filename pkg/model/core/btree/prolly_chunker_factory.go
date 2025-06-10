@@ -166,11 +166,12 @@ func (c *prollyChunker[TNode, TMetadata]) PopMultiple(finalize bool) model_core.
 	}
 
 	// Combine the nodes into a single list.
-	patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
-	messages := make([]TNode, 0, len(nodes))
-	for _, node := range nodes {
-		messages = append(messages, node.Message)
-		patcher.Merge(node.Patcher)
-	}
-	return model_core.NewPatchedMessage(messages, patcher)
+	return model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[TMetadata]) []TNode {
+		messages := make([]TNode, 0, len(nodes))
+		for _, node := range nodes {
+			messages = append(messages, node.Message)
+			patcher.Merge(node.Patcher)
+		}
+		return messages
+	})
 }

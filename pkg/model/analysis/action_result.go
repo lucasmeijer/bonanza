@@ -117,15 +117,13 @@ func convertDictToEnvironmentVariableList[TMetadata model_core.ReferenceMetadata
 			commandEncoder,
 			referenceFormat,
 			/* parentNodeComputer = */ func(createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]], childNodes []*model_command_pb.EnvironmentVariableList_Element) (model_core.PatchedMessage[*model_command_pb.EnvironmentVariableList_Element, TMetadata], error) {
-				patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
-				return model_core.NewPatchedMessage(
-					&model_command_pb.EnvironmentVariableList_Element{
+				return model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[TMetadata]) *model_command_pb.EnvironmentVariableList_Element {
+					return &model_command_pb.EnvironmentVariableList_Element{
 						Level: &model_command_pb.EnvironmentVariableList_Element_Parent{
 							Parent: patcher.CaptureAndAddDecodableReference(createdObject, capturer),
 						},
-					},
-					patcher,
-				), nil
+					}
+				}), nil
 			},
 		),
 	)

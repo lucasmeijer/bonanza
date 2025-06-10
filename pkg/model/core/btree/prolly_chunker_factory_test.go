@@ -44,22 +44,22 @@ func TestProllyChunkerFactory(t *testing.T) {
 
 		metadatas := make([]*MockReferenceMetadata, 0, 10)
 		for i := 1000; i < 1010; i++ {
-			patcher := model_core.NewReferenceMessagePatcher[model_core.ReferenceMetadata]()
 			metadata := NewMockReferenceMetadata(ctrl)
-			require.NoError(t, chunker.PushSingle(model_core.NewPatchedMessage(
-				&model_filesystem_pb.FileContents{
-					TotalSizeBytes: uint64(i),
-					Level: &model_filesystem_pb.FileContents_ChunkReference{
-						ChunkReference: &model_core_pb.DecodableReference{
-							Reference: patcher.AddReference(
-								object.MustNewSHA256V1LocalReference("5b2484693d5051be0fae63f4f862ce606cdc30ffbcd8a8a44b5b1b226b459262", uint32(i), 0, 0, 0),
-								metadata,
-							),
+			require.NoError(t, chunker.PushSingle(
+				model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.ReferenceMetadata]) *model_filesystem_pb.FileContents {
+					return &model_filesystem_pb.FileContents{
+						TotalSizeBytes: uint64(i),
+						Level: &model_filesystem_pb.FileContents_ChunkReference{
+							ChunkReference: &model_core_pb.DecodableReference{
+								Reference: patcher.AddReference(
+									object.MustNewSHA256V1LocalReference("5b2484693d5051be0fae63f4f862ce606cdc30ffbcd8a8a44b5b1b226b459262", uint32(i), 0, 0, 0),
+									metadata,
+								),
+							},
 						},
-					},
-				},
-				patcher,
-			)))
+					}
+				}),
+			))
 			metadatas = append(metadatas, metadata)
 		}
 

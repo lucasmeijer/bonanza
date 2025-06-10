@@ -389,18 +389,16 @@ func (e *builderExecutor) Execute(ctx context.Context, action *model_build_pb.Ac
 				case *model_evaluation_pb.Evaluation_Parent_:
 					firstKey = firstEntry.Parent.FirstKey
 				}
-				patcher := model_core.NewReferenceMessagePatcher[dag.ObjectContentsWalker]()
-				return model_core.NewPatchedMessage(
-					&model_evaluation_pb.Evaluation{
+				return model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[dag.ObjectContentsWalker]) *model_evaluation_pb.Evaluation {
+					return &model_evaluation_pb.Evaluation{
 						Level: &model_evaluation_pb.Evaluation_Parent_{
 							Parent: &model_evaluation_pb.Evaluation_Parent{
 								Reference: patcher.CaptureAndAddDecodableReference(createdObject, model_core.WalkableCreatedObjectCapturer),
 								FirstKey:  firstKey,
 							},
 						},
-					},
-					patcher,
-				), nil
+					}
+				}), nil
 			},
 		),
 	)
@@ -449,17 +447,15 @@ func (e *builderExecutor) Execute(ctx context.Context, action *model_build_pb.Ac
 				evaluationTreeEncoder,
 				namespace.ReferenceFormat,
 				/* parentNodeComputer = */ func(createdObject model_core.Decodable[model_core.CreatedObject[dag.ObjectContentsWalker]], childNodes []*model_evaluation_pb.Dependency) (model_core.PatchedMessage[*model_evaluation_pb.Dependency, dag.ObjectContentsWalker], error) {
-					patcher := model_core.NewReferenceMessagePatcher[dag.ObjectContentsWalker]()
-					return model_core.NewPatchedMessage(
-						&model_evaluation_pb.Dependency{
+					return model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[dag.ObjectContentsWalker]) *model_evaluation_pb.Dependency {
+						return &model_evaluation_pb.Dependency{
 							Level: &model_evaluation_pb.Dependency_Parent_{
 								Parent: &model_evaluation_pb.Dependency_Parent{
 									Reference: patcher.CaptureAndAddDecodableReference(createdObject, model_core.WalkableCreatedObjectCapturer),
 								},
 							},
-						},
-						patcher,
-					), nil
+						}
+					}), nil
 				},
 			),
 		)

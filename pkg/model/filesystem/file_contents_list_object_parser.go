@@ -85,9 +85,8 @@ func FileContentsEntryToProto[TReference object.BasicReference](
 
 	if entry.Reference.Value.GetHeight() > 0 {
 		// Large file.
-		patcher := model_core.NewReferenceMessagePatcher[dag.ObjectContentsWalker]()
-		return model_core.NewPatchedMessage(
-			&model_filesystem_pb.FileContents{
+		return model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[dag.ObjectContentsWalker]) *model_filesystem_pb.FileContents {
+			return &model_filesystem_pb.FileContents{
 				Level: &model_filesystem_pb.FileContents_FileContentsListReference{
 					FileContentsListReference: &model_core_pb.DecodableReference{
 						Reference: patcher.AddReference(
@@ -98,15 +97,13 @@ func FileContentsEntryToProto[TReference object.BasicReference](
 					},
 				},
 				TotalSizeBytes: entry.EndBytes,
-			},
-			patcher,
-		)
+			}
+		})
 	}
 
 	// Small file.
-	patcher := model_core.NewReferenceMessagePatcher[dag.ObjectContentsWalker]()
-	return model_core.NewPatchedMessage(
-		&model_filesystem_pb.FileContents{
+	return model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[dag.ObjectContentsWalker]) *model_filesystem_pb.FileContents {
+		return &model_filesystem_pb.FileContents{
 			Level: &model_filesystem_pb.FileContents_ChunkReference{
 				ChunkReference: &model_core_pb.DecodableReference{
 					Reference: patcher.AddReference(
@@ -117,9 +114,8 @@ func FileContentsEntryToProto[TReference object.BasicReference](
 				},
 			},
 			TotalSizeBytes: entry.EndBytes,
-		},
-		patcher,
-	)
+		}
+	})
 }
 
 // FileContentsList contains the properties of parts of a concatenated
