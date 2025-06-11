@@ -192,6 +192,8 @@ func main() {
 						uuid.NewRandom,
 						maximumWritableFileUploadDelay,
 						runnerConfiguration.EnvironmentVariables,
+						runnerConfiguration.BuildDirectoryOwnerUserId,
+						runnerConfiguration.BuildDirectoryOwnerGroupId,
 					)
 
 					client, err := remoteworker.NewClient(

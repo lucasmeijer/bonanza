@@ -179,6 +179,8 @@ type RunnerConfiguration struct {
 	MaximumFilePoolSizeBytes            int64                     `protobuf:"varint,12,opt,name=maximum_file_pool_size_bytes,json=maximumFilePoolSizeBytes,proto3" json:"maximum_file_pool_size_bytes,omitempty"`
 	WorkerId                            map[string]string         `protobuf:"bytes,13,rep,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	EnvironmentVariables                map[string]string         `protobuf:"bytes,14,rep,name=environment_variables,json=environmentVariables,proto3" json:"environment_variables,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	BuildDirectoryOwnerUserId           uint32                    `protobuf:"varint,15,opt,name=build_directory_owner_user_id,json=buildDirectoryOwnerUserId,proto3" json:"build_directory_owner_user_id,omitempty"`
+	BuildDirectoryOwnerGroupId          uint32                    `protobuf:"varint,16,opt,name=build_directory_owner_group_id,json=buildDirectoryOwnerGroupId,proto3" json:"build_directory_owner_group_id,omitempty"`
 	unknownFields                       protoimpl.UnknownFields
 	sizeCache                           protoimpl.SizeCache
 }
@@ -311,6 +313,20 @@ func (x *RunnerConfiguration) GetEnvironmentVariables() map[string]string {
 	return nil
 }
 
+func (x *RunnerConfiguration) GetBuildDirectoryOwnerUserId() uint32 {
+	if x != nil {
+		return x.BuildDirectoryOwnerUserId
+	}
+	return 0
+}
+
+func (x *RunnerConfiguration) GetBuildDirectoryOwnerGroupId() uint32 {
+	if x != nil {
+		return x.BuildDirectoryOwnerGroupId
+	}
+	return 0
+}
+
 var File_pkg_proto_configuration_bonanza_worker_bonanza_worker_proto protoreflect.FileDescriptor
 
 const file_pkg_proto_configuration_bonanza_worker_bonanza_worker_proto_rawDesc = "" +
@@ -325,7 +341,8 @@ const file_pkg_proto_configuration_bonanza_worker_bonanza_worker_proto_rawDesc =
 	"\x12parsed_object_pool\x18\x06 \x01(\v24.bonanza.configuration.model.parser.ParsedObjectPoolR\x10parsedObjectPool\"\xc8\x01\n" +
 	"\x1bBuildDirectoryConfiguration\x12S\n" +
 	"\arunners\x18\x01 \x03(\v29.bonanza.configuration.bonanza_worker.RunnerConfigurationR\arunners\x12T\n" +
-	"\x05mount\x18\x02 \x01(\v2>.buildbarn.configuration.filesystem.virtual.MountConfigurationR\x05mount\"\x90\t\n" +
+	"\x05mount\x18\x02 \x01(\v2>.buildbarn.configuration.filesystem.virtual.MountConfigurationR\x05mount\"\x96\n" +
+	"\n" +
 	"\x13RunnerConfiguration\x12M\n" +
 	"\bendpoint\x18\x01 \x01(\v21.buildbarn.configuration.grpc.ClientConfigurationR\bendpoint\x12 \n" +
 	"\vconcurrency\x18\x02 \x01(\x04R\vconcurrency\x122\n" +
@@ -342,7 +359,9 @@ const file_pkg_proto_configuration_bonanza_worker_bonanza_worker_proto_rawDesc =
 	"\x1cmaximum_file_pool_file_count\x18\v \x01(\x03R\x18maximumFilePoolFileCount\x12>\n" +
 	"\x1cmaximum_file_pool_size_bytes\x18\f \x01(\x03R\x18maximumFilePoolSizeBytes\x12d\n" +
 	"\tworker_id\x18\r \x03(\v2G.bonanza.configuration.bonanza_worker.RunnerConfiguration.WorkerIdEntryR\bworkerId\x12\x88\x01\n" +
-	"\x15environment_variables\x18\x0e \x03(\v2S.bonanza.configuration.bonanza_worker.RunnerConfiguration.EnvironmentVariablesEntryR\x14environmentVariables\x1a;\n" +
+	"\x15environment_variables\x18\x0e \x03(\v2S.bonanza.configuration.bonanza_worker.RunnerConfiguration.EnvironmentVariablesEntryR\x14environmentVariables\x12@\n" +
+	"\x1dbuild_directory_owner_user_id\x18\x0f \x01(\rR\x19buildDirectoryOwnerUserId\x12B\n" +
+	"\x1ebuild_directory_owner_group_id\x18\x10 \x01(\rR\x1abuildDirectoryOwnerGroupId\x1a;\n" +
 	"\rWorkerIdEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1aG\n" +

@@ -84,6 +84,8 @@ local statePath = std.extVar('STATE_PATH');
       maximumFilePoolFileCount: 1e5,
       maximumFilePoolSizeBytes: 1e9,
       workerId: { host: 'localhost' },
+      buildDirectoryOwnerUserId: std.extVar('USER_ID'),
+      buildDirectoryOwnerGroupId: std.extVar('GROUP_ID'),
     }],
     mount: {
       mountPath: statePath + '/bonanza_worker_mount',

@@ -104,6 +104,8 @@ type localExecutor struct {
 	uuidGenerator                  util.UUIDGenerator
 	maximumWritableFileUploadDelay time.Duration
 	environmentVariables           map[string]string
+	buildDirectoryOwnerUserID      uint32
+	buildDirectoryOwnerGroupID     uint32
 	readinessCheckingDirectory     virtual.Directory
 }
 
@@ -123,6 +125,8 @@ func NewLocalExecutor(
 	uuidGenerator util.UUIDGenerator,
 	maximumWritableFileUploadDelay time.Duration,
 	environmentVariables map[string]string,
+	buildDirectoryOwnerUserID uint32,
+	buildDirectoryOwnerGroupID uint32,
 ) remoteworker.Executor[*model_command_pb.Action] {
 	return &localExecutor{
 		objectDownloader:               objectDownloader,
@@ -140,6 +144,8 @@ func NewLocalExecutor(
 		uuidGenerator:                  uuidGenerator,
 		maximumWritableFileUploadDelay: maximumWritableFileUploadDelay,
 		environmentVariables:           environmentVariables,
+		buildDirectoryOwnerUserID:      buildDirectoryOwnerUserID,
+		buildDirectoryOwnerGroupID:     buildDirectoryOwnerGroupID,
 		readinessCheckingDirectory:     handleAllocator.New().AsStatelessDirectory(virtual.NewStaticDirectory(nil)),
 	}
 }
@@ -336,6 +342,10 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 		e.initialContentsSorter,
 		e.hiddenFilesMatcher,
 		e.clock,
+		/* defaultAttributesSetter = */ func(requested virtual.AttributesMask, attributes *virtual.Attributes) {
+			attributes.SetOwnerUserID(e.buildDirectoryOwnerUserID)
+			attributes.SetOwnerGroupID(e.buildDirectoryOwnerGroupID)
+		},
 	)
 	defer buildDirectory.RemoveAllChildren(true)
 

@@ -25,7 +25,7 @@ git_override(
 
 git_override(
     module_name = "com_github_buildbarn_bb_remote_execution",
-    commit = "5f05eba845f52f73ddf86998def4970d083d4d92",
+    commit = "81753944a0d407a8f053bc65edf97cdfc6051831",
     remote = "https://github.com/buildbarn/bb-remote-execution.git",
 )
 

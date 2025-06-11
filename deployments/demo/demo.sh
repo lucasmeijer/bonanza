@@ -16,13 +16,17 @@ set -eu
 
 export STATE_PATH="${HOME}/bonanza_demo"
 mkdir -p "${STATE_PATH}/bonanza_builder_cache"
-rm -rf "${STATE_PATH}/bonanza_builder_filepool"
-mkdir -p "${STATE_PATH}/bonanza_builder_filepool"
+rm -rf "${STATE_PATH}/bonanza_builder_filepool" "${STATE_PATH}/bonanza_worker_filepool"
 umount "${STATE_PATH}/bonanza_worker_mount" || true
 mkdir -p "${STATE_PATH}/bonanza_worker_mount" || true
 
 # Support conditionals in configuration files based on the operating system.
 export OS=$(uname)
+
+# Necessary to give the virtual file system the same ownership as the
+# user running the build actions.
+export USER_ID=$(id -u)
+export GROUP_ID=$(id -g)
 
 # Launch processes that should be killed last.
 set -m
