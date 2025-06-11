@@ -21,6 +21,9 @@ mkdir -p "${STATE_PATH}/bonanza_builder_filepool"
 umount "${STATE_PATH}/bonanza_worker_mount" || true
 mkdir -p "${STATE_PATH}/bonanza_worker_mount" || true
 
+# Support conditionals in configuration files based on the operating system.
+export OS=$(uname)
+
 # Launch processes that should be killed last.
 set -m
 for replica in a b; do

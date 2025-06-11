@@ -1,6 +1,10 @@
+local os = std.extVar('OS');
 local statePath = std.extVar('STATE_PATH');
 
 {
+  // If enabled, use NFSv4 instead of FUSE.
+  useNFSv4:: os == 'Darwin',
+
   global: { diagnosticsHttpServer: {
     httpServers: [{
       listenAddresses: [':9983'],
@@ -83,12 +87,18 @@ local statePath = std.extVar('STATE_PATH');
     }],
     mount: {
       mountPath: statePath + '/bonanza_worker_mount',
+    } + if $.useNFSv4 then {
       nfsv4: {
-        darwin: {
-          socketPath: statePath + '/bonanza_worker_mount.sock',
-        },
         enforcedLeaseTime: '120s',
         announcedLeaseTime: '60s',
+      } + {
+        Darwin: { darwin: { socketPath: statePath + '/bonanza_worker_mount.sock' } },
+        Linux: { linux: { mountOptions: ['vers=4.1'] } },
+      }[os],
+    } else {
+      fuse: {
+        directoryEntryValidity: '300s',
+        inodeAttributeValidity: '300s',
       },
     },
   }],
