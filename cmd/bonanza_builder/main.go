@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"time"
 
-	re_filesystem "github.com/buildbarn/bb-remote-execution/pkg/filesystem"
+	"github.com/buildbarn/bb-remote-execution/pkg/filesystem/pool"
 	"github.com/buildbarn/bb-storage/pkg/clock"
 	"github.com/buildbarn/bb-storage/pkg/filesystem"
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
@@ -83,7 +83,7 @@ func main() {
 			return util.StatusWrap(err, "Failed to create HTTP client")
 		}
 
-		filePool, err := re_filesystem.NewFilePoolFromConfiguration(configuration.FilePool)
+		filePool, err := pool.NewFilePoolFromConfiguration(configuration.FilePool)
 		if err != nil {
 			return util.StatusWrap(err, "Failed to create file pool")
 		}
@@ -267,7 +267,7 @@ type builderExecutor struct {
 	dagUploaderClient             dag_pb.UploaderClient
 	objectContentsWalkerSemaphore *semaphore.Weighted
 	httpClient                    *http.Client
-	filePool                      re_filesystem.FilePool
+	filePool                      pool.FilePool
 	cacheDirectory                filesystem.Directory
 	executionClient               *remoteexecution.Client[*model_command_pb.Action, emptypb.Empty, *emptypb.Empty, *model_command_pb.Result]
 	bzlFileBuiltins               starlark.StringDict

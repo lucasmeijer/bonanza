@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
-	re_filesystem "github.com/buildbarn/bb-remote-execution/pkg/filesystem"
+	"github.com/buildbarn/bb-remote-execution/pkg/filesystem/pool"
 	"github.com/buildbarn/bb-storage/pkg/filesystem"
 	"github.com/buildbarn/bonanza/pkg/evaluation"
 	"github.com/buildbarn/bonanza/pkg/label"
@@ -39,7 +39,7 @@ type baseComputer[TReference object.BasicReference, TMetadata BaseComputerRefere
 	parsedObjectPoolIngester    *model_parser.ParsedObjectPoolIngester[TReference]
 	buildSpecificationReference model_core.Decodable[TReference]
 	httpClient                  *http.Client
-	filePool                    re_filesystem.FilePool
+	filePool                    pool.FilePool
 	cacheDirectory              filesystem.Directory
 	executionClient             *remoteexecution.Client[*model_command_pb.Action, emptypb.Empty, *emptypb.Empty, *model_command_pb.Result]
 	executionNamespace          *object_pb.Namespace
@@ -69,7 +69,7 @@ func NewBaseComputer[TReference object.BasicReference, TMetadata BaseComputerRef
 	buildSpecificationReference model_core.Decodable[TReference],
 	buildSpecificationEncoder model_encoding.BinaryEncoder,
 	httpClient *http.Client,
-	filePool re_filesystem.FilePool,
+	filePool pool.FilePool,
 	cacheDirectory filesystem.Directory,
 	executionClient *remoteexecution.Client[*model_command_pb.Action, emptypb.Empty, *emptypb.Empty, *model_command_pb.Result],
 	executionInstanceName object.InstanceName,

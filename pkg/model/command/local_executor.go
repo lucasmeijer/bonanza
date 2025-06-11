@@ -12,7 +12,7 @@ import (
 	"time"
 
 	re_clock "github.com/buildbarn/bb-remote-execution/pkg/clock"
-	re_filesystem "github.com/buildbarn/bb-remote-execution/pkg/filesystem"
+	"github.com/buildbarn/bb-remote-execution/pkg/filesystem/pool"
 	"github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual"
 	runner_pb "github.com/buildbarn/bb-remote-execution/pkg/proto/runner"
 	"github.com/buildbarn/bb-storage/pkg/clock"
@@ -95,7 +95,7 @@ type localExecutor struct {
 	objectContentsWalkerSemaphore  *semaphore.Weighted
 	topLevelDirectory              TopLevelDirectory
 	handleAllocator                virtual.StatefulHandleAllocator
-	filePool                       re_filesystem.FilePool
+	filePool                       pool.FilePool
 	symlinkFactory                 virtual.SymlinkFactory
 	initialContentsSorter          virtual.Sorter
 	hiddenFilesMatcher             virtual.StringMatcher
@@ -114,7 +114,7 @@ func NewLocalExecutor(
 	objectContentsWalkerSemaphore *semaphore.Weighted,
 	topLevelDirectory TopLevelDirectory,
 	handleAllocator virtual.StatefulHandleAllocator,
-	filePool re_filesystem.FilePool,
+	filePool pool.FilePool,
 	symlinkFactory virtual.SymlinkFactory,
 	initialContentsSorter virtual.Sorter,
 	hiddenFilesMatcher virtual.StringMatcher,

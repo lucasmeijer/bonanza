@@ -26,7 +26,7 @@ go_library(
         "//pkg/storage/object",
         "//pkg/storage/object/namespacemapping",
         "@com_github_buildbarn_bb_remote_execution//pkg/clock",
-        "@com_github_buildbarn_bb_remote_execution//pkg/filesystem",
+        "@com_github_buildbarn_bb_remote_execution//pkg/filesystem/pool",
         "@com_github_buildbarn_bb_remote_execution//pkg/filesystem/virtual",
         "@com_github_buildbarn_bb_remote_execution//pkg/proto/runner",
         "@com_github_buildbarn_bb_storage//pkg/clock",

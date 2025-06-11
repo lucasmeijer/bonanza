@@ -12,7 +12,7 @@ import (
 	"time"
 
 	re_clock "github.com/buildbarn/bb-remote-execution/pkg/clock"
-	re_filesystem "github.com/buildbarn/bb-remote-execution/pkg/filesystem"
+	"github.com/buildbarn/bb-remote-execution/pkg/filesystem/pool"
 	"github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual"
 	virtual_configuration "github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual/configuration"
 	runner_pb "github.com/buildbarn/bb-remote-execution/pkg/proto/runner"
@@ -74,7 +74,7 @@ func main() {
 		// Location for storing temporary file objects. This is
 		// currently only used by the virtual file system to store
 		// output files of build actions.
-		filePool, err := re_filesystem.NewFilePoolFromConfiguration(configuration.FilePool)
+		filePool, err := pool.NewFilePoolFromConfiguration(configuration.FilePool)
 		if err != nil {
 			return util.StatusWrap(err, "Failed to create file pool")
 		}
@@ -179,7 +179,7 @@ func main() {
 						semaphore.NewWeighted(int64(runtime.NumCPU())),
 						rootDirectory,
 						handleAllocator,
-						re_filesystem.NewQuotaEnforcingFilePool(
+						pool.NewQuotaEnforcingFilePool(
 							filePool,
 							runnerConfiguration.MaximumFilePoolFileCount,
 							runnerConfiguration.MaximumFilePoolSizeBytes,
