@@ -11,6 +11,7 @@ bazel_dep(name = "gazelle", version = "0.43.0")
 bazel_dep(name = "googleapis", version = "0.0.0-20241220-5e258e33.bcr.1")
 bazel_dep(name = "jsonnet_go", version = "0.21.0")
 bazel_dep(name = "platforms", version = "1.0.0")
+bazel_dep(name = "toolchains_protoc", version = "0.4.2")  # must come BEFORE protobuf so the toolchain registration wins
 bazel_dep(name = "protobuf", version = "31.1")
 bazel_dep(name = "rules_go", version = "0.55.1")
 bazel_dep(name = "rules_jsonnet", version = "0.6.0")
@@ -56,6 +57,9 @@ git_override(
     ],
     remote = "https://github.com/marcohu/rules_antlr.git",
 )
+
+protoc = use_extension("@toolchains_protoc//protoc:extensions.bzl", "protoc")
+protoc.toolchain(version = "v31.1")
 
 go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
 go_sdk.download(
