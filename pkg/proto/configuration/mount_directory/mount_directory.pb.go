@@ -8,7 +8,6 @@ package mount_directory
 
 import (
 	virtual "github.com/buildbarn/bb-remote-execution/pkg/proto/configuration/filesystem/virtual"
-	_ "github.com/buildbarn/bb-storage/pkg/proto/configuration/eviction"
 	global "github.com/buildbarn/bb-storage/pkg/proto/configuration/global"
 	grpc "github.com/buildbarn/bb-storage/pkg/proto/configuration/grpc"
 	parser "github.com/buildbarn/bonanza/pkg/proto/configuration/model/parser"

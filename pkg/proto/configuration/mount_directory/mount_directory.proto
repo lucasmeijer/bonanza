@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package bonanza.configuration.mount_directory;
 
-import "pkg/proto/configuration/eviction/eviction.proto";
 import "pkg/proto/configuration/filesystem/virtual/virtual.proto";
 import "pkg/proto/configuration/global/global.proto";
 import "pkg/proto/configuration/grpc/grpc.proto";
