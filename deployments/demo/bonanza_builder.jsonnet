@@ -20,7 +20,10 @@ local statePath = std.extVar('STATE_PATH');
     count: 1e6,
     sizeBytes: 1e9,
   },
-  filePool: { directoryPath: statePath + '/bonanza_builder_filepool' },
+  filePool: { blockDevice: { file: {
+    path: statePath + '/bonanza_builder_filepool',
+    sizeBytes: 1e9,
+  } } },
 
   // Connection to the scheduler to run actions on workers.
   executionGrpcClient: {
