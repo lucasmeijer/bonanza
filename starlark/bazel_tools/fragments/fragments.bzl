@@ -99,6 +99,7 @@ def _cpp_fragment_impl(ctx):
     propeller_optimize_absolute_cc_profile = ctx.attr._propeller_optimize_absolute_cc_profile[BuildSettingInfo].value
     propeller_optimize_absolute_ld_profile = ctx.attr._propeller_optimize_absolute_ld_profile[BuildSettingInfo].value
     proto_profile = ctx.attr._proto_profile[BuildSettingInfo].value
+    remove_legacy_whole_archive = ctx.attr._remove_legacy_whole_archive[BuildSettingInfo].value
     save_feature_state = ctx.attr._save_feature_state[BuildSettingInfo].value
     start_end_lib = ctx.attr._start_end_lib[BuildSettingInfo].value
     strip = ctx.attr._strip[BuildSettingInfo].value
@@ -128,6 +129,7 @@ def _cpp_fragment_impl(ctx):
         force_pic = lambda: force_pic,
         generate_llvm_lcov = lambda: generate_llvm_lcov,
         grte_top = lambda: grte_top,
+        incompatible_remove_legacy_whole_archive = lambda: remove_legacy_whole_archive,
         incompatible_use_specific_tool_files = lambda: use_specific_tool_files,
         linkopts = ctx.attr._linkopt[BuildSettingInfo].value,
         minimum_os_version = lambda: minimum_os_version,
@@ -168,6 +170,7 @@ cpp_fragment = rule(
         "_propeller_optimize_absolute_cc_profile": attr.label(default = "//command_line_option:propeller_optimize_absolute_cc_profile"),
         "_propeller_optimize_absolute_ld_profile": attr.label(default = "//command_line_option:propeller_optimize_absolute_ld_profile"),
         "_proto_profile": attr.label(default = "//command_line_option:proto_profile"),
+        "_remove_legacy_whole_archive": attr.label(default = "//command_line_option:incompatible_remove_legacy_whole_archive"),
         "_save_feature_state": attr.label(default = "//command_line_option:experimental_save_feature_state"),
         "_starlark_compiling": attr.label(default = "//command_line_option:experimental_starlark_compiling"),
         "_starlark_linking": attr.label(default = "//command_line_option:experimental_starlark_linking"),
