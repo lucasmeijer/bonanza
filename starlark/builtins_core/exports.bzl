@@ -417,7 +417,7 @@ def _genrule_impl(ctx):
             ),
         ],
         inputs = [ctx.file._genrule_setup] + ctx.files.srcs,
-        tools = ctx.files.tools,
+        tools = [tool.files_to_run for tool in ctx.attr.tools],
         outputs = ctx.outputs.outs,
     )
     return [DefaultInfo(files = depset(ctx.outputs.outs))]
