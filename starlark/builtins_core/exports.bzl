@@ -3023,7 +3023,7 @@ def builtins_internal_cc_internal_create_library_to_link(library_to_link):
         _must_keep_debug = getattr(library_to_link, "must_keep_debug", False),
         _object_files = depset(getattr(library_to_link, "object_files", [])),
         _pic_object_files = depset(getattr(library_to_link, "pic_object_files", [])),
-        alwayslink = getattr(library_to_link, "dynamic_library", False),
+        alwayslink = getattr(library_to_link, "alwayslink", False),
         dynamic_library = getattr(library_to_link, "dynamic_library", None),
         interface_library = getattr(library_to_link, "interface_library", None),
         pic_static_library = getattr(library_to_link, "pic_static_library", None),
