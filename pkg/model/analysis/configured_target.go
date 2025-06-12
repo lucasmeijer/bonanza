@@ -3322,6 +3322,7 @@ func (a *args[TReference, TMetadata]) doAdd(thread *starlark.Thread, b *starlark
 	valueUnpackerInto := unpack.Or([]unpack.UnpackerInto[starlark.Value]{
 		unpack.Canonicalize(unpack.String),
 		unpack.Canonicalize(unpack.Type[*model_starlark.File[TReference, TMetadata]]("File")),
+		unpack.Canonicalize(unpack.Type[model_starlark.Label[TReference, TMetadata]]("Label")),
 	})
 	switch len(args) {
 	case 1:
