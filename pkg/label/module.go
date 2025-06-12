@@ -27,16 +27,6 @@ func NewModule(value string) (Module, error) {
 	return Module{value: value}, nil
 }
 
-// MustNewModule is the same as NewModule, except that it panics if the
-// provided value is not a valid Bazel module name.
-func MustNewModule(value string) Module {
-	m, err := NewModule(value)
-	if err != nil {
-		panic(err)
-	}
-	return m
-}
-
 func (m Module) String() string {
 	return m.value
 }

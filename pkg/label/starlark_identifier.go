@@ -29,17 +29,6 @@ func NewStarlarkIdentifier(value string) (StarlarkIdentifier, error) {
 	return StarlarkIdentifier{value: value}, nil
 }
 
-// MustNewStarlarkIdentifier is the same as NewStarlarkIdentifier,
-// except that it panics if the provided value is not a valid Starlark
-// identifier.
-func MustNewStarlarkIdentifier(value string) StarlarkIdentifier {
-	identifier, err := NewStarlarkIdentifier(value)
-	if err != nil {
-		panic(err)
-	}
-	return identifier
-}
-
 func (i StarlarkIdentifier) String() string {
 	return i.value
 }

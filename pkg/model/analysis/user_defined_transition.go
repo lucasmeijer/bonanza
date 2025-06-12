@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bonanza/pkg/evaluation"
 	"github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
@@ -28,7 +29,7 @@ import (
 	"go.starlark.net/starlark"
 )
 
-var commandLineOptionRepoRootPackage = label.MustNewCanonicalPackage("@@bazel_tools+")
+var commandLineOptionRepoRootPackage = util.Must(label.NewCanonicalPackage("@@bazel_tools+"))
 
 type expectedTransitionOutput[TReference any] struct {
 	label         string
@@ -333,7 +334,7 @@ type getBuildSettingValueEnvironment[TReference any, TMetadata any] interface {
 	GetVisibleTargetValue(model_core.PatchedMessage[*model_analysis_pb.VisibleTarget_Key, dag.ObjectContentsWalker]) model_core.Message[*model_analysis_pb.VisibleTarget_Value, TReference]
 }
 
-var featureFlagInfoProviderIdentifier = label.MustNewCanonicalStarlarkIdentifier("@@builtins_core+//:exports.bzl%FeatureFlagInfo")
+var featureFlagInfoProviderIdentifier = util.Must(label.NewCanonicalStarlarkIdentifier("@@builtins_core+//:exports.bzl%FeatureFlagInfo"))
 
 func (c *baseComputer[TReference, TMetadata]) getBuildSettingValue(ctx context.Context, e getBuildSettingValueEnvironment[TReference, TMetadata], fromPackage label.CanonicalPackage, buildSettingLabel string, configurationReference model_core.Message[*model_core_pb.DecodableReference, TReference]) (model_core.Message[*model_starlark_pb.Value, TReference], error) {
 	patchedConfigurationReference := model_core.Patch(e, configurationReference)

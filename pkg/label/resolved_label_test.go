@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bonanza/pkg/label"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,7 +25,7 @@ func TestResolvedLabel(t *testing.T) {
 			"@@[this is an error message]//pkg:foo",
 			"@@[this is an error message]//:[this is an error message]",
 		} {
-			resolvedLabel := label.MustNewResolvedLabel(input)
+			resolvedLabel := util.Must(label.NewResolvedLabel(input))
 			assert.Equal(t, input, resolvedLabel.String())
 		}
 	})
@@ -36,7 +37,7 @@ func TestResolvedLabel(t *testing.T) {
 			"@@com_github_buildbarn_bb_storage+//cmd/hello_world:hello_world":       "@@com_github_buildbarn_bb_storage+//cmd/hello_world",
 			"@@[this is an error message]//pkg:pkg":                                 "@@[this is an error message]//pkg",
 		} {
-			resolvedLabel := label.MustNewResolvedLabel(input)
+			resolvedLabel := util.Must(label.NewResolvedLabel(input))
 			assert.Equal(t, output, resolvedLabel.String())
 		}
 	})
@@ -75,7 +76,7 @@ func TestResolvedLabel(t *testing.T) {
 				"@@com_github_buildbarn_bb_storage+//cmd/hello_world",
 				"@@com_github_buildbarn_bb_storage+//cmd/hello_world:go_default_library",
 			} {
-				canonicalLabel, err := label.MustNewResolvedLabel(input).AsCanonical()
+				canonicalLabel, err := util.Must(label.NewResolvedLabel(input)).AsCanonical()
 				require.NoError(t, err)
 				assert.Equal(t, input, canonicalLabel.String())
 			}
@@ -87,7 +88,7 @@ func TestResolvedLabel(t *testing.T) {
 				"@@[this is an error message]//cmd/hello_world",
 				"@@[this is an error message]//cmd/hello_world:go_default_library",
 			} {
-				_, err := label.MustNewResolvedLabel(input).AsCanonical()
+				_, err := util.Must(label.NewResolvedLabel(input)).AsCanonical()
 				assert.Equal(t, errors.New("this is an error message"), err)
 			}
 		})
@@ -107,7 +108,7 @@ func TestResolvedLabel(t *testing.T) {
 			"@@[this is an error message]//pkg:foo":                                      "pkg",
 			"@@[this is an error message]//:[this is an error message]":                  "",
 		} {
-			resolvedLabel := label.MustNewResolvedLabel(input)
+			resolvedLabel := util.Must(label.NewResolvedLabel(input))
 			assert.Equal(t, output, resolvedLabel.GetPackagePath())
 		}
 	})
@@ -123,7 +124,7 @@ func TestResolvedLabel(t *testing.T) {
 			"@@[this is an error message]//pkg:foo":                     "foo",
 			"@@[this is an error message]//:[this is an error message]": "[this is an error message]",
 		} {
-			resolvedLabel := label.MustNewResolvedLabel(input)
+			resolvedLabel := util.Must(label.NewResolvedLabel(input))
 			assert.Equal(t, output, resolvedLabel.GetTargetName().String())
 		}
 	})
@@ -132,65 +133,65 @@ func TestResolvedLabel(t *testing.T) {
 		require.Equal(
 			t,
 			"@@example+//:foo",
-			label.MustNewResolvedLabel("@@example+").
-				AppendTargetName(label.MustNewTargetName("foo")).
+			util.Must(label.NewResolvedLabel("@@example+")).
+				AppendTargetName(util.Must(label.NewTargetName("foo"))).
 				String(),
 		)
 		require.Equal(
 			t,
 			"@@example+",
-			label.MustNewResolvedLabel("@@example+").
-				AppendTargetName(label.MustNewTargetName("example+")).
+			util.Must(label.NewResolvedLabel("@@example+")).
+				AppendTargetName(util.Must(label.NewTargetName("example+"))).
 				String(),
 		)
 		require.Equal(
 			t,
 			"@@example+//hello_world:foo",
-			label.MustNewResolvedLabel("@@example+//hello_world").
-				AppendTargetName(label.MustNewTargetName("foo")).
+			util.Must(label.NewResolvedLabel("@@example+//hello_world")).
+				AppendTargetName(util.Must(label.NewTargetName("foo"))).
 				String(),
 		)
 		require.Equal(
 			t,
 			"@@example+//hello_world",
-			label.MustNewResolvedLabel("@@example+//hello_world").
-				AppendTargetName(label.MustNewTargetName("hello_world")).
+			util.Must(label.NewResolvedLabel("@@example+//hello_world")).
+				AppendTargetName(util.Must(label.NewTargetName("hello_world"))).
 				String(),
 		)
 
 		require.Equal(
 			t,
 			"@@[this is an error message]//:bar",
-			label.MustNewResolvedLabel("@@[this is an error message]//:foo").
-				AppendTargetName(label.MustNewTargetName("bar")).
+			util.Must(label.NewResolvedLabel("@@[this is an error message]//:foo")).
+				AppendTargetName(util.Must(label.NewTargetName("bar"))).
 				String(),
 		)
 		require.Equal(
 			t,
 			"@@[this is an error message]//pkg:bar",
-			label.MustNewResolvedLabel("@@[this is an error message]//pkg:foo").
-				AppendTargetName(label.MustNewTargetName("bar")).
+			util.Must(label.NewResolvedLabel("@@[this is an error message]//pkg:foo")).
+				AppendTargetName(util.Must(label.NewTargetName("bar"))).
 				String(),
 		)
 		require.Equal(
 			t,
 			"@@[this is an error message]//pkg:bar",
-			label.MustNewResolvedLabel("@@[this is an error message]//pkg").
-				AppendTargetName(label.MustNewTargetName("bar")).
+			util.Must(label.NewResolvedLabel("@@[this is an error message]//pkg")).
+				AppendTargetName(util.Must(label.NewTargetName("bar"))).
 				String(),
 		)
 		require.Equal(
 			t,
 			"@@[this is an error message]//pkg",
-			label.MustNewResolvedLabel("@@[this is an error message]//pkg").
-				AppendTargetName(label.MustNewTargetName("pkg")).
+			util.Must(label.NewResolvedLabel("@@[this is an error message]//pkg")).
+				AppendTargetName(util.Must(label.NewTargetName("pkg"))).
 				String(),
 		)
 		require.Equal(
 			t,
 			"@@[this is an error message]//pkg",
-			label.MustNewResolvedLabel("@@[this is an error message]//pkg").
-				AppendTargetName(label.MustNewTargetName("pkg")).
+			util.Must(label.NewResolvedLabel("@@[this is an error message]//pkg")).
+				AppendTargetName(util.Must(label.NewTargetName("pkg"))).
 				String(),
 		)
 	})

@@ -7,6 +7,7 @@ import (
 	"maps"
 	"slices"
 
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bonanza/pkg/evaluation"
 	"github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
@@ -22,7 +23,7 @@ import (
 	"go.starlark.net/starlark"
 )
 
-var declaredToolchainInfoProviderIdentifier = label.MustNewCanonicalStarlarkIdentifier("@@builtins_core+//:exports.bzl%DeclaredToolchainInfo")
+var declaredToolchainInfoProviderIdentifier = util.Must(label.NewCanonicalStarlarkIdentifier("@@builtins_core+//:exports.bzl%DeclaredToolchainInfo"))
 
 const toolchainRuleIdentifier = "@@builtins_core+//:exports.bzl%toolchain"
 

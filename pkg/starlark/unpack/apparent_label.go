@@ -3,6 +3,7 @@ package unpack
 import (
 	"fmt"
 
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bonanza/pkg/label"
 
 	"go.starlark.net/starlark"
@@ -25,7 +26,7 @@ func (apparentLabelUnpackerInto) UnpackInto(thread *starlark.Thread, v starlark.
 	if !ok {
 		return fmt.Errorf("got %s, want string", v.Type())
 	}
-	canonicalPackage := label.MustNewCanonicalLabel(thread.CallFrame(1).Pos.Filename()).GetCanonicalPackage()
+	canonicalPackage := util.Must(label.NewCanonicalLabel(thread.CallFrame(1).Pos.Filename())).GetCanonicalPackage()
 	l, err := canonicalPackage.AppendLabel(s)
 	if err != nil {
 		return fmt.Errorf("invalid label: %w", err)

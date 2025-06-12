@@ -33,16 +33,6 @@ func NewNamespace(namespaceMessage *object.Namespace) (Namespace, error) {
 	}, nil
 }
 
-// MustNewNamespace is the same as NewNamespace, except that it requires
-// the call to succeed.
-func MustNewNamespace(namespaceMessage *object.Namespace) Namespace {
-	ns, err := NewNamespace(namespaceMessage)
-	if err != nil {
-		panic(err)
-	}
-	return ns
-}
-
 // NewGlobalReference creates a reference that uniquely refers to an
 // object across all namespaces.
 func (ns Namespace) NewGlobalReference(rawReference []byte) (GlobalReference, error) {

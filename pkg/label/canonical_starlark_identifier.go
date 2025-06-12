@@ -36,17 +36,6 @@ func NewCanonicalStarlarkIdentifier(value string) (CanonicalStarlarkIdentifier, 
 	}, nil
 }
 
-// MustNewCanonicalStarlarkIdentifier is the same as
-// NewCanonicalStarlarkIdentifier, except that it panics if the provided
-// string is not a valid canonical Starlark identifier.
-func MustNewCanonicalStarlarkIdentifier(value string) CanonicalStarlarkIdentifier {
-	i, err := NewCanonicalStarlarkIdentifier(value)
-	if err != nil {
-		panic(err)
-	}
-	return i
-}
-
 func (i CanonicalStarlarkIdentifier) String() string {
 	return i.value
 }

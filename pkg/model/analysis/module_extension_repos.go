@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bonanza/pkg/evaluation"
 	"github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
@@ -74,7 +75,7 @@ func (t bazelModuleTag) AttrNames() []string {
 	return attrNames
 }
 
-var repoRulesExtensionName = label.MustNewStarlarkIdentifier("_repo_rules")
+var repoRulesExtensionName = util.Must(label.NewStarlarkIdentifier("_repo_rules"))
 
 type useRepoRuleCapturingModuleDotBazelHandler[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata] struct {
 	labelResolver         label.Resolver

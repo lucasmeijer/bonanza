@@ -35,6 +35,7 @@ go_library(
     deps = [
         "//pkg/label",
         "@com_github_buildbarn_bb_storage//pkg/filesystem/path",
+        "@com_github_buildbarn_bb_storage//pkg/util",
         "@net_starlark_go//starlark",
         "@net_starlark_go//syntax",
         "@org_golang_x_exp//constraints",

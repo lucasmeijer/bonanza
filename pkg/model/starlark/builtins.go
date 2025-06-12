@@ -7,6 +7,7 @@ import (
 	"slices"
 	"sort"
 
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bonanza/pkg/glob"
 	pg_label "github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
@@ -124,16 +125,16 @@ func stringDictToStructFields(in starlark.StringDict) map[string]any {
 }
 
 var (
-	configurationAttrIdentifier = pg_label.MustNewStarlarkIdentifier("__configuration")
-	configurationFragmentLabel  = pg_label.MustNewCanonicalLabel("@@bazel_tools+//fragments:configuration")
-	fragmentsAttrIdentifier     = pg_label.MustNewStarlarkIdentifier("__fragments")
-	fragmentsPackage            = pg_label.MustNewCanonicalPackage("@@bazel_tools+//fragments")
+	configurationAttrIdentifier = util.Must(pg_label.NewStarlarkIdentifier("__configuration"))
+	configurationFragmentLabel  = util.Must(pg_label.NewCanonicalLabel("@@bazel_tools+//fragments:configuration"))
+	fragmentsAttrIdentifier     = util.Must(pg_label.NewStarlarkIdentifier("__fragments"))
+	fragmentsPackage            = util.Must(pg_label.NewCanonicalPackage("@@bazel_tools+//fragments"))
 
-	defaultMakeVariablesLabel       = pg_label.MustNewCanonicalLabel("@@bazel_tools+//tools/make:default_make_variables")
-	defaultToolchainsAttrIdentifier = pg_label.MustNewStarlarkIdentifier("__default_toolchains")
-	toolchainsAttrIdentifier        = pg_label.MustNewStarlarkIdentifier("toolchains")
-	targetPlatformAttrIdentifier    = pg_label.MustNewStarlarkIdentifier("__target_platform")
-	commandLineOptionPlatformsLabel = pg_label.MustNewCanonicalLabel("@@bazel_tools+//command_line_option:platforms")
+	defaultMakeVariablesLabel       = util.Must(pg_label.NewCanonicalLabel("@@bazel_tools+//tools/make:default_make_variables"))
+	defaultToolchainsAttrIdentifier = util.Must(pg_label.NewStarlarkIdentifier("__default_toolchains"))
+	toolchainsAttrIdentifier        = util.Must(pg_label.NewStarlarkIdentifier("toolchains"))
+	targetPlatformAttrIdentifier    = util.Must(pg_label.NewStarlarkIdentifier("__target_platform"))
+	commandLineOptionPlatformsLabel = util.Must(pg_label.NewCanonicalLabel("@@bazel_tools+//command_line_option:platforms"))
 )
 
 // convertFragmentsToAttr converts a list of fragment dependencies of a

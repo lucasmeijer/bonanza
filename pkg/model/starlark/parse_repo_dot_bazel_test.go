@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/buildbarn/bb-storage/pkg/testutil"
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/model/core/inlinedtree"
@@ -30,10 +31,10 @@ func TestParseModuleDotBazel(t *testing.T) {
 
 		defaultAttrs, err := model_starlark.ParseRepoDotBazel[object.LocalReference](
 			"",
-			label.MustNewCanonicalLabel("@@foo+//:REPO.bazel"),
+			util.Must(label.NewCanonicalLabel("@@foo+//:REPO.bazel")),
 			encoder,
 			&inlinedtree.Options{
-				ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
+				ReferenceFormat:  util.Must(object.NewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1)),
 				MaximumSizeBytes: 0,
 			},
 			model_core.CreatedObjectCapturer[model_core.CloneableReferenceMetadata](nil),
@@ -51,10 +52,10 @@ func TestParseModuleDotBazel(t *testing.T) {
 
 		defaultAttrs, err := model_starlark.ParseRepoDotBazel[object.LocalReference](
 			"repo()",
-			label.MustNewCanonicalLabel("@@foo+//:REPO.bazel"),
+			util.Must(label.NewCanonicalLabel("@@foo+//:REPO.bazel")),
 			encoder,
 			&inlinedtree.Options{
-				ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
+				ReferenceFormat:  util.Must(object.NewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1)),
 				MaximumSizeBytes: 0,
 			},
 			model_core.CreatedObjectCapturer[model_core.CloneableReferenceMetadata](nil),
@@ -70,10 +71,10 @@ func TestParseModuleDotBazel(t *testing.T) {
 
 		_, err := model_starlark.ParseRepoDotBazel[object.LocalReference](
 			"repo()\nrepo()",
-			label.MustNewCanonicalLabel("@@foo+//:REPO.bazel"),
+			util.Must(label.NewCanonicalLabel("@@foo+//:REPO.bazel")),
 			encoder,
 			&inlinedtree.Options{
-				ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
+				ReferenceFormat:  util.Must(object.NewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1)),
 				MaximumSizeBytes: 0,
 			},
 			model_core.CreatedObjectCapturer[model_core.CloneableReferenceMetadata](nil),
@@ -93,10 +94,10 @@ func TestParseModuleDotBazel(t *testing.T) {
 				default_applicable_licenses = ["//:license"],
 				default_package_metadata = ["//:metadata"],
 			)`,
-			label.MustNewCanonicalLabel("@@foo+//:REPO.bazel"),
+			util.Must(label.NewCanonicalLabel("@@foo+//:REPO.bazel")),
 			encoder,
 			&inlinedtree.Options{
-				ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
+				ReferenceFormat:  util.Must(object.NewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1)),
 				MaximumSizeBytes: 0,
 			},
 			model_core.CreatedObjectCapturer[model_core.CloneableReferenceMetadata](nil),
@@ -121,10 +122,10 @@ func TestParseModuleDotBazel(t *testing.T) {
 					"//somepackage:__pkg__",
 				],
 			)`,
-			label.MustNewCanonicalLabel("@@foo+//:REPO.bazel"),
+			util.Must(label.NewCanonicalLabel("@@foo+//:REPO.bazel")),
 			encoder,
 			&inlinedtree.Options{
-				ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
+				ReferenceFormat:  util.Must(object.NewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1)),
 				MaximumSizeBytes: 0,
 			},
 			objectCapturer,

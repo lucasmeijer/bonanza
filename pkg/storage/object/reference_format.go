@@ -27,16 +27,6 @@ func NewReferenceFormat(value object.ReferenceFormat_Value) (ReferenceFormat, er
 	return ReferenceFormat{}, nil
 }
 
-// MustNewReferenceFormat is identical to NewReferenceFormat, requiring
-// that the call succeeds.
-func MustNewReferenceFormat(value object.ReferenceFormat_Value) ReferenceFormat {
-	referenceFormat, err := NewReferenceFormat(value)
-	if err != nil {
-		panic(err)
-	}
-	return referenceFormat
-}
-
 // ToProto converts a ReferenceFormat to an enumeration value that can
 // be embedded into gRPC request messages.
 func (ReferenceFormat) ToProto() object.ReferenceFormat_Value {

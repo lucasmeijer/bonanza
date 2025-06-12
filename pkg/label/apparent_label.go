@@ -41,16 +41,6 @@ func NewApparentLabel(value string) (ApparentLabel, error) {
 	return newValidApparentLabel(value), nil
 }
 
-// MustNewApparentLabel is the same as NewApparentLabel, except that it
-// panics if the provided string is not a valid apparent label.
-func MustNewApparentLabel(value string) ApparentLabel {
-	l, err := NewApparentLabel(value)
-	if err != nil {
-		panic(err)
-	}
-	return l
-}
-
 func (l ApparentLabel) String() string {
 	return l.value
 }

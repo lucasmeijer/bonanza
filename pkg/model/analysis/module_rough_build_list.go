@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"sort"
 
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bonanza/pkg/ds"
 	"github.com/buildbarn/bonanza/pkg/evaluation"
 	"github.com/buildbarn/bonanza/pkg/label"
@@ -22,7 +23,7 @@ import (
 
 const moduleDotBazelFilename = "MODULE.bazel"
 
-var moduleDotBazelTargetName = label.MustNewTargetName(moduleDotBazelFilename)
+var moduleDotBazelTargetName = util.Must(label.NewTargetName(moduleDotBazelFilename))
 
 type bazelDepCapturingModuleDotBazelHandler struct {
 	ignoreDevDependencies bool
@@ -83,7 +84,7 @@ func (l roughBuildList) Less(i, j int) bool {
 
 	// Compare by version, falling back to string comparison if
 	// their canonical values are the same.
-	if cmp := label.MustNewModuleVersion(ei.Version).Compare(label.MustNewModuleVersion(ej.Version)); cmp < 0 {
+	if cmp := util.Must(label.NewModuleVersion(ei.Version)).Compare(util.Must(label.NewModuleVersion(ej.Version))); cmp < 0 {
 		return true
 	} else if cmp > 0 {
 		return false
@@ -160,7 +161,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeModuleRoughBuildListValue(c
 	ignoreDevDependencies := rootModuleValue.Message.IgnoreRootModuleDevDependencies
 	modulesToCheck := []moduleToCheck{{
 		name:    rootModuleName,
-		version: label.MustNewModuleVersion("0"),
+		version: util.Must(label.NewModuleVersion("0")),
 	}}
 	modulesSeen := map[moduleToCheck]struct{}{}
 	missingDependencies := false

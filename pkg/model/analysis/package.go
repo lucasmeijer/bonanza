@@ -7,6 +7,7 @@ import (
 	"maps"
 	"slices"
 
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bonanza/pkg/evaluation"
 	"github.com/buildbarn/bonanza/pkg/glob"
 	"github.com/buildbarn/bonanza/pkg/label"
@@ -22,8 +23,8 @@ import (
 )
 
 var buildDotBazelTargetNames = []label.TargetName{
-	label.MustNewTargetName("BUILD.bazel"),
-	label.MustNewTargetName("BUILD"),
+	util.Must(label.NewTargetName("BUILD.bazel")),
+	util.Must(label.NewTargetName("BUILD")),
 }
 
 func (c *baseComputer[TReference, TMetadata]) ComputePackageValue(ctx context.Context, key *model_analysis_pb.Package_Key, e PackageEnvironment[TReference, TMetadata]) (PatchedPackageValue, error) {

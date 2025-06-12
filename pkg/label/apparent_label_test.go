@@ -3,6 +3,7 @@ package label_test
 import (
 	"testing"
 
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bonanza/pkg/label"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,7 +19,7 @@ func TestApparentLabel(t *testing.T) {
 				"@com_github_buildbarn_bb_storage//:foo",
 				"@com_github_buildbarn_bb_storage//cmd/hello_world",
 			} {
-				_, ok := label.MustNewApparentLabel(input).AsCanonical()
+				_, ok := util.Must(label.NewApparentLabel(input)).AsCanonical()
 				require.False(t, ok)
 			}
 		})
@@ -29,7 +30,7 @@ func TestApparentLabel(t *testing.T) {
 				"@@com_github_buildbarn_bb_storage+//:foo",
 				"@@com_github_buildbarn_bb_storage+//cmd/hello_world",
 			} {
-				canonicalLabel, ok := label.MustNewApparentLabel(input).AsCanonical()
+				canonicalLabel, ok := util.Must(label.NewApparentLabel(input)).AsCanonical()
 				require.True(t, ok)
 				assert.Equal(t, input, canonicalLabel.String())
 			}
@@ -45,7 +46,7 @@ func TestApparentLabel(t *testing.T) {
 				"@@com_github_buildbarn_bb_storage+//:foo",
 				"@@com_github_buildbarn_bb_storage+//cmd/hello_world",
 			} {
-				_, ok := label.MustNewApparentLabel(input).GetApparentRepo()
+				_, ok := util.Must(label.NewApparentLabel(input)).GetApparentRepo()
 				require.False(t, ok)
 			}
 		})
@@ -56,7 +57,7 @@ func TestApparentLabel(t *testing.T) {
 				"@com_github_buildbarn_bb_storage//:foo",
 				"@com_github_buildbarn_bb_storage//cmd/hello_world",
 			} {
-				apparentRepo, ok := label.MustNewApparentLabel(input).GetApparentRepo()
+				apparentRepo, ok := util.Must(label.NewApparentLabel(input)).GetApparentRepo()
 				require.True(t, ok)
 				assert.Equal(t, "com_github_buildbarn_bb_storage", apparentRepo.String())
 			}
@@ -64,7 +65,7 @@ func TestApparentLabel(t *testing.T) {
 	})
 
 	t.Run("WithCanonicalRepo", func(t *testing.T) {
-		toRepo := label.MustNewCanonicalRepo("target+")
+		toRepo := util.Must(label.NewCanonicalRepo("target+"))
 
 		for input, output := range map[string]string{
 			"@rules_go//tests/legacy/info": "@@target+//tests/legacy/info",
@@ -74,7 +75,7 @@ func TestApparentLabel(t *testing.T) {
 			"@@//:rules_go":                "@@target+//:rules_go",
 			"@@//hello/world":              "@@target+//hello/world",
 		} {
-			require.Equal(t, output, label.MustNewApparentLabel(input).WithCanonicalRepo(toRepo).String())
+			require.Equal(t, output, util.Must(label.NewApparentLabel(input)).WithCanonicalRepo(toRepo).String())
 		}
 	})
 
@@ -88,7 +89,7 @@ func TestApparentLabel(t *testing.T) {
 			"@@//:rules_go":                "@@[message]//:rules_go",
 			"@@//hello/world":              "@@[message]//hello/world",
 		} {
-			require.Equal(t, output, label.MustNewApparentLabel(input).AsResolvedWithError("message").String())
+			require.Equal(t, output, util.Must(label.NewApparentLabel(input)).AsResolvedWithError("message").String())
 		}
 	})
 }

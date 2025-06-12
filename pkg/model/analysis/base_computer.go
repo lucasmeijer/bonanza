@@ -8,6 +8,7 @@ import (
 
 	"github.com/buildbarn/bb-remote-execution/pkg/filesystem/pool"
 	"github.com/buildbarn/bb-storage/pkg/filesystem"
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bonanza/pkg/evaluation"
 	"github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
@@ -220,7 +221,7 @@ func (c *baseComputer[TReference, TMetadata]) loadBzlGlobals(e loadBzlGlobalsEnv
 }
 
 func (c *baseComputer[TReference, TMetadata]) loadBzlGlobalsInStarlarkThread(e loadBzlGlobalsEnvironment[TReference], thread *starlark.Thread, loadLabelStr string, builtinsModuleNames []string) (starlark.StringDict, error) {
-	return c.loadBzlGlobals(e, label.MustNewCanonicalLabel(thread.CallFrame(0).Pos.Filename()).GetCanonicalPackage(), loadLabelStr, builtinsModuleNames)
+	return c.loadBzlGlobals(e, util.Must(label.NewCanonicalLabel(thread.CallFrame(0).Pos.Filename())).GetCanonicalPackage(), loadLabelStr, builtinsModuleNames)
 }
 
 func (c *baseComputer[TReference, TMetadata]) preloadBzlGlobals(e loadBzlGlobalsEnvironment[TReference], canonicalPackage label.CanonicalPackage, program *starlark.Program, builtinsModuleNames []string) (aggregateErr error) {
@@ -429,7 +430,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRepoDefaultAttrsValue(ctx c
 		return PatchedRepoDefaultAttrsValue{}, fmt.Errorf("invalid canonical repo: %w", err)
 	}
 
-	repoFileName := label.MustNewTargetName("REPO.bazel")
+	repoFileName := util.Must(label.NewTargetName("REPO.bazel"))
 	repoFileProperties := e.GetFilePropertiesValue(&model_analysis_pb.FileProperties_Key{
 		CanonicalRepo: canonicalRepo.String(),
 		Path:          repoFileName.String(),

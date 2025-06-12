@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bonanza/pkg/evaluation"
 	"github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
@@ -70,7 +71,7 @@ type parseModuleDotBazelFileEnvironment[TReference object.BasicReference] interf
 	GetFileReaderValue(key *model_analysis_pb.FileReader_Key) (*model_filesystem.FileReader[TReference], bool)
 }
 
-var bazelToolsModule = label.MustNewModule("bazel_tools")
+var bazelToolsModule = util.Must(label.NewModule("bazel_tools"))
 
 func (c *baseComputer[TReference, TMetadata]) parseModuleDotBazel(ctx context.Context, moduleContentsMsg model_core.Message[*model_filesystem_pb.FileContents, TReference], moduleInstance label.ModuleInstance, e parseModuleDotBazelFileEnvironment[TReference], handler pg_starlark.RootModuleDotBazelHandler) error {
 	fileReader, gotFileReader := e.GetFileReaderValue(&model_analysis_pb.FileReader_Key{})

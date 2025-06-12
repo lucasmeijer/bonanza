@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bonanza/pkg/encoding/float16"
 	"github.com/buildbarn/bonanza/pkg/proto/storage/object"
 )
@@ -67,7 +68,7 @@ func MustNewSHA256V1LocalReference(hash string, sizeBytes uint32, height uint8, 
 	}
 	binary.LittleEndian.PutUint16(rawReference[38:], f16)
 
-	referenceFormat := MustNewReferenceFormat(object.ReferenceFormat_SHA256_V1)
+	referenceFormat := util.Must(NewReferenceFormat(object.ReferenceFormat_SHA256_V1))
 	reference, err := referenceFormat.NewLocalReference(rawReference[:])
 	if err != nil {
 		panic(err)

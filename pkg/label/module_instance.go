@@ -29,16 +29,6 @@ func NewModuleInstance(value string) (ModuleInstance, error) {
 	return ModuleInstance{value: value}, nil
 }
 
-// MustNewModuleInstance is the same as NewModuleInstance, except that
-// it panics if the provided module instance is invalid.
-func MustNewModuleInstance(value string) ModuleInstance {
-	mi, err := NewModuleInstance(value)
-	if err != nil {
-		panic(err)
-	}
-	return mi
-}
-
 func (mi ModuleInstance) String() string {
 	return mi.value
 }

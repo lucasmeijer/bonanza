@@ -4,6 +4,7 @@ import (
 	"maps"
 	"slices"
 
+	"github.com/buildbarn/bb-storage/pkg/util"
 	pg_label "github.com/buildbarn/bonanza/pkg/label"
 
 	"go.starlark.net/starlark"
@@ -40,7 +41,7 @@ func NameAndExtractGlobals(globals starlark.StringDict, canonicalLabel pg_label.
 	//     y = x
 	for _, name := range slices.Sorted(maps.Keys(globals)) {
 		if value, ok := globals[name].(NamedGlobal); ok {
-			identifier := canonicalLabel.AppendStarlarkIdentifier(pg_label.MustNewStarlarkIdentifier(name))
+			identifier := canonicalLabel.AppendStarlarkIdentifier(util.Must(pg_label.NewStarlarkIdentifier(name)))
 			value.AssignIdentifier(identifier)
 		}
 	}

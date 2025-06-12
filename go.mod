@@ -17,8 +17,8 @@ replace go.starlark.net => go.starlark.net v0.0.0-20250225190231-0d3f41d403af
 require (
 	github.com/bazelbuild/buildtools v0.0.0-20250602201422-b1e23f1025b8
 	github.com/bluekeyes/go-gitdiff v0.8.1
-	github.com/buildbarn/bb-remote-execution v0.0.0-20250611130226-6b3bfab86d84
-	github.com/buildbarn/bb-storage v0.0.0-20250610194855-1f558fbdc7c5
+	github.com/buildbarn/bb-remote-execution v0.0.0-20250612204652-b66a0fb88d36
+	github.com/buildbarn/bb-storage v0.0.0-20250612195753-87ea1750ca4c
 	github.com/buildbarn/go-cdc v0.0.0-20240326143813-ab4a540e41c6
 	github.com/google/uuid v1.6.0
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bonanza/pkg/label"
 	"github.com/stretchr/testify/assert"
 )
@@ -13,22 +14,22 @@ func TestTargetName(t *testing.T) {
 		assert.Equal(
 			t,
 			"A/B",
-			label.MustNewTargetName("a").
-				GetSibling(label.MustNewTargetName("A/B")).
+			util.Must(label.NewTargetName("a")).
+				GetSibling(util.Must(label.NewTargetName("A/B"))).
 				String(),
 		)
 		assert.Equal(
 			t,
 			"a/A/B",
-			label.MustNewTargetName("a/b").
-				GetSibling(label.MustNewTargetName("A/B")).
+			util.Must(label.NewTargetName("a/b")).
+				GetSibling(util.Must(label.NewTargetName("A/B"))).
 				String(),
 		)
 		assert.Equal(
 			t,
 			"a/b/A/B",
-			label.MustNewTargetName("a/b/c").
-				GetSibling(label.MustNewTargetName("A/B")).
+			util.Must(label.NewTargetName("a/b/c")).
+				GetSibling(util.Must(label.NewTargetName("A/B"))).
 				String(),
 		)
 	})
@@ -39,7 +40,7 @@ func TestTargetName(t *testing.T) {
 			[]path.Component{
 				path.MustNewComponent("a"),
 			},
-			label.MustNewTargetName("a").ToComponents(),
+			util.Must(label.NewTargetName("a")).ToComponents(),
 		)
 		assert.Equal(
 			t,
@@ -47,7 +48,7 @@ func TestTargetName(t *testing.T) {
 				path.MustNewComponent("a"),
 				path.MustNewComponent("b"),
 			},
-			label.MustNewTargetName("a/b").ToComponents(),
+			util.Must(label.NewTargetName("a/b")).ToComponents(),
 		)
 		assert.Equal(
 			t,
@@ -56,7 +57,7 @@ func TestTargetName(t *testing.T) {
 				path.MustNewComponent("b"),
 				path.MustNewComponent("c"),
 			},
-			label.MustNewTargetName("a/b/c").ToComponents(),
+			util.Must(label.NewTargetName("a/b/c")).ToComponents(),
 		)
 	})
 }

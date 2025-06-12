@@ -3,6 +3,7 @@ package label_test
 import (
 	"testing"
 
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bonanza/pkg/label"
 	"github.com/stretchr/testify/assert"
 )
@@ -18,7 +19,7 @@ func TestCanonicalLabel(t *testing.T) {
 			`@@com_github_buildbarn_bb_storage+//cmd/ℕ ⊆ ℕ₀ ⊂ ℤ ⊂ ℚ ⊂ ℝ ⊂ ℂ`,
 			`@@com_github_buildbarn_bb_storage+//cmd/hello_world:ℕ ⊆ ℕ₀ ⊂ ℤ ⊂ ℚ ⊂ ℝ ⊂ ℂ`,
 		} {
-			canonicalLabel := label.MustNewCanonicalLabel(input)
+			canonicalLabel := util.Must(label.NewCanonicalLabel(input))
 			assert.Equal(t, input, canonicalLabel.String())
 		}
 	})
@@ -29,7 +30,7 @@ func TestCanonicalLabel(t *testing.T) {
 			"@@com_github_buildbarn_bb_storage+//cmd:cmd":                           "@@com_github_buildbarn_bb_storage+//cmd",
 			"@@com_github_buildbarn_bb_storage+//cmd/hello_world:hello_world":       "@@com_github_buildbarn_bb_storage+//cmd/hello_world",
 		} {
-			canonicalLabel := label.MustNewCanonicalLabel(input)
+			canonicalLabel := util.Must(label.NewCanonicalLabel(input))
 			assert.Equal(t, output, canonicalLabel.String())
 		}
 	})
@@ -65,7 +66,7 @@ func TestCanonicalLabel(t *testing.T) {
 			"@@com_github_buildbarn_bb_storage+//cmd/hello_world":                    "@@com_github_buildbarn_bb_storage+//cmd/hello_world",
 			"@@com_github_buildbarn_bb_storage+//cmd/hello_world:go_default_library": "@@com_github_buildbarn_bb_storage+//cmd/hello_world",
 		} {
-			canonicalLabel := label.MustNewCanonicalLabel(input)
+			canonicalLabel := util.Must(label.NewCanonicalLabel(input))
 			assert.Equal(t, output, canonicalLabel.GetCanonicalPackage().String())
 		}
 	})
@@ -77,7 +78,7 @@ func TestCanonicalLabel(t *testing.T) {
 			"@@com_github_buildbarn_bb_storage+//cmd":             "cmd",
 			"@@com_github_buildbarn_bb_storage+//cmd/hello_world": "hello_world",
 		} {
-			canonicalLabel := label.MustNewCanonicalLabel(input)
+			canonicalLabel := util.Must(label.NewCanonicalLabel(input))
 			assert.Equal(t, output, canonicalLabel.GetTargetName().String())
 		}
 	})
@@ -91,7 +92,7 @@ func TestCanonicalLabel(t *testing.T) {
 			"@@com_github_buildbarn_bb_storage+//cmd/hello_world":     "com_github_buildbarn_bb_storage+/cmd/hello_world/hello_world",
 			"@@com_github_buildbarn_bb_storage+//cmd/hello_world:baz": "com_github_buildbarn_bb_storage+/cmd/hello_world/baz",
 		} {
-			canonicalLabel := label.MustNewCanonicalLabel(input)
+			canonicalLabel := util.Must(label.NewCanonicalLabel(input))
 			assert.Equal(t, output, canonicalLabel.GetExternalRelativePath())
 		}
 	})
@@ -105,7 +106,7 @@ func TestCanonicalLabel(t *testing.T) {
 			"@@com_github_buildbarn_bb_storage+//cmd/hello_world":     "cmd/hello_world/hello_world",
 			"@@com_github_buildbarn_bb_storage+//cmd/hello_world:baz": "cmd/hello_world/baz",
 		} {
-			canonicalLabel := label.MustNewCanonicalLabel(input)
+			canonicalLabel := util.Must(label.NewCanonicalLabel(input))
 			assert.Equal(t, output, canonicalLabel.GetRepoRelativePath())
 		}
 	})

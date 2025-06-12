@@ -3,6 +3,7 @@ package label_test
 import (
 	"testing"
 
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bonanza/pkg/label"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,7 +29,7 @@ func TestCanonicalTargetPattern(t *testing.T) {
 				"@@com_github_buildbarn_bb_storage+//hello/...:*",
 			} {
 				t.Run(input, func(t *testing.T) {
-					_, ok := label.MustNewCanonicalTargetPattern(input).AsCanonicalLabel()
+					_, ok := util.Must(label.NewCanonicalTargetPattern(input)).AsCanonicalLabel()
 					require.False(t, ok)
 				})
 			}
@@ -43,7 +44,7 @@ func TestCanonicalTargetPattern(t *testing.T) {
 				"@@com_github_buildbarn_bb_storage+//all-targets",
 				"@@com_github_buildbarn_bb_storage+//*",
 			} {
-				canonicalLabel, ok := label.MustNewCanonicalTargetPattern(input).AsCanonicalLabel()
+				canonicalLabel, ok := util.Must(label.NewCanonicalTargetPattern(input)).AsCanonicalLabel()
 				require.True(t, ok)
 				assert.Equal(t, input, canonicalLabel.String())
 			}
@@ -69,54 +70,54 @@ func TestCanonicalTargetPattern(t *testing.T) {
 				"@@com_github_buildbarn_bb_storage+//*",
 			} {
 				t.Run(input, func(t *testing.T) {
-					_, _, ok := label.MustNewCanonicalTargetPattern(input).AsSinglePackageTargetPattern()
+					_, _, ok := util.Must(label.NewCanonicalTargetPattern(input)).AsSinglePackageTargetPattern()
 					require.False(t, ok)
 				})
 			}
 		})
 
 		t.Run("Success", func(t *testing.T) {
-			initialTarget, includeFileTargets, ok := label.MustNewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//:all").AsSinglePackageTargetPattern()
+			initialTarget, includeFileTargets, ok := util.Must(label.NewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//:all")).AsSinglePackageTargetPattern()
 			require.True(t, ok)
 			require.Equal(t, "@@com_github_buildbarn_bb_storage+//:all", initialTarget.String())
 			require.False(t, includeFileTargets)
 
-			initialTarget, includeFileTargets, ok = label.MustNewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//:all-targets").AsSinglePackageTargetPattern()
+			initialTarget, includeFileTargets, ok = util.Must(label.NewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//:all-targets")).AsSinglePackageTargetPattern()
 			require.True(t, ok)
 			require.Equal(t, "@@com_github_buildbarn_bb_storage+//:all-targets", initialTarget.String())
 			require.True(t, includeFileTargets)
 
-			initialTarget, includeFileTargets, ok = label.MustNewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//:*").AsSinglePackageTargetPattern()
+			initialTarget, includeFileTargets, ok = util.Must(label.NewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//:*")).AsSinglePackageTargetPattern()
 			require.True(t, ok)
 			require.Equal(t, "@@com_github_buildbarn_bb_storage+//:*", initialTarget.String())
 			require.True(t, includeFileTargets)
 
-			initialTarget, includeFileTargets, ok = label.MustNewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//hello:all").AsSinglePackageTargetPattern()
+			initialTarget, includeFileTargets, ok = util.Must(label.NewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//hello:all")).AsSinglePackageTargetPattern()
 			require.True(t, ok)
 			require.Equal(t, "@@com_github_buildbarn_bb_storage+//hello:all", initialTarget.String())
 			require.False(t, includeFileTargets)
 
-			initialTarget, includeFileTargets, ok = label.MustNewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//hello:all-targets").AsSinglePackageTargetPattern()
+			initialTarget, includeFileTargets, ok = util.Must(label.NewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//hello:all-targets")).AsSinglePackageTargetPattern()
 			require.True(t, ok)
 			require.Equal(t, "@@com_github_buildbarn_bb_storage+//hello:all-targets", initialTarget.String())
 			require.True(t, includeFileTargets)
 
-			initialTarget, includeFileTargets, ok = label.MustNewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//hello:*").AsSinglePackageTargetPattern()
+			initialTarget, includeFileTargets, ok = util.Must(label.NewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//hello:*")).AsSinglePackageTargetPattern()
 			require.True(t, ok)
 			require.Equal(t, "@@com_github_buildbarn_bb_storage+//hello:*", initialTarget.String())
 			require.True(t, includeFileTargets)
 
-			initialTarget, includeFileTargets, ok = label.MustNewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//all:all").AsSinglePackageTargetPattern()
+			initialTarget, includeFileTargets, ok = util.Must(label.NewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//all:all")).AsSinglePackageTargetPattern()
 			require.True(t, ok)
 			require.Equal(t, "@@com_github_buildbarn_bb_storage+//all", initialTarget.String())
 			require.False(t, includeFileTargets)
 
-			initialTarget, includeFileTargets, ok = label.MustNewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//all-targets:all-targets").AsSinglePackageTargetPattern()
+			initialTarget, includeFileTargets, ok = util.Must(label.NewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//all-targets:all-targets")).AsSinglePackageTargetPattern()
 			require.True(t, ok)
 			require.Equal(t, "@@com_github_buildbarn_bb_storage+//all-targets", initialTarget.String())
 			require.True(t, includeFileTargets)
 
-			initialTarget, includeFileTargets, ok = label.MustNewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//*:*").AsSinglePackageTargetPattern()
+			initialTarget, includeFileTargets, ok = util.Must(label.NewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//*:*")).AsSinglePackageTargetPattern()
 			require.True(t, ok)
 			require.Equal(t, "@@com_github_buildbarn_bb_storage+//*", initialTarget.String())
 			require.True(t, includeFileTargets)
@@ -140,49 +141,49 @@ func TestCanonicalTargetPattern(t *testing.T) {
 				"@@com_github_buildbarn_bb_storage+//*",
 			} {
 				t.Run(input, func(t *testing.T) {
-					_, _, ok := label.MustNewCanonicalTargetPattern(input).AsRecursiveTargetPattern()
+					_, _, ok := util.Must(label.NewCanonicalTargetPattern(input)).AsRecursiveTargetPattern()
 					require.False(t, ok)
 				})
 			}
 		})
 
 		t.Run("Success", func(t *testing.T) {
-			basePackage, includeFileTargets, ok := label.MustNewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//...").AsRecursiveTargetPattern()
+			basePackage, includeFileTargets, ok := util.Must(label.NewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//...")).AsRecursiveTargetPattern()
 			require.True(t, ok)
 			require.Equal(t, "@@com_github_buildbarn_bb_storage+", basePackage.String())
 			require.False(t, includeFileTargets)
 
-			basePackage, includeFileTargets, ok = label.MustNewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//...:all").AsRecursiveTargetPattern()
+			basePackage, includeFileTargets, ok = util.Must(label.NewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//...:all")).AsRecursiveTargetPattern()
 			require.True(t, ok)
 			require.Equal(t, "@@com_github_buildbarn_bb_storage+", basePackage.String())
 			require.False(t, includeFileTargets)
 
-			basePackage, includeFileTargets, ok = label.MustNewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//...:all-targets").AsRecursiveTargetPattern()
-			require.True(t, ok)
-			require.Equal(t, "@@com_github_buildbarn_bb_storage+", basePackage.String())
-			require.True(t, includeFileTargets)
-
-			basePackage, includeFileTargets, ok = label.MustNewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//...:*").AsRecursiveTargetPattern()
+			basePackage, includeFileTargets, ok = util.Must(label.NewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//...:all-targets")).AsRecursiveTargetPattern()
 			require.True(t, ok)
 			require.Equal(t, "@@com_github_buildbarn_bb_storage+", basePackage.String())
 			require.True(t, includeFileTargets)
 
-			basePackage, includeFileTargets, ok = label.MustNewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//hello/...").AsRecursiveTargetPattern()
+			basePackage, includeFileTargets, ok = util.Must(label.NewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//...:*")).AsRecursiveTargetPattern()
+			require.True(t, ok)
+			require.Equal(t, "@@com_github_buildbarn_bb_storage+", basePackage.String())
+			require.True(t, includeFileTargets)
+
+			basePackage, includeFileTargets, ok = util.Must(label.NewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//hello/...")).AsRecursiveTargetPattern()
 			require.True(t, ok)
 			require.Equal(t, "@@com_github_buildbarn_bb_storage+//hello", basePackage.String())
 			require.False(t, includeFileTargets)
 
-			basePackage, includeFileTargets, ok = label.MustNewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//hello/...:all").AsRecursiveTargetPattern()
+			basePackage, includeFileTargets, ok = util.Must(label.NewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//hello/...:all")).AsRecursiveTargetPattern()
 			require.True(t, ok)
 			require.Equal(t, "@@com_github_buildbarn_bb_storage+//hello", basePackage.String())
 			require.False(t, includeFileTargets)
 
-			basePackage, includeFileTargets, ok = label.MustNewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//hello/...:all-targets").AsRecursiveTargetPattern()
+			basePackage, includeFileTargets, ok = util.Must(label.NewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//hello/...:all-targets")).AsRecursiveTargetPattern()
 			require.True(t, ok)
 			require.Equal(t, "@@com_github_buildbarn_bb_storage+//hello", basePackage.String())
 			require.True(t, includeFileTargets)
 
-			basePackage, includeFileTargets, ok = label.MustNewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//hello/...:*").AsRecursiveTargetPattern()
+			basePackage, includeFileTargets, ok = util.Must(label.NewCanonicalTargetPattern("@@com_github_buildbarn_bb_storage+//hello/...:*")).AsRecursiveTargetPattern()
 			require.True(t, ok)
 			require.Equal(t, "@@com_github_buildbarn_bb_storage+//hello", basePackage.String())
 			require.True(t, includeFileTargets)

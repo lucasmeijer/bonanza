@@ -3,6 +3,7 @@ package label_test
 import (
 	"testing"
 
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bonanza/pkg/label"
 	"github.com/stretchr/testify/require"
 )
@@ -17,7 +18,7 @@ func TestCanonicalStarlarkIdentifier(t *testing.T) {
 			require.Equal(
 				t,
 				"bazel_features++version_extension",
-				label.MustNewCanonicalStarlarkIdentifier(input).
+				util.Must(label.NewCanonicalStarlarkIdentifier(input)).
 					ToModuleExtension().
 					String(),
 			)

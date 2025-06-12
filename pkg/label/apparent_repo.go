@@ -27,16 +27,6 @@ func NewApparentRepo(value string) (ApparentRepo, error) {
 	return ApparentRepo{value: value}, nil
 }
 
-// MustNewApparentRepo is the same as NewApparentRepo, except that it
-// panics if the provided string is not an apparent repo name.
-func MustNewApparentRepo(value string) ApparentRepo {
-	r, err := NewApparentRepo(value)
-	if err != nil {
-		panic(err)
-	}
-	return r
-}
-
 func (r ApparentRepo) String() string {
 	return r.value
 }

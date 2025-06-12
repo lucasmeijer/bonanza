@@ -10,6 +10,7 @@ go_library(
         "//pkg/label",
         "//pkg/starlark/unpack",
         "@com_github_buildbarn_bb_storage//pkg/filesystem/path",
+        "@com_github_buildbarn_bb_storage//pkg/util",
         "@net_starlark_go//starlark",
     ],
 )
@@ -24,6 +25,7 @@ go_test(
     deps = [
         "//pkg/label",
         "@com_github_buildbarn_bb_storage//pkg/filesystem/path",
+        "@com_github_buildbarn_bb_storage//pkg/util",
         "@com_github_stretchr_testify//require",
         "@net_starlark_go//starlark",
         "@org_uber_go_mock//gomock",

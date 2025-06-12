@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/buildbarn/bb-storage/pkg/testutil"
+	"github.com/buildbarn/bb-storage/pkg/util"
 	object_pb "github.com/buildbarn/bonanza/pkg/proto/storage/object"
 	tag_pb "github.com/buildbarn/bonanza/pkg/proto/storage/tag"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
@@ -39,10 +40,10 @@ func TestGRPCResolver(t *testing.T) {
 
 		_, _, err = updater.ResolveTag(
 			ctx,
-			object.MustNewNamespace(&object_pb.Namespace{
+			util.Must(object.NewNamespace(&object_pb.Namespace{
 				InstanceName:    "hello/world",
 				ReferenceFormat: object_pb.ReferenceFormat_SHA256_V1,
-			}),
+			})),
 			tag,
 		)
 		testutil.RequireEqualStatus(t, status.Error(codes.Unavailable, "Server offline"), err)
@@ -66,10 +67,10 @@ func TestGRPCResolver(t *testing.T) {
 
 		_, _, err = updater.ResolveTag(
 			ctx,
-			object.MustNewNamespace(&object_pb.Namespace{
+			util.Must(object.NewNamespace(&object_pb.Namespace{
 				InstanceName:    "hello/world",
 				ReferenceFormat: object_pb.ReferenceFormat_SHA256_V1,
-			}),
+			})),
 			tag,
 		)
 		testutil.RequireEqualStatus(t, status.Error(codes.Internal, "Server returned an invalid reference: Reference is 3 bytes in size, while SHA256_V1 references are 40 bytes in size"), err)
@@ -105,10 +106,10 @@ func TestGRPCResolver(t *testing.T) {
 
 		reference, complete, err := updater.ResolveTag(
 			ctx,
-			object.MustNewNamespace(&object_pb.Namespace{
+			util.Must(object.NewNamespace(&object_pb.Namespace{
 				InstanceName:    "hello/world",
 				ReferenceFormat: object_pb.ReferenceFormat_SHA256_V1,
-			}),
+			})),
 			tag,
 		)
 		require.NoError(t, err)

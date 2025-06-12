@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/buildbarn/bb-storage/pkg/util"
 	pg_label "github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
@@ -100,7 +101,7 @@ func (tr *TargetReference[TReference, TMetadata]) CompareSameType(thread *starla
 	}
 }
 
-var defaultInfoProviderIdentifier = pg_label.MustNewCanonicalStarlarkIdentifier("@@builtins_core+//:exports.bzl%DefaultInfo")
+var defaultInfoProviderIdentifier = util.Must(pg_label.NewCanonicalStarlarkIdentifier("@@builtins_core+//:exports.bzl%DefaultInfo"))
 
 // Attr returns the value of an attribute of a Starlark Target value.
 //

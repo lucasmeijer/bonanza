@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/buildbarn/bb-storage/pkg/testutil"
+	"github.com/buildbarn/bb-storage/pkg/util"
 	object_pb "github.com/buildbarn/bonanza/pkg/proto/storage/object"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 	"github.com/stretchr/testify/require"
@@ -14,7 +15,7 @@ import (
 
 func TestLocalReference(t *testing.T) {
 	t.Run("SHA256_V1", func(t *testing.T) {
-		referenceFormat := object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1)
+		referenceFormat := util.Must(object.NewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1))
 		t.Run("InvalidLength", func(t *testing.T) {
 			_, err := referenceFormat.NewLocalReference([]byte{1, 2, 3})
 			testutil.RequireEqualStatus(t, status.Error(codes.InvalidArgument, "Reference is 3 bytes in size, while SHA256_V1 references are 40 bytes in size"), err)

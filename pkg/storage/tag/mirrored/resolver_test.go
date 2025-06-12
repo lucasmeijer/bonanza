@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/buildbarn/bb-storage/pkg/testutil"
+	"github.com/buildbarn/bb-storage/pkg/util"
 	object_pb "github.com/buildbarn/bonanza/pkg/proto/storage/object"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 	"github.com/buildbarn/bonanza/pkg/storage/tag/mirrored"
@@ -25,10 +26,10 @@ func TestResolver(t *testing.T) {
 	replicaB := NewMockResolverForTesting(ctrl)
 	resolver := mirrored.NewResolver(replicaA, replicaB)
 
-	namespace := object.MustNewNamespace(&object_pb.Namespace{
+	namespace := util.Must(object.NewNamespace(&object_pb.Namespace{
 		InstanceName:    "hello/world",
 		ReferenceFormat: object_pb.ReferenceFormat_SHA256_V1,
-	})
+	}))
 
 	t.Run("FailureReplicaA", func(t *testing.T) {
 		// If a failure occurs resolving the tag through replica

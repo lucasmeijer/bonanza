@@ -41,6 +41,7 @@ go_test(
     deps = [
         ":label",
         "@com_github_buildbarn_bb_storage//pkg/filesystem/path",
+        "@com_github_buildbarn_bb_storage//pkg/util",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
     ],

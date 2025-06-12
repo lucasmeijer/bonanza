@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bonanza/pkg/label"
 	pg_starlark "github.com/buildbarn/bonanza/pkg/starlark"
 	"github.com/stretchr/testify/require"
@@ -22,8 +23,8 @@ func TestParseModuleDotBazel(t *testing.T) {
 
 		gomock.InOrder(
 			handler.EXPECT().RepositoryRuleOverride(
-				/* moduleName = */ label.MustNewModule("my_module_name"),
-				/* repositoryRuleIdentifier */ label.MustNewCanonicalStarlarkIdentifier("@@bazel_tools+//tools/build_defs/repo:http.bzl%http_archive"),
+				/* moduleName = */ util.Must(label.NewModule("my_module_name")),
+				/* repositoryRuleIdentifier */ util.Must(label.NewCanonicalStarlarkIdentifier("@@bazel_tools+//tools/build_defs/repo:http.bzl%http_archive")),
 				/* attrs */ map[string]starlark.Value{
 					"urls": starlark.NewList([]starlark.Value{
 						starlark.String("https://example.com/url1"),
@@ -44,20 +45,20 @@ func TestParseModuleDotBazel(t *testing.T) {
 			),
 		)
 
-		version1 := label.MustNewModuleVersion("1.2.3")
+		version1 := util.Must(label.NewModuleVersion("1.2.3"))
 		gomock.InOrder(
 			handler.EXPECT().BazelDep(
-				/* name = */ label.MustNewModule("my_module_name"),
+				/* name = */ util.Must(label.NewModule("my_module_name")),
 				/* version = */ nil,
 				/* maxCompatibilityLevel = */ -1,
-				/* repoName = */ label.MustNewApparentRepo("my_module_name"),
+				/* repoName = */ util.Must(label.NewApparentRepo("my_module_name")),
 				/* devDependency = */ false,
 			).Times(2),
 			handler.EXPECT().BazelDep(
-				/* name = */ label.MustNewModule("my_module_name"),
+				/* name = */ util.Must(label.NewModule("my_module_name")),
 				/* version = */ &version1,
 				/* maxCompatibilityLevel = */ 123,
-				/* repoName = */ label.MustNewApparentRepo("my_repo_name"),
+				/* repoName = */ util.Must(label.NewApparentRepo("my_repo_name")),
 				/* devDependency = */ true,
 			),
 		)
@@ -66,8 +67,8 @@ func TestParseModuleDotBazel(t *testing.T) {
 		// require.NoError(t, err)
 		gomock.InOrder(
 			handler.EXPECT().RepositoryRuleOverride(
-				/* moduleName = */ label.MustNewModule("my_module_name"),
-				/* repositoryRuleIdentifier */ label.MustNewCanonicalStarlarkIdentifier("@@bazel_tools+//tools/build_defs/repo:git.bzl%git_repository"),
+				/* moduleName = */ util.Must(label.NewModule("my_module_name")),
+				/* repositoryRuleIdentifier */ util.Must(label.NewCanonicalStarlarkIdentifier("@@bazel_tools+//tools/build_defs/repo:git.bzl%git_repository")),
 				/* attrs */ map[string]starlark.Value{
 					"remote": starlark.String("https://github.com/my-project/my-project.git"),
 					"commit": starlark.String("1368bebd5776a80ea3161a07dafe8beb7c8c144c"),
@@ -87,7 +88,7 @@ func TestParseModuleDotBazel(t *testing.T) {
 		)
 
 		handler.EXPECT().LocalPathOverride(
-			/* moduleName = */ label.MustNewModule("my_module_name"),
+			/* moduleName = */ util.Must(label.NewModule("my_module_name")),
 			/* path = */ gomock.Any(),
 		).Do(func(moduleName label.Module, localPath path.Parser) {
 			localPathBuilder, scopeWalker := path.EmptyBuilder.Join(path.VoidScopeWalker)
@@ -95,20 +96,20 @@ func TestParseModuleDotBazel(t *testing.T) {
 			require.Equal(t, "/some/path", localPathBuilder.GetUNIXString())
 		})
 
-		version2 := label.MustNewModuleVersion("1.0.0")
+		version2 := util.Must(label.NewModuleVersion("1.0.0"))
 		gomock.InOrder(
 			handler.EXPECT().Module(
-				/* name = */ label.MustNewModule("my_module_name"),
+				/* name = */ util.Must(label.NewModule("my_module_name")),
 				/* version = */ nil,
 				/* compatibilityLevel = */ 0,
-				/* repoName = */ label.MustNewApparentRepo("my_module_name"),
+				/* repoName = */ util.Must(label.NewApparentRepo("my_module_name")),
 				/* bazelCompatibility = */ gomock.Len(0),
 			).Times(2),
 			handler.EXPECT().Module(
-				/* name = */ label.MustNewModule("my_module_name"),
+				/* name = */ util.Must(label.NewModule("my_module_name")),
 				/* version = */ &version2,
 				/* compatibilityLevel = */ 123,
-				/* repoName = */ label.MustNewApparentRepo("my_repo_name"),
+				/* repoName = */ util.Must(label.NewApparentRepo("my_repo_name")),
 				/* bazelCompatibility = */ []string{
 					">=6.4.0",
 					"-7.0.0",
@@ -120,18 +121,18 @@ func TestParseModuleDotBazel(t *testing.T) {
 		require.NoError(t, err)
 		gomock.InOrder(
 			handler.EXPECT().MultipleVersionOverride(
-				/* moduleName = */ label.MustNewModule("my_module_name"),
+				/* moduleName = */ util.Must(label.NewModule("my_module_name")),
 				/* versions = */ []label.ModuleVersion{
-					label.MustNewModuleVersion("1.0.0"),
-					label.MustNewModuleVersion("1.2.0"),
+					util.Must(label.NewModuleVersion("1.0.0")),
+					util.Must(label.NewModuleVersion("1.2.0")),
 				},
 				/* registry = */ nil,
 			).Times(2),
 			handler.EXPECT().MultipleVersionOverride(
-				/* moduleName = */ label.MustNewModule("my_module_name"),
+				/* moduleName = */ util.Must(label.NewModule("my_module_name")),
 				/* versions = */ []label.ModuleVersion{
-					label.MustNewModuleVersion("1.0.0"),
-					label.MustNewModuleVersion("1.2.0"),
+					util.Must(label.NewModuleVersion("1.0.0")),
+					util.Must(label.NewModuleVersion("1.2.0")),
 				},
 				/* registry = */ registry,
 			),
@@ -144,8 +145,8 @@ func TestParseModuleDotBazel(t *testing.T) {
 			).Times(2),
 			handler.EXPECT().RegisterExecutionPlatforms(
 				/* platformTargetPatterns = */ []label.ApparentTargetPattern{
-					label.MustNewApparentTargetPattern("@@my_module_name+//:default_host_platform"),
-					label.MustNewApparentTargetPattern("@@my_module_name+//:remote_linux_platform"),
+					util.Must(label.NewApparentTargetPattern("@@my_module_name+//:default_host_platform")),
+					util.Must(label.NewApparentTargetPattern("@@my_module_name+//:remote_linux_platform")),
 				},
 				/* devDependency = */ true,
 			),
@@ -158,8 +159,8 @@ func TestParseModuleDotBazel(t *testing.T) {
 			).Times(2),
 			handler.EXPECT().RegisterToolchains(
 				/* toolchainTargetPatterns = */ []label.ApparentTargetPattern{
-					label.MustNewApparentTargetPattern("@bazel_tools//tools/python:autodetecting_toolchain"),
-					label.MustNewApparentTargetPattern("@local_config_winsdk//:all"),
+					util.Must(label.NewApparentTargetPattern("@bazel_tools//tools/python:autodetecting_toolchain")),
+					util.Must(label.NewApparentTargetPattern("@local_config_winsdk//:all")),
 				},
 				/* devDependency = */ true,
 			),
@@ -167,13 +168,13 @@ func TestParseModuleDotBazel(t *testing.T) {
 
 		gomock.InOrder(
 			handler.EXPECT().SingleVersionOverride(
-				/* moduleName = */ label.MustNewModule("my_module_name"),
+				/* moduleName = */ util.Must(label.NewModule("my_module_name")),
 				/* version = */ nil,
 				/* registry = */ nil,
 				/* patchOptions = */ &pg_starlark.PatchOptions{},
 			),
 			handler.EXPECT().SingleVersionOverride(
-				/* moduleName = */ label.MustNewModule("my_module_name"),
+				/* moduleName = */ util.Must(label.NewModule("my_module_name")),
 				/* version = */ nil,
 				/* registry = */ nil,
 				/* patchOptions = */ &pg_starlark.PatchOptions{
@@ -182,13 +183,13 @@ func TestParseModuleDotBazel(t *testing.T) {
 				},
 			),
 			handler.EXPECT().SingleVersionOverride(
-				/* moduleName = */ label.MustNewModule("my_module_name"),
+				/* moduleName = */ util.Must(label.NewModule("my_module_name")),
 				/* version = */ &version2,
 				/* registry = */ registry,
 				/* patchOptions = */ &pg_starlark.PatchOptions{
 					Patches: []label.ApparentLabel{
-						label.MustNewApparentLabel("@@my_module_name+//:patches/foo1.diff"),
-						label.MustNewApparentLabel("@@my_module_name+//:patches/foo2.diff"),
+						util.Must(label.NewApparentLabel("@@my_module_name+//:patches/foo1.diff")),
+						util.Must(label.NewApparentLabel("@@my_module_name+//:patches/foo2.diff")),
 					},
 					PatchCmds: []string{
 						"ls -l",
@@ -204,20 +205,20 @@ func TestParseModuleDotBazel(t *testing.T) {
 		proxy3 := NewMockModuleExtensionProxy(ctrl)
 		gomock.InOrder(
 			handler.EXPECT().UseExtension(
-				/* extensionBzlFile */ label.MustNewApparentLabel("@@my_module_name+//:extensions.bzl"),
-				/* extensionName */ label.MustNewStarlarkIdentifier("foo"),
+				/* extensionBzlFile */ util.Must(label.NewApparentLabel("@@my_module_name+//:extensions.bzl")),
+				/* extensionName */ util.Must(label.NewStarlarkIdentifier("foo")),
 				/* devDependency */ false,
 				/* isolate */ false,
 			).Return(proxy1, nil),
 			handler.EXPECT().UseExtension(
-				/* extensionBzlFile */ label.MustNewApparentLabel("@@my_module_name+//:extensions.bzl"),
-				/* extensionName */ label.MustNewStarlarkIdentifier("foo"),
+				/* extensionBzlFile */ util.Must(label.NewApparentLabel("@@my_module_name+//:extensions.bzl")),
+				/* extensionName */ util.Must(label.NewStarlarkIdentifier("foo")),
 				/* devDependency */ false,
 				/* isolate */ false,
 			).Return(proxy2, nil),
 			handler.EXPECT().UseExtension(
-				/* extensionBzlFile */ label.MustNewApparentLabel("@@my_module_name+//:extensions.bzl"),
-				/* extensionName */ label.MustNewStarlarkIdentifier("foo"),
+				/* extensionBzlFile */ util.Must(label.NewApparentLabel("@@my_module_name+//:extensions.bzl")),
+				/* extensionName */ util.Must(label.NewStarlarkIdentifier("foo")),
 				/* devDependency */ true,
 				/* isolate */ true,
 			).Return(proxy3, nil),
@@ -230,28 +231,28 @@ func TestParseModuleDotBazel(t *testing.T) {
 		gomock.InOrder(
 			proxy1.EXPECT().UseRepo(map[label.ApparentRepo]label.ApparentRepo{}),
 			proxy2.EXPECT().UseRepo(map[label.ApparentRepo]label.ApparentRepo{
-				label.MustNewApparentRepo("a"): label.MustNewApparentRepo("a"),
-				label.MustNewApparentRepo("b"): label.MustNewApparentRepo("b"),
-				label.MustNewApparentRepo("c"): label.MustNewApparentRepo("c"),
-				label.MustNewApparentRepo("d"): label.MustNewApparentRepo("e"),
-				label.MustNewApparentRepo("f"): label.MustNewApparentRepo("g"),
-				label.MustNewApparentRepo("h"): label.MustNewApparentRepo("i"),
+				util.Must(label.NewApparentRepo("a")): util.Must(label.NewApparentRepo("a")),
+				util.Must(label.NewApparentRepo("b")): util.Must(label.NewApparentRepo("b")),
+				util.Must(label.NewApparentRepo("c")): util.Must(label.NewApparentRepo("c")),
+				util.Must(label.NewApparentRepo("d")): util.Must(label.NewApparentRepo("e")),
+				util.Must(label.NewApparentRepo("f")): util.Must(label.NewApparentRepo("g")),
+				util.Must(label.NewApparentRepo("h")): util.Must(label.NewApparentRepo("i")),
 			}),
 		)
 
 		proxy4 := NewMockRepoRuleProxy(ctrl)
 		gomock.InOrder(
 			handler.EXPECT().UseRepoRule(
-				/* repoRuleBzlFile = */ label.MustNewApparentLabel("@bazel_tools//tools/build_defs/repo:http.bzl"),
-				/* repoRuleName = */ label.MustNewStarlarkIdentifier("http_archive"),
+				/* repoRuleBzlFile = */ util.Must(label.NewApparentLabel("@bazel_tools//tools/build_defs/repo:http.bzl")),
+				/* repoRuleName = */ util.Must(label.NewStarlarkIdentifier("http_archive")),
 			).Return(proxy4.Call, nil),
 			proxy4.EXPECT().Call(
-				/* name = */ label.MustNewApparentRepo("my_repo_name"),
+				/* name = */ util.Must(label.NewApparentRepo("my_repo_name")),
 				/* devDependency = */ false,
 				/* attrs = */ map[string]starlark.Value{},
 			).Times(2),
 			proxy4.EXPECT().Call(
-				/* name = */ label.MustNewApparentRepo("my_repo_name"),
+				/* name = */ util.Must(label.NewApparentRepo("my_repo_name")),
 				/* devDependency = */ true,
 				/* attrs = */ map[string]starlark.Value{
 					"sha256": starlark.String("345277dfc4bc0569927c92ee924c7c5483faad42b3004dd9bb5a6806214d44e7"),
@@ -441,7 +442,7 @@ http_archive(
     sha256 = "345277dfc4bc0569927c92ee924c7c5483faad42b3004dd9bb5a6806214d44e7",
 )
 `,
-			label.MustNewCanonicalLabel("@@my_module_name+//:MODULE.bazel"),
+			util.Must(label.NewCanonicalLabel("@@my_module_name+//:MODULE.bazel")),
 			path.UNIXFormat,
 			handler,
 		))
@@ -454,7 +455,7 @@ http_archive(
 		// nil.
 		handler := NewMockRootModuleDotBazelHandler(ctrl)
 		handler.EXPECT().LocalPathOverride(
-			/* moduleName = */ label.MustNewModule("my_module_name"),
+			/* moduleName = */ util.Must(label.NewModule("my_module_name")),
 			/* path = */ nil,
 		)
 
@@ -465,7 +466,7 @@ local_path_override(
     path = "/some/path",
 )
 `,
-			label.MustNewCanonicalLabel("@@my_module_name+//:MODULE.bazel"),
+			util.Must(label.NewCanonicalLabel("@@my_module_name+//:MODULE.bazel")),
 			/* localPathFormat = */ nil,
 			handler,
 		))

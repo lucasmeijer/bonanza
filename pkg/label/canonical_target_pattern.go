@@ -84,17 +84,6 @@ func newValidCanonicalTargetPattern(value string) CanonicalTargetPattern {
 	return CanonicalTargetPattern{value: removeTargetPatternTargetNameIfRedundant(value)}
 }
 
-// MustNewCanonicalTargetPattern is the same as
-// NewCanonicalTargetPattern, except that it panics if the provided
-// string is not a valid canonical target pattern.
-func MustNewCanonicalTargetPattern(value string) CanonicalTargetPattern {
-	tp, err := NewCanonicalTargetPattern(value)
-	if err != nil {
-		panic(err)
-	}
-	return tp
-}
-
 func (tp CanonicalTargetPattern) String() string {
 	return tp.value
 }

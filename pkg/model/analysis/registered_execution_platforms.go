@@ -8,6 +8,7 @@ import (
 	"maps"
 	"slices"
 
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	model_starlark "github.com/buildbarn/bonanza/pkg/model/starlark"
@@ -21,7 +22,7 @@ import (
 	"go.starlark.net/starlark"
 )
 
-var platformInfoProviderIdentifier = label.MustNewCanonicalStarlarkIdentifier("@@builtins_core+//:exports.bzl%PlatformInfo")
+var platformInfoProviderIdentifier = util.Must(label.NewCanonicalStarlarkIdentifier("@@builtins_core+//:exports.bzl%PlatformInfo"))
 
 type registeredExecutionPlatformExtractingModuleDotBazelHandler[TReference object.BasicReference, TMetadata BaseComputerReferenceMetadata] struct {
 	computer              *baseComputer[TReference, TMetadata]

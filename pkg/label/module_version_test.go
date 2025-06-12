@@ -3,6 +3,7 @@ package label_test
 import (
 	"testing"
 
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bonanza/pkg/label"
 	"github.com/stretchr/testify/assert"
 )
@@ -63,10 +64,10 @@ func TestModuleVersion(t *testing.T) {
 		}
 		for i := 0; i < len(versions); i++ {
 			for _, si := range versions[i] {
-				vi := label.MustNewModuleVersion(si)
+				vi := util.Must(label.NewModuleVersion(si))
 				for j := 0; j < len(versions); j++ {
 					for _, sj := range versions[j] {
-						vj := label.MustNewModuleVersion(sj)
+						vj := util.Must(label.NewModuleVersion(sj))
 						if cmp := vi.Compare(vj); i < j {
 							assert.Negative(t, cmp, "%s is not less than %s", vi, vj)
 						} else if i > j {

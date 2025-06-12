@@ -31,16 +31,6 @@ func NewCanonicalRepo(value string) (CanonicalRepo, error) {
 	return CanonicalRepo{value: value}, nil
 }
 
-// MustNewCanonicalRepo is the same as NewCanonicalRepo, except that it
-// panics if the provided canonical repo name is invalid.
-func MustNewCanonicalRepo(value string) CanonicalRepo {
-	r, err := NewCanonicalRepo(value)
-	if err != nil {
-		panic(err)
-	}
-	return r
-}
-
 func (r CanonicalRepo) String() string {
 	return r.value
 }

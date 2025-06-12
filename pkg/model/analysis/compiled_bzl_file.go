@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bonanza/pkg/evaluation"
 	"github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
@@ -249,7 +250,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeCompiledBzlFileGlobalValue(
 	), nil
 }
 
-var exportsBzlTargetName = label.MustNewTargetName("exports.bzl")
+var exportsBzlTargetName = util.Must(label.NewTargetName("exports.bzl"))
 
 type getBzlFileBuiltinsEnvironment[TReference any] interface {
 	GetCompiledBzlFileDecodedGlobalsValue(key *model_analysis_pb.CompiledBzlFileDecodedGlobals_Key) (starlark.StringDict, bool)

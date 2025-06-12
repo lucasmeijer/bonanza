@@ -3,6 +3,7 @@ package label_test
 import (
 	"testing"
 
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bonanza/pkg/label"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,7 +17,7 @@ func TestCanonicalPackage(t *testing.T) {
 			"@@com_github_buildbarn_bb_storage+//cmd/hello_world",
 			`@@com_github_buildbarn_bb_storage+//cmd/! "#$%&'()*+,-.;<=>?@[]^_{|}` + "`",
 		} {
-			canonicalPackage := label.MustNewCanonicalPackage(input)
+			canonicalPackage := util.Must(label.NewCanonicalPackage(input))
 			assert.Equal(t, input, canonicalPackage.String())
 		}
 	})
@@ -51,7 +52,7 @@ func TestCanonicalPackage(t *testing.T) {
 			"@@com_github_buildbarn_bb_storage+//cmd",
 			"@@com_github_buildbarn_bb_storage+//cmd/hello_world",
 		} {
-			canonicalPackage := label.MustNewCanonicalPackage(input)
+			canonicalPackage := util.Must(label.NewCanonicalPackage(input))
 			assert.Equal(t, "com_github_buildbarn_bb_storage+", canonicalPackage.GetCanonicalRepo().String())
 		}
 	})
@@ -62,14 +63,14 @@ func TestCanonicalPackage(t *testing.T) {
 			"@@com_github_buildbarn_bb_storage+//cmd":             "cmd",
 			"@@com_github_buildbarn_bb_storage+//cmd/hello_world": "cmd/hello_world",
 		} {
-			canonicalPackage := label.MustNewCanonicalPackage(input)
+			canonicalPackage := util.Must(label.NewCanonicalPackage(input))
 			assert.Equal(t, output, canonicalPackage.GetPackagePath())
 		}
 	})
 
 	t.Run("AppendLabel", func(t *testing.T) {
 		t.Run("AtRoot", func(t *testing.T) {
-			base := label.MustNewCanonicalPackage("@@example+")
+			base := util.Must(label.NewCanonicalPackage("@@example+"))
 			for input, output := range map[string]string{
 				":foo":         "@@example+//:foo",
 				"bar:wiz":      "@@example+//bar:wiz",
@@ -87,7 +88,7 @@ func TestCanonicalPackage(t *testing.T) {
 			}
 		})
 		t.Run("InsidePackage", func(t *testing.T) {
-			base := label.MustNewCanonicalPackage("@@example+//foo")
+			base := util.Must(label.NewCanonicalPackage("@@example+//foo"))
 			for input, output := range map[string]string{
 				":foo":                "@@example+//foo",
 				"bar:wiz":             "@@example+//foo/bar:wiz",
@@ -114,35 +115,35 @@ func TestCanonicalPackage(t *testing.T) {
 		require.Equal(
 			t,
 			"@@example+//:foo",
-			label.MustNewCanonicalPackage("@@example+").
-				AppendTargetName(label.MustNewTargetName("foo")).
+			util.Must(label.NewCanonicalPackage("@@example+")).
+				AppendTargetName(util.Must(label.NewTargetName("foo"))).
 				String(),
 		)
 		require.Equal(
 			t,
 			"@@example+",
-			label.MustNewCanonicalPackage("@@example+").
-				AppendTargetName(label.MustNewTargetName("example+")).
+			util.Must(label.NewCanonicalPackage("@@example+")).
+				AppendTargetName(util.Must(label.NewTargetName("example+"))).
 				String(),
 		)
 		require.Equal(
 			t,
 			"@@example+//hello_world:foo",
-			label.MustNewCanonicalPackage("@@example+//hello_world").
-				AppendTargetName(label.MustNewTargetName("foo")).
+			util.Must(label.NewCanonicalPackage("@@example+//hello_world")).
+				AppendTargetName(util.Must(label.NewTargetName("foo"))).
 				String(),
 		)
 		require.Equal(
 			t,
 			"@@example+//hello_world",
-			label.MustNewCanonicalPackage("@@example+//hello_world").
-				AppendTargetName(label.MustNewTargetName("hello_world")).
+			util.Must(label.NewCanonicalPackage("@@example+//hello_world")).
+				AppendTargetName(util.Must(label.NewTargetName("hello_world"))).
 				String(),
 		)
 	})
 
 	t.Run("AppendTargetPattern", func(t *testing.T) {
-		base := label.MustNewCanonicalPackage("@@example+//foo")
+		base := util.Must(label.NewCanonicalPackage("@@example+//foo"))
 		for input, output := range map[string]string{
 			"//foo/bar:wiz":         "@@example+//foo/bar:wiz",
 			"//foo/bar":             "@@example+//foo/bar",
@@ -191,7 +192,7 @@ func TestCanonicalPackage(t *testing.T) {
 
 	t.Run("ToRecursiveTargetPatternBelow", func(t *testing.T) {
 		t.Run("Invalid", func(t *testing.T) {
-			base := label.MustNewCanonicalPackage("@@repo+")
+			base := util.Must(label.NewCanonicalPackage("@@repo+"))
 			for _, input := range []string{
 				"",
 				"foo//bar",
@@ -204,12 +205,12 @@ func TestCanonicalPackage(t *testing.T) {
 		})
 
 		t.Run("Valid", func(t *testing.T) {
-			canonicalTargetPattern, err := label.MustNewCanonicalPackage("@@repo+").
+			canonicalTargetPattern, err := util.Must(label.NewCanonicalPackage("@@repo+")).
 				ToRecursiveTargetPatternBelow("foo/bar", false)
 			require.NoError(t, err)
 			assert.Equal(t, "@@repo+//foo/bar/...", canonicalTargetPattern.String())
 
-			canonicalTargetPattern, err = label.MustNewCanonicalPackage("@@repo+//foo").
+			canonicalTargetPattern, err = util.Must(label.NewCanonicalPackage("@@repo+//foo")).
 				ToRecursiveTargetPatternBelow("bar", true)
 			require.NoError(t, err)
 			assert.Equal(t, "@@repo+//foo/bar/...:*", canonicalTargetPattern.String())

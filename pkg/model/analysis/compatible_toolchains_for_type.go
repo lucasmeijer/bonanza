@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bonanza/pkg/evaluation"
 	"github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
@@ -15,7 +16,7 @@ import (
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 )
 
-var commandLineOptionPlatformsLabel = label.MustNewCanonicalLabel("@@bazel_tools+//command_line_option:platforms")
+var commandLineOptionPlatformsLabel = util.Must(label.NewCanonicalLabel("@@bazel_tools+//command_line_option:platforms"))
 
 type getTargetPlatformInfoProviderEnvironment[TReference any, TMetadata any] interface {
 	model_core.ExistingObjectCapturer[TReference, TMetadata]

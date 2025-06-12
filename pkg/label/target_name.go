@@ -28,16 +28,6 @@ func NewTargetName(value string) (TargetName, error) {
 	return TargetName{value: value}, nil
 }
 
-// MustNewTargetName is the same as NewTargetName, except that it panics
-// if the provided value is not a valid target name.
-func MustNewTargetName(value string) TargetName {
-	identifier, err := NewTargetName(value)
-	if err != nil {
-		panic(err)
-	}
-	return identifier
-}
-
 func (tn TargetName) String() string {
 	return tn.value
 }

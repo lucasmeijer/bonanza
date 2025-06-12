@@ -39,17 +39,6 @@ func NewApparentTargetPattern(value string) (ApparentTargetPattern, error) {
 	return newValidApparentTargetPattern(value), nil
 }
 
-// MustNewApparentTargetPattern is the same as NewApparentTargetPattern,
-// except that it panics if the provided value is not a valid apparent
-// target pattern.
-func MustNewApparentTargetPattern(value string) ApparentTargetPattern {
-	tp, err := NewApparentTargetPattern(value)
-	if err != nil {
-		panic(err)
-	}
-	return tp
-}
-
 func (tp ApparentTargetPattern) String() string {
 	return tp.value
 }

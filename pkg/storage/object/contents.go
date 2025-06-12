@@ -52,7 +52,7 @@ func NewContentsFromFullData(reference LocalReference, data []byte) (*Contents, 
 // MustNewContents constructs object contents given a list of outgoing
 // references and a payload. This function may be used as part of tests.
 func MustNewContents(referenceFormatValue object.ReferenceFormat_Value, references []LocalReference, payload []byte) *Contents {
-	referenceFormat := MustNewReferenceFormat(referenceFormatValue)
+	referenceFormat := util.Must(NewReferenceFormat(referenceFormatValue))
 	contents, err := referenceFormat.NewContents(references, payload)
 	if err != nil {
 		panic(err)

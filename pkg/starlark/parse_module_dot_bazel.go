@@ -6,6 +6,7 @@ import (
 	"net/url"
 
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bonanza/pkg/label"
 	"github.com/buildbarn/bonanza/pkg/starlark/unpack"
 
@@ -146,8 +147,8 @@ func (v *moduleExtensionProxyValue) AttrNames() []string {
 }
 
 var (
-	targetIdentifierHTTPArchive   = label.MustNewCanonicalStarlarkIdentifier("@@bazel_tools+//tools/build_defs/repo:http.bzl%http_archive")
-	targetIdentifierGitRepository = label.MustNewCanonicalStarlarkIdentifier("@@bazel_tools+//tools/build_defs/repo:git.bzl%git_repository")
+	targetIdentifierHTTPArchive   = util.Must(label.NewCanonicalStarlarkIdentifier("@@bazel_tools+//tools/build_defs/repo:http.bzl%http_archive"))
+	targetIdentifierGitRepository = util.Must(label.NewCanonicalStarlarkIdentifier("@@bazel_tools+//tools/build_defs/repo:git.bzl%git_repository"))
 )
 
 // Parse a MODULE.bazel file, and call into ModuleDotBazelHandler for

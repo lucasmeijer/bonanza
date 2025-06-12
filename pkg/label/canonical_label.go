@@ -89,16 +89,6 @@ func newValidCanonicalLabel(value string) CanonicalLabel {
 	return CanonicalLabel{value: removeLabelTargetNameIfRedundant(value)}
 }
 
-// MustNewCanonicalLabel is the same as NewCanonicalLabel, except that
-// it panics if the provided value is not a valid canonical label.
-func MustNewCanonicalLabel(value string) CanonicalLabel {
-	l, err := NewCanonicalLabel(value)
-	if err != nil {
-		panic(err)
-	}
-	return l
-}
-
 // GetCanonicalPackage strips the target name from a label, thereby
 // returning the canonical package name.
 func (l CanonicalLabel) GetCanonicalPackage() CanonicalPackage {

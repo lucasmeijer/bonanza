@@ -31,17 +31,6 @@ func NewModuleExtension(value string) (ModuleExtension, error) {
 	return ModuleExtension{value: value}, nil
 }
 
-// MustNewModuleExtension is the same as NewModuleExtension, except that
-// it panics if the provided string is not a valid module extension
-// name.
-func MustNewModuleExtension(value string) ModuleExtension {
-	me, err := NewModuleExtension(value)
-	if err != nil {
-		panic(err)
-	}
-	return me
-}
-
 func (me ModuleExtension) String() string {
 	return me.value
 }

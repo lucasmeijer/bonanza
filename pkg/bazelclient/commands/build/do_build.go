@@ -181,7 +181,7 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 	moduleDotBazelHandler := NewLocalPathExtractingModuleDotBazelHandler(modulePaths, workspacePath)
 	if err := pg_starlark.ParseModuleDotBazel(
 		string(moduleDotBazelContents),
-		label.MustNewCanonicalLabel("@@main+//:MODULE.bazel"),
+		util.Must(label.NewCanonicalLabel("@@main+//:MODULE.bazel")),
 		path.LocalFormat,
 		moduleDotBazelHandler,
 	); err != nil {
@@ -214,7 +214,7 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 	// trees. Parameters include minimum/maximum sizes of the
 	// resulting objects, and whether they are compressed and
 	// encrypted.
-	referenceFormat := object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1)
+	referenceFormat := util.Must(object.NewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1))
 	encryptionKeyBytes, err := base64.StdEncoding.DecodeString(args.CommonFlags.RemoteEncryptionKey)
 	if err != nil {
 		logger.Fatal(formatted.Textf("Failed to base64 decode value of --remote_encryption_key: %s", err))

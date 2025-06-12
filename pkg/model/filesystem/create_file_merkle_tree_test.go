@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/buildbarn/bb-storage/pkg/testutil"
+	"github.com/buildbarn/bb-storage/pkg/util"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
 	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
@@ -30,7 +31,7 @@ func TestCreateFileMerkleTree(t *testing.T) {
 			FileContentsListMinimumSizeBytes: 1 << 12,
 			FileContentsListMaximumSizeBytes: 1 << 14,
 		},
-		object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
+		util.Must(object.NewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1)),
 	)
 	require.NoError(t, err)
 

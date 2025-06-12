@@ -4,6 +4,7 @@ import (
 	"fmt"
 	go_path "path"
 
+	"github.com/buildbarn/bb-storage/pkg/util"
 	pg_label "github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
@@ -237,5 +238,5 @@ func (labelUnpackerInto[TReference, TMetadata]) GetConcatenationOperator() synta
 }
 
 func CurrentFilePackage(thread *starlark.Thread, depth int) pg_label.CanonicalPackage {
-	return pg_label.MustNewCanonicalLabel(thread.CallFrame(depth).Pos.Filename()).GetCanonicalPackage()
+	return util.Must(pg_label.NewCanonicalLabel(thread.CallFrame(depth).Pos.Filename())).GetCanonicalPackage()
 }

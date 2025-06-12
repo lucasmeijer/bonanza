@@ -45,17 +45,6 @@ func NewCanonicalPackage(value string) (CanonicalPackage, error) {
 	return CanonicalPackage{value: value}, nil
 }
 
-// MustNewCanonicalPackage is the same as NewCanonicalPackage, except
-// that it panics if the provided value is not a valid canonical package
-// name.
-func MustNewCanonicalPackage(value string) CanonicalPackage {
-	p, err := NewCanonicalPackage(value)
-	if err != nil {
-		panic(err)
-	}
-	return p
-}
-
 // GetCanonicalRepo returns the name of the canonical repo that contains
 // this package.
 func (p CanonicalPackage) GetCanonicalRepo() CanonicalRepo {

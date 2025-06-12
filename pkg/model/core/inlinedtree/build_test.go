@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/buildbarn/bb-storage/pkg/testutil"
+	"github.com/buildbarn/bb-storage/pkg/util"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/model/core/inlinedtree"
 	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
@@ -26,7 +27,7 @@ func TestBuild(t *testing.T) {
 		output, err := inlinedtree.Build(
 			inlinedtree.CandidateList[*model_filesystem_pb.DirectoryContents, model_core.ReferenceMetadata]{},
 			&inlinedtree.Options{
-				ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
+				ReferenceFormat:  util.Must(object.NewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1)),
 				MaximumSizeBytes: 16 * 1024,
 			},
 		)
@@ -83,7 +84,7 @@ func TestBuild(t *testing.T) {
 				ParentAppender:  parentAppender.Call,
 			}},
 			&inlinedtree.Options{
-				ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
+				ReferenceFormat:  util.Must(object.NewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1)),
 				MaximumSizeBytes: 0,
 			},
 		)
@@ -144,7 +145,7 @@ func TestBuild(t *testing.T) {
 				ParentAppender:  parentAppender.Call,
 			}},
 			&inlinedtree.Options{
-				ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
+				ReferenceFormat:  util.Must(object.NewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1)),
 				MaximumSizeBytes: 0,
 			},
 		)
@@ -215,7 +216,7 @@ func TestBuild(t *testing.T) {
 				ParentAppender:  parentAppender.Call,
 			}},
 			&inlinedtree.Options{
-				ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
+				ReferenceFormat:  util.Must(object.NewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1)),
 				MaximumSizeBytes: 100,
 			},
 		)
@@ -256,7 +257,7 @@ func TestBuild(t *testing.T) {
 				ParentAppender:  parentAppender.Call,
 			}},
 			&inlinedtree.Options{
-				ReferenceFormat:  object.MustNewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1),
+				ReferenceFormat:  util.Must(object.NewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1)),
 				MaximumSizeBytes: 100,
 			},
 		)

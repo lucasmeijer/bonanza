@@ -40,16 +40,6 @@ func NewModuleVersion(value string) (ModuleVersion, error) {
 	return ModuleVersion{value: value}, nil
 }
 
-// MustNewModuleVersion is the same as NewModuleVersion, except that it
-// panics if the provided value is not a valid Bazel module version.
-func MustNewModuleVersion(value string) ModuleVersion {
-	m, err := NewModuleVersion(value)
-	if err != nil {
-		panic(err)
-	}
-	return m
-}
-
 func (mv ModuleVersion) String() string {
 	return mv.value
 }
