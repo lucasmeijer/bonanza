@@ -2880,6 +2880,7 @@ def builtins_internal_cc_common_merge_linking_contexts(linking_contexts = []):
                 lc.linker_inputs
                 for lc in linking_contexts
             ],
+            order = "topological",
         ),
     )
 
