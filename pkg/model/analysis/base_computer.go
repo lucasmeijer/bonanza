@@ -479,3 +479,5 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRepoDefaultAttrsValue(ctx c
 		model_core.MapReferenceMetadataToWalkers(defaultAttrs.Patcher),
 	), nil
 }
+
+type RoundTripperForTesting http.RoundTripper

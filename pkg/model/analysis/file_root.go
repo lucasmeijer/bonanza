@@ -16,6 +16,7 @@ import (
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	"github.com/buildbarn/bonanza/pkg/model/core/btree"
 	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
+	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
 	model_starlark "github.com/buildbarn/bonanza/pkg/model/starlark"
 	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
 	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
@@ -121,7 +122,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 	}
 	fileLabel, err := label.NewCanonicalLabel(f.Message.Label)
 	if err != nil {
-		return PatchedFileRootValue{}, fmt.Errorf("invalid label: %w", err)
+		return PatchedFileRootValue{}, fmt.Errorf("invalid file label: %w", err)
 	}
 
 	if o := f.Message.Owner; o != nil {
@@ -179,34 +180,73 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 				return PatchedFileRootValue{}, errors.New("TODO: Support action outputs with runfiles layout")
 			}
 
-			patchedConfigurationReference := model_core.Patch(e, configurationReference)
+			// TODO: As symlinks of target outputs may point
+			// to input files, we must union the output root
+			// with the input root. This should ideally only
+			// be done when such a dependency is detected,
+			// so that this process can be cached more
+			// efficiently.
+			//
+			// TODO: We should prune everything in the
+			// resulting directory that does not belong to
+			// the file that's being requested.
+			directoryCreationParameters, gotDirectoryCreationParameters := e.GetDirectoryCreationParametersObjectValue(&model_analysis_pb.DirectoryCreationParametersObject_Key{})
+			directoryReaders, gotDirectoryReaders := e.GetDirectoryReadersValue(&model_analysis_pb.DirectoryReaders_Key{})
+			patchedConfigurationReference1 := model_core.Patch(e, configurationReference)
+			targetActionInputRoot := e.GetTargetActionInputRootValue(
+				model_core.NewPatchedMessage(
+					&model_analysis_pb.TargetActionInputRoot_Key{
+						Id: &model_analysis_pb.TargetActionId{
+							Label:                  targetLabel.String(),
+							ConfigurationReference: patchedConfigurationReference1.Message,
+							ActionId:               source.ActionId,
+						},
+					},
+					model_core.MapReferenceMetadataToWalkers(patchedConfigurationReference1.Patcher),
+				),
+			)
+			patchedConfigurationReference2 := model_core.Patch(e, configurationReference)
 			targetActionResult := e.GetTargetActionResultValue(
 				model_core.NewPatchedMessage(
 					&model_analysis_pb.TargetActionResult_Key{
 						Id: &model_analysis_pb.TargetActionId{
 							Label:                  targetLabel.String(),
-							ConfigurationReference: patchedConfigurationReference.Message,
+							ConfigurationReference: patchedConfigurationReference2.Message,
 							ActionId:               source.ActionId,
 						},
 					},
-					model_core.MapReferenceMetadataToWalkers(patchedConfigurationReference.Patcher),
+					model_core.MapReferenceMetadataToWalkers(patchedConfigurationReference2.Patcher),
 				),
 			)
-			if !targetActionResult.IsSet() {
+			if !gotDirectoryCreationParameters || !gotDirectoryReaders || !targetActionInputRoot.IsSet() || !targetActionResult.IsSet() {
 				return PatchedFileRootValue{}, evaluation.ErrMissingDependency
 			}
 
-			// TODO: We currently return the entire output
-			// root of the action. We should trim it to only
-			// contain the file or directory that was
-			// requested.
-			patchedOutputRoot := model_core.Patch(e, model_core.Nested(targetActionResult, targetActionResult.Message.OutputRoot))
-			return model_core.NewPatchedMessage(
-				&model_analysis_pb.FileRoot_Value{
-					RootDirectory: patchedOutputRoot.Message,
+			rootDirectory := changeTrackingDirectory[TReference, TMetadata]{
+				unmodifiedDirectory: model_core.Nested(targetActionInputRoot, &model_filesystem_pb.Directory{
+					Contents: &model_filesystem_pb.Directory_ContentsExternal{
+						ContentsExternal: targetActionInputRoot.Message.InputRootReference,
+					},
+				}),
+			}
+			if err := rootDirectory.mergeContents(
+				model_core.Nested(targetActionResult, targetActionResult.Message.OutputRoot),
+				&changeTrackingDirectoryLoadOptions[TReference]{
+					context:                 ctx,
+					directoryContentsReader: directoryReaders.DirectoryContents,
+					leavesReader:            directoryReaders.Leaves,
 				},
-				model_core.MapReferenceMetadataToWalkers(patchedOutputRoot.Patcher),
-			), nil
+			); err != nil {
+				return PatchedFileRootValue{}, err
+			}
+
+			return createFileRootFromChangeTrackingDirectory(
+				ctx,
+				e,
+				directoryReaders.DirectoryContents,
+				directoryCreationParameters,
+				&rootDirectory,
+			)
 		case *model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_ExpandTemplate_:
 			directoryCreationParameters, gotDirectoryCreationParameters := e.GetDirectoryCreationParametersObjectValue(&model_analysis_pb.DirectoryCreationParametersObject_Key{})
 			fileCreationParameters, gotFileCreationParameters := e.GetFileCreationParametersObjectValue(&model_analysis_pb.FileCreationParametersObject_Key{})
@@ -441,6 +481,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 			return createFileRootFromChangeTrackingDirectory(
 				ctx,
 				e,
+				directoryReaders.DirectoryContents,
 				directoryCreationParameters,
 				&rootDirectory,
 			)
@@ -454,6 +495,10 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 	// on following them until we reach a file. Create a directory
 	// hierarchy that contains the resulting file and all of the
 	// symbolic links that we encountered along the way.
+	if f.Message.Type != model_starlark_pb.File_FILE {
+		return PatchedFileRootValue{}, errors.New("source files can only be regular files")
+	}
+
 	directoryCreationParameters, gotDirectoryCreationParameters := e.GetDirectoryCreationParametersObjectValue(&model_analysis_pb.DirectoryCreationParametersObject_Key{})
 	directoryReaders, gotDirectoryReaders := e.GetDirectoryReadersValue(&model_analysis_pb.DirectoryReaders_Key{})
 	if !gotDirectoryCreationParameters || !gotDirectoryReaders {
@@ -514,12 +559,19 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 	default:
 		return PatchedFileRootValue{}, errors.New("unknown directory layout")
 	}
-	return createFileRootFromChangeTrackingDirectory(ctx, e, directoryCreationParameters, rootDirectory)
+	return createFileRootFromChangeTrackingDirectory(
+		ctx,
+		e,
+		directoryReaders.DirectoryContents,
+		directoryCreationParameters,
+		rootDirectory,
+	)
 }
 
 func createFileRootFromChangeTrackingDirectory[TReference object.BasicReference, TMetadata model_core.WalkableReferenceMetadata](
 	ctx context.Context,
 	e FileRootEnvironment[TReference, TMetadata],
+	directoryContentsReader model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_filesystem_pb.DirectoryContents, TReference]],
 	directoryCreationParameters *model_filesystem.DirectoryCreationParameters,
 	rootDirectory *changeTrackingDirectory[TReference, TMetadata],
 ) (PatchedFileRootValue, error) {
@@ -533,7 +585,9 @@ func createFileRootFromChangeTrackingDirectory[TReference object.BasicReference,
 			directoryCreationParameters,
 			&capturableChangeTrackingDirectory[TReference, TMetadata]{
 				options: &capturableChangeTrackingDirectoryOptions[TReference, TMetadata]{
-					objectCapturer: e,
+					context:                 ctx,
+					directoryContentsReader: directoryContentsReader,
+					objectCapturer:          e,
 				},
 				directory: rootDirectory,
 			},
@@ -673,3 +727,5 @@ func (cw *symlinkRecordingComponentWalker[TReference, TMetadata]) OnUp() (path.C
 	cw.base = parent
 	return cw, nil
 }
+
+type FileRootEnvironmentForTesting FileRootEnvironment[model_core.CreatedObjectTree, model_core.CreatedObjectTree]

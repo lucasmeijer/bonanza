@@ -1,0 +1,177 @@
+package analysis_test
+
+import (
+	"context"
+	"net/http"
+	"testing"
+
+	"github.com/buildbarn/bb-storage/pkg/eviction"
+	"github.com/buildbarn/bb-storage/pkg/testutil"
+	"github.com/buildbarn/bb-storage/pkg/util"
+	model_analysis "github.com/buildbarn/bonanza/pkg/model/analysis"
+	model_core "github.com/buildbarn/bonanza/pkg/model/core"
+	model_encoding "github.com/buildbarn/bonanza/pkg/model/encoding"
+	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
+	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
+	model_starlark "github.com/buildbarn/bonanza/pkg/model/starlark"
+	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
+	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
+	model_filesystem_pb "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
+	object_pb "github.com/buildbarn/bonanza/pkg/proto/storage/object"
+	"github.com/buildbarn/bonanza/pkg/storage/dag"
+	"github.com/buildbarn/bonanza/pkg/storage/object"
+
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
+
+	"go.uber.org/mock/gomock"
+)
+
+// baseComputerTester can be used to simulate invocations of build
+// analysis functions.
+type baseComputerTester struct {
+	computer                 model_analysis.Computer[model_core.CreatedObjectTree, model_core.CreatedObjectTree]
+	parsedObjectPoolIngester *model_parser.ParsedObjectPoolIngester[model_core.CreatedObjectTree]
+}
+
+// newBaseComputerTester creates a new instance of BaseComputer that has
+// all of its dependencies mocked.
+//
+// As references to object inputs and metadata of object outputs are of
+// type model_core.CreatedObjectTree, the resulting BaseComputer does
+// not depend on any storage access.
+func newBaseComputerTester(ctrl *gomock.Controller) *baseComputerTester {
+	buildSpecificationEncoder := NewMockBinaryEncoder(ctrl)
+	buildSpecificationEncoder.EXPECT().GetDecodingParametersSizeBytes().Return(16).AnyTimes()
+	cacheDirectory := NewMockDirectory(ctrl)
+	filePool := NewMockFilePool(ctrl)
+	httpRoundTripper := NewMockRoundTripperForTesting(ctrl)
+	parsedObjectPoolIngester := model_parser.NewParsedObjectPoolIngester(
+		model_parser.NewParsedObjectPool(
+			eviction.NewFIFOSet[model_parser.ParsedObjectEvictionKey](),
+			/* maximumCount = */ 0,
+			/* maximumSizeBytes = */ 0,
+		),
+		createdObjectReader{},
+	)
+
+	bzlFileBuiltins, buildFileBuiltins := model_starlark.GetBuiltins[model_core.CreatedObjectTree, model_core.CreatedObjectTree]()
+	return &baseComputerTester{
+		computer: model_analysis.NewBaseComputer[model_core.CreatedObjectTree, model_core.CreatedObjectTree](
+			parsedObjectPoolIngester,
+			model_core.NewDecodable(
+				model_core.CreatedObjectTree{
+					Contents: object.MustNewContents(object_pb.ReferenceFormat_SHA256_V1, nil, []byte("Build specification")),
+				},
+				[]byte("Build specification"),
+			),
+			buildSpecificationEncoder,
+			&http.Client{Transport: httpRoundTripper},
+			filePool,
+			cacheDirectory,
+			/* executionClient = */ nil,
+			object.NewInstanceName("default"),
+			bzlFileBuiltins,
+			buildFileBuiltins,
+		),
+		parsedObjectPoolIngester: parsedObjectPoolIngester,
+	}
+}
+
+// expectCaptureCreatedObject can be called by tests to indicate that
+// the analysis function may create new objects.
+func (bct *baseComputerTester) expectCaptureCreatedObject(e *MockFileRootEnvironmentForTesting) *gomock.Call {
+	return e.EXPECT().CaptureCreatedObject(gomock.Any()).
+		DoAndReturn(func(createdObject model_core.CreatedObject[model_core.CreatedObjectTree]) model_core.CreatedObjectTree {
+			return model_core.CreatedObjectTree(createdObject)
+		})
+}
+
+// expectCaptureCreatedObject can be called by tests to indicate that
+// the analysis function needs access to attributes necessary for
+// creating new directories.
+func (bct *baseComputerTester) expectGetDirectoryCreationParametersObjectValue(t *testing.T, e *MockFileRootEnvironmentForTesting) *gomock.Call {
+	return e.EXPECT().GetDirectoryCreationParametersObjectValue(
+		testutil.EqProto(t, &model_analysis_pb.DirectoryCreationParametersObject_Key{}),
+	).Return(util.Must(model_filesystem.NewDirectoryCreationParametersFromProto(
+		&model_filesystem_pb.DirectoryCreationParameters{
+			Access:                    &model_filesystem_pb.DirectoryAccessParameters{},
+			DirectoryMaximumSizeBytes: 1 << 16,
+		},
+		util.Must(object.NewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1)),
+	)), true)
+}
+
+// expectCaptureCreatedObject can be called by tests to indicate that
+// the analysis function needs read access to directories.
+func (bct *baseComputerTester) expectGetDirectoryReadersValue(t *testing.T, e *MockFileRootEnvironmentForTesting) *gomock.Call {
+	return e.EXPECT().GetDirectoryReadersValue(
+		testutil.EqProto(t, &model_analysis_pb.DirectoryReaders_Key{}),
+	).Return(&model_analysis.DirectoryReaders[model_core.CreatedObjectTree]{
+		DirectoryContents: model_parser.LookupParsedObjectReader(
+			bct.parsedObjectPoolIngester,
+			model_parser.NewMessageObjectParser[model_core.CreatedObjectTree, model_filesystem_pb.DirectoryContents](),
+		),
+	}, true)
+}
+
+// requireEqualPatchedMessage can be called by tests to validate that an
+// analysis function returns the right response.
+func requireEqualPatchedMessage[TMessage proto.Message](
+	t *testing.T,
+	want model_core.TopLevelMessage[TMessage, model_core.CreatedObjectTree],
+	got model_core.PatchedMessage[TMessage, dag.ObjectContentsWalker],
+) {
+	t.Helper()
+	gotMessage, _ := got.SortAndSetReferences()
+	if !model_core.TopLevelMessagesEqual(want, gotMessage) {
+		t.Fatalf("Not equal:\nWant:\n\n%s\n\nGot:\n\n%s", protojson.Format(want.Message), protojson.Format(got.Message))
+	}
+}
+
+// newMessage creates a new top-level message corresponding to a
+// Protobuf message.
+func newMessage[TMessage any](
+	builder func(*model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) TMessage,
+) model_core.TopLevelMessage[TMessage, model_core.CreatedObjectTree] {
+	m, metadata := model_core.BuildPatchedMessage(builder).SortAndSetReferences()
+	return model_core.NewTopLevelMessage(
+		m.Message,
+		object.OutgoingReferencesList[model_core.CreatedObjectTree](metadata),
+	)
+}
+
+// attachMessageObject can be called within the builder callback
+// provided to newMessage() to attach objects to a message.
+func attachMessageObject[TMessage proto.Message](
+	parentPatcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree],
+	builder func(childPatcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) TMessage,
+) *model_core_pb.DecodableReference {
+	createdObject := util.Must(
+		model_core.MarshalAndEncodePatchedMessage(
+			model_core.BuildPatchedMessage(builder),
+			util.Must(object.NewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1)),
+			model_encoding.NewChainedBinaryEncoder(nil),
+		),
+	)
+	return &model_core_pb.DecodableReference{
+		Reference: parentPatcher.AddReference(
+			createdObject.Value.GetLocalReference(),
+			model_core.CreatedObjectTree(createdObject.Value),
+		),
+		DecodingParameters: createdObject.GetDecodingParameters(),
+	}
+}
+
+// createdObjectReader is used by baseComputerTester to configure
+// BaseComputer so that it can read the contents of objects directly out
+// of references, as opposed to reading them from storage.
+type createdObjectReader struct{}
+
+func (createdObjectReader) ReadParsedObject(ctx context.Context, reference model_core.CreatedObjectTree) (model_core.Message[[]byte, model_core.CreatedObjectTree], error) {
+	return model_core.NewMessage(reference.GetPayload(), object.OutgoingReferencesList[model_core.CreatedObjectTree](reference.Metadata)), nil
+}
+
+func (createdObjectReader) GetDecodingParametersSizeBytes() int {
+	return 0
+}

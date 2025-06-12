@@ -80,7 +80,7 @@ func (r *reposFilePropertiesResolver[TReference, TMetadata]) getCurrentFilePrope
 	}
 	fileProperties := r.currentRepo.GetCurrentFileProperties()
 	if !fileProperties.IsSet() {
-		return model_core.Message[*model_filesystem_pb.FileProperties, TReference]{}, errors.New("path resolves to a directory")
+		return model_core.Message[*model_filesystem_pb.FileProperties, TReference]{}, errors.New("path resolves to a directory, while a file was expected")
 	}
 	return fileProperties, nil
 }
