@@ -150,18 +150,38 @@ func NewDepsetContentsFromList[TReference object.BasicReference, TMetadata model
 	children []any,
 	order model_starlark_pb.Depset_Order,
 ) *DepsetContents[TReference, TMetadata] {
-	switch len(children) {
-	case 0:
+	// Get rid of singleton lists.
+	for len(children) == 1 {
+		switch v := children[0].(type) {
+		case starlark.Value:
+			return &DepsetContents[TReference, TMetadata]{
+				children: v,
+			}
+		case model_core.Message[*model_starlark_pb.List_Element, TReference]:
+			// Only track the order if the depset contains
+			// multiple elements.
+			if level, ok := v.Message.Level.(*model_starlark_pb.List_Element_Parent_); ok && level.Parent.Count > 1 {
+				return &DepsetContents[TReference, TMetadata]{
+					children: v,
+					order:    order,
+				}
+			}
+			return &DepsetContents[TReference, TMetadata]{
+				children: v,
+			}
+		case []any:
+			children = v
+		default:
+			panic("unexpected element type")
+		}
+	}
+
+	if len(children) == 0 {
 		return &DepsetContents[TReference, TMetadata]{}
-	case 1:
-		return &DepsetContents[TReference, TMetadata]{
-			children: children[0],
-		}
-	default:
-		return &DepsetContents[TReference, TMetadata]{
-			children: children,
-			order:    order,
-		}
+	}
+	return &DepsetContents[TReference, TMetadata]{
+		children: children,
+		order:    order,
 	}
 }
 
