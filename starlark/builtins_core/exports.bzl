@@ -3080,6 +3080,16 @@ def builtins_internal_cc_internal_dynamic_library_soname(actions, path, preserve
     # TODO: This should include the name of the configuration.
     return "lib" + _escaped_path(path)
 
+def builtins_internal_cc_internal_dynamic_library_symlink(actions, library, solib_directory, preserve_name, prefix_consumer):
+    # TODO: The symlink is likely not created in the right location.
+    # TODO: Respect prefix_consumer.
+    symlink = actions.declare_file("%s/%s" % (
+        solib_directory,
+        builtins_internal_cc_internal_dynamic_library_soname(actions, library.path, preserve_name),
+    ))
+    actions.symlink(symlink, target_file = library)
+    return symlink
+
 def builtins_internal_cc_internal_empty_compilation_outputs():
     return _create_compilation_outputs(
         header_tokens = depset(),
@@ -3356,6 +3366,7 @@ exported_toplevels["_builtins"] = struct(
             create_module_map_action = builtins_internal_cc_internal_create_module_map_action,
             create_shared_non_lto_artifacts = builtins_internal_cc_internal_create_shared_non_lto_artifacts,
             dynamic_library_soname = builtins_internal_cc_internal_dynamic_library_soname,
+            dynamic_library_symlink = builtins_internal_cc_internal_dynamic_library_symlink,
             empty_compilation_outputs = builtins_internal_cc_internal_empty_compilation_outputs,
             escape_label = builtins_internal_cc_internal_escape_label,
             for_object_file = builtins_internal_cc_internal_for_object_file,
