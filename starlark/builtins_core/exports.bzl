@@ -3067,10 +3067,18 @@ def builtins_internal_cc_internal_create_shared_non_lto_artifacts(
             fail("TODO")
     return shared_non_lto_backends
 
+def _escaped_path(p):
+    return "".join([
+        "_U" if c == "_" else "_S" if c == "/" else "_B" if c == "\\" else "_C" if c == ":" else "_A" if c == "@" else c
+        for c in p.elems()
+    ])
+
 def builtins_internal_cc_internal_dynamic_library_soname(actions, path, preserve_name):
     if preserve_name:
         return path.rsplit("/", 1)[-1]
-    fail("TODO: implement!")
+
+    # TODO: This should include the name of the configuration.
+    return "lib" + _escaped_path(path)
 
 def builtins_internal_cc_internal_empty_compilation_outputs():
     return _create_compilation_outputs(
@@ -3081,10 +3089,7 @@ def builtins_internal_cc_internal_empty_compilation_outputs():
     )
 
 def builtins_internal_cc_internal_escape_label(label):
-    return "".join([
-        "_U" if c == "_" else "_S" if c == "/" else "_B" if c == "\\" else "_C" if c == ":" else "_A" if c == "@" else c
-        for c in (label.repo_name + "@" + label.package + ":" + label.name).elems()
-    ])
+    return _escaped_path(label.repo_name + "@" + label.package + ":" + label.name)
 
 def builtins_internal_cc_internal_for_object_file(name, is_whole_archive):
     return struct(
