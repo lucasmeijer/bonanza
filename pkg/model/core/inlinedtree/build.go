@@ -102,134 +102,152 @@ func Build[
 ) (model_core.PatchedMessage[TParentMessagePtr, TMetadata], error) {
 	defer candidates.Discard()
 
-	// Start off with an empty output message.
-	output := model_core.NewSimplePatchedMessage[TMetadata](TParentMessagePtr(new(TParentMessage)))
-	outputSizeBytes := 0
-
-	// For each candidate, compute how much the size of the output
-	// message increases, either when inlined or stored externally.
-	//
-	// TODO: Prevent these from getting recomputed every time.
-	bogusData := []byte("A")
-	bogusContents, err := options.ReferenceFormat.NewContents(nil, bogusData)
-	if err != nil {
-		panic(err)
-	}
-	bogusCreatedObject := model_core.CreatedObject[TMetadata]{
-		Contents: bogusContents,
-	}
-
-	candidatesToInline := make([]bool, len(candidates))
-	queuedCandidates := queuedCandidates{
-		Slice: make(ds.Slice[queuedCandidate], 0, len(candidates)),
-	}
-	for i, candidate := range candidates {
-		// Determine how much space this candidate uses when inlined.
+	// It is often the case that everything can be inlined. First
+	// determine the size of the resulting message if all candidates
+	// were to be inlined.
+	candidatesInlinedSizeBytes := make([]int, 0, len(candidates))
+	everythingInlinedSizeBytes := 0
+	for _, candidate := range candidates {
 		parentInlined := model_core.PatchedMessage[TParentMessagePtr, TMetadata]{
 			Message: TParentMessagePtr(new(TParentMessage)),
 		}
 		candidate.ParentAppender(parentInlined, nil)
 		inlinedSizeBytes := candidate.ExternalMessage.Patcher.GetReferencesSizeBytes() + marshalOptions.Size(parentInlined.Message)
+		candidatesInlinedSizeBytes = append(candidatesInlinedSizeBytes, inlinedSizeBytes)
+		everythingInlinedSizeBytes += inlinedSizeBytes
+	}
 
-		// Determine how much space this candidate uses when
-		// stored externally. The caller can set
-		// ExternalMessage.Message to nil to indicate that
-		// inlining should always be performed, meaning this can
-		// be skipped.
-		if candidate.ExternalMessage.Message != nil {
-			parentExternal := model_core.NewSimplePatchedMessage[TMetadata](TParentMessagePtr(new(TParentMessage)))
-			decodableBogusCreatedObject := model_core.NewDecodable(
-				bogusCreatedObject,
-				make([]byte, candidate.Encoder.GetDecodingParametersSizeBytes()),
-			)
-			candidate.ParentAppender(parentExternal, &decodableBogusCreatedObject)
-			externalSizeBytes := parentExternal.Patcher.GetReferencesSizeBytes() + marshalOptions.Size(parentExternal.Message)
-			parentExternal.Discard()
+	output := model_core.NewSimplePatchedMessage[TMetadata](TParentMessagePtr(new(TParentMessage)))
+	candidatesToInline := make([]bool, len(candidates))
+	if everythingInlinedSizeBytes <= options.MaximumSizeBytes {
+		// All candidates can be inlined. This means we don't
+		// need to do any additional processing.
+		for i, candidate := range candidates {
+			candidatesToInline[i] = true
+			output.Patcher.Merge(candidate.ExternalMessage.Patcher)
+		}
+	} else {
+		// We can't fit all candidates. For each candidate,
+		// compute how much the size of the output message
+		// increases when inlined, compared to storing it
+		// externally.
+		//
+		// TODO: Prevent these from getting recomputed every time.
+		bogusData := []byte("A")
+		bogusContents, err := options.ReferenceFormat.NewContents(nil, bogusData)
+		if err != nil {
+			panic(err)
+		}
+		bogusCreatedObject := model_core.CreatedObject[TMetadata]{
+			Contents: bogusContents,
+		}
 
-			if inlinedSizeBytes > externalSizeBytes {
-				// Inlining the data takes up more space.
-				// Queue it, so that we can inline it only
-				// if enough space is available.
-				outputSizeBytes += externalSizeBytes
-				queuedCandidates.Push(queuedCandidate{
-					candidateIndex:           i,
-					inlinedSizeIncreaseBytes: inlinedSizeBytes - externalSizeBytes,
-				})
-				continue
+		outputSizeBytes := 0
+		queuedCandidates := queuedCandidates{
+			Slice: make(ds.Slice[queuedCandidate], 0, len(candidates)),
+		}
+		for i, candidate := range candidates {
+			// Determine how much space this candidate uses when
+			// stored externally. The caller can set
+			// ExternalMessage.Message to nil to indicate that
+			// inlining should always be performed, meaning this can
+			// be skipped.
+			inlinedSizeBytes := candidatesInlinedSizeBytes[i]
+			if candidate.ExternalMessage.Message != nil {
+				parentExternal := model_core.NewSimplePatchedMessage[TMetadata](TParentMessagePtr(new(TParentMessage)))
+				decodableBogusCreatedObject := model_core.NewDecodable(
+					bogusCreatedObject,
+					make([]byte, candidate.Encoder.GetDecodingParametersSizeBytes()),
+				)
+				candidate.ParentAppender(parentExternal, &decodableBogusCreatedObject)
+				externalSizeBytes := parentExternal.Patcher.GetReferencesSizeBytes() + marshalOptions.Size(parentExternal.Message)
+				parentExternal.Discard()
+
+				if inlinedSizeBytes > externalSizeBytes {
+					// Inlining the data takes up more space.
+					// Queue it, so that we can inline it only
+					// if enough space is available.
+					outputSizeBytes += externalSizeBytes
+					queuedCandidates.Push(queuedCandidate{
+						candidateIndex:           i,
+						inlinedSizeIncreaseBytes: inlinedSizeBytes - externalSizeBytes,
+					})
+					continue
+				}
 			}
+
+			// Inlining the data is smaller than storing it
+			// externally. Inline it immediately.
+			candidatesToInline[i] = true
+			output.Patcher.Merge(candidate.ExternalMessage.Patcher)
+			outputSizeBytes += inlinedSizeBytes
 		}
 
-		// Inlining the data is smaller than storing it
-		// externally. Inline it immediately.
-		candidatesToInline[i] = true
-		output.Patcher.Merge(candidate.ExternalMessage.Patcher)
-		outputSizeBytes += inlinedSizeBytes
-	}
-
-	// Determine how much space is needed to inline all candidates
-	// that would otherwise cause the height of the object tree to
-	// increase. If space is available, inline them all. This
-	// ensures that the height is minimized.
-	heightAllInlined := output.Patcher.GetHeight()
-	highestInlinedSizeIncreaseBytes := 0
-	for _, queuedCandidate := range queuedCandidates.Slice {
-		candidate := &candidates[queuedCandidate.candidateIndex]
-		if h := candidate.ExternalMessage.Patcher.GetHeight(); heightAllInlined == h {
-			highestInlinedSizeIncreaseBytes += queuedCandidate.inlinedSizeIncreaseBytes
-		} else if heightAllInlined < h {
-			heightAllInlined = h
-			highestInlinedSizeIncreaseBytes = queuedCandidate.inlinedSizeIncreaseBytes
-		}
-	}
-
-	if newOutputSizeBytes := outputSizeBytes + highestInlinedSizeIncreaseBytes; newOutputSizeBytes <= options.MaximumSizeBytes {
-		for i := 0; i < queuedCandidates.Len(); {
-			queuedCandidate := &queuedCandidates.Slice[i]
+		// Determine how much space is needed to inline all candidates
+		// that would otherwise cause the height of the object tree to
+		// increase. If space is available, inline them all. This
+		// ensures that the height is minimized.
+		heightAllInlined := output.Patcher.GetHeight()
+		highestInlinedSizeIncreaseBytes := 0
+		for _, queuedCandidate := range queuedCandidates.Slice {
 			candidate := &candidates[queuedCandidate.candidateIndex]
-			if candidate.ExternalMessage.Patcher.GetHeight() == heightAllInlined {
-				candidatesToInline[queuedCandidate.candidateIndex] = true
-				output.Patcher.Merge(candidate.ExternalMessage.Patcher)
-
-				queuedCandidates.Swap(i, queuedCandidates.Len()-1)
-				queuedCandidates.Pop()
-			} else {
-				i++
+			if h := candidate.ExternalMessage.Patcher.GetHeight(); heightAllInlined == h {
+				highestInlinedSizeIncreaseBytes += queuedCandidate.inlinedSizeIncreaseBytes
+			} else if heightAllInlined < h {
+				heightAllInlined = h
+				highestInlinedSizeIncreaseBytes = queuedCandidate.inlinedSizeIncreaseBytes
 			}
 		}
-		outputSizeBytes = newOutputSizeBytes
-	}
 
-	// Fill the remaining space with as many candidates as possible,
-	// inlining the smallest ones first. Even though this is
-	// detrimental to the overall height, it reduces the total
-	// number of objects significantly.
-	//
-	// It may be that multiple candidates share the same size. In
-	// that case we could inline the candidate with the lowest
-	// index. However, this has the disadvantage that the order in
-	// which candidates are provided to this function matters even
-	// if they pertain to different fields, making refactoring hard.
-	//
-	// Work around this by inlining all equally sized candidates
-	// collectively. If there is no space to fit all of them, we
-	// store them externally and inline less preferential candidates
-	// instead.
-	heap.Init(&queuedCandidates)
-	var queuedCandidatesWithSameSize []queuedCandidate
-	for queuedCandidates.Len() > 0 && outputSizeBytes+queuedCandidates.Slice[0].inlinedSizeIncreaseBytes <= options.MaximumSizeBytes {
-		queuedCandidatesWithSameSize = append(queuedCandidatesWithSameSize[:0], heap.Pop(&queuedCandidates).(queuedCandidate))
-		inlinedSizeIncreaseBytes := queuedCandidatesWithSameSize[0].inlinedSizeIncreaseBytes
-		for queuedCandidates.Len() > 0 && queuedCandidates.Slice[0].inlinedSizeIncreaseBytes == inlinedSizeIncreaseBytes {
-			queuedCandidatesWithSameSize = append(queuedCandidatesWithSameSize, heap.Pop(&queuedCandidates).(queuedCandidate))
-		}
-
-		if newOutputSizeBytes := outputSizeBytes + inlinedSizeIncreaseBytes*len(queuedCandidatesWithSameSize); newOutputSizeBytes <= options.MaximumSizeBytes {
-			for _, queuedCandidate := range queuedCandidatesWithSameSize {
+		if newOutputSizeBytes := outputSizeBytes + highestInlinedSizeIncreaseBytes; newOutputSizeBytes <= options.MaximumSizeBytes {
+			for i := 0; i < queuedCandidates.Len(); {
+				queuedCandidate := &queuedCandidates.Slice[i]
 				candidate := &candidates[queuedCandidate.candidateIndex]
-				candidatesToInline[queuedCandidate.candidateIndex] = true
-				output.Patcher.Merge(candidate.ExternalMessage.Patcher)
+				if candidate.ExternalMessage.Patcher.GetHeight() == heightAllInlined {
+					candidatesToInline[queuedCandidate.candidateIndex] = true
+					output.Patcher.Merge(candidate.ExternalMessage.Patcher)
+
+					queuedCandidates.Swap(i, queuedCandidates.Len()-1)
+					queuedCandidates.Pop()
+				} else {
+					i++
+				}
 			}
 			outputSizeBytes = newOutputSizeBytes
+		}
+
+		// Fill the remaining space with as many candidates as possible,
+		// inlining the smallest ones first. Even though this is
+		// detrimental to the overall height, it reduces the total
+		// number of objects significantly.
+		//
+		// It may be that multiple candidates share the same size. In
+		// that case we could inline the candidate with the lowest
+		// index. However, this has the disadvantage that the order in
+		// which candidates are provided to this function matters even
+		// if they pertain to different fields, making refactoring hard.
+		//
+		// Work around this by inlining all equally sized candidates
+		// collectively. If there is no space to fit all of them, we
+		// store them externally and inline less preferential candidates
+		// instead.
+		heap.Init(&queuedCandidates)
+		var queuedCandidatesWithSameSize []queuedCandidate
+		for queuedCandidates.Len() > 0 && outputSizeBytes+queuedCandidates.Slice[0].inlinedSizeIncreaseBytes <= options.MaximumSizeBytes {
+			queuedCandidatesWithSameSize = append(queuedCandidatesWithSameSize[:0], heap.Pop(&queuedCandidates).(queuedCandidate))
+			inlinedSizeIncreaseBytes := queuedCandidatesWithSameSize[0].inlinedSizeIncreaseBytes
+			for queuedCandidates.Len() > 0 && queuedCandidates.Slice[0].inlinedSizeIncreaseBytes == inlinedSizeIncreaseBytes {
+				queuedCandidatesWithSameSize = append(queuedCandidatesWithSameSize, heap.Pop(&queuedCandidates).(queuedCandidate))
+			}
+
+			if newOutputSizeBytes := outputSizeBytes + inlinedSizeIncreaseBytes*len(queuedCandidatesWithSameSize); newOutputSizeBytes <= options.MaximumSizeBytes {
+				for _, queuedCandidate := range queuedCandidatesWithSameSize {
+					candidate := &candidates[queuedCandidate.candidateIndex]
+					candidatesToInline[queuedCandidate.candidateIndex] = true
+					output.Patcher.Merge(candidate.ExternalMessage.Patcher)
+				}
+				outputSizeBytes = newOutputSizeBytes
+			}
 		}
 	}
 

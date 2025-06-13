@@ -226,7 +226,6 @@ func TestFileRoot(t *testing.T) {
 						},
 					}
 				}).Decay())
-				bct.expectCaptureCreatedObject(e).AnyTimes()
 
 				fileRoot, err := bct.computer.ComputeFileRootValue(
 					ctx,

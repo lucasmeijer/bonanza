@@ -177,7 +177,6 @@ func TestBuild(t *testing.T) {
 		// be able to inline the candidate, it should not store
 		// the data externally.
 		encoder := NewMockBinaryEncoder(ctrl)
-		encoder.EXPECT().GetDecodingParametersSizeBytes().Return(4)
 
 		leaves := &model_filesystem_pb.Leaves{
 			Symlinks: []*model_filesystem_pb.SymlinkNode{{
@@ -194,20 +193,6 @@ func TestBuild(t *testing.T) {
 				output.Message.Leaves = leavesInline
 			}).
 			Times(2)
-		metadata1 := NewMockReferenceMetadata(ctrl)
-		parentAppender.EXPECT().Call(gomock.Any(), gomock.Not(nil)).
-			Do(func(output model_core.PatchedMessage[*model_filesystem_pb.DirectoryContents, model_core.ReferenceMetadata], externalObject *model_core.Decodable[model_core.CreatedObject[model_core.ReferenceMetadata]]) {
-				output.Message.Leaves = &model_filesystem_pb.DirectoryContents_LeavesExternal{
-					LeavesExternal: &model_filesystem_pb.LeavesReference{
-						Reference: &model_core_pb.DecodableReference{
-							Reference:          output.Patcher.AddReference(externalObject.Value.GetLocalReference(), metadata1),
-							DecodingParameters: externalObject.GetDecodingParameters(),
-						},
-					},
-				}
-			}).
-			Times(1)
-		metadata1.EXPECT().Discard()
 
 		output, err := inlinedtree.Build(
 			inlinedtree.CandidateList[*model_filesystem_pb.DirectoryContents, model_core.ReferenceMetadata]{{
