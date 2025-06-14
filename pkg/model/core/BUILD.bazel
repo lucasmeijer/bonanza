@@ -9,6 +9,7 @@ go_library(
         "decodable.go",
         "file_writing_object_capturer.go",
         "get_index_from_reference_message.go",
+        "marshalable.go",
         "message.go",
         "noop_reference_metadata.go",
         "object_capturer.go",

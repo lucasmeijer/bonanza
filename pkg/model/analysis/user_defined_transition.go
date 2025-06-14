@@ -212,7 +212,7 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 		btree.NewObjectCreatingNodeMerger(
 			c.getValueObjectEncoder(),
 			c.getReferenceFormat(),
-			/* parentNodeComputer = */ func(createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]], childNodes []*model_analysis_pb.BuildSettingOverride) (model_core.PatchedMessage[*model_analysis_pb.BuildSettingOverride, TMetadata], error) {
+			/* parentNodeComputer = */ func(createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]], childNodes []*model_analysis_pb.BuildSettingOverride) model_core.PatchedMessage[*model_analysis_pb.BuildSettingOverride, TMetadata] {
 				var firstLabel string
 				switch firstEntry := childNodes[0].Level.(type) {
 				case *model_analysis_pb.BuildSettingOverride_Leaf_:
@@ -229,7 +229,7 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 							},
 						},
 					}
-				}), nil
+				})
 			},
 		),
 	)
@@ -314,8 +314,8 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 		return model_core.NewSimplePatchedMessage[TMetadata, *model_core_pb.DecodableReference](nil), nil
 	}
 
-	createdConfiguration, err := model_core.MarshalAndEncodePatchedListMessage(
-		buildSettingOverrides,
+	createdConfiguration, err := model_core.MarshalAndEncode(
+		model_core.MessageListToMarshalable(buildSettingOverrides),
 		c.getReferenceFormat(),
 		c.getValueObjectEncoder(),
 	)

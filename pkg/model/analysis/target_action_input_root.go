@@ -185,8 +185,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionInputRootValue(
 		return PatchedTargetActionInputRootValue{}, err
 	}
 
-	rootDirectoryObject, err := model_core.MarshalAndEncodePatchedMessage(
-		createdRootDirectory.Message,
+	rootDirectoryObject, err := model_core.MarshalAndEncode(
+		model_core.MessageToMarshalable(createdRootDirectory.Message),
 		c.getReferenceFormat(),
 		directoryCreationParameters.GetEncoder(),
 	)

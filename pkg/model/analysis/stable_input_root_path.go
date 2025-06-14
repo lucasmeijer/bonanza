@@ -44,7 +44,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeStableInputRootPathValue(ct
 		environment[environmentVariable.Name] = environmentVariable.Value
 	}
 	referenceFormat := c.getReferenceFormat()
-	environmentVariableList, err := convertDictToEnvironmentVariableList(
+	environmentVariableList, _, err := convertDictToEnvironmentVariableList(
 		environment,
 		commandEncoder,
 		referenceFormat,
@@ -54,9 +54,10 @@ func (c *baseComputer[TReference, TMetadata]) ComputeStableInputRootPathValue(ct
 		return PatchedStableInputRootPathValue{}, err
 	}
 
-	createdCommand, err := model_core.MarshalAndEncodePatchedMessage(
+	// TODO: This should use inlinedtree.Build().
+	createdCommand, err := model_core.MarshalAndEncode(
 		model_core.NewPatchedMessage(
-			&model_command_pb.Command{
+			model_core.NewMessageMarshalable(&model_command_pb.Command{
 				Arguments: []*model_command_pb.ArgumentList_Element{{
 					Level: &model_command_pb.ArgumentList_Element_Leaf{
 						Leaf: "pwd",
@@ -67,7 +68,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeStableInputRootPathValue(ct
 				FileCreationParameters:      fileCreationParametersValue.Message.FileCreationParameters,
 				WorkingDirectory:            path.EmptyBuilder.GetUNIXString(),
 				NeedsStableInputRootPath:    true,
-			},
+			}),
 			environmentVariableList.Patcher,
 		),
 		referenceFormat,
@@ -77,13 +78,13 @@ func (c *baseComputer[TReference, TMetadata]) ComputeStableInputRootPathValue(ct
 		return PatchedStableInputRootPathValue{}, fmt.Errorf("failed to create command: %w", err)
 	}
 
-	createdInputRoot, err := model_core.MarshalAndEncodePatchedMessage(
+	createdInputRoot, err := model_core.MarshalAndEncode(
 		model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](
-			&model_filesystem_pb.DirectoryContents{
+			model_core.NewMessageMarshalable(&model_filesystem_pb.DirectoryContents{
 				Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
 					LeavesInline: &model_filesystem_pb.Leaves{},
 				},
-			},
+			}),
 		),
 		referenceFormat,
 		directoryCreationParameters.GetEncoder(),

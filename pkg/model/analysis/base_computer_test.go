@@ -148,8 +148,8 @@ func attachMessageObject[TMessage proto.Message](
 	builder func(childPatcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) TMessage,
 ) *model_core_pb.DecodableReference {
 	createdObject := util.Must(
-		model_core.MarshalAndEncodePatchedMessage(
-			model_core.BuildPatchedMessage(builder),
+		model_core.MarshalAndEncode(
+			model_core.MessageToMarshalable(model_core.BuildPatchedMessage(builder)),
 			util.Must(object.NewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1)),
 			model_encoding.NewChainedBinaryEncoder(nil),
 		),

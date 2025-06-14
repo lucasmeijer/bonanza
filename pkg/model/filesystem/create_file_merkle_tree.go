@@ -37,7 +37,7 @@ func CreateFileMerkleTree[T model_core.ReferenceMetadata](ctx context.Context, p
 		btree.NewObjectCreatingNodeMerger[*model_filesystem_pb.FileContents, T](
 			parameters.fileContentsListEncoder,
 			parameters.referenceFormat,
-			/* parentNodeComputer = */ func(createdObject model_core.Decodable[model_core.CreatedObject[T]], childNodes []*model_filesystem_pb.FileContents) (model_core.PatchedMessage[*model_filesystem_pb.FileContents, T], error) {
+			/* parentNodeComputer = */ func(createdObject model_core.Decodable[model_core.CreatedObject[T]], childNodes []*model_filesystem_pb.FileContents) model_core.PatchedMessage[*model_filesystem_pb.FileContents, T] {
 				// Compute the total file size to store
 				// in the parent FileContents node.
 				var totalSizeBytes uint64
@@ -55,7 +55,7 @@ func CreateFileMerkleTree[T model_core.ReferenceMetadata](ctx context.Context, p
 						},
 						TotalSizeBytes: totalSizeBytes,
 					}
-				}), nil
+				})
 			},
 		),
 	)

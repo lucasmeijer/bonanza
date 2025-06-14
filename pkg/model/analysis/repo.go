@@ -45,7 +45,6 @@ import (
 
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"go.starlark.net/starlark"
@@ -1630,24 +1629,25 @@ func bytesToValidString(p []byte) (string, bool) {
 	}
 }
 
-func newArgumentsBuilder[TMetadata model_core.ReferenceMetadata](commandEncoder model_encoding.BinaryEncoder, referenceFormat object.ReferenceFormat, objectCapturer model_core.CreatedObjectCapturer[TMetadata]) btree.Builder[*model_command_pb.ArgumentList_Element, TMetadata] {
+func newArgumentsBuilder[TMetadata model_core.ReferenceMetadata](commandEncoder model_encoding.BinaryEncoder, referenceFormat object.ReferenceFormat, objectCapturer model_core.CreatedObjectCapturer[TMetadata]) (btree.Builder[*model_command_pb.ArgumentList_Element, TMetadata], btree.ParentNodeComputer[*model_command_pb.ArgumentList_Element, TMetadata]) {
+	parentNodeComputer := func(createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]], childNodes []*model_command_pb.ArgumentList_Element) model_core.PatchedMessage[*model_command_pb.ArgumentList_Element, TMetadata] {
+		return model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[TMetadata]) *model_command_pb.ArgumentList_Element {
+			return &model_command_pb.ArgumentList_Element{
+				Level: &model_command_pb.ArgumentList_Element_Parent{
+					Parent: patcher.CaptureAndAddDecodableReference(createdObject, objectCapturer),
+				},
+			}
+		})
+	}
 	return btree.NewSplitProllyBuilder(
 		1<<16,
 		1<<18,
 		btree.NewObjectCreatingNodeMerger(
 			commandEncoder,
 			referenceFormat,
-			/* parentNodeComputer = */ func(createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]], childNodes []*model_command_pb.ArgumentList_Element) (model_core.PatchedMessage[*model_command_pb.ArgumentList_Element, TMetadata], error) {
-				return model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[TMetadata]) *model_command_pb.ArgumentList_Element {
-					return &model_command_pb.ArgumentList_Element{
-						Level: &model_command_pb.ArgumentList_Element_Parent{
-							Parent: patcher.CaptureAndAddDecodableReference(createdObject, objectCapturer),
-						},
-					}
-				}), nil
-			},
+			parentNodeComputer,
 		),
-	)
+	), parentNodeComputer
 }
 
 func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -1707,7 +1707,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 	// variables to B-trees, so that they can
 	// be attached to the Command message.
 	referenceFormat := mrc.computer.getReferenceFormat()
-	argumentsBuilder := newArgumentsBuilder(mrc.commandEncoder, referenceFormat, model_core.WalkableCreatedObjectCapturer)
+	argumentsBuilder, argumentsParentNodeComputer := newArgumentsBuilder(mrc.commandEncoder, referenceFormat, model_core.WalkableCreatedObjectCapturer)
 	for _, argument := range arguments {
 		var argumentStr string
 		switch typedArgument := argument.(type) {
@@ -1733,7 +1733,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 		return nil, err
 	}
 
-	environmentVariableList, err := convertDictToEnvironmentVariableList(
+	environmentVariableList, envParentNodeComputer, err := convertDictToEnvironmentVariableList(
 		environment,
 		mrc.commandEncoder,
 		referenceFormat,
@@ -1781,7 +1781,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 			// Fields that should always be inlined into the
 			// Command message.
 			{
-				ExternalMessage: model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker]((proto.Message)(nil)),
+				ExternalMessage: model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker]((model_core.Marshalable)(nil)),
 				ParentAppender: func(
 					command model_core.PatchedMessage[*model_command_pb.Command, dag.ObjectContentsWalker],
 					externalObject *model_core.Decodable[model_core.CreatedObject[dag.ObjectContentsWalker]],
@@ -1794,40 +1794,38 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 			},
 			// Fields that can be stored externally if needed.
 			{
-				ExternalMessage: model_core.NewPatchedMessage(
-					(proto.Message)(nil),
-					argumentList.Patcher,
-				),
+				ExternalMessage: model_core.MessageListToMarshalable(argumentList),
+				Encoder:         mrc.commandEncoder,
 				ParentAppender: func(
 					command model_core.PatchedMessage[*model_command_pb.Command, dag.ObjectContentsWalker],
 					externalObject *model_core.Decodable[model_core.CreatedObject[dag.ObjectContentsWalker]],
 				) {
-					// TODO: This should push out the
-					// arguments if they get too big.
-					command.Message.Arguments = argumentList.Message
+					command.Message.Arguments = btree.MaybeMergeNodes(
+						argumentList.Message,
+						externalObject,
+						command.Patcher,
+						argumentsParentNodeComputer,
+					)
 				},
 			},
 			{
-				ExternalMessage: model_core.NewPatchedMessage(
-					(proto.Message)(nil),
-					environmentVariableList.Patcher,
-				),
+				ExternalMessage: model_core.MessageListToMarshalable(environmentVariableList),
+				Encoder:         mrc.commandEncoder,
 				ParentAppender: func(
 					command model_core.PatchedMessage[*model_command_pb.Command, dag.ObjectContentsWalker],
 					externalObject *model_core.Decodable[model_core.CreatedObject[dag.ObjectContentsWalker]],
 				) {
-					// TODO: This should push out the
-					// environment variables if they get
-					// too big.
-					command.Message.EnvironmentVariables = environmentVariableList.Message
+					command.Message.EnvironmentVariables = btree.MaybeMergeNodes(
+						environmentVariableList.Message,
+						externalObject,
+						command.Patcher,
+						envParentNodeComputer,
+					)
 				},
 			},
 			{
-				ExternalMessage: model_core.NewPatchedMessage[proto.Message](
-					outputPathPatternChildren.Message,
-					outputPathPatternChildren.Patcher,
-				),
-				Encoder: mrc.commandEncoder,
+				ExternalMessage: model_core.MessageToMarshalable(outputPathPatternChildren),
+				Encoder:         mrc.commandEncoder,
 				ParentAppender: func(
 					command model_core.PatchedMessage[*model_command_pb.Command, dag.ObjectContentsWalker],
 					externalObject *model_core.Decodable[model_core.CreatedObject[dag.ObjectContentsWalker]],
@@ -1846,8 +1844,8 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 	if err != nil {
 		return nil, err
 	}
-	createdCommand, err := model_core.MarshalAndEncodePatchedMessage(
-		command,
+	createdCommand, err := model_core.MarshalAndEncode(
+		model_core.MessageToMarshalable(command),
 		referenceFormat,
 		mrc.commandEncoder,
 	)
@@ -2131,7 +2129,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doRead(thread *star
 		}
 	}
 	referenceFormat := mrc.computer.getReferenceFormat()
-	environmentVariableList, err := convertDictToEnvironmentVariableList(
+	environmentVariableList, _, err := convertDictToEnvironmentVariableList(
 		environment,
 		mrc.commandEncoder,
 		referenceFormat,
@@ -2141,9 +2139,10 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doRead(thread *star
 		return nil, err
 	}
 
-	createdCommand, err := model_core.MarshalAndEncodePatchedMessage(
+	// TODO: This should use inlinedtree.Build().
+	createdCommand, err := model_core.MarshalAndEncode(
 		model_core.NewPatchedMessage(
-			&model_command_pb.Command{
+			model_core.NewMessageMarshalable(&model_command_pb.Command{
 				Arguments: []*model_command_pb.ArgumentList_Element{
 					{
 						Level: &model_command_pb.ArgumentList_Element_Leaf{
@@ -2161,7 +2160,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doRead(thread *star
 				FileCreationParameters:      mrc.fileCreationParametersMessage,
 				WorkingDirectory:            "/",
 				NeedsStableInputRootPath:    true,
-			},
+			}),
 			environmentVariableList.Patcher,
 		),
 		referenceFormat,
@@ -2274,7 +2273,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doWhich(thread *sta
 		environment[environmentVariable.Name] = environmentVariable.Value
 	}
 	referenceFormat := mrc.computer.getReferenceFormat()
-	environmentVariableList, err := convertDictToEnvironmentVariableList(
+	environmentVariableList, _, err := convertDictToEnvironmentVariableList(
 		environment,
 		mrc.commandEncoder,
 		referenceFormat,
@@ -2284,9 +2283,10 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doWhich(thread *sta
 		return nil, err
 	}
 
-	createdCommand, err := model_core.MarshalAndEncodePatchedMessage(
+	// TODO: This should use inlinedtree.Build().
+	createdCommand, err := model_core.MarshalAndEncode(
 		model_core.NewPatchedMessage(
-			&model_command_pb.Command{
+			model_core.NewMessageMarshalable(&model_command_pb.Command{
 				Arguments: []*model_command_pb.ArgumentList_Element{
 					{
 						Level: &model_command_pb.ArgumentList_Element_Leaf{
@@ -2308,7 +2308,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doWhich(thread *sta
 				DirectoryCreationParameters: mrc.directoryCreationParametersMessage,
 				FileCreationParameters:      mrc.fileCreationParametersMessage,
 				WorkingDirectory:            path.EmptyBuilder.GetUNIXString(),
-			},
+			}),
 			environmentVariableList.Patcher,
 		),
 		referenceFormat,
@@ -2318,13 +2318,13 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doWhich(thread *sta
 		return nil, fmt.Errorf("failed to create command: %w", err)
 	}
 
-	createdInputRoot, err := model_core.MarshalAndEncodePatchedMessage(
+	createdInputRoot, err := model_core.MarshalAndEncode(
 		model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](
-			&model_filesystem_pb.DirectoryContents{
+			model_core.NewMessageMarshalable(&model_filesystem_pb.DirectoryContents{
 				Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
 					LeavesInline: &model_filesystem_pb.Leaves{},
 				},
-			},
+			}),
 		),
 		referenceFormat,
 		mrc.directoryCreationParameters.GetEncoder(),
@@ -2455,7 +2455,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) Exists(p *model_sta
 		}
 	}
 	referenceFormat := mrc.computer.getReferenceFormat()
-	environmentVariableList, err := convertDictToEnvironmentVariableList(
+	environmentVariableList, _, err := convertDictToEnvironmentVariableList(
 		environment,
 		mrc.commandEncoder,
 		referenceFormat,
@@ -2465,9 +2465,10 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) Exists(p *model_sta
 		return false, err
 	}
 
-	createdCommand, err := model_core.MarshalAndEncodePatchedMessage(
+	// TODO: This should use inlinedtree.Build().
+	createdCommand, err := model_core.MarshalAndEncode(
 		model_core.NewPatchedMessage(
-			&model_command_pb.Command{
+			model_core.NewMessageMarshalable(&model_command_pb.Command{
 				Arguments: []*model_command_pb.ArgumentList_Element{
 					{
 						Level: &model_command_pb.ArgumentList_Element_Leaf{
@@ -2490,7 +2491,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) Exists(p *model_sta
 				FileCreationParameters:      mrc.fileCreationParametersMessage,
 				WorkingDirectory:            "/",
 				NeedsStableInputRootPath:    true,
-			},
+			}),
 			environmentVariableList.Patcher,
 		),
 		referenceFormat,
@@ -2588,7 +2589,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) Readdir(p *model_st
 		}
 	}
 	referenceFormat := mrc.computer.getReferenceFormat()
-	environmentVariableList, err := convertDictToEnvironmentVariableList(
+	environmentVariableList, _, err := convertDictToEnvironmentVariableList(
 		environment,
 		mrc.commandEncoder,
 		referenceFormat,
@@ -2598,9 +2599,10 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) Readdir(p *model_st
 		return nil, err
 	}
 
-	createdCommand, err := model_core.MarshalAndEncodePatchedMessage(
+	// TODO: This should use inlinedtree.Build().
+	createdCommand, err := model_core.MarshalAndEncode(
 		model_core.NewPatchedMessage(
-			&model_command_pb.Command{
+			model_core.NewMessageMarshalable(&model_command_pb.Command{
 				Arguments: []*model_command_pb.ArgumentList_Element{
 					{
 						Level: &model_command_pb.ArgumentList_Element_Leaf{
@@ -2618,7 +2620,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) Readdir(p *model_st
 				FileCreationParameters:      mrc.fileCreationParametersMessage,
 				WorkingDirectory:            p.GetUNIXString(),
 				NeedsStableInputRootPath:    true,
-			},
+			}),
 			environmentVariableList.Patcher,
 		),
 		referenceFormat,
@@ -3312,8 +3314,8 @@ func (c *baseComputer[TReference, TMetadata]) createMerkleTreeFromChangeTracking
 
 	// Store the root directory itself. We don't embed it into the
 	// response, as that prevents it from being accessed separately.
-	createdRootDirectoryObject, err := model_core.MarshalAndEncodePatchedMessage(
-		createdRootDirectory.Message,
+	createdRootDirectoryObject, err := model_core.MarshalAndEncode(
+		model_core.MessageToMarshalable(createdRootDirectory.Message),
 		c.getReferenceFormat(),
 		directoryCreationParameters.GetEncoder(),
 	)

@@ -3,7 +3,6 @@ package core
 import (
 	"math"
 
-	"github.com/buildbarn/bonanza/pkg/encoding/varint"
 	model_encoding "github.com/buildbarn/bonanza/pkg/model/encoding"
 	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
@@ -106,13 +105,18 @@ func (m PatchedMessage[T, TMetadata]) SortAndSetReferences() (TopLevelMessage[T,
 	return NewTopLevelMessage(m.Message, references), metadata
 }
 
-func encode[TMetadata ReferenceMetadata](
-	data []byte,
-	references []object.LocalReference,
-	metadata []TMetadata,
+// MarshalAndEncode marshals a patched message, encodes it, and converts
+// it to an object that can be written to storage.
+func MarshalAndEncode[TMetadata ReferenceMetadata](
+	m PatchedMessage[Marshalable, TMetadata],
 	referenceFormat object.ReferenceFormat,
 	encoder model_encoding.BinaryEncoder,
 ) (Decodable[CreatedObject[TMetadata]], error) {
+	references, metadata := m.Patcher.SortAndSetReferences()
+	data, err := m.Message.Marshal()
+	if err != nil {
+		return Decodable[CreatedObject[TMetadata]]{}, err
+	}
 	encodedData, decodingParameters, err := encoder.EncodeBinary(data)
 	if err != nil {
 		return Decodable[CreatedObject[TMetadata]]{}, err
@@ -128,47 +132,6 @@ func encode[TMetadata ReferenceMetadata](
 		},
 		decodingParameters,
 	), nil
-}
-
-var marshalOptions = proto.MarshalOptions{
-	Deterministic: true,
-	UseCachedSize: true,
-}
-
-// MarshalAndEncodePatchedMessage marshals a Protobuf message, encodes
-// it, and converts it to an object that can be written to storage.
-func MarshalAndEncodePatchedMessage[TMessage proto.Message, TMetadata ReferenceMetadata](
-	m PatchedMessage[TMessage, TMetadata],
-	referenceFormat object.ReferenceFormat,
-	encoder model_encoding.BinaryEncoder,
-) (Decodable[CreatedObject[TMetadata]], error) {
-	references, metadata := m.Patcher.SortAndSetReferences()
-	data, err := marshalOptions.Marshal(m.Message)
-	if err != nil {
-		return Decodable[CreatedObject[TMetadata]]{}, err
-	}
-	return encode(data, references, metadata, referenceFormat, encoder)
-}
-
-// MarshalAndEncodePatchedListMessage marshals a list of Protobuf
-// messages, encodes them, and converts them to a single object that can
-// be written to storage.
-func MarshalAndEncodePatchedListMessage[TMessage proto.Message, TMetadata ReferenceMetadata](
-	m PatchedMessage[[]TMessage, TMetadata],
-	referenceFormat object.ReferenceFormat,
-	encoder model_encoding.BinaryEncoder,
-) (Decodable[CreatedObject[TMetadata]], error) {
-	references, metadata := m.Patcher.SortAndSetReferences()
-	var data []byte
-	for _, node := range m.Message {
-		data = varint.AppendForward(data, marshalOptions.Size(node))
-		var err error
-		data, err = marshalOptions.MarshalAppend(data, node)
-		if err != nil {
-			return Decodable[CreatedObject[TMetadata]]{}, err
-		}
-	}
-	return encode(data, references, metadata, referenceFormat, encoder)
 }
 
 // MarshalAny wraps a patched message into a model_core_pb.Any message.
@@ -211,4 +174,18 @@ func MarshalAny[TMessage proto.Message, TMetadata ReferenceMetadata](m PatchedMe
 		},
 		newPatcher,
 	), nil
+}
+
+func MessageToMarshalable[TMessage proto.Message, TMetadata ReferenceMetadata](m PatchedMessage[TMessage, TMetadata]) PatchedMessage[Marshalable, TMetadata] {
+	return NewPatchedMessage(
+		NewMessageMarshalable(m.Message),
+		m.Patcher,
+	)
+}
+
+func MessageListToMarshalable[TMessage proto.Message, TMetadata ReferenceMetadata](m PatchedMessage[[]TMessage, TMetadata]) PatchedMessage[Marshalable, TMetadata] {
+	return NewPatchedMessage(
+		NewMessageListMarshalable(m.Message),
+		m.Patcher,
+	)
 }

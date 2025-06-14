@@ -16,7 +16,7 @@ import (
 type ParentNodeComputer[TNode proto.Message, TMetadata model_core.ReferenceMetadata] func(
 	createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]],
 	childNodes []TNode,
-) (model_core.PatchedMessage[TNode, TMetadata], error)
+) model_core.PatchedMessage[TNode, TMetadata]
 
 // NewObjectCreatingNodeMerger creates a NodeMerger that can be used in
 // combination with Builder to construct B-trees that are backed by
@@ -24,19 +24,38 @@ type ParentNodeComputer[TNode proto.Message, TMetadata model_core.ReferenceMetad
 func NewObjectCreatingNodeMerger[TNode proto.Message, TMetadata model_core.ReferenceMetadata](encoder model_encoding.BinaryEncoder, referenceFormat object.ReferenceFormat, parentNodeComputer ParentNodeComputer[TNode, TMetadata]) NodeMerger[TNode, TMetadata] {
 	return func(list model_core.PatchedMessage[[]TNode, TMetadata]) (model_core.PatchedMessage[TNode, TMetadata], error) {
 		// Marshal each of the messages, prepending its size.
-		createdObject, err := model_core.MarshalAndEncodePatchedListMessage(list, referenceFormat, encoder)
+		createdObject, err := model_core.MarshalAndEncode(model_core.MessageListToMarshalable(list), referenceFormat, encoder)
 		if err != nil {
 			return model_core.PatchedMessage[TNode, TMetadata]{}, util.StatusWrap(err, "Failed to marshal list")
 		}
 
-		// Construct a parent node that references the object containing
-		// the children.
-		parentNode, err := parentNodeComputer(createdObject, list.Message)
-		if err != nil {
-			return model_core.PatchedMessage[TNode, TMetadata]{}, util.StatusWrap(err, "Failed to compute parent node")
-		}
-		return parentNode, nil
+		// Construct a parent node that references the object
+		// containing the children.
+		return parentNodeComputer(createdObject, list.Message), nil
 	}
+}
+
+// MaybeMergeNodes either returns the top-level elements of a B-tree in
+// literal form, or emits a single parent node referring to the elements
+// stored in a separate object.
+//
+// This function is typically used in combination with
+// inlinedtree.Build() to spill the top-level elements of a B-tree into
+// a separate object, if storing them inline would cause the parent
+// object to become too large.
+func MaybeMergeNodes[TNode proto.Message, TMetadata model_core.ReferenceMetadata](
+	nodes []TNode,
+	externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
+	patcher *model_core.ReferenceMessagePatcher[TMetadata],
+	parentNodeComputer ParentNodeComputer[TNode, TMetadata],
+) []TNode {
+	if externalObject == nil || len(nodes) < 1 {
+		return nodes
+	}
+
+	merged := parentNodeComputer(*externalObject, nodes)
+	patcher.Merge(merged.Patcher)
+	return []TNode{merged.Message}
 }
 
 // ParentNodeComputerForTesting is an instantiation of

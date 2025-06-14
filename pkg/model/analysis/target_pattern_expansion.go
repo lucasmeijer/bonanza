@@ -82,7 +82,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetPatternExpansionValue
 		btree.NewObjectCreatingNodeMerger(
 			c.getValueObjectEncoder(),
 			c.getReferenceFormat(),
-			/* parentNodeComputer = */ func(createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]], childNodes []*model_analysis_pb.TargetPatternExpansion_Value_TargetLabel) (model_core.PatchedMessage[*model_analysis_pb.TargetPatternExpansion_Value_TargetLabel, TMetadata], error) {
+			/* parentNodeComputer = */ func(createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]], childNodes []*model_analysis_pb.TargetPatternExpansion_Value_TargetLabel) model_core.PatchedMessage[*model_analysis_pb.TargetPatternExpansion_Value_TargetLabel, TMetadata] {
 				return model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[TMetadata]) *model_analysis_pb.TargetPatternExpansion_Value_TargetLabel {
 					return &model_analysis_pb.TargetPatternExpansion_Value_TargetLabel{
 						Level: &model_analysis_pb.TargetPatternExpansion_Value_TargetLabel_Parent_{
@@ -91,7 +91,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetPatternExpansionValue
 							},
 						},
 					}
-				}), nil
+				})
 			},
 		),
 	)

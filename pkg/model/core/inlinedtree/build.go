@@ -31,7 +31,7 @@ type ParentAppender[TParentMessage any, TMetadata model_core.ReferenceMetadata] 
 type Candidate[TParentMessage any, TMetadata model_core.ReferenceMetadata] struct {
 	// Message to store in a child object if no space is present to
 	// inline it into the parent object.
-	ExternalMessage model_core.PatchedMessage[proto.Message, TMetadata]
+	ExternalMessage model_core.PatchedMessage[model_core.Marshalable, TMetadata]
 	// Encoder to use when storing ExternalMessage in a child object.
 	Encoder encoding.BinaryEncoder
 	// Function to invoke to either inline the message into the
@@ -259,7 +259,7 @@ func Build[
 		} else {
 			// Store the message separately, and store a
 			// reference in the parent.
-			createdObject, err := model_core.MarshalAndEncodePatchedMessage(candidate.ExternalMessage, options.ReferenceFormat, candidate.Encoder)
+			createdObject, err := model_core.MarshalAndEncode(candidate.ExternalMessage, options.ReferenceFormat, candidate.Encoder)
 			if err != nil {
 				output.Discard()
 				return model_core.PatchedMessage[TParentMessagePtr, TMetadata]{}, util.StatusWrapf(err, "Failed to create object contents for candidate at index %d", i)

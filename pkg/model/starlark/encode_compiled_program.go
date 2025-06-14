@@ -41,6 +41,45 @@ type ValueEncodingOptions[TReference any, TMetadata model_core.CloneableReferenc
 	ObjectMaximumSizeBytes int
 }
 
+func (o *ValueEncodingOptions[TReference, TMetadata]) ComputeListParentNode(createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]], childNodes []*model_starlark_pb.List_Element) model_core.PatchedMessage[*model_starlark_pb.List_Element, TMetadata] {
+	// Compute the total number of elements
+	// contained in the new list.
+	//
+	// For depsets it is easy to craft instances
+	// that have more than 2^64-1 elements due to
+	// excessive repetition. Make sure to clamp the
+	// value in that case, so that consumers know
+	// they can't use this field to jump to
+	// arbitrary elements.
+	count := uint64(0)
+	for _, childNode := range childNodes {
+		childCount := uint64(1)
+		if level, ok := childNode.Level.(*model_starlark_pb.List_Element_Parent_); ok {
+			childCount = level.Parent.Count
+		}
+		var carryOut uint64
+		count, carryOut = bits.Add64(count, childCount, 0)
+		if carryOut > 0 {
+			count = math.MaxUint64
+			break
+		}
+	}
+
+	return model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[TMetadata]) *model_starlark_pb.List_Element {
+		return &model_starlark_pb.List_Element{
+			Level: &model_starlark_pb.List_Element_Parent_{
+				Parent: &model_starlark_pb.List_Element_Parent{
+					Reference: patcher.CaptureAndAddDecodableReference(
+						createdObject,
+						o.ObjectCapturer,
+					),
+					Count: count,
+				},
+			},
+		}
+	})
+}
+
 // newSplitBTreeBuilder creates a B-tree builder that stores a minimium
 // of one entry in leaves, and a minimum of two entries in parents. This
 // ensures that very large values are stored in separate objects, while
@@ -58,52 +97,7 @@ func newSplitBTreeBuilder[TReference any, TMessage proto.Message, TMetadata mode
 }
 
 func NewListBuilder[TReference any, TMetadata model_core.CloneableReferenceMetadata](options *ValueEncodingOptions[TReference, TMetadata]) btree.Builder[*model_starlark_pb.List_Element, TMetadata] {
-	return newSplitBTreeBuilder(
-		options,
-		/* parentNodeComputer = */ func(createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]], childNodes []*model_starlark_pb.List_Element) (model_core.PatchedMessage[*model_starlark_pb.List_Element, TMetadata], error) {
-			// Compute the total number of elements
-			// contained in the new list.
-			//
-			// For depsets it is easy to craft instances
-			// that have more than 2^64-1 elements due to
-			// excessive repetition. Make sure to clamp the
-			// value in that case, so that consumers know
-			// they can't use this field to jump to
-			// arbitrary elements.
-			count := uint64(0)
-			for _, childNode := range childNodes {
-				var childCount uint64
-				switch level := childNode.Level.(type) {
-				case *model_starlark_pb.List_Element_Leaf:
-					childCount = 1
-				case *model_starlark_pb.List_Element_Parent_:
-					childCount = level.Parent.Count
-				default:
-					return model_core.PatchedMessage[*model_starlark_pb.List_Element, TMetadata]{}, errors.New("invalid list element level")
-				}
-				var carryOut uint64
-				count, carryOut = bits.Add64(count, childCount, 0)
-				if carryOut > 0 {
-					count = math.MaxUint64
-					break
-				}
-			}
-
-			return model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[TMetadata]) *model_starlark_pb.List_Element {
-				return &model_starlark_pb.List_Element{
-					Level: &model_starlark_pb.List_Element_Parent_{
-						Parent: &model_starlark_pb.List_Element_Parent{
-							Reference: patcher.CaptureAndAddDecodableReference(
-								createdObject,
-								options.ObjectCapturer,
-							),
-							Count: count,
-						},
-					},
-				}
-			}), nil
-		},
-	)
+	return newSplitBTreeBuilder(options, options.ComputeListParentNode)
 }
 
 type EncodableValue[TReference any, TMetadata model_core.CloneableReferenceMetadata] interface {
@@ -208,7 +202,7 @@ func EncodeValue[TReference any, TMetadata model_core.CloneableReferenceMetadata
 			/* parentNodeComputer = */ func(
 				createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]],
 				childNodes []*model_starlark_pb.Dict_Entry,
-			) (model_core.PatchedMessage[*model_starlark_pb.Dict_Entry, TMetadata], error) {
+			) model_core.PatchedMessage[*model_starlark_pb.Dict_Entry, TMetadata] {
 				return model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[TMetadata]) *model_starlark_pb.Dict_Entry {
 					return &model_starlark_pb.Dict_Entry{
 						Level: &model_starlark_pb.Dict_Entry_Parent_{
@@ -220,7 +214,7 @@ func EncodeValue[TReference any, TMetadata model_core.CloneableReferenceMetadata
 							},
 						},
 					}
-				}), nil
+				})
 			},
 		)
 

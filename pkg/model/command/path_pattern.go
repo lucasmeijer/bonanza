@@ -14,7 +14,6 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/proto"
 )
 
 func GetPathPatternWithChildren[TMetadata model_core.ReferenceMetadata](
@@ -45,7 +44,7 @@ func GetPathPatternWithChildren[TMetadata model_core.ReferenceMetadata](
 
 func GetPathPatternInlineCandidate[TMetadata model_core.ReferenceMetadata](name string, grandChildren model_core.PatchedMessage[*model_command_pb.PathPattern_Children, TMetadata], encoder model_encoding.BinaryEncoder, objectCapturer model_core.CreatedObjectCapturer[TMetadata]) inlinedtree.Candidate[*model_command_pb.PathPattern_Children, TMetadata] {
 	return inlinedtree.Candidate[*model_command_pb.PathPattern_Children, TMetadata]{
-		ExternalMessage: model_core.NewPatchedMessage[proto.Message](grandChildren.Message, grandChildren.Patcher),
+		ExternalMessage: model_core.MessageToMarshalable(grandChildren),
 		Encoder:         encoder,
 		ParentAppender: func(
 			children model_core.PatchedMessage[*model_command_pb.PathPattern_Children, TMetadata],

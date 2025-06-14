@@ -563,8 +563,8 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 	if proto.Size(&outputs) > 0 {
 		// Action has one or more outputs. Upload them and
 		// attach a reference to the result message.
-		if createdObject, err := model_core.MarshalAndEncodePatchedMessage(
-			model_core.NewPatchedMessage(&outputs, outputsPatcher),
+		if createdObject, err := model_core.MarshalAndEncode(
+			model_core.NewPatchedMessage(model_core.NewMessageMarshalable(&outputs), outputsPatcher),
 			namespace.ReferenceFormat,
 			directoryEncoder,
 		); err == nil {

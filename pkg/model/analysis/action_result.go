@@ -109,22 +109,23 @@ func convertDictToEnvironmentVariableList[TMetadata model_core.ReferenceMetadata
 	commandEncoder model_encoding.BinaryEncoder,
 	referenceFormat object.ReferenceFormat,
 	capturer model_core.CreatedObjectCapturer[TMetadata],
-) (model_core.PatchedMessage[[]*model_command_pb.EnvironmentVariableList_Element, TMetadata], error) {
+) (model_core.PatchedMessage[[]*model_command_pb.EnvironmentVariableList_Element, TMetadata], btree.ParentNodeComputer[*model_command_pb.EnvironmentVariableList_Element, TMetadata], error) {
+	parentNodeComputer := func(createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]], childNodes []*model_command_pb.EnvironmentVariableList_Element) model_core.PatchedMessage[*model_command_pb.EnvironmentVariableList_Element, TMetadata] {
+		return model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[TMetadata]) *model_command_pb.EnvironmentVariableList_Element {
+			return &model_command_pb.EnvironmentVariableList_Element{
+				Level: &model_command_pb.EnvironmentVariableList_Element_Parent{
+					Parent: patcher.CaptureAndAddDecodableReference(createdObject, capturer),
+				},
+			}
+		})
+	}
 	environmentVariablesBuilder := btree.NewSplitProllyBuilder(
 		1<<16,
 		1<<18,
 		btree.NewObjectCreatingNodeMerger(
 			commandEncoder,
 			referenceFormat,
-			/* parentNodeComputer = */ func(createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]], childNodes []*model_command_pb.EnvironmentVariableList_Element) (model_core.PatchedMessage[*model_command_pb.EnvironmentVariableList_Element, TMetadata], error) {
-				return model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[TMetadata]) *model_command_pb.EnvironmentVariableList_Element {
-					return &model_command_pb.EnvironmentVariableList_Element{
-						Level: &model_command_pb.EnvironmentVariableList_Element_Parent{
-							Parent: patcher.CaptureAndAddDecodableReference(createdObject, capturer),
-						},
-					}
-				}), nil
-			},
+			parentNodeComputer,
 		),
 	)
 	for _, name := range slices.Sorted(maps.Keys(environment)) {
@@ -138,8 +139,9 @@ func convertDictToEnvironmentVariableList[TMetadata model_core.ReferenceMetadata
 				},
 			}),
 		); err != nil {
-			return model_core.PatchedMessage[[]*model_command_pb.EnvironmentVariableList_Element, TMetadata]{}, err
+			return model_core.PatchedMessage[[]*model_command_pb.EnvironmentVariableList_Element, TMetadata]{}, nil, err
 		}
 	}
-	return environmentVariablesBuilder.FinalizeList()
+	envList, err := environmentVariablesBuilder.FinalizeList()
+	return envList, parentNodeComputer, err
 }

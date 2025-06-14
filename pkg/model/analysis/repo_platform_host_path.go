@@ -46,7 +46,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRepoPlatformHostPathValue(c
 		}
 	}
 	referenceFormat := c.getReferenceFormat()
-	environmentVariableList, err := convertDictToEnvironmentVariableList(
+	environmentVariableList, _, err := convertDictToEnvironmentVariableList(
 		environment,
 		commandEncoder,
 		referenceFormat,
@@ -58,10 +58,11 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRepoPlatformHostPathValue(c
 
 	// Request that the worker captures a given path by copying it
 	// into its input root directory, using "cp -RH".
+	// TODO: This should use inlinedtree.Build().
 	const capturedFilename = "captured"
-	createdCommand, err := model_core.MarshalAndEncodePatchedMessage(
+	createdCommand, err := model_core.MarshalAndEncode(
 		model_core.NewPatchedMessage(
-			&model_command_pb.Command{
+			model_core.NewMessageMarshalable(&model_command_pb.Command{
 				Arguments: []*model_command_pb.ArgumentList_Element{
 					{
 						Level: &model_command_pb.ArgumentList_Element_Leaf{
@@ -98,7 +99,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRepoPlatformHostPathValue(c
 					},
 				},
 				WorkingDirectory: (*path.Trace)(nil).GetUNIXString(),
-			},
+			}),
 			environmentVariableList.Patcher,
 		),
 		referenceFormat,

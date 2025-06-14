@@ -350,8 +350,8 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 		if l := createdRootDirectory.MaximumSymlinkEscapementLevels; l == nil || l.Value != 0 {
 			logger.Fatal(formatted.Textf("Module %#v contains one or more symbolic links that potentially escape the module's root directory", moduleName.String()))
 		}
-		createdObject, err := model_core.MarshalAndEncodePatchedMessage(
-			createdModuleRootDirectories[i].Message,
+		createdObject, err := model_core.MarshalAndEncode(
+			model_core.MessageToMarshalable(createdModuleRootDirectories[i].Message),
 			referenceFormat,
 			directoryParameters.GetEncoder(),
 		)
@@ -392,8 +392,8 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 		logger.Fatal(formatted.Textf("Failed to create build specification encoder: %s", err))
 	}
 
-	createdBuildSpecification, err := model_core.MarshalAndEncodePatchedMessage(
-		model_core.NewPatchedMessage(&buildSpecification, buildSpecificationPatcher),
+	createdBuildSpecification, err := model_core.MarshalAndEncode(
+		model_core.NewPatchedMessage(model_core.NewMessageMarshalable(&buildSpecification), buildSpecificationPatcher),
 		referenceFormat,
 		buildSpecificationEncoder,
 	)

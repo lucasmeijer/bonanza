@@ -13,8 +13,6 @@ import (
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 	"github.com/stretchr/testify/require"
 
-	"google.golang.org/protobuf/proto"
-
 	"go.uber.org/mock/gomock"
 )
 
@@ -79,7 +77,7 @@ func TestBuild(t *testing.T) {
 
 		output, err := inlinedtree.Build(
 			inlinedtree.CandidateList[*model_filesystem_pb.DirectoryContents, model_core.ReferenceMetadata]{{
-				ExternalMessage: model_core.NewSimplePatchedMessage[model_core.ReferenceMetadata, proto.Message](leaves),
+				ExternalMessage: model_core.NewSimplePatchedMessage[model_core.ReferenceMetadata](model_core.NewMessageMarshalable(leaves)),
 				Encoder:         encoder,
 				ParentAppender:  parentAppender.Call,
 			}},
@@ -140,7 +138,7 @@ func TestBuild(t *testing.T) {
 
 		output, err := inlinedtree.Build(
 			inlinedtree.CandidateList[*model_filesystem_pb.DirectoryContents, model_core.ReferenceMetadata]{{
-				ExternalMessage: model_core.NewSimplePatchedMessage[model_core.ReferenceMetadata, proto.Message](leaves),
+				ExternalMessage: model_core.NewSimplePatchedMessage[model_core.ReferenceMetadata](model_core.NewMessageMarshalable(leaves)),
 				Encoder:         encoder,
 				ParentAppender:  parentAppender.Call,
 			}},
@@ -196,7 +194,7 @@ func TestBuild(t *testing.T) {
 
 		output, err := inlinedtree.Build(
 			inlinedtree.CandidateList[*model_filesystem_pb.DirectoryContents, model_core.ReferenceMetadata]{{
-				ExternalMessage: model_core.NewSimplePatchedMessage[model_core.ReferenceMetadata, proto.Message](leaves),
+				ExternalMessage: model_core.NewSimplePatchedMessage[model_core.ReferenceMetadata](model_core.NewMessageMarshalable(leaves)),
 				Encoder:         encoder,
 				ParentAppender:  parentAppender.Call,
 			}},
@@ -238,7 +236,7 @@ func TestBuild(t *testing.T) {
 
 		output, err := inlinedtree.Build(
 			inlinedtree.CandidateList[*model_filesystem_pb.DirectoryContents, model_core.ReferenceMetadata]{{
-				ExternalMessage: model_core.NewSimplePatchedMessage[model_core.ReferenceMetadata](proto.Message(nil)),
+				ExternalMessage: model_core.NewSimplePatchedMessage[model_core.ReferenceMetadata](model_core.Marshalable(nil)),
 				ParentAppender:  parentAppender.Call,
 			}},
 			&inlinedtree.Options{

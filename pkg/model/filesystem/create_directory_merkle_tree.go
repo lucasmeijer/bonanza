@@ -19,7 +19,6 @@ import (
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
@@ -256,8 +255,8 @@ func (b *directoryMerkleTreeBuilder[TDirectory, TFile]) maybeFinalizeDirectory(u
 		inlineCandidates = append(
 			inlineCandidates,
 			inlinedtree.Candidate[*model_filesystem_pb.DirectoryContents, TDirectory]{
-				ExternalMessage: model_core.NewPatchedMessage[proto.Message](
-					ud.leaves.Message,
+				ExternalMessage: model_core.NewPatchedMessage(
+					model_core.NewMessageMarshalable(ud.leaves.Message),
 					model_core.MapReferenceMessagePatcherMetadata(
 						ud.leaves.Patcher,
 						func(reference object.LocalReference, metadata TFile) TDirectory {
@@ -294,11 +293,8 @@ func (b *directoryMerkleTreeBuilder[TDirectory, TFile]) maybeFinalizeDirectory(u
 			inlineCandidates = append(
 				inlineCandidates,
 				inlinedtree.Candidate[*model_filesystem_pb.DirectoryContents, TDirectory]{
-					ExternalMessage: model_core.NewPatchedMessage[proto.Message](
-						createdDirectory.Message.Message,
-						createdDirectory.Message.Patcher,
-					),
-					Encoder: b.directoryEncoder,
+					ExternalMessage: model_core.MessageToMarshalable(createdDirectory.Message),
+					Encoder:         b.directoryEncoder,
 					ParentAppender: func(
 						directory model_core.PatchedMessage[*model_filesystem_pb.DirectoryContents, TDirectory],
 						externalObject *model_core.Decodable[model_core.CreatedObject[TDirectory]],

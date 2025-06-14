@@ -12,8 +12,6 @@ import (
 	"github.com/buildbarn/bonanza/pkg/model/core/inlinedtree"
 	model_encoding "github.com/buildbarn/bonanza/pkg/model/encoding"
 	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
-
-	"google.golang.org/protobuf/proto"
 )
 
 // packageGroupNode is a simplified representation of the
@@ -69,7 +67,7 @@ func packageGroupNodeToProto[TMetadata model_core.ReferenceMetadata](n *packageG
 
 	// Set the IncludeSubpackages field.
 	inlineCandidates = append(inlineCandidates, inlinedtree.Candidate[*model_starlark_pb.PackageGroup_Subpackages, TMetadata]{
-		ExternalMessage: model_core.NewSimplePatchedMessage[TMetadata](proto.Message(nil)),
+		ExternalMessage: model_core.NewSimplePatchedMessage[TMetadata](model_core.Marshalable(nil)),
 		ParentAppender: func(
 			subpackages model_core.PatchedMessage[*model_starlark_pb.PackageGroup_Subpackages, TMetadata],
 			externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
@@ -99,7 +97,7 @@ func packageGroupNodeToProto[TMetadata model_core.ReferenceMetadata](n *packageG
 		}
 
 		inlineCandidates = append(inlineCandidates, inlinedtree.Candidate[*model_starlark_pb.PackageGroup_Subpackages, TMetadata]{
-			ExternalMessage: model_core.NewPatchedMessage[proto.Message](&overrides, patcher),
+			ExternalMessage: model_core.NewPatchedMessage(model_core.NewMessageMarshalable(&overrides), patcher),
 			Encoder:         encoder,
 			ParentAppender: func(
 				subpackages model_core.PatchedMessage[*model_starlark_pb.PackageGroup_Subpackages, TMetadata],

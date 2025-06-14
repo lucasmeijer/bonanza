@@ -26,8 +26,6 @@ import (
 	"github.com/buildbarn/bonanza/pkg/storage/dag"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 
-	"google.golang.org/protobuf/proto"
-
 	"go.starlark.net/starlark"
 )
 
@@ -310,7 +308,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionCommandValue(ct
 	// Construct the list of command line arguments.
 	// TODO: Respect use_param_file().
 	referenceFormat := c.getReferenceFormat()
-	argumentsBuilder := newArgumentsBuilder(commandEncoder, referenceFormat, e)
+	argumentsBuilder, argumentsParentNodeComputer := newArgumentsBuilder(commandEncoder, referenceFormat, e)
 	valueDecodingOptions := c.getValueDecodingOptions(ctx, func(resolvedLabel label.ResolvedLabel) (starlark.Value, error) {
 		return model_starlark.NewLabel[TReference, TMetadata](resolvedLabel), nil
 	})
@@ -630,6 +628,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionCommandValue(ct
 		return PatchedTargetActionCommandValue{}, err
 	}
 
+	// TODO: This might need to reload the list if it's just a
+	// single parent element constructed through MaybeMergeNodes().
 	// TODO: Also respect use_default_shell_env.
 	environmentVariablesList := model_core.PatchList(e, model_core.Nested(action, actionDefinition.Env))
 
@@ -689,7 +689,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionCommandValue(ct
 			// Fields that should always be inlined into the
 			// Command message.
 			{
-				ExternalMessage: model_core.NewSimplePatchedMessage[TMetadata]((proto.Message)(nil)),
+				ExternalMessage: model_core.NewSimplePatchedMessage[TMetadata]((model_core.Marshalable)(nil)),
 				ParentAppender: func(
 					command model_core.PatchedMessage[*model_command_pb.Command, TMetadata],
 					externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
@@ -701,24 +701,23 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionCommandValue(ct
 			},
 			// Fields that can be stored externally if needed.
 			{
-				ExternalMessage: model_core.NewPatchedMessage(
-					(proto.Message)(nil),
-					argumentsList.Patcher,
-				),
+				ExternalMessage: model_core.MessageListToMarshalable(argumentsList),
+				Encoder:         commandEncoder,
 				ParentAppender: func(
 					command model_core.PatchedMessage[*model_command_pb.Command, TMetadata],
 					externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
 				) {
-					// TODO: This should push out the
-					// arguments if they get too big.
-					command.Message.Arguments = argumentsList.Message
+					command.Message.Arguments = btree.MaybeMergeNodes(
+						argumentsList.Message,
+						externalObject,
+						command.Patcher,
+						argumentsParentNodeComputer,
+					)
 				},
 			},
 			{
-				ExternalMessage: model_core.NewPatchedMessage(
-					(proto.Message)(nil),
-					environmentVariablesList.Patcher,
-				),
+				ExternalMessage: model_core.NewPatchedMessage((model_core.Marshalable)(nil), environmentVariablesList.Patcher),
+				Encoder:         commandEncoder,
 				ParentAppender: func(
 					command model_core.PatchedMessage[*model_command_pb.Command, TMetadata],
 					externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
@@ -730,11 +729,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionCommandValue(ct
 				},
 			},
 			{
-				ExternalMessage: model_core.NewPatchedMessage[proto.Message](
-					outputPathPatternChildren.Message,
-					outputPathPatternChildren.Patcher,
-				),
-				Encoder: commandEncoder,
+				ExternalMessage: model_core.MessageToMarshalable(outputPathPatternChildren),
+				Encoder:         commandEncoder,
 				ParentAppender: func(
 					command model_core.PatchedMessage[*model_command_pb.Command, TMetadata],
 					externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
@@ -753,8 +749,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionCommandValue(ct
 	if err != nil {
 		return PatchedTargetActionCommandValue{}, err
 	}
-	createdCommand, err := model_core.MarshalAndEncodePatchedMessage(
-		command,
+	createdCommand, err := model_core.MarshalAndEncode(
+		model_core.MessageToMarshalable(command),
 		referenceFormat,
 		commandEncoder,
 	)

@@ -403,8 +403,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeHttpArchiveContentsValue(ct
 	if l := createdRootDirectory.MaximumSymlinkEscapementLevels; l == nil || l.Value != 0 {
 		return PatchedHttpArchiveContentsValue{}, errors.New("archive contains one or more symbolic links that potentially escape the archive's root directory")
 	}
-	createdRootDirectoryObject, err := model_core.MarshalAndEncodePatchedMessage(
-		createdRootDirectory.Message,
+	createdRootDirectoryObject, err := model_core.MarshalAndEncode(
+		model_core.MessageToMarshalable(createdRootDirectory.Message),
 		c.getReferenceFormat(),
 		directoryCreationParameters.GetEncoder(),
 	)
