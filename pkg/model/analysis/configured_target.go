@@ -2200,7 +2200,7 @@ func (rc *ruleContext[TReference, TMetadata]) newFilesToRunProviderFromStruct(th
 			},
 			// Fields that can be stored externally if needed.
 			{
-				ExternalMessage: model_core.MessageListToMarshalable(runfilesFiles),
+				ExternalMessage: model_core.ProtoListToMarshalable(runfilesFiles),
 				Encoder:         valueEncodingOptions.ObjectEncoder,
 				ParentAppender: func(
 					filesToRunProvider model_core.PatchedMessage[*model_analysis_pb.FilesToRunProvider_Leaf, TMetadata],
@@ -2215,7 +2215,7 @@ func (rc *ruleContext[TReference, TMetadata]) newFilesToRunProviderFromStruct(th
 				},
 			},
 			{
-				ExternalMessage: model_core.MessageListToMarshalable(runfilesSymlinks),
+				ExternalMessage: model_core.ProtoListToMarshalable(runfilesSymlinks),
 				Encoder:         valueEncodingOptions.ObjectEncoder,
 				ParentAppender: func(
 					filesToRunProvider model_core.PatchedMessage[*model_analysis_pb.FilesToRunProvider_Leaf, TMetadata],
@@ -2230,7 +2230,7 @@ func (rc *ruleContext[TReference, TMetadata]) newFilesToRunProviderFromStruct(th
 				},
 			},
 			{
-				ExternalMessage: model_core.MessageListToMarshalable(runfilesRootSymlinks),
+				ExternalMessage: model_core.ProtoListToMarshalable(runfilesRootSymlinks),
 				Encoder:         valueEncodingOptions.ObjectEncoder,
 				ParentAppender: func(
 					filesToRunProvider model_core.PatchedMessage[*model_analysis_pb.FilesToRunProvider_Leaf, TMetadata],
@@ -2646,7 +2646,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 			},
 			// Fields that can be stored externally if needed.
 			{
-				ExternalMessage: model_core.MessageListToMarshalable(argsList),
+				ExternalMessage: model_core.ProtoListToMarshalable(argsList),
 				Encoder:         valueEncodingOptions.ObjectEncoder,
 				ParentAppender: func(
 					actionDefinition model_core.PatchedMessage[*model_analysis_pb.TargetActionDefinition, TMetadata],
@@ -2661,7 +2661,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 				},
 			},
 			{
-				ExternalMessage: model_core.MessageListToMarshalable(envList),
+				ExternalMessage: model_core.ProtoListToMarshalable(envList),
 				Encoder:         rc.commandEncoder,
 				ParentAppender: func(
 					actionDefinition model_core.PatchedMessage[*model_analysis_pb.TargetActionDefinition, TMetadata],
@@ -2676,7 +2676,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 				},
 			},
 			{
-				ExternalMessage: model_core.MessageListToMarshalable(encodedInputs),
+				ExternalMessage: model_core.ProtoListToMarshalable(encodedInputs),
 				Encoder:         valueEncodingOptions.ObjectEncoder,
 				ParentAppender: func(
 					actionDefinition model_core.PatchedMessage[*model_analysis_pb.TargetActionDefinition, TMetadata],
@@ -2691,7 +2691,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 				},
 			},
 			{
-				ExternalMessage: model_core.MessageListToMarshalable(toolsList),
+				ExternalMessage: model_core.ProtoListToMarshalable(toolsList),
 				Encoder:         valueEncodingOptions.ObjectEncoder,
 				ParentAppender: func(
 					actionDefinition model_core.PatchedMessage[*model_analysis_pb.TargetActionDefinition, TMetadata],
@@ -2706,7 +2706,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 				},
 			},
 			{
-				ExternalMessage: model_core.MessageToMarshalable(outputPathPatternChildren),
+				ExternalMessage: model_core.ProtoToMarshalable(outputPathPatternChildren),
 				Encoder:         rc.commandEncoder,
 				ParentAppender: func(
 					actionDefinition model_core.PatchedMessage[*model_analysis_pb.TargetActionDefinition, TMetadata],
@@ -2721,7 +2721,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 				},
 			},
 			{
-				ExternalMessage: model_core.MessageToMarshalable(createdInitialOutputDirectory.Message),
+				ExternalMessage: model_core.ProtoToMarshalable(createdInitialOutputDirectory.Message),
 				Encoder:         rc.commandEncoder,
 				ParentAppender: func(
 					actionDefinition model_core.PatchedMessage[*model_analysis_pb.TargetActionDefinition, TMetadata],

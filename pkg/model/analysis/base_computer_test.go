@@ -110,7 +110,7 @@ func (bct *baseComputerTester) expectGetDirectoryReadersValue(t *testing.T, e *M
 	).Return(&model_analysis.DirectoryReaders[model_core.CreatedObjectTree]{
 		DirectoryContents: model_parser.LookupParsedObjectReader(
 			bct.parsedObjectPoolIngester,
-			model_parser.NewMessageObjectParser[model_core.CreatedObjectTree, model_filesystem_pb.DirectoryContents](),
+			model_parser.NewProtoObjectParser[model_core.CreatedObjectTree, model_filesystem_pb.DirectoryContents](),
 		),
 	}, true)
 }
@@ -149,7 +149,7 @@ func attachMessageObject[TMessage proto.Message](
 ) *model_core_pb.DecodableReference {
 	createdObject := util.Must(
 		model_core.MarshalAndEncode(
-			model_core.MessageToMarshalable(model_core.BuildPatchedMessage(builder)),
+			model_core.ProtoToMarshalable(model_core.BuildPatchedMessage(builder)),
 			util.Must(object.NewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1)),
 			model_encoding.NewChainedBinaryEncoder(nil),
 		),

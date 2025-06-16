@@ -24,7 +24,7 @@ type ParentNodeComputer[TNode proto.Message, TMetadata model_core.ReferenceMetad
 func NewObjectCreatingNodeMerger[TNode proto.Message, TMetadata model_core.ReferenceMetadata](encoder model_encoding.BinaryEncoder, referenceFormat object.ReferenceFormat, parentNodeComputer ParentNodeComputer[TNode, TMetadata]) NodeMerger[TNode, TMetadata] {
 	return func(list model_core.PatchedMessage[[]TNode, TMetadata]) (model_core.PatchedMessage[TNode, TMetadata], error) {
 		// Marshal each of the messages, prepending its size.
-		createdObject, err := model_core.MarshalAndEncode(model_core.MessageListToMarshalable(list), referenceFormat, encoder)
+		createdObject, err := model_core.MarshalAndEncode(model_core.ProtoListToMarshalable(list), referenceFormat, encoder)
 		if err != nil {
 			return model_core.PatchedMessage[TNode, TMetadata]{}, util.StatusWrap(err, "Failed to marshal list")
 		}

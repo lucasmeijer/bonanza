@@ -57,7 +57,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeStableInputRootPathValue(ct
 	// TODO: This should use inlinedtree.Build().
 	createdCommand, err := model_core.MarshalAndEncode(
 		model_core.NewPatchedMessage(
-			model_core.NewMessageMarshalable(&model_command_pb.Command{
+			model_core.NewProtoMarshalable(&model_command_pb.Command{
 				Arguments: []*model_command_pb.ArgumentList_Element{{
 					Level: &model_command_pb.ArgumentList_Element_Leaf{
 						Leaf: "pwd",
@@ -80,7 +80,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeStableInputRootPathValue(ct
 
 	createdInputRoot, err := model_core.MarshalAndEncode(
 		model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](
-			model_core.NewMessageMarshalable(&model_filesystem_pb.DirectoryContents{
+			model_core.NewProtoMarshalable(&model_filesystem_pb.DirectoryContents{
 				Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
 					LeavesInline: &model_filesystem_pb.Leaves{},
 				},

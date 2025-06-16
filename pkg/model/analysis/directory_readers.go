@@ -40,21 +40,21 @@ func (c *baseComputer[TReference, TMetadata]) ComputeDirectoryReadersValue(ctx c
 			c.parsedObjectPoolIngester,
 			model_parser.NewChainedObjectParser(
 				encoderObjectParser,
-				model_parser.NewMessageObjectParser[TReference, model_filesystem_pb.DirectoryContents](),
+				model_parser.NewProtoObjectParser[TReference, model_filesystem_pb.DirectoryContents](),
 			),
 		),
 		Leaves: model_parser.LookupParsedObjectReader(
 			c.parsedObjectPoolIngester,
 			model_parser.NewChainedObjectParser(
 				encoderObjectParser,
-				model_parser.NewMessageObjectParser[TReference, model_filesystem_pb.Leaves](),
+				model_parser.NewProtoObjectParser[TReference, model_filesystem_pb.Leaves](),
 			),
 		),
 		CommandOutputs: model_parser.LookupParsedObjectReader(
 			c.parsedObjectPoolIngester,
 			model_parser.NewChainedObjectParser(
 				encoderObjectParser,
-				model_parser.NewMessageObjectParser[TReference, model_command_pb.Outputs](),
+				model_parser.NewProtoObjectParser[TReference, model_command_pb.Outputs](),
 			),
 		),
 	}, nil

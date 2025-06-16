@@ -22,7 +22,7 @@ message LeavesReference {
   // Reference to an object containing a Leaves message.
   bonanza.model.core.DecodableReference reference = 1
       [(bonanza.model.core.object_format) = {
-        message_type_name:
+        proto_type_name:
           "bonanza.model.filesystem.Leaves";
       }];
 
@@ -98,7 +98,7 @@ message DirectoryReference {
   // Reference to an object containing a Directory message.
   bonanza.model.core.DecodableReference reference = 1
       [(bonanza.model.core.object_format) = {
-        message_type_name:
+        proto_type_name:
           "bonanza.model.filesystem.DirectoryContents";
       }];
 
@@ -138,7 +138,7 @@ message FileContents {
     // by this message.
     bonanza.model.core.DecodableReference file_contents_list_reference = 1
         [(bonanza.model.core.object_format) = {
-          message_list_type_name:
+          proto_list_type_name:
             "bonanza.model.filesystem.FileContents";
         }];
 

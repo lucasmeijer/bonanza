@@ -25,7 +25,7 @@ message ApplicationConfiguration {
 
   bonanza.model.core.WeakDecodableReference root_directory_reference = 6
       [(bonanza.model.core.object_format) = {
-        message_list_type_name:
+        proto_list_type_name:
           "bonanza.model.filesystem.DirectoryContents";
       }];
 

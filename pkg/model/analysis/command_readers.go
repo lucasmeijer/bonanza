@@ -28,7 +28,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeCommandReadersValue(ctx con
 			c.parsedObjectPoolIngester,
 			model_parser.NewChainedObjectParser(
 				encodedObjectParser,
-				model_parser.NewMessageObjectParser[TReference, model_command_pb.PathPattern_Children](),
+				model_parser.NewProtoObjectParser[TReference, model_command_pb.PathPattern_Children](),
 			),
 		),
 	}, nil

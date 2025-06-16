@@ -10,7 +10,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type messageListObjectParser[
+type protoListObjectParser[
 	TReference any,
 	TMessage any,
 	TMessagePtr interface {
@@ -19,10 +19,10 @@ type messageListObjectParser[
 	},
 ] struct{}
 
-// NewMessageListObjectParser is capable of unmarshaling objects
+// NewProtoListObjectParser is capable of unmarshaling objects
 // containing a list of Protobuf messages. Messages are prefixed with
 // their size, encoded as a variable length integer.
-func NewMessageListObjectParser[
+func NewProtoListObjectParser[
 	TReference any,
 	TMessage any,
 	TMessagePtr interface {
@@ -30,10 +30,10 @@ func NewMessageListObjectParser[
 		proto.Message
 	},
 ]() ObjectParser[TReference, model_core.Message[[]TMessagePtr, TReference]] {
-	return &messageListObjectParser[TReference, TMessage, TMessagePtr]{}
+	return &protoListObjectParser[TReference, TMessage, TMessagePtr]{}
 }
 
-func (p *messageListObjectParser[TReference, TMessage, TMessagePtr]) ParseObject(in model_core.Message[[]byte, TReference], decodingParameters []byte) (model_core.Message[[]TMessagePtr, TReference], int, error) {
+func (p *protoListObjectParser[TReference, TMessage, TMessagePtr]) ParseObject(in model_core.Message[[]byte, TReference], decodingParameters []byte) (model_core.Message[[]TMessagePtr, TReference], int, error) {
 	if len(decodingParameters) > 0 {
 		return model_core.Message[[]TMessagePtr, TReference]{}, 0, status.Error(codes.InvalidArgument, "Unexpected decoding parameters")
 	}
@@ -67,6 +67,6 @@ func (p *messageListObjectParser[TReference, TMessage, TMessagePtr]) ParseObject
 	return model_core.NewMessage(elements, in.OutgoingReferences), len(in.Message), nil
 }
 
-func (p *messageListObjectParser[TReference, TMessage, TMessagePtr]) GetDecodingParametersSizeBytes() int {
+func (p *protoListObjectParser[TReference, TMessage, TMessagePtr]) GetDecodingParametersSizeBytes() int {
 	return 0
 }

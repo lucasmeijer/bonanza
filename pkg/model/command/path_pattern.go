@@ -44,7 +44,7 @@ func GetPathPatternWithChildren[TMetadata model_core.ReferenceMetadata](
 
 func GetPathPatternInlineCandidate[TMetadata model_core.ReferenceMetadata](name string, grandChildren model_core.PatchedMessage[*model_command_pb.PathPattern_Children, TMetadata], encoder model_encoding.BinaryEncoder, objectCapturer model_core.CreatedObjectCapturer[TMetadata]) inlinedtree.Candidate[*model_command_pb.PathPattern_Children, TMetadata] {
 	return inlinedtree.Candidate[*model_command_pb.PathPattern_Children, TMetadata]{
-		ExternalMessage: model_core.MessageToMarshalable(grandChildren),
+		ExternalMessage: model_core.ProtoToMarshalable(grandChildren),
 		Encoder:         encoder,
 		ParentAppender: func(
 			children model_core.PatchedMessage[*model_command_pb.PathPattern_Children, TMetadata],

@@ -176,16 +176,16 @@ func MarshalAny[TMessage proto.Message, TMetadata ReferenceMetadata](m PatchedMe
 	), nil
 }
 
-func MessageToMarshalable[TMessage proto.Message, TMetadata ReferenceMetadata](m PatchedMessage[TMessage, TMetadata]) PatchedMessage[Marshalable, TMetadata] {
+func ProtoToMarshalable[TMessage proto.Message, TMetadata ReferenceMetadata](m PatchedMessage[TMessage, TMetadata]) PatchedMessage[Marshalable, TMetadata] {
 	return NewPatchedMessage(
-		NewMessageMarshalable(m.Message),
+		NewProtoMarshalable(m.Message),
 		m.Patcher,
 	)
 }
 
-func MessageListToMarshalable[TMessage proto.Message, TMetadata ReferenceMetadata](m PatchedMessage[[]TMessage, TMetadata]) PatchedMessage[Marshalable, TMetadata] {
+func ProtoListToMarshalable[TMessage proto.Message, TMetadata ReferenceMetadata](m PatchedMessage[[]TMessage, TMetadata]) PatchedMessage[Marshalable, TMetadata] {
 	return NewPatchedMessage(
-		NewMessageListMarshalable(m.Message),
+		NewProtoListMarshalable(m.Message),
 		m.Patcher,
 	)
 }

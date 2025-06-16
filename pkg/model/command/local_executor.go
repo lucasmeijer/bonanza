@@ -224,7 +224,7 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 		parsedObjectPoolIngester,
 		model_parser.NewChainedObjectParser(
 			model_parser.NewEncodedObjectParser[object.LocalReference](commandEncoder),
-			model_parser.NewMessageObjectParser[object.LocalReference, model_command_pb.Command](),
+			model_parser.NewProtoObjectParser[object.LocalReference, model_command_pb.Command](),
 		),
 	)
 
@@ -252,7 +252,7 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 			parsedObjectPoolIngester,
 			model_parser.NewChainedObjectParser(
 				model_parser.NewEncodedObjectParser[object.LocalReference](commandEncoder),
-				model_parser.NewMessageListObjectParser[object.LocalReference, model_command_pb.ArgumentList_Element](),
+				model_parser.NewProtoListObjectParser[object.LocalReference, model_command_pb.ArgumentList_Element](),
 			),
 		),
 		model_core.Nested(command, command.Message.Arguments),
@@ -282,7 +282,7 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 			parsedObjectPoolIngester,
 			model_parser.NewChainedObjectParser(
 				model_parser.NewEncodedObjectParser[object.LocalReference](commandEncoder),
-				model_parser.NewMessageListObjectParser[object.LocalReference, model_command_pb.EnvironmentVariableList_Element](),
+				model_parser.NewProtoListObjectParser[object.LocalReference, model_command_pb.EnvironmentVariableList_Element](),
 			),
 		),
 		model_core.Nested(command, command.Message.EnvironmentVariables),
@@ -372,7 +372,7 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 					parsedObjectPoolIngester,
 					model_parser.NewChainedObjectParser(
 						model_parser.NewEncodedObjectParser[object.LocalReference](directoryEncoder),
-						model_parser.NewMessageObjectParser[object.LocalReference, model_filesystem_pb.Leaves](),
+						model_parser.NewProtoObjectParser[object.LocalReference, model_filesystem_pb.Leaves](),
 					),
 				),
 				pg_vfs.NewStatelessHandleAllocatingFileFactory(
@@ -538,7 +538,7 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 								parsedObjectPoolIngester,
 								model_parser.NewChainedObjectParser(
 									model_parser.NewEncodedObjectParser[object.LocalReference](commandEncoder),
-									model_parser.NewMessageObjectParser[object.LocalReference, model_command_pb.PathPattern_Children](),
+									model_parser.NewProtoObjectParser[object.LocalReference, model_command_pb.PathPattern_Children](),
 								),
 							),
 							writableFileUploadDelay: writableFileUploadDelayChan,
@@ -564,7 +564,7 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 		// Action has one or more outputs. Upload them and
 		// attach a reference to the result message.
 		if createdObject, err := model_core.MarshalAndEncode(
-			model_core.NewPatchedMessage(model_core.NewMessageMarshalable(&outputs), outputsPatcher),
+			model_core.NewPatchedMessage(model_core.NewProtoMarshalable(&outputs), outputsPatcher),
 			namespace.ReferenceFormat,
 			directoryEncoder,
 		); err == nil {

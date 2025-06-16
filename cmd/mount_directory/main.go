@@ -90,7 +90,7 @@ func main() {
 			parsedObjectPoolIngester,
 			model_parser.NewChainedObjectParser(
 				model_parser.NewEncodedObjectParser[object.LocalReference](directoryEncoder),
-				model_parser.NewMessageObjectParser[object.LocalReference, model_filesystem_pb.Leaves](),
+				model_parser.NewProtoObjectParser[object.LocalReference, model_filesystem_pb.Leaves](),
 			),
 		)
 		directoryClusterReader := model_parser.LookupParsedObjectReader(

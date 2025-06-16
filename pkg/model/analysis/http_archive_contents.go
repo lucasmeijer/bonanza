@@ -404,7 +404,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeHttpArchiveContentsValue(ct
 		return PatchedHttpArchiveContentsValue{}, errors.New("archive contains one or more symbolic links that potentially escape the archive's root directory")
 	}
 	createdRootDirectoryObject, err := model_core.MarshalAndEncode(
-		model_core.MessageToMarshalable(createdRootDirectory.Message),
+		model_core.ProtoToMarshalable(createdRootDirectory.Message),
 		c.getReferenceFormat(),
 		directoryCreationParameters.GetEncoder(),
 	)

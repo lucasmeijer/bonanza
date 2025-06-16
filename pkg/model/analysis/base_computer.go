@@ -96,59 +96,59 @@ func NewBaseComputer[TReference object.BasicReference, TMetadata BaseComputerRef
 		valueReaders: model_starlark.ValueReaders[TReference]{
 			Dict: model_parser.LookupParsedObjectReader(
 				parsedObjectPoolIngester,
-				model_parser.NewMessageListObjectParser[TReference, model_starlark_pb.Dict_Entry](),
+				model_parser.NewProtoListObjectParser[TReference, model_starlark_pb.Dict_Entry](),
 			),
 			List: model_parser.LookupParsedObjectReader(
 				parsedObjectPoolIngester,
-				model_parser.NewMessageListObjectParser[TReference, model_starlark_pb.List_Element](),
+				model_parser.NewProtoListObjectParser[TReference, model_starlark_pb.List_Element](),
 			),
 		},
 		argsReader: model_parser.LookupParsedObjectReader(
 			parsedObjectPoolIngester,
-			model_parser.NewMessageListObjectParser[TReference, model_analysis_pb.Args](),
+			model_parser.NewProtoListObjectParser[TReference, model_analysis_pb.Args](),
 		),
 		argsAddReader: model_parser.LookupParsedObjectReader(
 			parsedObjectPoolIngester,
-			model_parser.NewMessageListObjectParser[TReference, model_analysis_pb.Args_Leaf_Add](),
+			model_parser.NewProtoListObjectParser[TReference, model_analysis_pb.Args_Leaf_Add](),
 		),
 		buildSpecificationReader: model_parser.LookupParsedObjectReader(
 			parsedObjectPoolIngester,
 			model_parser.NewChainedObjectParser(
 				model_parser.NewEncodedObjectParser[TReference](buildSpecificationEncoder),
-				model_parser.NewMessageObjectParser[TReference, model_build_pb.BuildSpecification](),
+				model_parser.NewProtoObjectParser[TReference, model_build_pb.BuildSpecification](),
 			),
 		),
 		buildSettingOverrideReader: model_parser.LookupParsedObjectReader(
 			parsedObjectPoolIngester,
-			model_parser.NewMessageListObjectParser[TReference, model_analysis_pb.BuildSettingOverride](),
+			model_parser.NewProtoListObjectParser[TReference, model_analysis_pb.BuildSettingOverride](),
 		),
 		configuredTargetOutputReader: model_parser.LookupParsedObjectReader(
 			parsedObjectPoolIngester,
-			model_parser.NewMessageListObjectParser[TReference, model_analysis_pb.ConfiguredTarget_Value_Output](),
+			model_parser.NewProtoListObjectParser[TReference, model_analysis_pb.ConfiguredTarget_Value_Output](),
 		),
 		commandOutputsReader: model_parser.LookupParsedObjectReader(
 			parsedObjectPoolIngester,
-			model_parser.NewMessageObjectParser[TReference, model_command_pb.Outputs](),
+			model_parser.NewProtoObjectParser[TReference, model_command_pb.Outputs](),
 		),
 		configuredTargetActionReader: model_parser.LookupParsedObjectReader(
 			parsedObjectPoolIngester,
-			model_parser.NewMessageListObjectParser[TReference, model_analysis_pb.ConfiguredTarget_Value_Action](),
+			model_parser.NewProtoListObjectParser[TReference, model_analysis_pb.ConfiguredTarget_Value_Action](),
 		),
 		filesToRunProviderReader: model_parser.LookupParsedObjectReader(
 			parsedObjectPoolIngester,
-			model_parser.NewMessageListObjectParser[TReference, model_analysis_pb.FilesToRunProvider](),
+			model_parser.NewProtoListObjectParser[TReference, model_analysis_pb.FilesToRunProvider](),
 		),
 		moduleExtensionReposValueRepoReader: model_parser.LookupParsedObjectReader(
 			parsedObjectPoolIngester,
-			model_parser.NewMessageListObjectParser[TReference, model_analysis_pb.ModuleExtensionRepos_Value_Repo](),
+			model_parser.NewProtoListObjectParser[TReference, model_analysis_pb.ModuleExtensionRepos_Value_Repo](),
 		),
 		packageValueTargetReader: model_parser.LookupParsedObjectReader(
 			parsedObjectPoolIngester,
-			model_parser.NewMessageListObjectParser[TReference, model_analysis_pb.Package_Value_Target](),
+			model_parser.NewProtoListObjectParser[TReference, model_analysis_pb.Package_Value_Target](),
 		),
 		targetPatternExpansionValueTargetLabelReader: model_parser.LookupParsedObjectReader(
 			parsedObjectPoolIngester,
-			model_parser.NewMessageListObjectParser[TReference, model_analysis_pb.TargetPatternExpansion_Value_TargetLabel](),
+			model_parser.NewProtoListObjectParser[TReference, model_analysis_pb.TargetPatternExpansion_Value_TargetLabel](),
 		),
 	}
 }

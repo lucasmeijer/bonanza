@@ -29,8 +29,8 @@ type ObjectFormat struct {
 	// Types that are valid to be assigned to Format:
 	//
 	//	*ObjectFormat_Raw
-	//	*ObjectFormat_MessageTypeName
-	//	*ObjectFormat_MessageListTypeName
+	//	*ObjectFormat_ProtoTypeName
+	//	*ObjectFormat_ProtoListTypeName
 	Format        isObjectFormat_Format `protobuf_oneof:"format"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -82,19 +82,19 @@ func (x *ObjectFormat) GetRaw() *emptypb.Empty {
 	return nil
 }
 
-func (x *ObjectFormat) GetMessageTypeName() string {
+func (x *ObjectFormat) GetProtoTypeName() string {
 	if x != nil {
-		if x, ok := x.Format.(*ObjectFormat_MessageTypeName); ok {
-			return x.MessageTypeName
+		if x, ok := x.Format.(*ObjectFormat_ProtoTypeName); ok {
+			return x.ProtoTypeName
 		}
 	}
 	return ""
 }
 
-func (x *ObjectFormat) GetMessageListTypeName() string {
+func (x *ObjectFormat) GetProtoListTypeName() string {
 	if x != nil {
-		if x, ok := x.Format.(*ObjectFormat_MessageListTypeName); ok {
-			return x.MessageListTypeName
+		if x, ok := x.Format.(*ObjectFormat_ProtoListTypeName); ok {
+			return x.ProtoListTypeName
 		}
 	}
 	return ""
@@ -108,19 +108,19 @@ type ObjectFormat_Raw struct {
 	Raw *emptypb.Empty `protobuf:"bytes,1,opt,name=raw,proto3,oneof"`
 }
 
-type ObjectFormat_MessageTypeName struct {
-	MessageTypeName string `protobuf:"bytes,2,opt,name=message_type_name,json=messageTypeName,proto3,oneof"`
+type ObjectFormat_ProtoTypeName struct {
+	ProtoTypeName string `protobuf:"bytes,2,opt,name=proto_type_name,json=protoTypeName,proto3,oneof"`
 }
 
-type ObjectFormat_MessageListTypeName struct {
-	MessageListTypeName string `protobuf:"bytes,3,opt,name=message_list_type_name,json=messageListTypeName,proto3,oneof"`
+type ObjectFormat_ProtoListTypeName struct {
+	ProtoListTypeName string `protobuf:"bytes,3,opt,name=proto_list_type_name,json=protoListTypeName,proto3,oneof"`
 }
 
 func (*ObjectFormat_Raw) isObjectFormat_Format() {}
 
-func (*ObjectFormat_MessageTypeName) isObjectFormat_Format() {}
+func (*ObjectFormat_ProtoTypeName) isObjectFormat_Format() {}
 
-func (*ObjectFormat_MessageListTypeName) isObjectFormat_Format() {}
+func (*ObjectFormat_ProtoListTypeName) isObjectFormat_Format() {}
 
 type Reference struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -387,11 +387,11 @@ var File_pkg_proto_model_core_core_proto protoreflect.FileDescriptor
 
 const file_pkg_proto_model_core_core_proto_rawDesc = "" +
 	"\n" +
-	"\x1fpkg/proto/model/core/core.proto\x12\x12bonanza.model.core\x1a\x19google/protobuf/any.proto\x1a google/protobuf/descriptor.proto\x1a\x1bgoogle/protobuf/empty.proto\"\xa9\x01\n" +
+	"\x1fpkg/proto/model/core/core.proto\x12\x12bonanza.model.core\x1a\x19google/protobuf/any.proto\x1a google/protobuf/descriptor.proto\x1a\x1bgoogle/protobuf/empty.proto\"\xa1\x01\n" +
 	"\fObjectFormat\x12*\n" +
-	"\x03raw\x18\x01 \x01(\v2\x16.google.protobuf.EmptyH\x00R\x03raw\x12,\n" +
-	"\x11message_type_name\x18\x02 \x01(\tH\x00R\x0fmessageTypeName\x125\n" +
-	"\x16message_list_type_name\x18\x03 \x01(\tH\x00R\x13messageListTypeNameB\b\n" +
+	"\x03raw\x18\x01 \x01(\v2\x16.google.protobuf.EmptyH\x00R\x03raw\x12(\n" +
+	"\x0fproto_type_name\x18\x02 \x01(\tH\x00R\rprotoTypeName\x121\n" +
+	"\x14proto_list_type_name\x18\x03 \x01(\tH\x00R\x11protoListTypeNameB\b\n" +
 	"\x06format\"!\n" +
 	"\tReference\x12\x14\n" +
 	"\x05index\x18\x01 \x01(\aR\x05index\"\x82\x01\n" +
@@ -455,8 +455,8 @@ func file_pkg_proto_model_core_core_proto_init() {
 	}
 	file_pkg_proto_model_core_core_proto_msgTypes[0].OneofWrappers = []any{
 		(*ObjectFormat_Raw)(nil),
-		(*ObjectFormat_MessageTypeName)(nil),
-		(*ObjectFormat_MessageListTypeName)(nil),
+		(*ObjectFormat_ProtoTypeName)(nil),
+		(*ObjectFormat_ProtoListTypeName)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

@@ -1794,7 +1794,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 			},
 			// Fields that can be stored externally if needed.
 			{
-				ExternalMessage: model_core.MessageListToMarshalable(argumentList),
+				ExternalMessage: model_core.ProtoListToMarshalable(argumentList),
 				Encoder:         mrc.commandEncoder,
 				ParentAppender: func(
 					command model_core.PatchedMessage[*model_command_pb.Command, dag.ObjectContentsWalker],
@@ -1809,7 +1809,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 				},
 			},
 			{
-				ExternalMessage: model_core.MessageListToMarshalable(environmentVariableList),
+				ExternalMessage: model_core.ProtoListToMarshalable(environmentVariableList),
 				Encoder:         mrc.commandEncoder,
 				ParentAppender: func(
 					command model_core.PatchedMessage[*model_command_pb.Command, dag.ObjectContentsWalker],
@@ -1824,7 +1824,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 				},
 			},
 			{
-				ExternalMessage: model_core.MessageToMarshalable(outputPathPatternChildren),
+				ExternalMessage: model_core.ProtoToMarshalable(outputPathPatternChildren),
 				Encoder:         mrc.commandEncoder,
 				ParentAppender: func(
 					command model_core.PatchedMessage[*model_command_pb.Command, dag.ObjectContentsWalker],
@@ -1845,7 +1845,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 		return nil, err
 	}
 	createdCommand, err := model_core.MarshalAndEncode(
-		model_core.MessageToMarshalable(command),
+		model_core.ProtoToMarshalable(command),
 		referenceFormat,
 		mrc.commandEncoder,
 	)
@@ -2142,7 +2142,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doRead(thread *star
 	// TODO: This should use inlinedtree.Build().
 	createdCommand, err := model_core.MarshalAndEncode(
 		model_core.NewPatchedMessage(
-			model_core.NewMessageMarshalable(&model_command_pb.Command{
+			model_core.NewProtoMarshalable(&model_command_pb.Command{
 				Arguments: []*model_command_pb.ArgumentList_Element{
 					{
 						Level: &model_command_pb.ArgumentList_Element_Leaf{
@@ -2286,7 +2286,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doWhich(thread *sta
 	// TODO: This should use inlinedtree.Build().
 	createdCommand, err := model_core.MarshalAndEncode(
 		model_core.NewPatchedMessage(
-			model_core.NewMessageMarshalable(&model_command_pb.Command{
+			model_core.NewProtoMarshalable(&model_command_pb.Command{
 				Arguments: []*model_command_pb.ArgumentList_Element{
 					{
 						Level: &model_command_pb.ArgumentList_Element_Leaf{
@@ -2320,7 +2320,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doWhich(thread *sta
 
 	createdInputRoot, err := model_core.MarshalAndEncode(
 		model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](
-			model_core.NewMessageMarshalable(&model_filesystem_pb.DirectoryContents{
+			model_core.NewProtoMarshalable(&model_filesystem_pb.DirectoryContents{
 				Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
 					LeavesInline: &model_filesystem_pb.Leaves{},
 				},
@@ -2468,7 +2468,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) Exists(p *model_sta
 	// TODO: This should use inlinedtree.Build().
 	createdCommand, err := model_core.MarshalAndEncode(
 		model_core.NewPatchedMessage(
-			model_core.NewMessageMarshalable(&model_command_pb.Command{
+			model_core.NewProtoMarshalable(&model_command_pb.Command{
 				Arguments: []*model_command_pb.ArgumentList_Element{
 					{
 						Level: &model_command_pb.ArgumentList_Element_Leaf{
@@ -2602,7 +2602,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) Readdir(p *model_st
 	// TODO: This should use inlinedtree.Build().
 	createdCommand, err := model_core.MarshalAndEncode(
 		model_core.NewPatchedMessage(
-			model_core.NewMessageMarshalable(&model_command_pb.Command{
+			model_core.NewProtoMarshalable(&model_command_pb.Command{
 				Arguments: []*model_command_pb.ArgumentList_Element{
 					{
 						Level: &model_command_pb.ArgumentList_Element_Leaf{
@@ -3315,7 +3315,7 @@ func (c *baseComputer[TReference, TMetadata]) createMerkleTreeFromChangeTracking
 	// Store the root directory itself. We don't embed it into the
 	// response, as that prevents it from being accessed separately.
 	createdRootDirectoryObject, err := model_core.MarshalAndEncode(
-		model_core.MessageToMarshalable(createdRootDirectory.Message),
+		model_core.ProtoToMarshalable(createdRootDirectory.Message),
 		c.getReferenceFormat(),
 		directoryCreationParameters.GetEncoder(),
 	)

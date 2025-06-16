@@ -23,7 +23,7 @@ message Action {
   // arguments, environment variables, and set of paths to capture.
   bonanza.model.core.DecodableReference command_reference = 2
       [(bonanza.model.core.object_format) = {
-        message_type_name:
+        proto_type_name:
           "bonanza.model.command.Command";
       }];
 
@@ -31,7 +31,7 @@ message Action {
   // be present on the worker when executing.
   bonanza.model.core.DecodableReference input_root_reference = 3
       [(bonanza.model.core.object_format) = {
-        message_type_name:
+        proto_type_name:
           "bonanza.model.filesystem.DirectoryContents";
       }];
 
@@ -50,7 +50,7 @@ message ActionResult {
 
     bonanza.model.core.DecodableReference outputs_reference = 2
         [(bonanza.model.core.object_format) = {
-          message_type_name:
+          proto_type_name:
             "bonanza.model.command.Outputs";
         }];
   }
@@ -149,7 +149,7 @@ message CompatibleToolchainsForType {
     // without any platform constraints and build settings in place.
     bonanza.model.core.DecodableReference configuration_reference = 2
         [(bonanza.model.core.object_format) = {
-          message_list_type_name:
+          proto_list_type_name:
             "bonanza.model.analysis.BuildSettingOverride";
         }];
   }
@@ -221,7 +221,7 @@ message BuildSettingOverride {
     // overrides.
     bonanza.model.core.DecodableReference reference = 1
         [(bonanza.model.core.object_format) = {
-          message_list_type_name:
+          proto_list_type_name:
             "bonanza.model.analysis.BuildSettingOverride";
         }];
 
@@ -246,7 +246,7 @@ message Args {
     // Reference to the B-tree node containing additional arguments.
     bonanza.model.core.DecodableReference reference = 1
         [(bonanza.model.core.object_format) = {
-          message_list_type_name:
+          proto_list_type_name:
             "bonanza.model.analysis.Args";
         }];
   }
@@ -258,7 +258,7 @@ message Args {
         // Args.add*() invocations.
         bonanza.model.core.DecodableReference reference = 1
             [(bonanza.model.core.object_format) = {
-              message_list_type_name:
+              proto_list_type_name:
                 "bonanza.model.analysis.Args.Leaf.Add";
             }];
       }
@@ -408,7 +408,7 @@ message FilesToRunProvider {
     // placed in an action's input root.
     bonanza.model.core.DecodableReference reference = 1
         [(bonanza.model.core.object_format) = {
-          message_list_type_name:
+          proto_list_type_name:
             "bonanza.model.analysis.FilesToRunProvider";
         }];
   }
@@ -497,7 +497,7 @@ message ConfiguredTarget {
     // any platform constraints and build settings in place.
     bonanza.model.core.DecodableReference configuration_reference = 2
         [(bonanza.model.core.object_format) = {
-          message_list_type_name:
+          proto_list_type_name:
             "bonanza.model.analysis.BuildSettingOverride";
         }];
   }
@@ -512,7 +512,7 @@ message ConfiguredTarget {
         // Reference to the B-tree node containing additional outputs.
         bonanza.model.core.DecodableReference reference = 1
             [(bonanza.model.core.object_format) = {
-              message_list_type_name:
+              proto_list_type_name:
                 "bonanza.model.analysis.ConfiguredTarget.Value.Output";
             }];
 
@@ -589,7 +589,7 @@ message ConfiguredTarget {
         // Reference to the B-tree node containing additional actions.
         bonanza.model.core.DecodableReference reference = 1
             [(bonanza.model.core.object_format) = {
-              message_list_type_name:
+              proto_list_type_name:
                 "bonanza.model.analysis.ConfiguredTarget.Value.Action";
             }];
 
@@ -666,7 +666,7 @@ message ExecTransition {
     // The configuration from which inputs need to be sourced.
     bonanza.model.core.DecodableReference input_configuration_reference = 2
         [(bonanza.model.core.object_format) = {
-          message_list_type_name:
+          proto_list_type_name:
             "bonanza.model.analysis.BuildSettingOverride";
         }];
   }
@@ -676,7 +676,7 @@ message ExecTransition {
     // that has cfg = "exec" or cfg = exec_group(...).
     bonanza.model.core.DecodableReference output_configuration_reference = 2
         [(bonanza.model.core.object_format) = {
-          message_list_type_name:
+          proto_list_type_name:
             "bonanza.model.analysis.BuildSettingOverride";
         }];
   }
@@ -780,7 +780,7 @@ message FilesRoot {
     // Reference to a Starlark list containing files.
     bonanza.model.core.DecodableReference list_reference = 1
         [(bonanza.model.core.object_format) = {
-          message_list_type_name:
+          proto_list_type_name:
             "bonanza.model.starlark.List.Element";
         }];
 
@@ -1041,7 +1041,7 @@ message ModuleExtensionRepos {
         // contains properties of repos in the module extension.
         bonanza.model.core.DecodableReference reference = 1
             [(bonanza.model.core.object_format) = {
-              message_list_type_name:
+              proto_list_type_name:
                 "bonanza.model.analysis.ModuleExtensionRepos.Value.Repo";
             }];
 
@@ -1206,7 +1206,7 @@ message Package {
         // contain properties of targets in the package.
         bonanza.model.core.DecodableReference reference = 1
             [(bonanza.model.core.object_format) = {
-              message_list_type_name:
+              proto_list_type_name:
                 "bonanza.model.analysis.Package.Value.Target";
             }];
 
@@ -1457,7 +1457,7 @@ message ResolvedToolchains {
     // without any platform constraints and build settings in place.
     bonanza.model.core.DecodableReference configuration_reference = 2
         [(bonanza.model.core.object_format) = {
-          message_list_type_name:
+          proto_list_type_name:
             "bonanza.model.analysis.BuildSettingOverride";
         }];
 
@@ -1514,7 +1514,7 @@ message Select {
     // platform constraints and build settings in place.
     bonanza.model.core.DecodableReference configuration_reference = 2
         [(bonanza.model.core.object_format) = {
-          message_list_type_name:
+          proto_list_type_name:
             "bonanza.model.analysis.BuildSettingOverride";
         }];
 
@@ -1561,7 +1561,7 @@ message SuccessfulActionResult {
   message Value {
     bonanza.model.core.DecodableReference outputs_reference = 2
         [(bonanza.model.core.object_format) = {
-          message_list_type_name:
+          proto_list_type_name:
             "bonanza.model.command.Outputs";
         }];
   }
@@ -1586,7 +1586,7 @@ message TargetActionId {
   // declaring the action.
   bonanza.model.core.DecodableReference configuration_reference = 2
       [(bonanza.model.core.object_format) = {
-        message_list_type_name:
+        proto_list_type_name:
           "bonanza.model.analysis.BuildSettingOverride";
       }];
 
@@ -1615,7 +1615,7 @@ message TargetActionCommand {
   message Value {
     bonanza.model.core.DecodableReference command_reference = 1
         [(bonanza.model.core.object_format) = {
-          message_type_name:
+          proto_type_name:
             "bonanza.model.command.Command";
         }];
   }
@@ -1657,7 +1657,7 @@ message TargetCompletion {
     // platform constraints and build settings in place.
     bonanza.model.core.DecodableReference configuration_reference = 2
         [(bonanza.model.core.object_format) = {
-          message_list_type_name:
+          proto_list_type_name:
             "bonanza.model.analysis.BuildSettingOverride";
         }];
   }
@@ -1685,7 +1685,7 @@ message TargetPatternExpansion {
         // target pattern.
         bonanza.model.core.DecodableReference
             reference = 1 [(bonanza.model.core.object_format) = {
-          message_list_type_name:
+          proto_list_type_name:
             "bonanza.model.analysis.TargetPatternExpansion.Value.TargetLabel";
         }];
       }
@@ -1787,7 +1787,7 @@ message UserDefinedTransition {
     // The configuration from which inputs need to be sourced.
     bonanza.model.core.DecodableReference input_configuration_reference = 2
         [(bonanza.model.core.object_format) = {
-          message_list_type_name:
+          proto_list_type_name:
             "bonanza.model.analysis.BuildSettingOverride";
         }];
   }
@@ -1801,7 +1801,7 @@ message UserDefinedTransition {
         // Output configuration that is identified by this key.
         bonanza.model.core.DecodableReference output_configuration_reference = 2
             [(bonanza.model.core.object_format) = {
-              message_list_type_name:
+              proto_list_type_name:
                 "bonanza.model.analysis.BuildSettingOverride";
             }];
       }
@@ -1849,7 +1849,7 @@ message VisibleTarget {
     // platform constraints and build settings into account.
     bonanza.model.core.DecodableReference configuration_reference = 4
         [(bonanza.model.core.object_format) = {
-          message_list_type_name:
+          proto_list_type_name:
             "bonanza.model.analysis.BuildSettingOverride";
         }];
 

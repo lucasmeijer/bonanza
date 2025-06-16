@@ -529,7 +529,7 @@ func (e *builderExecutor) Execute(ctx context.Context, action *model_build_pb.Ac
 	var evaluationsReference *model_core_pb.WeakDecodableReference
 	if len(evaluations.Message) > 0 {
 		createdEvaluations, err := model_core.MarshalAndEncode(
-			model_core.MessageListToMarshalable(evaluations),
+			model_core.ProtoListToMarshalable(evaluations),
 			namespace.ReferenceFormat,
 			evaluationTreeEncoder,
 		)

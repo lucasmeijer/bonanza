@@ -19,16 +19,16 @@ type Marshalable interface {
 	Marshal() ([]byte, error)
 }
 
-type messageMarshalable struct {
+type protoMarshalable struct {
 	message proto.Message
 }
 
-// NewMessageMarshalable converts a Protobuf message to a Marshalable.
+// NewProtoMarshalable converts a Protobuf message to a Marshalable.
 // This prevents further access to the message's contents, but does
 // allow it to be passed along in contexts where the data is only
 // expected to be marshaled and stored.
-func NewMessageMarshalable(message proto.Message) Marshalable {
-	return messageMarshalable{
+func NewProtoMarshalable(message proto.Message) Marshalable {
+	return protoMarshalable{
 		message: message,
 	}
 }
@@ -38,27 +38,27 @@ var marshalOptions = proto.MarshalOptions{
 	UseCachedSize: true,
 }
 
-func (mm messageMarshalable) Marshal() ([]byte, error) {
+func (mm protoMarshalable) Marshal() ([]byte, error) {
 	return marshalOptions.Marshal(mm.message)
 }
 
-type messageListMarshalable[TMessage proto.Message] struct {
+type protoListMarshalable[TMessage proto.Message] struct {
 	messages []TMessage
 }
 
-// NewMessageListMarshalable converts a list of Protobuf message to a
+// NewProtoListMarshalable converts a list of Protobuf message to a
 // Marshalable. This prevents further access to the message's contents,
 // but does allow it to be passed along in contexts where the data is
 // only expected to be marshaled and stored.
 //
 // When marshaled, each message is prefixed with its size.
-func NewMessageListMarshalable[TMessage proto.Message](messages []TMessage) Marshalable {
-	return messageListMarshalable[TMessage]{
+func NewProtoListMarshalable[TMessage proto.Message](messages []TMessage) Marshalable {
+	return protoListMarshalable[TMessage]{
 		messages: messages,
 	}
 }
 
-func (mlm messageListMarshalable[TMessage]) Marshal() ([]byte, error) {
+func (mlm protoListMarshalable[TMessage]) Marshal() ([]byte, error) {
 	var data []byte
 	for _, message := range mlm.messages {
 		data = varint.AppendForward(data, marshalOptions.Size(message))

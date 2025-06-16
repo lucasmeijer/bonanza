@@ -54,7 +54,7 @@ func NewFileAccessParametersFromProto(m *model_filesystem_pb.FileAccessParameter
 func (p *FileAccessParameters) DecodeFileContentsList(contents *object.Contents, decodingParameters []byte) ([]*model_filesystem_pb.FileContents, error) {
 	fileContentsList, _, err := model_parser.NewChainedObjectParser(
 		model_parser.NewEncodedObjectParser[object.LocalReference](p.fileContentsListEncoder),
-		model_parser.NewMessageListObjectParser[object.LocalReference, model_filesystem_pb.FileContents](),
+		model_parser.NewProtoListObjectParser[object.LocalReference, model_filesystem_pb.FileContents](),
 	).ParseObject(
 		model_core.NewMessage(contents.GetPayload(), object.OutgoingReferences[object.LocalReference](contents)),
 		decodingParameters,

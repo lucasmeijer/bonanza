@@ -86,7 +86,7 @@ message PathPattern {
     // object.
     bonanza.model.core.DecodableReference children_external = 1
         [(bonanza.model.core.object_format) = {
-          message_type_name:
+          proto_type_name:
             "bonanza.model.command.PathPattern.Children";
         }];
 
@@ -101,7 +101,7 @@ message ArgumentList {
       string leaf = 1;
       bonanza.model.core.DecodableReference parent = 2
           [(bonanza.model.core.object_format) = {
-            message_list_type_name:
+            proto_list_type_name:
               "bonanza.model.command.ArgumentList.Element";
           }];
     }
@@ -121,7 +121,7 @@ message EnvironmentVariableList {
       Leaf leaf = 1;
       bonanza.model.core.DecodableReference parent = 2
           [(bonanza.model.core.object_format) = {
-            message_list_type_name:
+            proto_list_type_name:
               "bonanza.model.command.EnvironmentVariableList.Element";
           }];
     }
@@ -157,13 +157,13 @@ message Action {
   // process to launch and files to capture.
   bonanza.model.core.WeakDecodableReference command_reference = 3
       [(bonanza.model.core.object_format) = {
-        message_list_type_name:
+        proto_list_type_name:
           "bonanza.model.command.Command";
       }];
 
   bonanza.model.core.WeakDecodableReference input_root_reference = 4
       [(bonanza.model.core.object_format) = {
-        message_list_type_name:
+        proto_list_type_name:
           "bonanza.model.filesystem.DirectoryContents";
       }];
 }
@@ -179,7 +179,7 @@ message Result {
   // the same way as directories.
   bonanza.model.core.WeakDecodableReference outputs_reference = 3
       [(bonanza.model.core.object_format) = {
-        message_list_type_name:
+        proto_list_type_name:
           "bonanza.model.command.Outputs";
       }];
 

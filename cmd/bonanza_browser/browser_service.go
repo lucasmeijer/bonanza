@@ -90,12 +90,12 @@ func (s *BrowserService) RegisterHandlers(mux *http.ServeMux) {
 		wrapHandler(s.doEvaluation),
 	)
 	mux.HandleFunc(
-		"/object/{instance_name}/{reference_format}/{reference}/message/{message_type}",
-		wrapHandler(s.doMessageObject),
+		"/object/{instance_name}/{reference_format}/{reference}/proto/{message_type}",
+		wrapHandler(s.doProtoObject),
 	)
 	mux.HandleFunc(
-		"/object/{instance_name}/{reference_format}/{reference}/message_list/{message_type}",
-		wrapHandler(s.doMessageListObject),
+		"/object/{instance_name}/{reference_format}/{reference}/proto_list/{message_type}",
+		wrapHandler(s.doProtoListObject),
 	)
 	mux.HandleFunc(
 		"/object/{instance_name}/{reference_format}/{reference}/raw",
@@ -245,7 +245,7 @@ func getEncoderFromForm(r *http.Request) ([]*browser_pb.RecentlyObservedEncoder,
 	if provided == "" {
 		return nil, "", nil
 	}
-	var unmarshaled MessageList[model_encoding_pb.BinaryEncoder, *model_encoding_pb.BinaryEncoder]
+	var unmarshaled ProtoList[model_encoding_pb.BinaryEncoder, *model_encoding_pb.BinaryEncoder]
 	if err := json.Unmarshal([]byte(provided), &unmarshaled); err != nil {
 		return nil, provided, fmt.Errorf("failed to unmarshal encoder configuration: %w", err)
 	}
@@ -271,7 +271,7 @@ func getEncodersFromRequest(r *http.Request) ([]*browser_pb.RecentlyObservedEnco
 	recentlyObservedEncoders = trimRecentlyObservedEncoders(recentlyObservedEncoders)
 	if currentEncoderConfigurationStr == "" {
 		if marshaled, err := json.MarshalIndent(
-			MessageList[model_encoding_pb.BinaryEncoder, *model_encoding_pb.BinaryEncoder](
+			ProtoList[model_encoding_pb.BinaryEncoder, *model_encoding_pb.BinaryEncoder](
 				recentlyObservedEncoders[0].Configuration,
 			),
 			/* prefix = */ "",
@@ -430,7 +430,7 @@ func renderEncoderSelector(recentlyObservedEncoders []*browser_pb.RecentlyObserv
 		),
 	}
 	for _, recentlyObservedEncoder := range recentlyObservedEncoders {
-		l := MessageList[model_encoding_pb.BinaryEncoder, *model_encoding_pb.BinaryEncoder](recentlyObservedEncoder.Configuration)
+		l := ProtoList[model_encoding_pb.BinaryEncoder, *model_encoding_pb.BinaryEncoder](recentlyObservedEncoder.Configuration)
 		compact, err := json.Marshal(l)
 		if err != nil {
 			continue
@@ -669,7 +669,7 @@ func (s *BrowserService) doEvaluation(w http.ResponseWriter, r *http.Request) (g
 		parsedObjectPoolIngester,
 		model_parser.NewChainedObjectParser(
 			model_parser.NewEncodedObjectParser[object.LocalReference](binaryEncoder),
-			model_parser.NewMessageListObjectParser[object.LocalReference, model_evaluation_pb.Evaluation](),
+			model_parser.NewProtoListObjectParser[object.LocalReference, model_evaluation_pb.Evaluation](),
 		),
 	)
 	ctx := r.Context()
@@ -761,7 +761,7 @@ func (s *BrowserService) doEvaluation(w http.ResponseWriter, r *http.Request) (g
 				parsedObjectPoolIngester,
 				model_parser.NewChainedObjectParser(
 					model_parser.NewEncodedObjectParser[object.LocalReference](binaryEncoder),
-					model_parser.NewMessageListObjectParser[object.LocalReference, model_evaluation_pb.Dependency](),
+					model_parser.NewProtoListObjectParser[object.LocalReference, model_evaluation_pb.Dependency](),
 				),
 			)
 			var errIter error
@@ -971,7 +971,7 @@ func (s *BrowserService) doObject(
 	), nil
 }
 
-func (s *BrowserService) doMessageObject(w http.ResponseWriter, r *http.Request) (g.Node, error) {
+func (s *BrowserService) doProtoObject(w http.ResponseWriter, r *http.Request) (g.Node, error) {
 	return s.doObject(
 		w,
 		r,
@@ -984,7 +984,7 @@ func (s *BrowserService) doMessageObject(w http.ResponseWriter, r *http.Request)
 	)
 }
 
-func (s *BrowserService) doMessageListObject(w http.ResponseWriter, r *http.Request) (g.Node, error) {
+func (s *BrowserService) doProtoListObject(w http.ResponseWriter, r *http.Request) (g.Node, error) {
 	return s.doObject(
 		w,
 		r,
@@ -1010,7 +1010,7 @@ func (s *BrowserService) doRawObject(w http.ResponseWriter, r *http.Request) (g.
 	)
 }
 
-type MessageList[
+type ProtoList[
 	TMessage any,
 	TMessagePtr interface {
 		*TMessage
@@ -1019,26 +1019,26 @@ type MessageList[
 ] []*TMessage
 
 var (
-	_ json.Marshaler   = MessageList[model_encoding_pb.BinaryEncoder, *model_encoding_pb.BinaryEncoder]{}
-	_ json.Unmarshaler = &MessageList[model_encoding_pb.BinaryEncoder, *model_encoding_pb.BinaryEncoder]{}
+	_ json.Marshaler   = ProtoList[model_encoding_pb.BinaryEncoder, *model_encoding_pb.BinaryEncoder]{}
+	_ json.Unmarshaler = &ProtoList[model_encoding_pb.BinaryEncoder, *model_encoding_pb.BinaryEncoder]{}
 )
 
-func (ml MessageList[TMessage, TMessagePtr]) MarshalJSON() ([]byte, error) {
+func (pl ProtoList[TMessage, TMessagePtr]) MarshalJSON() ([]byte, error) {
 	b := []byte("[")
-	for i, m := range ml {
+	for i, m := range pl {
 		var err error
 		b, err = protojson.MarshalOptions{}.MarshalAppend(b, TMessagePtr(m))
 		if err != nil {
 			return nil, err
 		}
-		if i != len(ml)-1 {
+		if i != len(pl)-1 {
 			b = append(b, ',')
 		}
 	}
 	return append(b, ']'), nil
 }
 
-func (ml *MessageList[TMessage, TMessagePtr]) UnmarshalJSON(b []byte) error {
+func (pl *ProtoList[TMessage, TMessagePtr]) UnmarshalJSON(b []byte) error {
 	decoder := json.NewDecoder(bytes.NewReader(b))
 	t, err := decoder.Token()
 	if err != nil {
@@ -1048,19 +1048,19 @@ func (ml *MessageList[TMessage, TMessagePtr]) UnmarshalJSON(b []byte) error {
 		return errors.New("expected start of list")
 	}
 
-	var values MessageList[TMessage, TMessagePtr]
+	var values ProtoList[TMessage, TMessagePtr]
 	for decoder.More() {
-		var value messageUnmarshaler[TMessage, TMessagePtr]
+		var value protoUnmarshaler[TMessage, TMessagePtr]
 		if err := decoder.Decode(&value); err != nil {
 			return err
 		}
 		values = append(values, &value.message)
 	}
-	*ml = values
+	*pl = values
 	return nil
 }
 
-type messageUnmarshaler[
+type protoUnmarshaler[
 	TMessage any,
 	TMessagePtr interface {
 		*TMessage
@@ -1070,10 +1070,10 @@ type messageUnmarshaler[
 	message TMessage
 }
 
-var _ json.Unmarshaler = &messageUnmarshaler[model_encoding_pb.BinaryEncoder, *model_encoding_pb.BinaryEncoder]{}
+var _ json.Unmarshaler = &protoUnmarshaler[model_encoding_pb.BinaryEncoder, *model_encoding_pb.BinaryEncoder]{}
 
-func (ml *messageUnmarshaler[TMessage, TMessagePtr]) UnmarshalJSON(b []byte) error {
-	return protojson.Unmarshal(b, TMessagePtr(&ml.message))
+func (pu *protoUnmarshaler[TMessage, TMessagePtr]) UnmarshalJSON(b []byte) error {
+	return protojson.Unmarshal(b, TMessagePtr(&pu.message))
 }
 
 // payloadRenderer implements a strategy for rendering the contents of
@@ -1225,10 +1225,10 @@ func (d *messageJSONRenderer) renderField(fieldDescriptor protoreflect.FieldDesc
 					switch format := objectFormat.GetFormat().(type) {
 					case *model_core_pb.ObjectFormat_Raw:
 						link = path.Join(d.basePath, rawReference, "raw")
-					case *model_core_pb.ObjectFormat_MessageTypeName:
-						link = path.Join(d.basePath, rawReference, "message", format.MessageTypeName)
-					case *model_core_pb.ObjectFormat_MessageListTypeName:
-						link = path.Join(d.basePath, rawReference, "message_list", format.MessageListTypeName)
+					case *model_core_pb.ObjectFormat_ProtoTypeName:
+						link = path.Join(d.basePath, rawReference, "proto", format.ProtoTypeName)
+					case *model_core_pb.ObjectFormat_ProtoListTypeName:
+						link = path.Join(d.basePath, rawReference, "proto_list", format.ProtoListTypeName)
 					default:
 						return []g.Node{
 							h.Span(

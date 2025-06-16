@@ -62,7 +62,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRepoPlatformHostPathValue(c
 	const capturedFilename = "captured"
 	createdCommand, err := model_core.MarshalAndEncode(
 		model_core.NewPatchedMessage(
-			model_core.NewMessageMarshalable(&model_command_pb.Command{
+			model_core.NewProtoMarshalable(&model_command_pb.Command{
 				Arguments: []*model_command_pb.ArgumentList_Element{
 					{
 						Level: &model_command_pb.ArgumentList_Element_Leaf{

@@ -351,7 +351,7 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 			logger.Fatal(formatted.Textf("Module %#v contains one or more symbolic links that potentially escape the module's root directory", moduleName.String()))
 		}
 		createdObject, err := model_core.MarshalAndEncode(
-			model_core.MessageToMarshalable(createdModuleRootDirectories[i].Message),
+			model_core.ProtoToMarshalable(createdModuleRootDirectories[i].Message),
 			referenceFormat,
 			directoryParameters.GetEncoder(),
 		)
@@ -393,7 +393,7 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 	}
 
 	createdBuildSpecification, err := model_core.MarshalAndEncode(
-		model_core.NewPatchedMessage(model_core.NewMessageMarshalable(&buildSpecification), buildSpecificationPatcher),
+		model_core.NewPatchedMessage(model_core.NewProtoMarshalable(&buildSpecification), buildSpecificationPatcher),
 		referenceFormat,
 		buildSpecificationEncoder,
 	)
@@ -662,12 +662,12 @@ func (f *messageJSONFormatter) formatJSONField(fieldDescriptor protoreflect.Fiel
 							if link, err := url.JoinPath(f.baseURL, rawReference, "raw"); err == nil {
 								return formatReferenceLink(link, rawReference)
 							}
-						case *model_core_pb.ObjectFormat_MessageTypeName:
-							if link, err := url.JoinPath(f.baseURL, rawReference, "message", format.MessageTypeName); err == nil {
+						case *model_core_pb.ObjectFormat_ProtoTypeName:
+							if link, err := url.JoinPath(f.baseURL, rawReference, "proto", format.ProtoTypeName); err == nil {
 								return formatReferenceLink(link, rawReference)
 							}
-						case *model_core_pb.ObjectFormat_MessageListTypeName:
-							if link, err := url.JoinPath(f.baseURL, rawReference, "message_list", format.MessageListTypeName); err == nil {
+						case *model_core_pb.ObjectFormat_ProtoListTypeName:
+							if link, err := url.JoinPath(f.baseURL, rawReference, "proto_list", format.ProtoListTypeName); err == nil {
 								return formatReferenceLink(link, rawReference)
 							}
 						}

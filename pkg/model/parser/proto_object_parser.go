@@ -9,7 +9,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type messageObjectParser[
+type protoObjectParser[
 	TReference any,
 	TMessage any,
 	TMessagePtr interface {
@@ -18,7 +18,7 @@ type messageObjectParser[
 	},
 ] struct{}
 
-func NewMessageObjectParser[
+func NewProtoObjectParser[
 	TReference any,
 	TMessage any,
 	TMessagePtr interface {
@@ -26,10 +26,10 @@ func NewMessageObjectParser[
 		proto.Message
 	},
 ]() ObjectParser[TReference, model_core.Message[TMessagePtr, TReference]] {
-	return &messageObjectParser[TReference, TMessage, TMessagePtr]{}
+	return &protoObjectParser[TReference, TMessage, TMessagePtr]{}
 }
 
-func (p *messageObjectParser[TReference, TMessage, TMessagePtr]) ParseObject(in model_core.Message[[]byte, TReference], decodingParameters []byte) (model_core.Message[TMessagePtr, TReference], int, error) {
+func (p *protoObjectParser[TReference, TMessage, TMessagePtr]) ParseObject(in model_core.Message[[]byte, TReference], decodingParameters []byte) (model_core.Message[TMessagePtr, TReference], int, error) {
 	if len(decodingParameters) > 0 {
 		return model_core.Message[TMessagePtr, TReference]{}, 0, status.Error(codes.InvalidArgument, "Unexpected decoding parameters")
 	}
@@ -41,6 +41,6 @@ func (p *messageObjectParser[TReference, TMessage, TMessagePtr]) ParseObject(in 
 	return model_core.NewMessage(TMessagePtr(&message), in.OutgoingReferences), len(in.Message), nil
 }
 
-func (p *messageObjectParser[TReference, TMessage, TMessagePtr]) GetDecodingParametersSizeBytes() int {
+func (p *protoObjectParser[TReference, TMessage, TMessagePtr]) GetDecodingParametersSizeBytes() int {
 	return 0
 }

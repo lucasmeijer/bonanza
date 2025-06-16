@@ -295,7 +295,7 @@ message Dict {
     message Parent {
       bonanza.model.core.DecodableReference reference = 1
           [(bonanza.model.core.object_format) = {
-            message_list_type_name:
+            proto_list_type_name:
               "bonanza.model.starlark.Dict.Entry";
           }];
     }
@@ -324,7 +324,7 @@ message File {
     // Configuration that is used to build the file.
     bonanza.model.core.DecodableReference configuration_reference = 1
         [(bonanza.model.core.object_format) = {
-          message_list_type_name:
+          proto_list_type_name:
             "bonanza.model.analysis.BuildSettingOverride";
         }];
 
@@ -443,7 +443,7 @@ message List {
       // Reference to an object containing additional list elements.
       bonanza.model.core.DecodableReference reference = 1
           [(bonanza.model.core.object_format) = {
-            message_list_type_name:
+            proto_list_type_name:
               "bonanza.model.starlark.List.Element";
           }];
 
@@ -518,7 +518,7 @@ message PackageGroup {
       // object.
       bonanza.model.core.DecodableReference overrides_external = 2
           [(bonanza.model.core.object_format) = {
-            message_type_name:
+            proto_type_name:
               "bonanza.model.starlark.PackageGroup.Subpackages.Overrides";
           }];
 

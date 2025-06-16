@@ -133,7 +133,7 @@ func NewFileContentsListObjectParser[TReference object.BasicReference]() parser.
 }
 
 func (p *fileContentsListObjectParser[TReference]) ParseObject(in model_core.Message[[]byte, TReference], decodingParameters []byte) (FileContentsList[TReference], int, error) {
-	l, sizeBytes, err := model_parser.NewMessageListObjectParser[TReference, model_filesystem_pb.FileContents]().
+	l, sizeBytes, err := model_parser.NewProtoListObjectParser[TReference, model_filesystem_pb.FileContents]().
 		ParseObject(in, decodingParameters)
 	if err != nil {
 		return nil, 0, err

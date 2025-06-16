@@ -10,7 +10,7 @@ message Dependency {
   message Parent {
     bonanza.model.core.DecodableReference reference = 1
         [(bonanza.model.core.object_format) = {
-          message_list_type_name:
+          proto_list_type_name:
             "bonanza.model.evaluation.Dependency";
         }];
   }
@@ -29,7 +29,7 @@ message Evaluation {
     // Reference of the object containing additional Evaluation objects.
     bonanza.model.core.DecodableReference reference = 1
         [(bonanza.model.core.object_format) = {
-          message_list_type_name:
+          proto_list_type_name:
             "bonanza.model.evaluation.Evaluation";
         }];
 

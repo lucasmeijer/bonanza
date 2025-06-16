@@ -315,7 +315,7 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 	}
 
 	createdConfiguration, err := model_core.MarshalAndEncode(
-		model_core.MessageListToMarshalable(buildSettingOverrides),
+		model_core.ProtoListToMarshalable(buildSettingOverrides),
 		c.getReferenceFormat(),
 		c.getValueObjectEncoder(),
 	)

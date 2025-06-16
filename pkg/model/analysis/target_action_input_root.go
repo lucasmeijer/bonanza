@@ -186,7 +186,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionInputRootValue(
 	}
 
 	rootDirectoryObject, err := model_core.MarshalAndEncode(
-		model_core.MessageToMarshalable(createdRootDirectory.Message),
+		model_core.ProtoToMarshalable(createdRootDirectory.Message),
 		c.getReferenceFormat(),
 		directoryCreationParameters.GetEncoder(),
 	)

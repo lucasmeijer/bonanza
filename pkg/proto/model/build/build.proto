@@ -133,7 +133,7 @@ message Action {
   // Reference of the build specification DAG.
   bonanza.model.core.WeakDecodableReference build_specification_reference = 4
       [(bonanza.model.core.object_format) = {
-        message_type_name:
+        proto_type_name:
           "bonanza.model.build.BuildSpecification";
       }];
 
@@ -162,7 +162,7 @@ message Result {
   // this build.
   bonanza.model.core.WeakDecodableReference evaluations_reference = 2
       [(bonanza.model.core.object_format) = {
-        message_list_type_name:
+        proto_list_type_name:
           "bonanza.model.evaluation.Evaluation";
       }];
 }
