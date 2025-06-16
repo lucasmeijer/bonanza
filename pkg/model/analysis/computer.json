@@ -232,7 +232,6 @@
       },
       "FileRoot": {
          "dependsOn": [
-            "ConfiguredTarget",
             "DirectoryCreationParametersObject",
             "DirectoryReaders",
             "FileCreationParametersObject",
@@ -241,7 +240,8 @@
             "FileRoot",
             "Repo",
             "TargetActionInputRoot",
-            "TargetActionResult"
+            "TargetActionResult",
+            "TargetOutput"
          ],
          "keyContainsReferences": true
       },
@@ -615,6 +615,12 @@
          "dependsOn": [
             "ConfiguredTarget",
             "FileRoot"
+         ],
+         "keyContainsReferences": true
+      },
+      "TargetOutput": {
+         "dependsOn": [
+            "ConfiguredTarget"
          ],
          "keyContainsReferences": true
       },

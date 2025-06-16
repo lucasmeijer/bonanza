@@ -14,7 +14,6 @@ import (
 	"github.com/buildbarn/bonanza/pkg/evaluation"
 	"github.com/buildbarn/bonanza/pkg/label"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	"github.com/buildbarn/bonanza/pkg/model/core/btree"
 	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
 	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
 	model_starlark "github.com/buildbarn/bonanza/pkg/model/starlark"
@@ -134,48 +133,22 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 		configurationReference := model_core.Nested(f, o.ConfigurationReference)
 		targetLabel := fileLabel.GetCanonicalPackage().AppendTargetName(targetName)
 		patchedConfigurationReference := model_core.Patch(e, configurationReference)
-		configuredTarget := e.GetConfiguredTargetValue(
+		output := e.GetTargetOutputValue(
 			model_core.NewPatchedMessage(
-				&model_analysis_pb.ConfiguredTarget_Key{
+				&model_analysis_pb.TargetOutput_Key{
 					Label:                  targetLabel.String(),
 					ConfigurationReference: patchedConfigurationReference.Message,
+					PackageRelativePath:    fileLabel.GetTargetName().String(),
 				},
 				model_core.MapReferenceMetadataToWalkers(patchedConfigurationReference.Patcher),
 			),
 		)
-		if !configuredTarget.IsSet() {
+		if !output.IsSet() {
 			return PatchedFileRootValue{}, evaluation.ErrMissingDependency
 		}
 
-		packageRelativePathStr := fileLabel.GetTargetName().String()
-		output, err := btree.Find(
-			ctx,
-			c.configuredTargetOutputReader,
-			model_core.Nested(configuredTarget, configuredTarget.Message.Outputs),
-			func(entry model_core.Message[*model_analysis_pb.ConfiguredTarget_Value_Output, TReference]) (int, *model_core_pb.DecodableReference) {
-				switch level := entry.Message.Level.(type) {
-				case *model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_:
-					return strings.Compare(packageRelativePathStr, level.Leaf.PackageRelativePath), nil
-				case *model_analysis_pb.ConfiguredTarget_Value_Output_Parent_:
-					return strings.Compare(packageRelativePathStr, level.Parent.FirstPackageRelativePath), level.Parent.Reference
-				default:
-					return 0, nil
-				}
-			},
-		)
-		if err != nil {
-			return PatchedFileRootValue{}, err
-		}
-		if !output.IsSet() {
-			return PatchedFileRootValue{}, errors.New("target does not yield an output with the provided name")
-		}
-		outputLeaf, ok := output.Message.Level.(*model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_)
-		if !ok {
-			return PatchedFileRootValue{}, errors.New("unknown output level type")
-		}
-
-		switch source := outputLeaf.Leaf.Source.(type) {
-		case *model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_ActionId:
+		switch source := output.Message.Definition.GetSource().(type) {
+		case *model_analysis_pb.TargetOutputDefinition_ActionId:
 			if key.Message.DirectoryLayout != model_analysis_pb.DirectoryLayout_INPUT_ROOT {
 				return PatchedFileRootValue{}, errors.New("TODO: Support action outputs with runfiles layout")
 			}
@@ -247,7 +220,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 				directoryCreationParameters,
 				&rootDirectory,
 			)
-		case *model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_ExpandTemplate_:
+		case *model_analysis_pb.TargetOutputDefinition_ExpandTemplate_:
 			directoryCreationParameters, gotDirectoryCreationParameters := e.GetDirectoryCreationParametersObjectValue(&model_analysis_pb.DirectoryCreationParametersObject_Key{})
 			fileCreationParameters, gotFileCreationParameters := e.GetFileCreationParametersObjectValue(&model_analysis_pb.FileCreationParametersObject_Key{})
 			fileReader, gotFileReader := e.GetFileReaderValue(&model_analysis_pb.FileReader_Key{})
@@ -363,7 +336,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 					objectContentsWalkerFactory.CreateObjectContentsWalker,
 				),
 			), nil
-		case *model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_StaticPackageDirectory:
+		case *model_analysis_pb.TargetOutputDefinition_StaticPackageDirectory:
 			// Output file was already computed during configuration.
 			// For example by calling ctx.actions.write() or
 			// ctx.actions.symlink(target_path=...).
@@ -405,7 +378,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 				},
 				model_core.MapReferenceMetadataToWalkers(createdDirectory.Message.Patcher),
 			), nil
-		case *model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_Symlink:
+		case *model_analysis_pb.TargetOutputDefinition_Symlink:
 			if key.Message.DirectoryLayout != model_analysis_pb.DirectoryLayout_INPUT_ROOT {
 				return PatchedFileRootValue{}, errors.New("TODO: Support symlinks with runfiles layout")
 			}

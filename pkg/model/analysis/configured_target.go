@@ -1472,7 +1472,10 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 			if err := outputsTreeBuilder.PushChild(model_core.NewPatchedMessage(
 				&model_analysis_pb.ConfiguredTarget_Value_Output{
 					Level: &model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_{
-						Leaf: output.definition.Message,
+						Leaf: &model_analysis_pb.ConfiguredTarget_Value_Output_Leaf{
+							PackageRelativePath: packageRelativePath,
+							Definition:          output.definition.Message,
+						},
 					},
 				},
 				output.definition.Patcher,
@@ -1572,10 +1575,10 @@ type targetOutput[TMetadata model_core.ReferenceMetadata] struct {
 	fileType            model_starlark_pb.File_Type
 
 	// Variable fields.
-	definition model_core.PatchedMessage[*model_analysis_pb.ConfiguredTarget_Value_Output_Leaf, TMetadata]
+	definition model_core.PatchedMessage[*model_analysis_pb.TargetOutputDefinition, TMetadata]
 }
 
-func (o *targetOutput[TMetadata]) setDefinition(definition model_core.PatchedMessage[*model_analysis_pb.ConfiguredTarget_Value_Output_Leaf, TMetadata]) error {
+func (o *targetOutput[TMetadata]) setDefinition(definition model_core.PatchedMessage[*model_analysis_pb.TargetOutputDefinition, TMetadata]) error {
 	if o.definition.IsSet() {
 		return fmt.Errorf("file %#v is an output of multiple actions", o.packageRelativePath.String())
 	}
@@ -1883,9 +1886,8 @@ func (rc *ruleContext[TReference, TMetadata]) setOutputToStaticDirectory(output 
 
 	return output.setDefinition(
 		model_core.NewPatchedMessage(
-			&model_analysis_pb.ConfiguredTarget_Value_Output_Leaf{
-				PackageRelativePath: output.packageRelativePath.String(),
-				Source: &model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_StaticPackageDirectory{
+			&model_analysis_pb.TargetOutputDefinition{
+				Source: &model_analysis_pb.TargetOutputDefinition_StaticPackageDirectory{
 					StaticPackageDirectory: createdDirectory.Message.Message,
 				},
 			},
@@ -2075,9 +2077,9 @@ func (rca *ruleContextActions[TReference, TMetadata]) doExpandTemplate(thread *s
 		return nil, err
 	}
 
-	substitutionsList := make([]*model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_ExpandTemplate_Substitution, 0, len(substitutions))
+	substitutionsList := make([]*model_analysis_pb.TargetOutputDefinition_ExpandTemplate_Substitution, 0, len(substitutions))
 	for _, needle := range slices.Sorted(maps.Keys(substitutions)) {
-		substitutionsList = append(substitutionsList, &model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_ExpandTemplate_Substitution{
+		substitutionsList = append(substitutionsList, &model_analysis_pb.TargetOutputDefinition_ExpandTemplate_Substitution{
 			Needle:      []byte(needle),
 			Replacement: []byte(substitutions[needle]),
 		})
@@ -2089,10 +2091,9 @@ func (rca *ruleContextActions[TReference, TMetadata]) doExpandTemplate(thread *s
 	patchedTemplate := model_core.Patch(rc.environment, template.GetDefinition())
 	return starlark.None, output.setDefinition(
 		model_core.NewPatchedMessage(
-			&model_analysis_pb.ConfiguredTarget_Value_Output_Leaf{
-				PackageRelativePath: output.packageRelativePath.String(),
-				Source: &model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_ExpandTemplate_{
-					ExpandTemplate: &model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_ExpandTemplate{
+			&model_analysis_pb.TargetOutputDefinition{
+				Source: &model_analysis_pb.TargetOutputDefinition_ExpandTemplate_{
+					ExpandTemplate: &model_analysis_pb.TargetOutputDefinition_ExpandTemplate{
 						Template:      patchedTemplate.Message,
 						IsExecutable:  isExecutable,
 						Substitutions: substitutionsList,
@@ -2518,9 +2519,8 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 	for _, output := range outputs {
 		if err := output.setDefinition(
 			model_core.NewSimplePatchedMessage[TMetadata](
-				&model_analysis_pb.ConfiguredTarget_Value_Output_Leaf{
-					PackageRelativePath: output.packageRelativePath.String(),
-					Source: &model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_ActionId{
+				&model_analysis_pb.TargetOutputDefinition{
+					Source: &model_analysis_pb.TargetOutputDefinition_ActionId{
 						ActionId: actionID,
 					},
 				},
@@ -2824,9 +2824,8 @@ func (rca *ruleContextActions[TReference, TMetadata]) doSymlink(thread *starlark
 		patchedTargetFileDefinition := model_core.Patch(rc.environment, targetFileDefinition)
 		return starlark.None, output.setDefinition(
 			model_core.NewPatchedMessage(
-				&model_analysis_pb.ConfiguredTarget_Value_Output_Leaf{
-					PackageRelativePath: output.packageRelativePath.String(),
-					Source: &model_analysis_pb.ConfiguredTarget_Value_Output_Leaf_Symlink{
+				&model_analysis_pb.TargetOutputDefinition{
+					Source: &model_analysis_pb.TargetOutputDefinition_Symlink{
 						Symlink: patchedTargetFileDefinition.Message,
 					},
 				},

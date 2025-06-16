@@ -484,6 +484,47 @@ message TargetActionDefinition {
   bool use_default_shell_env = 8;
 }
 
+message TargetOutputDefinition {
+  message ExpandTemplate {
+    // File that contains the template for the output file's
+    // contents.
+    bonanza.model.starlark.File template = 1;
+
+    // Whether the output file is executable.
+    bool is_executable = 2;
+
+    message Substitution {
+      bytes needle = 1;
+      bytes replacement = 2;
+    }
+
+    // Needles to search for in the template, and replacements to
+    // emit at the locations where such needs are found.
+    repeated Substitution substitutions = 3;
+  }
+
+  oneof source {
+    // Output of a command that was declared using
+    // ctx.actions.run() or ctx.actions.run_shell(). The
+    // identifier of the command generating the file is provided.
+    bytes action_id = 2;
+
+    // Output of template expansion performed by
+    // ctx.actions.expand_template().
+    ExpandTemplate expand_template = 3;
+
+    // Output of ctx.actions.symlink(target_path=...) or
+    // ctx.actions.write(), provided in the form of a directory
+    // hierarchy containing the file or symlink in question,
+    // rooted at the output directory of the current package and
+    // configuration.
+    bonanza.model.filesystem.DirectoryContents static_package_directory = 4;
+
+    // Output of ctx.actions.symlink(target_file=...).
+    bonanza.model.starlark.File symlink = 5;
+  }
+}
+
 message ConfiguredTarget {
   message Key {
     // The label of the package. The label MUST include a canonical repo
@@ -525,45 +566,8 @@ message ConfiguredTarget {
         // The package relative path of the output.
         string package_relative_path = 1;
 
-        message ExpandTemplate {
-          // File that contains the template for the output file's
-          // contents.
-          bonanza.model.starlark.File template = 1;
-
-          // Whether the output file is executable.
-          bool is_executable = 2;
-
-          message Substitution {
-            bytes needle = 1;
-            bytes replacement = 2;
-          }
-
-          // Needles to search for in the template, and replacements to
-          // emit at the locations where such needs are found.
-          repeated Substitution substitutions = 3;
-        }
-
-        oneof source {
-          // Output of a command that was declared using
-          // ctx.actions.run() or ctx.actions.run_shell(). The
-          // identifier of the command generating the file is provided.
-          bytes action_id = 2;
-
-          // Output of template expansion performed by
-          // ctx.actions.expand_template().
-          ExpandTemplate expand_template = 3;
-
-          // Output of ctx.actions.symlink(target_path=...) or
-          // ctx.actions.write(), provided in the form of a directory
-          // hierarchy containing the file or symlink in question,
-          // rooted at the output directory of the current package and
-          // configuration.
-          bonanza.model.filesystem.DirectoryContents static_package_directory =
-              4;
-
-          // Output of ctx.actions.symlink(target_file=...).
-          bonanza.model.starlark.File symlink = 5;
-        }
+        // The definition of the output.
+        TargetOutputDefinition definition = 2;
       }
 
       oneof level {
@@ -618,6 +622,31 @@ message ConfiguredTarget {
     }
 
     repeated Action actions = 3;
+  }
+}
+
+message TargetOutput {
+  message Key {
+    // The label of the package. The label MUST include a canonical repo
+    // name, and MUST NOT include a target name if it matches the last
+    // component of the package path.
+    string label = 1;
+
+    // Platform constraints and build settings that are currently active.
+    //
+    // If this reference is not set, the target is configured without
+    // any platform constraints and build settings in place.
+    bonanza.model.core.DecodableReference configuration_reference = 2
+        [(bonanza.model.core.object_format) = {
+          proto_list_type_name:
+            "bonanza.model.analysis.BuildSettingOverride";
+        }];
+
+    string package_relative_path = 3;
+  }
+
+  message Value {
+    TargetOutputDefinition definition = 1;
   }
 }
 

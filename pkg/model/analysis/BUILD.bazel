@@ -68,6 +68,7 @@ go_library(
         "target_action_input_root.go",
         "target_action_result.go",
         "target_completion.go",
+        "target_output.go",
         "target_pattern_expansion.go",
         "used_module_extension.go",
         "used_module_extensions.go",
