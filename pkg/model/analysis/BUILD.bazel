@@ -198,7 +198,10 @@ gomock(
 gomock(
     name = "mocks_filesystem",
     out = "mocks_filesystem_test.go",
-    interfaces = ["Directory"],
+    interfaces = [
+        "Directory",
+        "FileReadWriter",
+    ],
     library = "@com_github_buildbarn_bb_storage//pkg/filesystem",
     mockgen_model_library = "@org_uber_go_mock//mockgen/model",
     mockgen_tool = "@org_uber_go_mock//mockgen",

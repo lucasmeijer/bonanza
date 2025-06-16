@@ -105,6 +105,26 @@ func (m PatchedMessage[T, TMetadata]) SortAndSetReferences() (TopLevelMessage[T,
 	return NewTopLevelMessage(m.Message, references), metadata
 }
 
+// PatchedMessagesEqual returns true if two patched messages contain the
+// same data.
+//
+// Nested messages belonging to different objects may contain the same
+// data, but use different reference numbers. This function therefore
+// needs to convert the provided messages to top-level messages, which
+// is expensive. We therefore compare the message size first.
+func PatchedMessagesEqual[
+	TMessage proto.Message,
+	TMetadata1, TMetadata2 ReferenceMetadata,
+](m1 PatchedMessage[TMessage, TMetadata1], m2 PatchedMessage[TMessage, TMetadata2]) bool {
+	if marshalOptions.Size(m1.Message) != marshalOptions.Size(m2.Message) {
+		return false
+	}
+
+	tlm1, _ := m1.SortAndSetReferences()
+	tlm2, _ := m2.SortAndSetReferences()
+	return TopLevelMessagesEqual(tlm1, tlm2)
+}
+
 // MarshalAndEncode marshals a patched message, encodes it, and converts
 // it to an object that can be written to storage.
 func MarshalAndEncode[TMetadata ReferenceMetadata](

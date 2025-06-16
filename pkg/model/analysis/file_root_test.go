@@ -16,6 +16,28 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
+// emptyLeaves can be embedded into DirectoryContents messages to
+// indicate that a directory contains no files or symlinks.
+var emptyLeaves = &model_filesystem_pb.DirectoryContents_LeavesInline{
+	LeavesInline: &model_filesystem_pb.Leaves{},
+}
+
+// singleChildDirectoryContents can be used to construct a directory
+// that only contains a single child that is also a directory.
+func singleChildDirectoryContents(name string, childContents *model_filesystem_pb.DirectoryContents) *model_filesystem_pb.DirectoryContents {
+	return &model_filesystem_pb.DirectoryContents{
+		Directories: []*model_filesystem_pb.DirectoryNode{{
+			Name: name,
+			Directory: &model_filesystem_pb.Directory{
+				Contents: &model_filesystem_pb.Directory_ContentsInline{
+					ContentsInline: childContents,
+				},
+			},
+		}},
+		Leaves: emptyLeaves,
+	}
+}
+
 func TestFileRoot(t *testing.T) {
 	ctrl, ctx := gomock.WithContext(t.Context(), t)
 	bct := newBaseComputerTester(ctrl)
@@ -102,8 +124,8 @@ func TestFileRoot(t *testing.T) {
 			).Return(newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.Repo_Value {
 				return &model_analysis_pb.Repo_Value{
 					RootDirectoryReference: &model_filesystem_pb.DirectoryReference{
-						Reference: attachMessageObject(patcher, func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_filesystem_pb.DirectoryContents {
-							return &model_filesystem_pb.DirectoryContents{
+						Reference: attachObject(patcher, newObject(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) model_core.Marshalable {
+							return model_core.NewProtoMarshalable(&model_filesystem_pb.DirectoryContents{
 								Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
 									LeavesInline: &model_filesystem_pb.Leaves{
 										Files: []*model_filesystem_pb.FileNode{{
@@ -112,13 +134,13 @@ func TestFileRoot(t *testing.T) {
 										}},
 									},
 								},
-							}
-						}),
+							})
+						})),
 						DirectoriesCount:               0,
 						MaximumSymlinkEscapementLevels: &wrapperspb.UInt32Value{Value: 0},
 					},
 				}
-			}).Decay())
+			}))
 
 			_, err := bct.computer.ComputeFileRootValue(
 				ctx,
@@ -150,26 +172,19 @@ func TestFileRoot(t *testing.T) {
 			).Return(newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.Repo_Value {
 				return &model_analysis_pb.Repo_Value{
 					RootDirectoryReference: &model_filesystem_pb.DirectoryReference{
-						Reference: attachMessageObject(patcher, func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_filesystem_pb.DirectoryContents {
-							return &model_filesystem_pb.DirectoryContents{
-								Directories: []*model_filesystem_pb.DirectoryNode{{
-									Name: "foo",
-									Directory: &model_filesystem_pb.Directory{
-										Contents: &model_filesystem_pb.Directory_ContentsInline{
-											ContentsInline: &model_filesystem_pb.DirectoryContents{},
-										},
-									},
-								}},
-								Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
-									LeavesInline: &model_filesystem_pb.Leaves{},
+						Reference: attachObject(patcher, newObject(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) model_core.Marshalable {
+							return model_core.NewProtoMarshalable(singleChildDirectoryContents(
+								"foo",
+								&model_filesystem_pb.DirectoryContents{
+									Leaves: emptyLeaves,
 								},
-							}
-						}),
+							))
+						})),
 						DirectoriesCount:               0,
 						MaximumSymlinkEscapementLevels: &wrapperspb.UInt32Value{Value: 0},
 					},
 				}
-			}).Decay())
+			}))
 
 			_, err := bct.computer.ComputeFileRootValue(
 				ctx,
@@ -203,8 +218,8 @@ func TestFileRoot(t *testing.T) {
 				).Return(newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.Repo_Value {
 					return &model_analysis_pb.Repo_Value{
 						RootDirectoryReference: &model_filesystem_pb.DirectoryReference{
-							Reference: attachMessageObject(patcher, func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_filesystem_pb.DirectoryContents {
-								return &model_filesystem_pb.DirectoryContents{
+							Reference: attachObject(patcher, newObject(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) model_core.Marshalable {
+								return model_core.NewProtoMarshalable(&model_filesystem_pb.DirectoryContents{
 									Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
 										LeavesInline: &model_filesystem_pb.Leaves{
 											Files: []*model_filesystem_pb.FileNode{
@@ -219,13 +234,13 @@ func TestFileRoot(t *testing.T) {
 											},
 										},
 									},
-								}
-							}),
+								})
+							})),
 							DirectoriesCount:               0,
 							MaximumSymlinkEscapementLevels: &wrapperspb.UInt32Value{Value: 0},
 						},
 					}
-				}).Decay())
+				}))
 
 				fileRoot, err := bct.computer.ComputeFileRootValue(
 					ctx,
@@ -249,46 +264,29 @@ func TestFileRoot(t *testing.T) {
 				// roots, they should be named
 				// "external/${repo}/${file}".
 				fileRoot := run(t, model_analysis_pb.DirectoryLayout_INPUT_ROOT)
-				requireEqualPatchedMessage(t, newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Value {
+				requireEqualPatchedMessage(t, func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Value {
 					return &model_analysis_pb.FileRoot_Value{
-						RootDirectory: &model_filesystem_pb.DirectoryContents{
-							Directories: []*model_filesystem_pb.DirectoryNode{{
-								Name: "external",
-								Directory: &model_filesystem_pb.Directory{
-									Contents: &model_filesystem_pb.Directory_ContentsInline{
-										ContentsInline: &model_filesystem_pb.DirectoryContents{
-											Directories: []*model_filesystem_pb.DirectoryNode{{
-												Name: "myrepo+",
-												Directory: &model_filesystem_pb.Directory{
-													Contents: &model_filesystem_pb.Directory_ContentsInline{
-														ContentsInline: &model_filesystem_pb.DirectoryContents{
-															Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
-																LeavesInline: &model_filesystem_pb.Leaves{
-																	Files: []*model_filesystem_pb.FileNode{
-																		{
-																			Name:       "bar",
-																			Properties: &model_filesystem_pb.FileProperties{},
-																		},
-																	},
-																},
-															},
-														},
-													},
+						RootDirectory: singleChildDirectoryContents(
+							"external",
+							singleChildDirectoryContents(
+								"myrepo+",
+								&model_filesystem_pb.DirectoryContents{
+									Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+										LeavesInline: &model_filesystem_pb.Leaves{
+											Files: []*model_filesystem_pb.FileNode{
+												{
+													Name:       "bar",
+													Properties: &model_filesystem_pb.FileProperties{},
 												},
-											}},
-											Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
-												LeavesInline: &model_filesystem_pb.Leaves{},
 											},
 										},
 									},
 								},
-							}},
-							Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
-								LeavesInline: &model_filesystem_pb.Leaves{},
-							},
-						},
+							),
+						),
 					}
-				}), fileRoot)
+				}, fileRoot)
+				fileRoot.Discard()
 			})
 
 			t.Run("Runfiles", func(t *testing.T) {
@@ -296,35 +294,209 @@ func TestFileRoot(t *testing.T) {
 				// runfiles directories, they should be
 				// named "${repo}/${file}".
 				fileRoot := run(t, model_analysis_pb.DirectoryLayout_RUNFILES)
-				requireEqualPatchedMessage(t, newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Value {
+				requireEqualPatchedMessage(t, func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Value {
 					return &model_analysis_pb.FileRoot_Value{
-						RootDirectory: &model_filesystem_pb.DirectoryContents{
-							Directories: []*model_filesystem_pb.DirectoryNode{{
-								Name: "myrepo+",
-								Directory: &model_filesystem_pb.Directory{
-									Contents: &model_filesystem_pb.Directory_ContentsInline{
-										ContentsInline: &model_filesystem_pb.DirectoryContents{
-											Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
-												LeavesInline: &model_filesystem_pb.Leaves{
-													Files: []*model_filesystem_pb.FileNode{
-														{
-															Name:       "bar",
-															Properties: &model_filesystem_pb.FileProperties{},
+						RootDirectory: singleChildDirectoryContents(
+							"myrepo+",
+							&model_filesystem_pb.DirectoryContents{
+								Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+									LeavesInline: &model_filesystem_pb.Leaves{
+										Files: []*model_filesystem_pb.FileNode{
+											{
+												Name:       "bar",
+												Properties: &model_filesystem_pb.FileProperties{},
+											},
+										},
+									},
+								},
+							},
+						),
+					}
+				}, fileRoot)
+				fileRoot.Discard()
+			})
+		})
+	})
+
+	t.Run("Action", func(t *testing.T) {
+		// TODO!
+	})
+
+	t.Run("ExpandTemplate", func(t *testing.T) {
+		// TODO: Test error cases.
+
+		t.Run("Success", func(t *testing.T) {
+			e := NewMockFileRootEnvironmentForTesting(ctrl)
+			bct.expectCaptureExistingObject(e)
+			bct.expectGetDirectoryCreationParametersObjectValue(t, e)
+			bct.expectGetDirectoryReadersValue(t, e)
+			bct.expectGetFileCreationParametersObjectValue(t, e)
+			bct.expectGetFileReaderValue(t, e)
+			configuration := newObject(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) model_core.Marshalable {
+				return model_core.NewProtoListMarshalable([]*model_analysis_pb.BuildSettingOverride{{
+					Level: &model_analysis_pb.BuildSettingOverride_Leaf_{
+						Leaf: &model_analysis_pb.BuildSettingOverride_Leaf{
+							Label: "@@bazel_tools+//command_line_option:platforms",
+							Value: &model_starlark_pb.Value{
+								Kind: &model_starlark_pb.Value_List{
+									List: &model_starlark_pb.List{
+										Elements: []*model_starlark_pb.List_Element{{
+											Level: &model_starlark_pb.List_Element_Leaf{
+												Leaf: &model_starlark_pb.Value{
+													Kind: &model_starlark_pb.Value_Label{
+														Label: "@@platforms+//host",
+													},
+												},
+											},
+										}},
+									},
+								},
+							},
+						},
+					},
+				}})
+			})
+			e.EXPECT().GetTargetOutputValue(
+				eqPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.TargetOutput_Key {
+					return &model_analysis_pb.TargetOutput_Key{
+						Label:                  "@@myrepo+//:generate",
+						ConfigurationReference: attachObject(patcher, configuration),
+						PackageRelativePath:    "output",
+					}
+				}),
+			).Return(newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.TargetOutput_Value {
+				return &model_analysis_pb.TargetOutput_Value{
+					Definition: &model_analysis_pb.TargetOutputDefinition{
+						Source: &model_analysis_pb.TargetOutputDefinition_ExpandTemplate_{
+							ExpandTemplate: &model_analysis_pb.TargetOutputDefinition_ExpandTemplate{
+								Template: &model_starlark_pb.File{
+									Label: "@@myrepo+//:template",
+									Type:  model_starlark_pb.File_FILE,
+								},
+								IsExecutable: true,
+								Substitutions: []*model_analysis_pb.TargetOutputDefinition_ExpandTemplate_Substitution{
+									{Needle: []byte("{{first_name}}"), Replacement: []byte("Albert")},
+									{Needle: []byte("{{last_name}}"), Replacement: []byte("Einstein")},
+								},
+							},
+						},
+					},
+				}
+			}))
+			e.EXPECT().GetFileRootValue(
+				eqPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Key {
+					return &model_analysis_pb.FileRoot_Key{
+						DirectoryLayout: model_analysis_pb.DirectoryLayout_INPUT_ROOT,
+						File: &model_starlark_pb.File{
+							Label: "@@myrepo+//:template",
+							Type:  model_starlark_pb.File_FILE,
+						},
+					}
+				}),
+			).Return(newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Value {
+				return &model_analysis_pb.FileRoot_Value{
+					RootDirectory: singleChildDirectoryContents(
+						"external",
+						singleChildDirectoryContents(
+							"myrepo+",
+							&model_filesystem_pb.DirectoryContents{
+								Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+									LeavesInline: &model_filesystem_pb.Leaves{
+										Files: []*model_filesystem_pb.FileNode{
+											{
+												Name: "template",
+												Properties: &model_filesystem_pb.FileProperties{
+													Contents: &model_filesystem_pb.FileContents{
+														Level: &model_filesystem_pb.FileContents_ChunkReference{
+															ChunkReference: attachObject(patcher, newObject(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) model_core.Marshalable {
+																return model_core.NewRawMarshalable([]byte("{{first_name}} {{last_name}}"))
+															})),
 														},
+														TotalSizeBytes: 28,
 													},
 												},
 											},
 										},
 									},
 								},
-							}},
-							Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
-								LeavesInline: &model_filesystem_pb.Leaves{},
+							},
+						),
+					),
+				}
+			}))
+			expandedTemplateFile := NewMockFileReadWriter(ctrl)
+			bct.filePool.EXPECT().NewFile().Return(expandedTemplateFile, nil)
+			expandedTemplateFile.EXPECT().WriteAt([]byte("Albert Einstein"), int64(0)).Return(15, nil)
+			expandedTemplateFile.EXPECT().Close()
+
+			fileRoot, err := bct.computer.ComputeFileRootValue(
+				ctx,
+				newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Key {
+					return &model_analysis_pb.FileRoot_Key{
+						DirectoryLayout: model_analysis_pb.DirectoryLayout_INPUT_ROOT,
+						File: &model_starlark_pb.File{
+							Label: "@@myrepo+//:output",
+							Type:  model_starlark_pb.File_FILE,
+							Owner: &model_starlark_pb.File_Owner{
+								ConfigurationReference: attachObject(patcher, configuration),
+								TargetName:             "generate",
 							},
 						},
 					}
-				}), fileRoot)
-			})
+				}),
+				e,
+			)
+			require.NoError(t, err)
+			requireEqualPatchedMessage(t, func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Value {
+				return &model_analysis_pb.FileRoot_Value{
+					RootDirectory: singleChildDirectoryContents(
+						"bazel-out",
+						singleChildDirectoryContents(
+							"Cg6Kx80o8BPYmGdgWYfRZvbKyWojQ7snQzHOx70XAwRPAAAAAAAAAA.",
+							singleChildDirectoryContents(
+								"bin",
+								singleChildDirectoryContents(
+									"external",
+									singleChildDirectoryContents(
+										"myrepo+",
+										&model_filesystem_pb.DirectoryContents{
+											Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+												LeavesInline: &model_filesystem_pb.Leaves{
+													Files: []*model_filesystem_pb.FileNode{
+														{
+															Name: "output",
+															Properties: &model_filesystem_pb.FileProperties{
+																Contents: &model_filesystem_pb.FileContents{
+																	Level: &model_filesystem_pb.FileContents_ChunkReference{
+																		ChunkReference: attachObject(patcher, newObject(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) model_core.Marshalable {
+																			return model_core.NewRawMarshalable([]byte("Albert Einstein"))
+																		})),
+																	},
+																	TotalSizeBytes: 15,
+																},
+																IsExecutable: true,
+															},
+														},
+													},
+												},
+											},
+										},
+									),
+								),
+							),
+						),
+					),
+				}
+			}, fileRoot)
+			fileRoot.Discard()
 		})
+	})
+
+	t.Run("StaticPackageDirectory", func(t *testing.T) {
+		// TODO!
+	})
+
+	t.Run("Symlink", func(t *testing.T) {
+		// TODO!
 	})
 }

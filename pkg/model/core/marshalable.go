@@ -70,3 +70,17 @@ func (mlm protoListMarshalable[TMessage]) Marshal() ([]byte, error) {
 	}
 	return data, nil
 }
+
+type rawMarshalable struct {
+	data []byte
+}
+
+func NewRawMarshalable(data []byte) Marshalable {
+	return rawMarshalable{
+		data: data,
+	}
+}
+
+func (rm rawMarshalable) Marshal() ([]byte, error) {
+	return rm.data, nil
+}

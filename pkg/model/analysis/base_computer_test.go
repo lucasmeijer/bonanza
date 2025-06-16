@@ -32,6 +32,7 @@ import (
 type baseComputerTester struct {
 	computer                 model_analysis.Computer[model_core.CreatedObjectTree, model_core.CreatedObjectTree]
 	parsedObjectPoolIngester *model_parser.ParsedObjectPoolIngester[model_core.CreatedObjectTree]
+	filePool                 *MockFilePool
 }
 
 // newBaseComputerTester creates a new instance of BaseComputer that has
@@ -75,6 +76,7 @@ func newBaseComputerTester(ctrl *gomock.Controller) *baseComputerTester {
 			buildFileBuiltins,
 		),
 		parsedObjectPoolIngester: parsedObjectPoolIngester,
+		filePool:                 filePool,
 	}
 }
 
@@ -87,9 +89,18 @@ func (bct *baseComputerTester) expectCaptureCreatedObject(e *MockFileRootEnviron
 		})
 }
 
-// expectCaptureCreatedObject can be called by tests to indicate that
-// the analysis function needs access to attributes necessary for
-// creating new directories.
+// expectCaptureExistingObject can be called by tests to indicate that
+// the analysis function may forward objects to other functions.
+func (bct *baseComputerTester) expectCaptureExistingObject(e *MockFileRootEnvironmentForTesting) *gomock.Call {
+	return e.EXPECT().CaptureExistingObject(gomock.Any()).
+		DoAndReturn(func(reference model_core.CreatedObjectTree) model_core.CreatedObjectTree {
+			return reference
+		})
+}
+
+// expectGetDirectoryCreationParametersObjectValue can be called by
+// tests to indicate that the analysis function needs access to
+// attributes necessary for creating new directories.
 func (bct *baseComputerTester) expectGetDirectoryCreationParametersObjectValue(t *testing.T, e *MockFileRootEnvironmentForTesting) *gomock.Call {
 	return e.EXPECT().GetDirectoryCreationParametersObjectValue(
 		testutil.EqProto(t, &model_analysis_pb.DirectoryCreationParametersObject_Key{}),
@@ -102,8 +113,44 @@ func (bct *baseComputerTester) expectGetDirectoryCreationParametersObjectValue(t
 	)), true)
 }
 
-// expectCaptureCreatedObject can be called by tests to indicate that
-// the analysis function needs read access to directories.
+// expectGetFileCreationParametersObjectValue can be called by tests to
+// indicate that the analysis function needs access to attributes
+// necessary for creating new files.
+func (bct *baseComputerTester) expectGetFileCreationParametersObjectValue(t *testing.T, e *MockFileRootEnvironmentForTesting) *gomock.Call {
+	return e.EXPECT().GetFileCreationParametersObjectValue(
+		testutil.EqProto(t, &model_analysis_pb.FileCreationParametersObject_Key{}),
+	).Return(util.Must(model_filesystem.NewFileCreationParametersFromProto(
+		&model_filesystem_pb.FileCreationParameters{
+			Access:                           &model_filesystem_pb.FileAccessParameters{},
+			ChunkMinimumSizeBytes:            1 << 16,
+			ChunkMaximumSizeBytes:            1 << 18,
+			FileContentsListMinimumSizeBytes: 1 << 16,
+			FileContentsListMaximumSizeBytes: 1 << 18,
+		},
+		util.Must(object.NewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1)),
+	)), true)
+}
+
+// expectGetFileReaderValue can be called by tests to
+// indicate that the analysis function needs access to attributes
+// necessary for reading existing files.
+func (bct *baseComputerTester) expectGetFileReaderValue(t *testing.T, e *MockFileRootEnvironmentForTesting) *gomock.Call {
+	return e.EXPECT().GetFileReaderValue(
+		testutil.EqProto(t, &model_analysis_pb.FileReader_Key{}),
+	).Return(model_filesystem.NewFileReader(
+		model_parser.LookupParsedObjectReader(
+			bct.parsedObjectPoolIngester,
+			model_filesystem.NewFileContentsListObjectParser[model_core.CreatedObjectTree](),
+		),
+		model_parser.LookupParsedObjectReader(
+			bct.parsedObjectPoolIngester,
+			model_parser.NewRawObjectParser[model_core.CreatedObjectTree](),
+		),
+	), true)
+}
+
+// expectGetDirectoryReadersValue can be called by tests to indicate
+// that the analysis function needs read access to directories.
 func (bct *baseComputerTester) expectGetDirectoryReadersValue(t *testing.T, e *MockFileRootEnvironmentForTesting) *gomock.Call {
 	return e.EXPECT().GetDirectoryReadersValue(
 		testutil.EqProto(t, &model_analysis_pb.DirectoryReaders_Key{}),
@@ -119,41 +166,46 @@ func (bct *baseComputerTester) expectGetDirectoryReadersValue(t *testing.T, e *M
 // analysis function returns the right response.
 func requireEqualPatchedMessage[TMessage proto.Message](
 	t *testing.T,
-	want model_core.TopLevelMessage[TMessage, model_core.CreatedObjectTree],
+	wantBuilder func(*model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) TMessage,
 	got model_core.PatchedMessage[TMessage, dag.ObjectContentsWalker],
 ) {
 	t.Helper()
-	gotMessage, _ := got.SortAndSetReferences()
-	if !model_core.TopLevelMessagesEqual(want, gotMessage) {
+	want := model_core.BuildPatchedMessage(wantBuilder)
+	if !model_core.PatchedMessagesEqual(want, got) {
 		t.Fatalf("Not equal:\nWant:\n\n%s\n\nGot:\n\n%s", protojson.Format(want.Message), protojson.Format(got.Message))
 	}
 }
 
-// newMessage creates a new top-level message corresponding to a
-// Protobuf message.
+// newMessage creates a new message as part of tests.
 func newMessage[TMessage any](
 	builder func(*model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) TMessage,
-) model_core.TopLevelMessage[TMessage, model_core.CreatedObjectTree] {
+) model_core.Message[TMessage, model_core.CreatedObjectTree] {
 	m, metadata := model_core.BuildPatchedMessage(builder).SortAndSetReferences()
-	return model_core.NewTopLevelMessage(
+	return model_core.NewMessage(
 		m.Message,
 		object.OutgoingReferencesList[model_core.CreatedObjectTree](metadata),
 	)
 }
 
-// attachMessageObject can be called within the builder callback
-// provided to newMessage() to attach objects to a message.
-func attachMessageObject[TMessage proto.Message](
-	parentPatcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree],
-	builder func(childPatcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) TMessage,
-) *model_core_pb.DecodableReference {
-	createdObject := util.Must(
+// newMessage creates a new storage object as part of tests.
+func newObject(
+	builder func(childPatcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) model_core.Marshalable,
+) model_core.Decodable[model_core.CreatedObject[model_core.CreatedObjectTree]] {
+	return util.Must(
 		model_core.MarshalAndEncode(
-			model_core.ProtoToMarshalable(model_core.BuildPatchedMessage(builder)),
+			model_core.BuildPatchedMessage(builder),
 			util.Must(object.NewReferenceFormat(object_pb.ReferenceFormat_SHA256_V1)),
 			model_encoding.NewChainedBinaryEncoder(nil),
 		),
 	)
+}
+
+// attachObject can be called within the builder callback provided to
+// newMessage() to attach objects to a message.
+func attachObject(
+	parentPatcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree],
+	createdObject model_core.Decodable[model_core.CreatedObject[model_core.CreatedObjectTree]],
+) *model_core_pb.DecodableReference {
 	return &model_core_pb.DecodableReference{
 		Reference: parentPatcher.AddReference(
 			createdObject.Value.GetLocalReference(),
@@ -174,4 +226,27 @@ func (createdObjectReader) ReadParsedObject(ctx context.Context, reference model
 
 func (createdObjectReader) GetDecodingParametersSizeBytes() int {
 	return 0
+}
+
+type patchedMessageMatcher[TMessage proto.Message] struct {
+	want model_core.PatchedMessage[TMessage, model_core.CreatedObjectTree]
+}
+
+var _ gomock.Matcher = patchedMessageMatcher[proto.Message]{}
+
+func eqPatchedMessage[TMessage proto.Message](
+	builder func(childPatcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) TMessage,
+) gomock.Matcher {
+	return patchedMessageMatcher[TMessage]{
+		want: model_core.BuildPatchedMessage(builder),
+	}
+}
+
+func (m patchedMessageMatcher[TMessage]) Matches(got any) bool {
+	gotMessage, ok := got.(model_core.PatchedMessage[TMessage, dag.ObjectContentsWalker])
+	return ok && model_core.PatchedMessagesEqual(m.want, gotMessage)
+}
+
+func (m patchedMessageMatcher[TMessage]) String() string {
+	return protojson.Format(m.want.Message)
 }
