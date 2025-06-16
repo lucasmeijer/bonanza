@@ -326,6 +326,17 @@ func TestFileRoot(t *testing.T) {
 		// TODO: Test error cases.
 
 		t.Run("Success", func(t *testing.T) {
+			// Simulate the computation of the output of:
+			//
+			//     ctx.actions.expand_template(
+			//         template = File("@@myrepo+//:template"),
+			//         output = File("@@myrepo+//:output"),
+			//         substitutions = {
+			//             "{{first_name}}": "Albert",
+			//             "{{last_name}}": "Einstein",
+			//         },
+			//         is_executable = True,
+			//     )
 			e := NewMockFileRootEnvironmentForTesting(ctrl)
 			bct.expectCaptureExistingObject(e)
 			bct.expectGetDirectoryCreationParametersObjectValue(t, e)
