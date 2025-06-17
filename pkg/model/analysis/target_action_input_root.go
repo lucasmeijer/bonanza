@@ -123,7 +123,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionInputRootValue(
 		}
 
 		// Create the tool's runfiles directory.
-		executablePath, err := model_starlark.FileGetPath(executable, nil)
+		executablePath, err := model_starlark.FileGetInputRootPath(executable, nil)
 		if err != nil {
 			return PatchedTargetActionInputRootValue{}, fmt.Errorf("failed to get path of tool executable: %w", err)
 		}

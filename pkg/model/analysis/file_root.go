@@ -57,7 +57,7 @@ func getStarlarkFileProperties[TReference object.BasicReference, TMetadata model
 		return model_core.Message[*model_filesystem_pb.FileProperties, TReference]{}, evaluation.ErrMissingDependency
 	}
 
-	filePath, err := model_starlark.FileGetPath(f, nil)
+	filePath, err := model_starlark.FileGetInputRootPath(f, nil)
 	if err != nil {
 		return model_core.Message[*model_filesystem_pb.FileProperties, TReference]{}, err
 	}
@@ -112,6 +112,17 @@ func getPackageOutputDirectoryComponents[TReference object.BasicReference](confi
 		components = append(components, path.MustNewComponent(packageComponent))
 	}
 	return components, nil
+}
+
+func fileGetPathInDirectoryLayout[TReference object.BasicReference](f model_core.Message[*model_starlark_pb.File, TReference], directoryLayout model_analysis_pb.DirectoryLayout) (string, error) {
+	switch directoryLayout {
+	case model_analysis_pb.DirectoryLayout_INPUT_ROOT:
+		return model_starlark.FileGetInputRootPath(f, nil)
+	case model_analysis_pb.DirectoryLayout_RUNFILES:
+		return model_starlark.FileGetRunfilesPath(f)
+	default:
+		return "", errors.New("unknown directory layout")
+	}
 }
 
 func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.Context, key model_core.Message[*model_analysis_pb.FileRoot_Key, TReference], e FileRootEnvironment[TReference, TMetadata]) (PatchedFileRootValue, error) {
@@ -378,16 +389,12 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 				},
 				model_core.MapReferenceMetadataToWalkers(createdDirectory.Message.Patcher),
 			), nil
-		case *model_analysis_pb.TargetOutputDefinition_Symlink:
-			if key.Message.DirectoryLayout != model_analysis_pb.DirectoryLayout_INPUT_ROOT {
-				return PatchedFileRootValue{}, errors.New("TODO: Support symlinks with runfiles layout")
-			}
-
+		case *model_analysis_pb.TargetOutputDefinition_Symlink_:
 			// Symlink to another file. Obtain the root of
 			// the target and add a symlink to it.
 			directoryCreationParameters, gotDirectoryCreationParameters := e.GetDirectoryCreationParametersObjectValue(&model_analysis_pb.DirectoryCreationParametersObject_Key{})
 			directoryReaders, gotDirectoryReaders := e.GetDirectoryReadersValue(&model_analysis_pb.DirectoryReaders_Key{})
-			symlinkTargetFile := model_core.Nested(output, source.Symlink)
+			symlinkTargetFile := model_core.Nested(output, source.Symlink.Target)
 			patchedSymlinkTargetFile := model_core.Patch(e, symlinkTargetFile)
 			symlinkTarget := e.GetFileRootValue(
 				model_core.NewPatchedMessage(
@@ -402,17 +409,17 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 				return PatchedFileRootValue{}, evaluation.ErrMissingDependency
 			}
 
+			symlinkPath, err := fileGetPathInDirectoryLayout(f, key.Message.DirectoryLayout)
+			if err != nil {
+				return PatchedFileRootValue{}, err
+			}
+
 			rootDirectory := changeTrackingDirectory[TReference, TMetadata]{
 				unmodifiedDirectory: model_core.Nested(symlinkTarget, &model_filesystem_pb.Directory{
 					Contents: &model_filesystem_pb.Directory_ContentsInline{
 						ContentsInline: symlinkTarget.Message.RootDirectory,
 					},
 				}),
-			}
-
-			symlinkPath, err := model_starlark.FileGetPath(f, nil)
-			if err != nil {
-				return PatchedFileRootValue{}, err
 			}
 			loadOptions := &changeTrackingDirectoryLoadOptions[TReference]{
 				context:                 ctx,
@@ -434,7 +441,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 			// the directory in which it is contained.
 			// Remove leading components of the target that
 			// are equal to those of the symlink's path.
-			targetPath, err := model_starlark.FileGetPath(symlinkTargetFile, nil)
+			targetPath, err := fileGetPathInDirectoryLayout(symlinkTargetFile, key.Message.DirectoryLayout)
 			if err != nil {
 				return PatchedFileRootValue{}, err
 			}
@@ -450,6 +457,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 			if err := d.setSymlink(loadOptions, *r.TerminalName, path.UNIXFormat.NewParser(relativeTargetPath)); err != nil {
 				return PatchedFileRootValue{}, fmt.Errorf("failed to create symlink at %#v: %w", symlinkPath, err)
 			}
+
+			// TODO: Validate IsExecutable!
 
 			return createFileRootFromChangeTrackingDirectory(
 				ctx,

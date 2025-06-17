@@ -503,6 +503,16 @@ message TargetOutputDefinition {
     repeated Substitution substitutions = 3;
   }
 
+  message Symlink {
+    // The target of the symlink.
+    bonanza.model.starlark.File target = 1;
+
+    // If set to true, require that the target is a regular file that is
+    // executable. Setting this to false does not mean the target is not
+    // executable, just that no verification is done.
+    bool is_executable = 2;
+  }
+
   oneof source {
     // Output of a command that was declared using
     // ctx.actions.run() or ctx.actions.run_shell(). The
@@ -521,7 +531,7 @@ message TargetOutputDefinition {
     bonanza.model.filesystem.DirectoryContents static_package_directory = 4;
 
     // Output of ctx.actions.symlink(target_file=...).
-    bonanza.model.starlark.File symlink = 5;
+    Symlink symlink = 5;
   }
 }
 

@@ -22,18 +22,24 @@ var emptyLeaves = &model_filesystem_pb.DirectoryContents_LeavesInline{
 	LeavesInline: &model_filesystem_pb.Leaves{},
 }
 
+func directoryNode(name string, contents *model_filesystem_pb.DirectoryContents) *model_filesystem_pb.DirectoryNode {
+	return &model_filesystem_pb.DirectoryNode{
+		Name: name,
+		Directory: &model_filesystem_pb.Directory{
+			Contents: &model_filesystem_pb.Directory_ContentsInline{
+				ContentsInline: contents,
+			},
+		},
+	}
+}
+
 // singleChildDirectoryContents can be used to construct a directory
 // that only contains a single child that is also a directory.
 func singleChildDirectoryContents(name string, childContents *model_filesystem_pb.DirectoryContents) *model_filesystem_pb.DirectoryContents {
 	return &model_filesystem_pb.DirectoryContents{
-		Directories: []*model_filesystem_pb.DirectoryNode{{
-			Name: name,
-			Directory: &model_filesystem_pb.Directory{
-				Contents: &model_filesystem_pb.Directory_ContentsInline{
-					ContentsInline: childContents,
-				},
-			},
-		}},
+		Directories: []*model_filesystem_pb.DirectoryNode{
+			directoryNode(name, childContents),
+		},
 		Leaves: emptyLeaves,
 	}
 }
@@ -674,6 +680,201 @@ func TestFileRoot(t *testing.T) {
 	})
 
 	t.Run("Symlink", func(t *testing.T) {
-		// TODO!
+		// TODO: Test error cases.
+
+		t.Run("Success", func(t *testing.T) {
+			// Simulate the computation of the output of:
+			//
+			//     output = ctx.actions.declare_file("b")
+			//     ctx.actions.symlink(
+			//         output = output,
+			//         target_file = File("@@myrepo+//:a"),
+			//     )
+			run := func(t *testing.T, directoryLayout model_analysis_pb.DirectoryLayout, target *model_filesystem_pb.DirectoryContents) model_analysis.PatchedFileRootValue {
+				e := NewMockFileRootEnvironmentForTesting(ctrl)
+				bct.expectCaptureExistingObject(e)
+				bct.expectGetDirectoryCreationParametersObjectValue(t, e)
+				bct.expectGetDirectoryReadersValue(t, e)
+				e.EXPECT().GetTargetOutputValue(
+					eqPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.TargetOutput_Key {
+						return &model_analysis_pb.TargetOutput_Key{
+							Label:                  "@@myrepo+//:create_symlink",
+							ConfigurationReference: attachObject(patcher, exampleConfiguration),
+							PackageRelativePath:    "b",
+						}
+					}),
+				).Return(newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.TargetOutput_Value {
+					return &model_analysis_pb.TargetOutput_Value{
+						Definition: &model_analysis_pb.TargetOutputDefinition{
+							Source: &model_analysis_pb.TargetOutputDefinition_Symlink_{
+								Symlink: &model_analysis_pb.TargetOutputDefinition_Symlink{
+									Target: &model_starlark_pb.File{
+										Label: "@@myrepo+//:a",
+										Type:  model_starlark_pb.File_FILE,
+									},
+								},
+							},
+						},
+					}
+				}))
+				e.EXPECT().GetFileRootValue(
+					eqPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Key {
+						return &model_analysis_pb.FileRoot_Key{
+							DirectoryLayout: directoryLayout,
+							File: &model_starlark_pb.File{
+								Label: "@@myrepo+//:a",
+								Type:  model_starlark_pb.File_FILE,
+							},
+						}
+					}),
+				).Return(newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Value {
+					return &model_analysis_pb.FileRoot_Value{
+						RootDirectory: target,
+					}
+				}))
+
+				fileRoot, err := bct.computer.ComputeFileRootValue(
+					ctx,
+					newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Key {
+						return &model_analysis_pb.FileRoot_Key{
+							DirectoryLayout: directoryLayout,
+							File: &model_starlark_pb.File{
+								Label: "@@myrepo+//:b",
+								Type:  model_starlark_pb.File_FILE,
+								Owner: &model_starlark_pb.File_Owner{
+									ConfigurationReference: attachObject(patcher, exampleConfiguration),
+									TargetName:             "create_symlink",
+								},
+							},
+						}
+					}),
+					e,
+				)
+				require.NoError(t, err)
+				return fileRoot
+			}
+
+			t.Run("InputRoot", func(t *testing.T) {
+				fileRoot := run(
+					t,
+					model_analysis_pb.DirectoryLayout_INPUT_ROOT,
+					singleChildDirectoryContents(
+						"external",
+						singleChildDirectoryContents(
+							"myrepo+",
+							&model_filesystem_pb.DirectoryContents{
+								Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+									LeavesInline: &model_filesystem_pb.Leaves{
+										Files: []*model_filesystem_pb.FileNode{
+											{
+												Name:       "a",
+												Properties: &model_filesystem_pb.FileProperties{},
+											},
+										},
+									},
+								},
+							},
+						),
+					),
+				)
+				requireEqualPatchedMessage(t, func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Value {
+					return &model_analysis_pb.FileRoot_Value{
+						RootDirectory: &model_filesystem_pb.DirectoryContents{
+							Directories: []*model_filesystem_pb.DirectoryNode{
+								directoryNode("bazel-out", singleChildDirectoryContents(
+									"Cg6Kx80o8BPYmGdgWYfRZvbKyWojQ7snQzHOx70XAwRPAAAAAAAAAA.",
+									singleChildDirectoryContents(
+										"bin",
+										singleChildDirectoryContents(
+											"external",
+											singleChildDirectoryContents(
+												"myrepo+",
+												&model_filesystem_pb.DirectoryContents{
+													Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+														LeavesInline: &model_filesystem_pb.Leaves{
+															Symlinks: []*model_filesystem_pb.SymlinkNode{
+																{
+																	Name:   "b",
+																	Target: "../../../../../external/myrepo+/a",
+																},
+															},
+														},
+													},
+												},
+											),
+										),
+									),
+								)),
+								directoryNode("external", singleChildDirectoryContents(
+									"myrepo+",
+									&model_filesystem_pb.DirectoryContents{
+										Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+											LeavesInline: &model_filesystem_pb.Leaves{
+												Files: []*model_filesystem_pb.FileNode{
+													{
+														Name:       "a",
+														Properties: &model_filesystem_pb.FileProperties{},
+													},
+												},
+											},
+										},
+									},
+								)),
+							},
+							Leaves: emptyLeaves,
+						},
+					}
+				}, fileRoot)
+				fileRoot.Discard()
+			})
+
+			t.Run("Runfiles", func(t *testing.T) {
+				fileRoot := run(
+					t,
+					model_analysis_pb.DirectoryLayout_RUNFILES,
+					singleChildDirectoryContents(
+						"myrepo+",
+						&model_filesystem_pb.DirectoryContents{
+							Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+								LeavesInline: &model_filesystem_pb.Leaves{
+									Files: []*model_filesystem_pb.FileNode{
+										{
+											Name:       "a",
+											Properties: &model_filesystem_pb.FileProperties{},
+										},
+									},
+								},
+							},
+						},
+					),
+				)
+				requireEqualPatchedMessage(t, func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Value {
+					return &model_analysis_pb.FileRoot_Value{
+						RootDirectory: singleChildDirectoryContents(
+							"myrepo+",
+							&model_filesystem_pb.DirectoryContents{
+								Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+									LeavesInline: &model_filesystem_pb.Leaves{
+										Files: []*model_filesystem_pb.FileNode{
+											{
+												Name:       "a",
+												Properties: &model_filesystem_pb.FileProperties{},
+											},
+										},
+										Symlinks: []*model_filesystem_pb.SymlinkNode{
+											{
+												Name:   "b",
+												Target: "a",
+											},
+										},
+									},
+								},
+							},
+						),
+					}
+				}, fileRoot)
+				fileRoot.Discard()
+			})
+		})
 	})
 }

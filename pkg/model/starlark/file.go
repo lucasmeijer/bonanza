@@ -59,7 +59,7 @@ func (f *File[TReference, TMetadata]) WithTreeRelativePath(treeRelativePath *bb_
 }
 
 func (f *File[TReference, TMetadata]) String() string {
-	if p, err := FileGetPath(f.definition, f.treeRelativePath); err == nil {
+	if p, err := FileGetInputRootPath(f.definition, f.treeRelativePath); err == nil {
 		return fmt.Sprintf("<File %s>", p)
 	}
 	return "<File>"
@@ -143,7 +143,7 @@ func (f *File[TReference, TMetadata]) Attr(thread *starlark.Thread, name string)
 		}
 		return starlark.String(go_path.Base(pathEnd)), nil
 	case "dirname":
-		p, err := FileGetPath(f.definition, f.treeRelativePath)
+		p, err := FileGetInputRootPath(f.definition, f.treeRelativePath)
 		if err != nil {
 			return nil, err
 		}
@@ -187,7 +187,7 @@ func (f *File[TReference, TMetadata]) Attr(thread *starlark.Thread, name string)
 
 		return NewLabel[TReference, TMetadata](canonicalLabel.AsResolved()), nil
 	case "path":
-		p, err := FileGetPath(f.definition, f.treeRelativePath)
+		p, err := FileGetInputRootPath(f.definition, f.treeRelativePath)
 		if err != nil {
 			return nil, err
 		}
@@ -270,10 +270,10 @@ func (f *File[TReference, TMetadata]) GetTreeRelativePath() *bb_path.Trace {
 	return f.treeRelativePath
 }
 
-// FileGetPath returns the full input root path corresponding to a File
-// object, similar to accessing the "path" attribute of a File from
-// within Starlark code.
-func FileGetPath[TReference object.BasicReference](f model_core.Message[*model_starlark_pb.File, TReference], treeRelativePath *bb_path.Trace) (string, error) {
+// FileGetInputRootPath returns the full input root path corresponding
+// to a File object, similar to accessing the "path" attribute of a File
+// from within Starlark code.
+func FileGetInputRootPath[TReference object.BasicReference](f model_core.Message[*model_starlark_pb.File, TReference], treeRelativePath *bb_path.Trace) (string, error) {
 	canonicalLabel, err := pg_label.NewCanonicalLabel(f.Message.Label)
 	if err != nil {
 		return "", fmt.Errorf("invalid canonical label %#v: %w", f.Message.Label, err)
@@ -291,6 +291,21 @@ func FileGetPath[TReference object.BasicReference](f model_core.Message[*model_s
 			canonicalPackage.GetPackagePath(),
 			canonicalLabel.GetTargetName().String(),
 		)...,
+	), nil
+}
+
+// FileGetRunfilesPath returns a runfiles root directory relative path
+// corresponding to a File object.
+func FileGetRunfilesPath[TReference object.BasicReference](f model_core.Message[*model_starlark_pb.File, TReference]) (string, error) {
+	canonicalLabel, err := pg_label.NewCanonicalLabel(f.Message.Label)
+	if err != nil {
+		return "", fmt.Errorf("invalid canonical label %#v: %w", f.Message.Label, err)
+	}
+	canonicalPackage := canonicalLabel.GetCanonicalPackage()
+	return go_path.Join(
+		canonicalPackage.GetCanonicalRepo().String(),
+		canonicalPackage.GetPackagePath(),
+		canonicalLabel.GetTargetName().String(),
 	), nil
 }
 

@@ -2367,7 +2367,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 			}
 		}
 
-		argv0, err = model_starlark.FileGetPath(executableFile.GetDefinition(), nil)
+		argv0, err = model_starlark.FileGetInputRootPath(executableFile.GetDefinition(), nil)
 		if err != nil {
 			return nil, fmt.Errorf("executable: %w", err)
 		}
@@ -2808,6 +2808,9 @@ func (rca *ruleContextActions[TReference, TMetadata]) doSymlink(thread *starlark
 	if useExecRootForSource {
 		return nil, errors.New("this implementation does not support use_exec_root_for_source=True")
 	}
+	if isExecutable && output.fileType != model_starlark_pb.File_FILE {
+		return nil, errors.New("is_executable=True can only be used in combination with regular file outputs")
+	}
 
 	if targetFile != nil {
 		if targetPath != nil {
@@ -2825,8 +2828,11 @@ func (rca *ruleContextActions[TReference, TMetadata]) doSymlink(thread *starlark
 		return starlark.None, output.setDefinition(
 			model_core.NewPatchedMessage(
 				&model_analysis_pb.TargetOutputDefinition{
-					Source: &model_analysis_pb.TargetOutputDefinition_Symlink{
-						Symlink: patchedTargetFileDefinition.Message,
+					Source: &model_analysis_pb.TargetOutputDefinition_Symlink_{
+						Symlink: &model_analysis_pb.TargetOutputDefinition_Symlink{
+							Target:       patchedTargetFileDefinition.Message,
+							IsExecutable: isExecutable,
+						},
 					},
 				},
 				patchedTargetFileDefinition.Patcher,

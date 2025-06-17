@@ -215,7 +215,7 @@ func expandFileIfDirectory[TReference object.BasicReference, TMetadata BaseCompu
 
 	// Traverse to the root of the directory for which files need to
 	// be reported.
-	directoryPath, err := model_starlark.FileGetPath(fileDefinition, nil)
+	directoryPath, err := model_starlark.FileGetInputRootPath(fileDefinition, nil)
 	if err != nil {
 		*errOut = err
 		return func(yield func(*model_starlark.File[TReference, TMetadata]) bool) {}
@@ -461,7 +461,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionCommandValue(ct
 					case starlark.String:
 						s = string(typedV)
 					case *model_starlark.File[TReference, TMetadata]:
-						s, err = model_starlark.FileGetPath(typedV.GetDefinition(), typedV.GetTreeRelativePath())
+						s, err = model_starlark.FileGetInputRootPath(typedV.GetDefinition(), typedV.GetTreeRelativePath())
 						if err != nil {
 							return PatchedTargetActionCommandValue{}, err
 						}
