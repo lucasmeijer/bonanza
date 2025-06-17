@@ -8,7 +8,6 @@ import (
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
 	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
-	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
 	model_filesystem_pb "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
 
@@ -24,9 +23,9 @@ type DirectoryComponentWalker[TReference object.BasicReference] struct {
 	onUpHandler             func() (path.ComponentWalker, error)
 
 	// Variable fields.
-	currentDirectoryReference model_core.Message[*model_core_pb.DecodableReference, TReference]
-	directoriesStack          []model_core.Message[*model_filesystem_pb.DirectoryContents, TReference]
-	fileProperties            model_core.Message[*model_filesystem_pb.FileProperties, TReference]
+	currentDirectory model_core.Message[*model_filesystem_pb.Directory, TReference]
+	directoriesStack []model_core.Message[*model_filesystem_pb.DirectoryContents, TReference]
+	fileProperties   model_core.Message[*model_filesystem_pb.FileProperties, TReference]
 }
 
 var _ path.ComponentWalker = (*DirectoryComponentWalker[object.BasicReference])(nil)
@@ -36,7 +35,7 @@ func NewDirectoryComponentWalker[TReference object.BasicReference](
 	directoryContentsReader model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_filesystem_pb.DirectoryContents, TReference]],
 	leavesReader model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_filesystem_pb.Leaves, TReference]],
 	onUpHandler func() (path.ComponentWalker, error),
-	currentDirectoryReference model_core.Message[*model_core_pb.DecodableReference, TReference],
+	currentDirectory model_core.Message[*model_filesystem_pb.Directory, TReference],
 	directoriesStack []model_core.Message[*model_filesystem_pb.DirectoryContents, TReference],
 ) *DirectoryComponentWalker[TReference] {
 	return &DirectoryComponentWalker[TReference]{
@@ -45,31 +44,19 @@ func NewDirectoryComponentWalker[TReference object.BasicReference](
 		leavesReader:            leavesReader,
 		onUpHandler:             onUpHandler,
 
-		currentDirectoryReference: currentDirectoryReference,
-		directoriesStack:          directoriesStack,
+		currentDirectory: currentDirectory,
+		directoriesStack: directoriesStack,
 	}
 }
 
 func (cw *DirectoryComponentWalker[TReference]) dereferenceCurrentDirectory() error {
-	if cw.currentDirectoryReference.IsSet() {
-		d, err := model_parser.Dereference(cw.context, cw.directoryContentsReader, cw.currentDirectoryReference)
+	if cw.currentDirectory.IsSet() {
+		d, err := DirectoryGetContents(cw.context, cw.directoryContentsReader, cw.currentDirectory)
 		if err != nil {
 			return err
 		}
 		cw.directoriesStack = append(cw.directoriesStack, d)
-		cw.currentDirectoryReference.Clear()
-	}
-	return nil
-}
-
-func (cw *DirectoryComponentWalker[TReference]) pushDirectory(d model_core.Message[*model_filesystem_pb.Directory, TReference]) error {
-	switch contents := d.Message.GetContents().(type) {
-	case *model_filesystem_pb.Directory_ContentsExternal:
-		cw.currentDirectoryReference = model_core.Nested(d, contents.ContentsExternal.Reference)
-	case *model_filesystem_pb.Directory_ContentsInline:
-		cw.directoriesStack = append(cw.directoriesStack, model_core.Nested(d, contents.ContentsInline))
-	default:
-		return status.Error(codes.InvalidArgument, "Unknown directory contents type")
+		cw.currentDirectory.Clear()
 	}
 	return nil
 }
@@ -86,9 +73,7 @@ func (cw *DirectoryComponentWalker[TReference]) OnDirectory(name path.Component)
 		len(directories),
 		func(i int) int { return strings.Compare(n, directories[i].Name) },
 	); ok {
-		if err := cw.pushDirectory(model_core.Nested(d, directories[i].Directory)); err != nil {
-			return nil, err
-		}
+		cw.currentDirectory = model_core.Nested(d, directories[i].Directory)
 		return path.GotDirectory{
 			Child:        cw,
 			IsReversible: true,
@@ -134,7 +119,8 @@ func (cw *DirectoryComponentWalker[TReference]) OnTerminal(name path.Component) 
 		len(directories),
 		func(i int) int { return strings.Compare(n, directories[i].Name) },
 	); ok {
-		return nil, cw.pushDirectory(model_core.Nested(d, directories[i].Directory))
+		cw.currentDirectory = model_core.Nested(d, directories[i].Directory)
+		return nil, nil
 	}
 
 	leaves, err := DirectoryGetLeaves(cw.context, cw.leavesReader, d)
@@ -170,8 +156,8 @@ func (cw *DirectoryComponentWalker[TReference]) OnTerminal(name path.Component) 
 }
 
 func (cw *DirectoryComponentWalker[TReference]) OnUp() (path.ComponentWalker, error) {
-	if cw.currentDirectoryReference.IsSet() {
-		cw.currentDirectoryReference.Clear()
+	if cw.currentDirectory.IsSet() {
+		cw.currentDirectory.Clear()
 	} else if len(cw.directoriesStack) == 1 {
 		return cw.onUpHandler()
 	} else {
@@ -188,6 +174,23 @@ func (cw *DirectoryComponentWalker[TReference]) GetCurrentDirectoriesStack() ([]
 		return nil, err
 	}
 	return cw.directoriesStack, nil
+}
+
+// GetCurrentDirectory returns the lowest directory that the component
+// walker currently uses to perform resolution.
+func (cw *DirectoryComponentWalker[TReference]) GetCurrentDirectory() model_core.Message[*model_filesystem_pb.Directory, TReference] {
+	if cw.currentDirectory.IsSet() {
+		return cw.currentDirectory
+	}
+	currentDirectoryContents := cw.directoriesStack[len(cw.directoriesStack)-1]
+	return model_core.Nested(
+		currentDirectoryContents,
+		&model_filesystem_pb.Directory{
+			Contents: &model_filesystem_pb.Directory_ContentsInline{
+				ContentsInline: currentDirectoryContents.Message,
+			},
+		},
+	)
 }
 
 func (cw *DirectoryComponentWalker[TReference]) GetCurrentFileProperties() model_core.Message[*model_filesystem_pb.FileProperties, TReference] {

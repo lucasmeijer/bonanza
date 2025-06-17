@@ -156,7 +156,7 @@ func (r *filesUnderDirectoryReporter[TReference, TMetadata]) yieldFilesUnderCurr
 			func() (path.ComponentWalker, error) {
 				return nil, errors.New("path escapes the input root")
 			},
-			model_core.Message[*model_core_pb.DecodableReference, TReference]{},
+			model_core.Message[*model_filesystem_pb.Directory, TReference]{},
 			append([]model_core.Message[*model_filesystem_pb.DirectoryContents, TReference](nil), r.directoriesStack...),
 		)
 		if err := path.Resolve(
@@ -227,7 +227,7 @@ func expandFileIfDirectory[TReference object.BasicReference, TMetadata BaseCompu
 		func() (path.ComponentWalker, error) {
 			return nil, errors.New("path escapes the input root")
 		},
-		model_core.Message[*model_core_pb.DecodableReference, TReference]{},
+		model_core.Message[*model_filesystem_pb.Directory, TReference]{},
 		[]model_core.Message[*model_filesystem_pb.DirectoryContents, TReference]{
 			model_core.Nested(fileRoot, fileRoot.Message.RootDirectory),
 		},

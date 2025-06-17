@@ -161,6 +161,21 @@ func (d *changeTrackingDirectory[TReference, TMetadata]) setContents(contents mo
 	return nil
 }
 
+func (d *changeTrackingDirectory[TReference, TMetadata]) mergeDirectoryMessage(directoryMessage model_core.Message[*model_filesystem_pb.Directory, TReference], options *changeTrackingDirectoryLoadOptions[TReference]) error {
+	// There is no need to perform any merging if both directories
+	// are backed by the same message.
+	if !d.unmodifiedDirectory.IsSet() || !model_core.MessagesEqual(d.unmodifiedDirectory, directoryMessage) {
+		directoryContents, err := model_filesystem.DirectoryGetContents(options.context, options.directoryContentsReader, directoryMessage)
+		if err != nil {
+			return err
+		}
+		if err := d.mergeContents(directoryContents, options); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // mergeContents recursively merges the contents of a given directory
 // message into an already existing changeTrackingDirectory. Any
 // conflicts will cause merging to fail.
@@ -224,17 +239,9 @@ func (d *changeTrackingDirectory[TReference, TMetadata]) mergeContents(contents 
 			return fmt.Errorf("directory %#v conflicts with an existing symbolic link", name.String())
 		} else if child, ok := d.directories[name]; ok {
 			// Recurse into the already existing directory
-			// to merge their contents. We can skip this if
-			// the existing directory is backed by the same
-			// message contents.
-			if !child.unmodifiedDirectory.IsSet() || !model_core.MessagesEqual(child.unmodifiedDirectory, newDirectory) {
-				childMessage, err := model_filesystem.DirectoryGetContents(options.context, options.directoryContentsReader, newDirectory)
-				if err != nil {
-					return err
-				}
-				if err := child.mergeContents(childMessage, options); err != nil {
-					return err
-				}
+			// to merge their contents.
+			if err := child.mergeDirectoryMessage(newDirectory, options); err != nil {
+				return err
 			}
 		} else {
 			d.setDirectorySimple(name, &changeTrackingDirectory[TReference, TMetadata]{
@@ -245,11 +252,74 @@ func (d *changeTrackingDirectory[TReference, TMetadata]) mergeContents(contents 
 	return nil
 }
 
+func (d *changeTrackingDirectory[TReference, TMetadata]) mergeDirectory(other *changeTrackingDirectory[TReference, TMetadata], options *changeTrackingDirectoryLoadOptions[TReference]) error {
+	if other.unmodifiedDirectory.IsSet() {
+		return d.mergeDirectoryMessage(other.unmodifiedDirectory, options)
+	}
+
+	if err := d.maybeLoadContents(options); err != nil {
+		return err
+	}
+	if err := other.maybeLoadContents(options); err != nil {
+		return err
+	}
+
+	for name, f := range other.files {
+		if _, ok := d.files[name]; ok {
+			// TODO: Check equality!
+		} else if _, ok := d.symlinks[name]; ok {
+			return fmt.Errorf("file %#v conflicts with an existing symbolic link", name.String())
+		} else if _, ok := d.directories[name]; ok {
+			return fmt.Errorf("file %#v conflicts with an existing directory", name.String())
+		} else {
+			d.setFileSimple(name, f)
+		}
+	}
+	for name, target := range other.symlinks {
+		if _, ok := d.files[name]; ok {
+			return fmt.Errorf("symbolic link %#v conflicts with an existing file", name.String())
+		} else if _, ok := d.symlinks[name]; ok {
+			// TODO: Check equality!
+		} else if _, ok := d.directories[name]; ok {
+			return fmt.Errorf("symbolic link %#v conflicts with an existing directory", name.String())
+		} else {
+			d.setSymlinkSimple(name, target)
+		}
+	}
+	for name, otherChild := range other.directories {
+		if _, ok := d.files[name]; ok {
+			return fmt.Errorf("directory %#v conflicts with an existing file", name.String())
+		} else if _, ok := d.symlinks[name]; ok {
+			return fmt.Errorf("directory %#v conflicts with an existing symbolic link", name.String())
+		} else if child, ok := d.directories[name]; ok {
+			// Recurse into the already existing directory
+			// to merge their contents.
+			if err := child.mergeDirectory(otherChild, options); err != nil {
+				return err
+			}
+		} else {
+			d.setDirectorySimple(name, otherChild)
+		}
+	}
+	return nil
+}
+
 func (d *changeTrackingDirectory[TReference, TMetadata]) setDirectorySimple(name path.Component, child *changeTrackingDirectory[TReference, TMetadata]) {
 	if d.directories == nil {
 		d.directories = map[path.Component]*changeTrackingDirectory[TReference, TMetadata]{}
 	}
 	d.directories[name] = child
+}
+
+func (d *changeTrackingDirectory[TReference, TMetadata]) setDirectory(loadOptions *changeTrackingDirectoryLoadOptions[TReference], name path.Component, f *changeTrackingDirectory[TReference, TMetadata]) error {
+	if err := d.maybeLoadContents(loadOptions); err != nil {
+		return err
+	}
+
+	d.setDirectorySimple(name, f)
+	delete(d.files, name)
+	delete(d.symlinks, name)
+	return nil
 }
 
 func (d *changeTrackingDirectory[TReference, TMetadata]) getOrCreateDirectory(name path.Component) (*changeTrackingDirectory[TReference, TMetadata], error) {

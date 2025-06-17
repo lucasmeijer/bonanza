@@ -50,7 +50,14 @@ func (r *reposFilePropertiesResolver[TReference, TMetadata]) setCurrentRepo(name
 		r.directoryReaders.DirectoryContents,
 		r.directoryReaders.Leaves,
 		r.handleRepoOnUp,
-		model_core.Nested(repoValue, repoValue.Message.RootDirectoryReference.GetReference()),
+		model_core.Nested(
+			repoValue,
+			&model_filesystem_pb.Directory{
+				Contents: &model_filesystem_pb.Directory_ContentsExternal{
+					ContentsExternal: repoValue.Message.RootDirectoryReference,
+				},
+			},
+		),
 		nil,
 	)
 	return nil
