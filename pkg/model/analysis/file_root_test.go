@@ -42,6 +42,31 @@ func TestFileRoot(t *testing.T) {
 	ctrl, ctx := gomock.WithContext(t.Context(), t)
 	bct := newBaseComputerTester(ctrl)
 
+	exampleConfiguration := newObject(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) model_core.Marshalable {
+		return model_core.NewProtoListMarshalable([]*model_analysis_pb.BuildSettingOverride{{
+			Level: &model_analysis_pb.BuildSettingOverride_Leaf_{
+				Leaf: &model_analysis_pb.BuildSettingOverride_Leaf{
+					Label: "@@bazel_tools+//command_line_option:platforms",
+					Value: &model_starlark_pb.Value{
+						Kind: &model_starlark_pb.Value_List{
+							List: &model_starlark_pb.List{
+								Elements: []*model_starlark_pb.List_Element{{
+									Level: &model_starlark_pb.List_Element_Leaf{
+										Leaf: &model_starlark_pb.Value{
+											Kind: &model_starlark_pb.Value_Label{
+												Label: "@@platforms+//host",
+											},
+										},
+									},
+								}},
+							},
+						},
+					},
+				},
+			},
+		}})
+	})
+
 	t.Run("MissingFile", func(t *testing.T) {
 		// Request needs to contain a Starlark File object.
 		e := NewMockFileRootEnvironmentForTesting(ctrl)
@@ -328,9 +353,10 @@ func TestFileRoot(t *testing.T) {
 		t.Run("Success", func(t *testing.T) {
 			// Simulate the computation of the output of:
 			//
+			//     output = ctx.actions.declare_file("output")
 			//     ctx.actions.expand_template(
 			//         template = File("@@myrepo+//:template"),
-			//         output = File("@@myrepo+//:output"),
+			//         output = output,
 			//         substitutions = {
 			//             "{{first_name}}": "Albert",
 			//             "{{last_name}}": "Einstein",
@@ -344,35 +370,11 @@ func TestFileRoot(t *testing.T) {
 				bct.expectGetDirectoryReadersValue(t, e)
 				bct.expectGetFileCreationParametersObjectValue(t, e)
 				bct.expectGetFileReaderValue(t, e)
-				configuration := newObject(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) model_core.Marshalable {
-					return model_core.NewProtoListMarshalable([]*model_analysis_pb.BuildSettingOverride{{
-						Level: &model_analysis_pb.BuildSettingOverride_Leaf_{
-							Leaf: &model_analysis_pb.BuildSettingOverride_Leaf{
-								Label: "@@bazel_tools+//command_line_option:platforms",
-								Value: &model_starlark_pb.Value{
-									Kind: &model_starlark_pb.Value_List{
-										List: &model_starlark_pb.List{
-											Elements: []*model_starlark_pb.List_Element{{
-												Level: &model_starlark_pb.List_Element_Leaf{
-													Leaf: &model_starlark_pb.Value{
-														Kind: &model_starlark_pb.Value_Label{
-															Label: "@@platforms+//host",
-														},
-													},
-												},
-											}},
-										},
-									},
-								},
-							},
-						},
-					}})
-				})
 				e.EXPECT().GetTargetOutputValue(
 					eqPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.TargetOutput_Key {
 						return &model_analysis_pb.TargetOutput_Key{
 							Label:                  "@@myrepo+//:generate",
-							ConfigurationReference: attachObject(patcher, configuration),
+							ConfigurationReference: attachObject(patcher, exampleConfiguration),
 							PackageRelativePath:    "output",
 						}
 					}),
@@ -450,7 +452,7 @@ func TestFileRoot(t *testing.T) {
 								Label: "@@myrepo+//:output",
 								Type:  model_starlark_pb.File_FILE,
 								Owner: &model_starlark_pb.File_Owner{
-									ConfigurationReference: attachObject(patcher, configuration),
+									ConfigurationReference: attachObject(patcher, exampleConfiguration),
 									TargetName:             "generate",
 								},
 							},
@@ -545,7 +547,130 @@ func TestFileRoot(t *testing.T) {
 	})
 
 	t.Run("StaticPackageDirectory", func(t *testing.T) {
-		// TODO!
+		// TODO: Test error cases.
+
+		t.Run("Success", func(t *testing.T) {
+			// Simulate the computation of the output of:
+			//
+			//     output = ctx.actions.declare_symlink("passwd")
+			//     ctx.actions.symlink(
+			//         output = output,
+			//         target_path = "/etc/passwd",
+			//     )
+			run := func(t *testing.T, directoryLayout model_analysis_pb.DirectoryLayout) model_analysis.PatchedFileRootValue {
+				e := NewMockFileRootEnvironmentForTesting(ctrl)
+				bct.expectCaptureExistingObject(e)
+				bct.expectGetDirectoryCreationParametersObjectValue(t, e)
+				e.EXPECT().GetTargetOutputValue(
+					eqPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.TargetOutput_Key {
+						return &model_analysis_pb.TargetOutput_Key{
+							Label:                  "@@myrepo+//:create_symlink",
+							ConfigurationReference: attachObject(patcher, exampleConfiguration),
+							PackageRelativePath:    "passwd",
+						}
+					}),
+				).Return(newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.TargetOutput_Value {
+					return &model_analysis_pb.TargetOutput_Value{
+						Definition: &model_analysis_pb.TargetOutputDefinition{
+							Source: &model_analysis_pb.TargetOutputDefinition_StaticPackageDirectory{
+								StaticPackageDirectory: &model_filesystem_pb.DirectoryContents{
+									Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+										LeavesInline: &model_filesystem_pb.Leaves{
+											Symlinks: []*model_filesystem_pb.SymlinkNode{
+												{
+													Name:   "passwd",
+													Target: "/etc/passwd",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					}
+				}))
+
+				fileRoot, err := bct.computer.ComputeFileRootValue(
+					ctx,
+					newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Key {
+						return &model_analysis_pb.FileRoot_Key{
+							DirectoryLayout: directoryLayout,
+							File: &model_starlark_pb.File{
+								Label: "@@myrepo+//:passwd",
+								Type:  model_starlark_pb.File_FILE,
+								Owner: &model_starlark_pb.File_Owner{
+									ConfigurationReference: attachObject(patcher, exampleConfiguration),
+									TargetName:             "create_symlink",
+								},
+							},
+						}
+					}),
+					e,
+				)
+				require.NoError(t, err)
+				return fileRoot
+			}
+
+			t.Run("InputRoot", func(t *testing.T) {
+				fileRoot := run(t, model_analysis_pb.DirectoryLayout_INPUT_ROOT)
+				requireEqualPatchedMessage(t, func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Value {
+					return &model_analysis_pb.FileRoot_Value{
+						RootDirectory: singleChildDirectoryContents(
+							"bazel-out",
+							singleChildDirectoryContents(
+								"Cg6Kx80o8BPYmGdgWYfRZvbKyWojQ7snQzHOx70XAwRPAAAAAAAAAA.",
+								singleChildDirectoryContents(
+									"bin",
+									singleChildDirectoryContents(
+										"external",
+										singleChildDirectoryContents(
+											"myrepo+",
+											&model_filesystem_pb.DirectoryContents{
+												Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+													LeavesInline: &model_filesystem_pb.Leaves{
+														Symlinks: []*model_filesystem_pb.SymlinkNode{
+															{
+																Name:   "passwd",
+																Target: "/etc/passwd",
+															},
+														},
+													},
+												},
+											},
+										),
+									),
+								),
+							),
+						),
+					}
+				}, fileRoot)
+				fileRoot.Discard()
+			})
+
+			t.Run("Runfiles", func(t *testing.T) {
+				fileRoot := run(t, model_analysis_pb.DirectoryLayout_RUNFILES)
+				requireEqualPatchedMessage(t, func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Value {
+					return &model_analysis_pb.FileRoot_Value{
+						RootDirectory: singleChildDirectoryContents(
+							"myrepo+",
+							&model_filesystem_pb.DirectoryContents{
+								Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+									LeavesInline: &model_filesystem_pb.Leaves{
+										Symlinks: []*model_filesystem_pb.SymlinkNode{
+											{
+												Name:   "passwd",
+												Target: "/etc/passwd",
+											},
+										},
+									},
+								},
+							},
+						),
+					}
+				}, fileRoot)
+				fileRoot.Discard()
+			})
+		})
 	})
 
 	t.Run("Symlink", func(t *testing.T) {
