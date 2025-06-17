@@ -337,94 +337,199 @@ func TestFileRoot(t *testing.T) {
 			//         },
 			//         is_executable = True,
 			//     )
-			e := NewMockFileRootEnvironmentForTesting(ctrl)
-			bct.expectCaptureExistingObject(e)
-			bct.expectGetDirectoryCreationParametersObjectValue(t, e)
-			bct.expectGetDirectoryReadersValue(t, e)
-			bct.expectGetFileCreationParametersObjectValue(t, e)
-			bct.expectGetFileReaderValue(t, e)
-			configuration := newObject(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) model_core.Marshalable {
-				return model_core.NewProtoListMarshalable([]*model_analysis_pb.BuildSettingOverride{{
-					Level: &model_analysis_pb.BuildSettingOverride_Leaf_{
-						Leaf: &model_analysis_pb.BuildSettingOverride_Leaf{
-							Label: "@@bazel_tools+//command_line_option:platforms",
-							Value: &model_starlark_pb.Value{
-								Kind: &model_starlark_pb.Value_List{
-									List: &model_starlark_pb.List{
-										Elements: []*model_starlark_pb.List_Element{{
-											Level: &model_starlark_pb.List_Element_Leaf{
-												Leaf: &model_starlark_pb.Value{
-													Kind: &model_starlark_pb.Value_Label{
-														Label: "@@platforms+//host",
+			run := func(t *testing.T, directoryLayout model_analysis_pb.DirectoryLayout) model_analysis.PatchedFileRootValue {
+				e := NewMockFileRootEnvironmentForTesting(ctrl)
+				bct.expectCaptureExistingObject(e)
+				bct.expectGetDirectoryCreationParametersObjectValue(t, e)
+				bct.expectGetDirectoryReadersValue(t, e)
+				bct.expectGetFileCreationParametersObjectValue(t, e)
+				bct.expectGetFileReaderValue(t, e)
+				configuration := newObject(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) model_core.Marshalable {
+					return model_core.NewProtoListMarshalable([]*model_analysis_pb.BuildSettingOverride{{
+						Level: &model_analysis_pb.BuildSettingOverride_Leaf_{
+							Leaf: &model_analysis_pb.BuildSettingOverride_Leaf{
+								Label: "@@bazel_tools+//command_line_option:platforms",
+								Value: &model_starlark_pb.Value{
+									Kind: &model_starlark_pb.Value_List{
+										List: &model_starlark_pb.List{
+											Elements: []*model_starlark_pb.List_Element{{
+												Level: &model_starlark_pb.List_Element_Leaf{
+													Leaf: &model_starlark_pb.Value{
+														Kind: &model_starlark_pb.Value_Label{
+															Label: "@@platforms+//host",
+														},
 													},
 												},
-											},
-										}},
+											}},
+										},
 									},
 								},
 							},
 						},
-					},
-				}})
-			})
-			e.EXPECT().GetTargetOutputValue(
-				eqPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.TargetOutput_Key {
-					return &model_analysis_pb.TargetOutput_Key{
-						Label:                  "@@myrepo+//:generate",
-						ConfigurationReference: attachObject(patcher, configuration),
-						PackageRelativePath:    "output",
-					}
-				}),
-			).Return(newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.TargetOutput_Value {
-				return &model_analysis_pb.TargetOutput_Value{
-					Definition: &model_analysis_pb.TargetOutputDefinition{
-						Source: &model_analysis_pb.TargetOutputDefinition_ExpandTemplate_{
-							ExpandTemplate: &model_analysis_pb.TargetOutputDefinition_ExpandTemplate{
-								Template: &model_starlark_pb.File{
-									Label: "@@myrepo+//:template",
-									Type:  model_starlark_pb.File_FILE,
-								},
-								IsExecutable: true,
-								Substitutions: []*model_analysis_pb.TargetOutputDefinition_ExpandTemplate_Substitution{
-									{Needle: []byte("{{first_name}}"), Replacement: []byte("Albert")},
-									{Needle: []byte("{{last_name}}"), Replacement: []byte("Einstein")},
+					}})
+				})
+				e.EXPECT().GetTargetOutputValue(
+					eqPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.TargetOutput_Key {
+						return &model_analysis_pb.TargetOutput_Key{
+							Label:                  "@@myrepo+//:generate",
+							ConfigurationReference: attachObject(patcher, configuration),
+							PackageRelativePath:    "output",
+						}
+					}),
+				).Return(newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.TargetOutput_Value {
+					return &model_analysis_pb.TargetOutput_Value{
+						Definition: &model_analysis_pb.TargetOutputDefinition{
+							Source: &model_analysis_pb.TargetOutputDefinition_ExpandTemplate_{
+								ExpandTemplate: &model_analysis_pb.TargetOutputDefinition_ExpandTemplate{
+									Template: &model_starlark_pb.File{
+										Label: "@@myrepo+//:template",
+										Type:  model_starlark_pb.File_FILE,
+									},
+									IsExecutable: true,
+									Substitutions: []*model_analysis_pb.TargetOutputDefinition_ExpandTemplate_Substitution{
+										{Needle: []byte("{{first_name}}"), Replacement: []byte("Albert")},
+										{Needle: []byte("{{last_name}}"), Replacement: []byte("Einstein")},
+									},
 								},
 							},
 						},
-					},
-				}
-			}))
-			e.EXPECT().GetFileRootValue(
-				eqPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Key {
-					return &model_analysis_pb.FileRoot_Key{
-						DirectoryLayout: model_analysis_pb.DirectoryLayout_INPUT_ROOT,
-						File: &model_starlark_pb.File{
-							Label: "@@myrepo+//:template",
-							Type:  model_starlark_pb.File_FILE,
-						},
 					}
-				}),
-			).Return(newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Value {
-				return &model_analysis_pb.FileRoot_Value{
-					RootDirectory: singleChildDirectoryContents(
-						"external",
-						singleChildDirectoryContents(
+				}))
+				e.EXPECT().GetFileRootValue(
+					eqPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Key {
+						return &model_analysis_pb.FileRoot_Key{
+							DirectoryLayout: model_analysis_pb.DirectoryLayout_INPUT_ROOT,
+							File: &model_starlark_pb.File{
+								Label: "@@myrepo+//:template",
+								Type:  model_starlark_pb.File_FILE,
+							},
+						}
+					}),
+				).Return(newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Value {
+					return &model_analysis_pb.FileRoot_Value{
+						RootDirectory: singleChildDirectoryContents(
+							"external",
+							singleChildDirectoryContents(
+								"myrepo+",
+								&model_filesystem_pb.DirectoryContents{
+									Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+										LeavesInline: &model_filesystem_pb.Leaves{
+											Files: []*model_filesystem_pb.FileNode{
+												{
+													Name: "template",
+													Properties: &model_filesystem_pb.FileProperties{
+														Contents: &model_filesystem_pb.FileContents{
+															Level: &model_filesystem_pb.FileContents_ChunkReference{
+																ChunkReference: attachObject(patcher, newObject(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) model_core.Marshalable {
+																	return model_core.NewRawMarshalable([]byte("{{first_name}} {{last_name}}"))
+																})),
+															},
+															TotalSizeBytes: 28,
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							),
+						),
+					}
+				}))
+				expandedTemplateFile := NewMockFileReadWriter(ctrl)
+				bct.filePool.EXPECT().NewFile().Return(expandedTemplateFile, nil)
+				expandedTemplateFile.EXPECT().WriteAt([]byte("Albert Einstein"), int64(0)).Return(15, nil)
+				expandedTemplateFile.EXPECT().Close()
+
+				fileRoot, err := bct.computer.ComputeFileRootValue(
+					ctx,
+					newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Key {
+						return &model_analysis_pb.FileRoot_Key{
+							DirectoryLayout: directoryLayout,
+							File: &model_starlark_pb.File{
+								Label: "@@myrepo+//:output",
+								Type:  model_starlark_pb.File_FILE,
+								Owner: &model_starlark_pb.File_Owner{
+									ConfigurationReference: attachObject(patcher, configuration),
+									TargetName:             "generate",
+								},
+							},
+						}
+					}),
+					e,
+				)
+				require.NoError(t, err)
+				return fileRoot
+			}
+
+			t.Run("InputRoot", func(t *testing.T) {
+				fileRoot := run(t, model_analysis_pb.DirectoryLayout_INPUT_ROOT)
+				requireEqualPatchedMessage(t, func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Value {
+					return &model_analysis_pb.FileRoot_Value{
+						RootDirectory: singleChildDirectoryContents(
+							"bazel-out",
+							singleChildDirectoryContents(
+								"Cg6Kx80o8BPYmGdgWYfRZvbKyWojQ7snQzHOx70XAwRPAAAAAAAAAA.",
+								singleChildDirectoryContents(
+									"bin",
+									singleChildDirectoryContents(
+										"external",
+										singleChildDirectoryContents(
+											"myrepo+",
+											&model_filesystem_pb.DirectoryContents{
+												Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+													LeavesInline: &model_filesystem_pb.Leaves{
+														Files: []*model_filesystem_pb.FileNode{
+															{
+																Name: "output",
+																Properties: &model_filesystem_pb.FileProperties{
+																	Contents: &model_filesystem_pb.FileContents{
+																		Level: &model_filesystem_pb.FileContents_ChunkReference{
+																			ChunkReference: attachObject(patcher, newObject(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) model_core.Marshalable {
+																				return model_core.NewRawMarshalable([]byte("Albert Einstein"))
+																			})),
+																		},
+																		TotalSizeBytes: 15,
+																	},
+																	IsExecutable: true,
+																},
+															},
+														},
+													},
+												},
+											},
+										),
+									),
+								),
+							),
+						),
+					}
+				}, fileRoot)
+				fileRoot.Discard()
+			})
+
+			t.Run("Runfiles", func(t *testing.T) {
+				fileRoot := run(t, model_analysis_pb.DirectoryLayout_RUNFILES)
+				requireEqualPatchedMessage(t, func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Value {
+					return &model_analysis_pb.FileRoot_Value{
+						RootDirectory: singleChildDirectoryContents(
 							"myrepo+",
 							&model_filesystem_pb.DirectoryContents{
 								Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
 									LeavesInline: &model_filesystem_pb.Leaves{
 										Files: []*model_filesystem_pb.FileNode{
 											{
-												Name: "template",
+												Name: "output",
 												Properties: &model_filesystem_pb.FileProperties{
 													Contents: &model_filesystem_pb.FileContents{
 														Level: &model_filesystem_pb.FileContents_ChunkReference{
 															ChunkReference: attachObject(patcher, newObject(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) model_core.Marshalable {
-																return model_core.NewRawMarshalable([]byte("{{first_name}} {{last_name}}"))
+																return model_core.NewRawMarshalable([]byte("Albert Einstein"))
 															})),
 														},
-														TotalSizeBytes: 28,
+														TotalSizeBytes: 15,
 													},
+													IsExecutable: true,
 												},
 											},
 										},
@@ -432,74 +537,10 @@ func TestFileRoot(t *testing.T) {
 								},
 							},
 						),
-					),
-				}
-			}))
-			expandedTemplateFile := NewMockFileReadWriter(ctrl)
-			bct.filePool.EXPECT().NewFile().Return(expandedTemplateFile, nil)
-			expandedTemplateFile.EXPECT().WriteAt([]byte("Albert Einstein"), int64(0)).Return(15, nil)
-			expandedTemplateFile.EXPECT().Close()
-
-			fileRoot, err := bct.computer.ComputeFileRootValue(
-				ctx,
-				newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Key {
-					return &model_analysis_pb.FileRoot_Key{
-						DirectoryLayout: model_analysis_pb.DirectoryLayout_INPUT_ROOT,
-						File: &model_starlark_pb.File{
-							Label: "@@myrepo+//:output",
-							Type:  model_starlark_pb.File_FILE,
-							Owner: &model_starlark_pb.File_Owner{
-								ConfigurationReference: attachObject(patcher, configuration),
-								TargetName:             "generate",
-							},
-						},
 					}
-				}),
-				e,
-			)
-			require.NoError(t, err)
-			requireEqualPatchedMessage(t, func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Value {
-				return &model_analysis_pb.FileRoot_Value{
-					RootDirectory: singleChildDirectoryContents(
-						"bazel-out",
-						singleChildDirectoryContents(
-							"Cg6Kx80o8BPYmGdgWYfRZvbKyWojQ7snQzHOx70XAwRPAAAAAAAAAA.",
-							singleChildDirectoryContents(
-								"bin",
-								singleChildDirectoryContents(
-									"external",
-									singleChildDirectoryContents(
-										"myrepo+",
-										&model_filesystem_pb.DirectoryContents{
-											Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
-												LeavesInline: &model_filesystem_pb.Leaves{
-													Files: []*model_filesystem_pb.FileNode{
-														{
-															Name: "output",
-															Properties: &model_filesystem_pb.FileProperties{
-																Contents: &model_filesystem_pb.FileContents{
-																	Level: &model_filesystem_pb.FileContents_ChunkReference{
-																		ChunkReference: attachObject(patcher, newObject(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) model_core.Marshalable {
-																			return model_core.NewRawMarshalable([]byte("Albert Einstein"))
-																		})),
-																	},
-																	TotalSizeBytes: 15,
-																},
-																IsExecutable: true,
-															},
-														},
-													},
-												},
-											},
-										},
-									),
-								),
-							),
-						),
-					),
-				}
-			}, fileRoot)
-			fileRoot.Discard()
+				}, fileRoot)
+				fileRoot.Discard()
+			})
 		})
 	})
 
