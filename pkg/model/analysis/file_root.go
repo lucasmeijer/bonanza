@@ -125,6 +125,139 @@ func fileGetPathInDirectoryLayout[TReference object.BasicReference](f model_core
 	}
 }
 
+type changeTrackingDirectorySymlinkFollowingResolver[TReference object.BasicReference, TMetadata model_core.ReferenceMetadata] struct {
+	loadOptions *changeTrackingDirectoryLoadOptions[TReference]
+
+	stack util.NonEmptyStack[*changeTrackingDirectory[TReference, TMetadata]]
+	file  *changeTrackingFile[TReference, TMetadata]
+}
+
+func (r *changeTrackingDirectorySymlinkFollowingResolver[TReference, TMetadata]) OnAbsolute() (path.ComponentWalker, error) {
+	r.stack.PopAll()
+	return r, nil
+}
+
+func (r *changeTrackingDirectorySymlinkFollowingResolver[TReference, TMetadata]) OnRelative() (path.ComponentWalker, error) {
+	return r, nil
+}
+
+func (r *changeTrackingDirectorySymlinkFollowingResolver[TReference, TMetadata]) OnDriveLetter(driveLetter rune) (path.ComponentWalker, error) {
+	return nil, errors.New("drive letters are not supported")
+}
+
+var errChangeTrackingDirectorySymlinkFollowingResolverFileNotFound = errors.New("file not found")
+
+func (r *changeTrackingDirectorySymlinkFollowingResolver[TReference, TMetadata]) OnDirectory(name path.Component) (path.GotDirectoryOrSymlink, error) {
+	d := r.stack.Peek()
+	if err := d.maybeLoadContents(r.loadOptions); err != nil {
+		return nil, err
+	}
+
+	if dChild, ok := d.directories[name]; ok {
+		r.stack.Push(dChild)
+		return path.GotDirectory{
+			Child:        r,
+			IsReversible: true,
+		}, nil
+	}
+	if _, ok := d.files[name]; ok {
+		return nil, errors.New("path resolves to a file, while a directory was expected")
+	}
+	if target, ok := d.symlinks[name]; ok {
+		return path.GotSymlink{
+			Parent: path.NewRelativeScopeWalker(r),
+			Target: target,
+		}, nil
+	}
+	return nil, errChangeTrackingDirectorySymlinkFollowingResolverFileNotFound
+}
+
+func (r *changeTrackingDirectorySymlinkFollowingResolver[TReference, TMetadata]) OnTerminal(name path.Component) (*path.GotSymlink, error) {
+	d := r.stack.Peek()
+	if err := d.maybeLoadContents(r.loadOptions); err != nil {
+		return nil, err
+	}
+
+	if dChild, ok := d.directories[name]; ok {
+		r.stack.Push(dChild)
+		return nil, nil
+	}
+	if f, ok := d.files[name]; ok {
+		r.file = f
+		return nil, nil
+	}
+	if target, ok := d.symlinks[name]; ok {
+		return &path.GotSymlink{
+			Parent: path.NewRelativeScopeWalker(r),
+			Target: target,
+		}, nil
+	}
+	return nil, errChangeTrackingDirectorySymlinkFollowingResolverFileNotFound
+}
+
+func (r *changeTrackingDirectorySymlinkFollowingResolver[TReference, TMetadata]) OnUp() (path.ComponentWalker, error) {
+	if _, ok := r.stack.PopSingle(); !ok {
+		return nil, errors.New("path resolves to a location above the root directory")
+	}
+	return r, nil
+}
+
+func copyFileAndDependencies[TReference object.BasicReference, TMetadata model_core.ReferenceMetadata](
+	originalOutputDirectory *changeTrackingDirectory[TReference, TMetadata],
+	filePath string,
+	fileType model_starlark_pb.File_Type,
+	loadOptions *changeTrackingDirectoryLoadOptions[TReference],
+) (*changeTrackingDirectory[TReference, TMetadata], error) {
+	resolver := changeTrackingDirectorySymlinkFollowingResolver[TReference, TMetadata]{
+		loadOptions: loadOptions,
+		stack:       util.NewNonEmptyStack(originalOutputDirectory),
+	}
+	var trimmedOutputRootDirectory changeTrackingDirectory[TReference, TMetadata]
+	symlinkRecordingComponentWalker := symlinkRecordingComponentWalker[TReference, TMetadata]{
+		base:  &resolver,
+		stack: util.NewNonEmptyStack(&trimmedOutputRootDirectory),
+	}
+	if err := path.Resolve(
+		path.UNIXFormat.NewParser(filePath),
+		path.NewLoopDetectingScopeWalker(
+			path.NewRelativeScopeWalker(&symlinkRecordingComponentWalker),
+		),
+	); err != nil {
+		return nil, fmt.Errorf("failed to resolve path: %w", err)
+	}
+
+	// Resolving the file created all intermediate symbolic links.
+	// Copy over the regular file or directory they point to as
+	// well.
+	switch fileType {
+	case model_starlark_pb.File_FILE:
+		if resolver.file == nil {
+			return nil, errors.New("target action output is a directory, while a file was expected")
+		}
+		if err := symlinkRecordingComponentWalker.stack.Peek().setFile(
+			loadOptions,
+			*symlinkRecordingComponentWalker.terminalName,
+			resolver.file,
+		); err != nil {
+			return nil, err
+		}
+	case model_starlark_pb.File_DIRECTORY:
+		if resolver.file != nil {
+			return nil, errors.New("target action output is a file, while a directory was expected")
+		}
+		if err := symlinkRecordingComponentWalker.stack.Peek().setDirectory(
+			loadOptions,
+			*symlinkRecordingComponentWalker.terminalName,
+			resolver.stack.Peek(),
+		); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, errors.New("unknown file type")
+	}
+	return &trimmedOutputRootDirectory, nil
+}
+
 func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.Context, key model_core.Message[*model_analysis_pb.FileRoot_Key, TReference], e FileRootEnvironment[TReference, TMetadata]) (PatchedFileRootValue, error) {
 	f := model_core.Nested(key, key.Message.File)
 	if f.Message == nil {
@@ -162,84 +295,92 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 		case *model_analysis_pb.TargetOutputDefinition_ActionId:
 			directoryCreationParameters, gotDirectoryCreationParameters := e.GetDirectoryCreationParametersObjectValue(&model_analysis_pb.DirectoryCreationParametersObject_Key{})
 			directoryReaders, gotDirectoryReaders := e.GetDirectoryReadersValue(&model_analysis_pb.DirectoryReaders_Key{})
-			patchedConfigurationReference1 := model_core.Patch(e, configurationReference)
+			patchedConfigurationReference := model_core.Patch(e, configurationReference)
 			targetActionResult := e.GetTargetActionResultValue(
 				model_core.NewPatchedMessage(
 					&model_analysis_pb.TargetActionResult_Key{
 						Id: &model_analysis_pb.TargetActionId{
 							Label:                  targetLabel.String(),
-							ConfigurationReference: patchedConfigurationReference1.Message,
+							ConfigurationReference: patchedConfigurationReference.Message,
 							ActionId:               source.ActionId,
 						},
 					},
-					model_core.MapReferenceMetadataToWalkers(patchedConfigurationReference1.Patcher),
+					model_core.MapReferenceMetadataToWalkers(patchedConfigurationReference.Patcher),
 				),
 			)
 			if !gotDirectoryCreationParameters || !gotDirectoryReaders || !targetActionResult.IsSet() {
 				return PatchedFileRootValue{}, evaluation.ErrMissingDependency
 			}
 
+			// Target actions may emit multiple outputs, but
+			// we should return a file root that only
+			// contains a single output. Create a new
+			// directory hierarchy that only contains a copy
+			// of the file that was requested (and any
+			// symlink targets).
+			originalOutputRootDirectory := changeTrackingDirectory[TReference, TMetadata]{
+				unmodifiedDirectory: model_core.Nested(
+					targetActionResult,
+					&model_filesystem_pb.Directory{
+						Contents: &model_filesystem_pb.Directory_ContentsInline{
+							ContentsInline: targetActionResult.Message.OutputRoot,
+						},
+					},
+				),
+			}
 			filePath, err := model_starlark.FileGetInputRootPath(f, nil)
 			if err != nil {
 				return PatchedFileRootValue{}, err
 			}
-
-			targetActionResultWalker := model_filesystem.NewDirectoryComponentWalker(
-				ctx,
-				directoryReaders.DirectoryContents,
-				directoryReaders.Leaves,
-				/* onUpHandler = */ func() (path.ComponentWalker, error) {
-					return nil, errors.New("path resolves to a location outside the input root")
-				},
-				model_core.Message[*model_filesystem_pb.Directory, TReference]{},
-				[]model_core.Message[*model_filesystem_pb.DirectoryContents, TReference]{
-					model_core.Nested(targetActionResult, targetActionResult.Message.OutputRoot),
-				},
-			)
-			var outputRootDirectory changeTrackingDirectory[TReference, TMetadata]
-			symlinkRecordingComponentWalker := symlinkRecordingComponentWalker[TReference, TMetadata]{
-				base:  targetActionResultWalker,
-				stack: util.NewNonEmptyStack(&outputRootDirectory),
-			}
-			if err := path.Resolve(
-				path.UNIXFormat.NewParser(filePath),
-				path.NewLoopDetectingScopeWalker(
-					path.NewRelativeScopeWalker(&symlinkRecordingComponentWalker),
-				),
-			); err != nil {
-				return PatchedFileRootValue{}, fmt.Errorf("failed to resolve path: %w", err)
-			}
-
-			// Resolving the file created all intermediate
-			// symbolic links. Copy over the regular file or
-			// directory they point to as well.
 			loadOptions := &changeTrackingDirectoryLoadOptions[TReference]{
 				context:                 ctx,
 				directoryContentsReader: directoryReaders.DirectoryContents,
 				leavesReader:            directoryReaders.Leaves,
 			}
-			if resolvedFileProperties := targetActionResultWalker.GetCurrentFileProperties(); resolvedFileProperties.IsSet() {
-				// Copy over the regular file.
-				resolvedFile, err := newChangeTrackingFileFromFileProperties[TReference, TMetadata](resolvedFileProperties)
+			trimmedOutputRootDirectory, err := copyFileAndDependencies(&originalOutputRootDirectory, filePath, f.Message.Type, loadOptions)
+			if err != nil {
+				if !errors.Is(err, errChangeTrackingDirectorySymlinkFollowingResolverFileNotFound) {
+					return PatchedFileRootValue{}, err
+				}
+
+				// Target action outputs contain one or
+				// more symbolic links pointing to files
+				// that were provided as inputs. Merge
+				// the input root of the action with the
+				// outputs and retry.
+				//
+				// We only try to do this when needed,
+				// as it's only rarely the case that
+				// such dependencies exist.
+				patchedConfigurationReference := model_core.Patch(e, configurationReference)
+				targetActionInputRoot := e.GetTargetActionInputRootValue(
+					model_core.NewPatchedMessage(
+						&model_analysis_pb.TargetActionInputRoot_Key{
+							Id: &model_analysis_pb.TargetActionId{
+								Label:                  targetLabel.String(),
+								ConfigurationReference: patchedConfigurationReference.Message,
+								ActionId:               source.ActionId,
+							},
+						},
+						model_core.MapReferenceMetadataToWalkers(patchedConfigurationReference.Patcher),
+					),
+				)
+				if !targetActionInputRoot.IsSet() {
+					return PatchedFileRootValue{}, evaluation.ErrMissingDependency
+				}
+				if err := originalOutputRootDirectory.mergeDirectoryMessage(
+					model_core.Nested(targetActionInputRoot, &model_filesystem_pb.Directory{
+						Contents: &model_filesystem_pb.Directory_ContentsExternal{
+							ContentsExternal: targetActionInputRoot.Message.InputRootReference,
+						},
+					}),
+					loadOptions,
+				); err != nil {
+					return PatchedFileRootValue{}, err
+				}
+
+				trimmedOutputRootDirectory, err = copyFileAndDependencies(&originalOutputRootDirectory, filePath, f.Message.Type, loadOptions)
 				if err != nil {
-					return PatchedFileRootValue{}, err
-				}
-				if err := symlinkRecordingComponentWalker.stack.Peek().setFile(
-					loadOptions,
-					*symlinkRecordingComponentWalker.terminalName,
-					resolvedFile,
-				); err != nil {
-					return PatchedFileRootValue{}, err
-				}
-			} else {
-				// Copy over the directory.
-				if err := symlinkRecordingComponentWalker.stack.Peek().setDirectory(
-					loadOptions,
-					*symlinkRecordingComponentWalker.terminalName,
-					&changeTrackingDirectory[TReference, TMetadata]{
-						unmodifiedDirectory: targetActionResultWalker.GetCurrentDirectory(),
-					},
-				); err != nil {
 					return PatchedFileRootValue{}, err
 				}
 			}
@@ -251,16 +392,16 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 					e,
 					directoryReaders.DirectoryContents,
 					directoryCreationParameters,
-					&outputRootDirectory,
+					trimmedOutputRootDirectory,
 				)
 			case model_analysis_pb.DirectoryLayout_RUNFILES:
 				// Merge the bazel-out/*/bin/external/*
 				// directories into external/*.
-				externalDirectory, err := outputRootDirectory.getOrCreateDirectory(model_starlark.ComponentExternal)
+				externalDirectory, err := trimmedOutputRootDirectory.getOrCreateDirectory(model_starlark.ComponentExternal)
 				if err != nil {
 					return PatchedFileRootValue{}, err
 				}
-				if bazelOutDirectory, ok := outputRootDirectory.directories[model_starlark.ComponentBazelOut]; ok {
+				if bazelOutDirectory, ok := trimmedOutputRootDirectory.directories[model_starlark.ComponentBazelOut]; ok {
 					for configurationName, configurationDirectory := range bazelOutDirectory.directories {
 						if binDirectory, ok := configurationDirectory.directories[model_starlark.ComponentBin]; ok {
 							if configurationExternalDirectory, ok := binDirectory.directories[model_starlark.ComponentExternal]; ok {
