@@ -326,23 +326,16 @@ type changeTrackingDirectorySymlinksRelativizer[TReference object.BasicReference
 
 func (sr *changeTrackingDirectorySymlinksRelativizer[TReference, TMetadata]) relativizeSymlinksRecursively(dStack util.NonEmptyStack[*changeTrackingDirectory[TReference, TMetadata]], dPath *path.Trace, maximumEscapementLevels uint32) error {
 	d := dStack.Peek()
-	if directory := d.unmodifiedDirectory; directory.IsSet() {
-		if contentsExternal, ok := directory.Message.GetContents().(*model_filesystem_pb.Directory_ContentsExternal); ok {
-			currentMaximumEscapementLevels := contentsExternal.ContentsExternal.MaximumSymlinkEscapementLevels
-			if currentMaximumEscapementLevels != nil && currentMaximumEscapementLevels.Value <= maximumEscapementLevels {
-				// This directory is guaranteed to not contain
-				// any symlinks that escape beyond the maximum
-				// number of permitted levels. There is no need
-				// to traverse it.
-				return nil
-			}
-		}
-
-		if err := d.maybeLoadContents(sr.directoryLoadOptions); err != nil {
-			return err
-		}
+	if d.maximumSymlinkEscapementLevelsAtMost(maximumEscapementLevels) {
+		// This directory is guaranteed to not contain any symlinks
+		// that escape beyond the maximum number of permitted levels.
+		// There is no need to traverse it.
+		return nil
 	}
 
+	if err := d.maybeLoadContents(sr.directoryLoadOptions); err != nil {
+		return err
+	}
 	for name, target := range d.symlinks {
 		escapementCounter := model_filesystem.NewEscapementCountingScopeWalker()
 		if err := path.Resolve(target, escapementCounter); err != nil {

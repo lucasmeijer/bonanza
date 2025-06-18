@@ -121,6 +121,18 @@ type changeTrackingDirectory[TReference object.BasicReference, TMetadata model_c
 	symlinks    map[path.Component]path.Parser
 }
 
+func (d *changeTrackingDirectory[TReference, TMetadata]) maximumSymlinkEscapementLevelsAtMost(maximumEscapementLevels uint32) bool {
+	if directory := d.unmodifiedDirectory; directory.IsSet() {
+		if contentsExternal, ok := directory.Message.GetContents().(*model_filesystem_pb.Directory_ContentsExternal); ok {
+			currentMaximumEscapementLevels := contentsExternal.ContentsExternal.MaximumSymlinkEscapementLevels
+			if currentMaximumEscapementLevels != nil && currentMaximumEscapementLevels.Value <= maximumEscapementLevels {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (d *changeTrackingDirectory[TReference, TMetadata]) setContents(contents model_core.Message[*model_filesystem_pb.DirectoryContents, TReference], options *changeTrackingDirectoryLoadOptions[TReference]) error {
 	leaves, err := model_filesystem.DirectoryGetLeaves(options.context, options.leavesReader, contents)
 	if err != nil {
