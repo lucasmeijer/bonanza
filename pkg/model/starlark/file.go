@@ -290,6 +290,7 @@ func FileGetInputRootPath[TReference object.BasicReference](f model_core.Message
 			canonicalPackage.GetCanonicalRepo().String(),
 			canonicalPackage.GetPackagePath(),
 			canonicalLabel.GetTargetName().String(),
+			treeRelativePath.GetUNIXString(),
 		)...,
 	), nil
 }
