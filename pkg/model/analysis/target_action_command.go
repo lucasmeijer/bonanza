@@ -378,7 +378,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionCommandValue(ct
 							expandedValues = append(expandedValues, child)
 						}
 						if errIter != nil {
-							return PatchedTargetActionCommandValue{}, err
+							return PatchedTargetActionCommandValue{}, errIter
 						}
 					} else {
 						expandedValues = append(expandedValues, v)
