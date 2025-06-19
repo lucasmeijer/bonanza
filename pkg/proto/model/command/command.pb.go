@@ -843,12 +843,12 @@ const file_pkg_proto_model_command_command_proto_rawDesc = "" +
 	"\x06Action\x12?\n" +
 	"\tnamespace\x18\x01 \x01(\v2!.bonanza.storage.object.NamespaceR\tnamespace\x12P\n" +
 	"\x10command_encoders\x18\x02 \x03(\v2%.bonanza.model.encoding.BinaryEncoderR\x0fcommandEncoders\x12|\n" +
-	"\x11command_reference\x18\x03 \x01(\v2*.bonanza.model.core.WeakDecodableReferenceB#\xea\xd7 \x1f\x1a\x1dbonanza.model.command.CommandR\x10commandReference\x12\x8e\x01\n" +
-	"\x14input_root_reference\x18\x04 \x01(\v2*.bonanza.model.core.WeakDecodableReferenceB0\xea\xd7 ,\x1a*bonanza.model.filesystem.DirectoryContentsR\x12inputRootReference\"\x94\x02\n" +
+	"\x11command_reference\x18\x03 \x01(\v2*.bonanza.model.core.WeakDecodableReferenceB#\xea\xd7 \x1f\x12\x1dbonanza.model.command.CommandR\x10commandReference\x12\x8e\x01\n" +
+	"\x14input_root_reference\x18\x04 \x01(\v2*.bonanza.model.core.WeakDecodableReferenceB0\xea\xd7 ,\x12*bonanza.model.filesystem.DirectoryContentsR\x12inputRootReference\"\x94\x02\n" +
 	"\x06Result\x12*\n" +
 	"\x06status\x18\x01 \x01(\v2\x12.google.rpc.StatusR\x06status\x12\x1b\n" +
 	"\texit_code\x18\x02 \x01(\x03R\bexitCode\x12|\n" +
-	"\x11outputs_reference\x18\x03 \x01(\v2*.bonanza.model.core.WeakDecodableReferenceB#\xea\xd7 \x1f\x1a\x1dbonanza.model.command.OutputsR\x10outputsReference\x12C\n" +
+	"\x11outputs_reference\x18\x03 \x01(\v2*.bonanza.model.core.WeakDecodableReferenceB#\xea\xd7 \x1f\x12\x1dbonanza.model.command.OutputsR\x10outputsReference\x12C\n" +
 	"\x12auxiliary_metadata\x18\x04 \x03(\v2\x14.google.protobuf.AnyR\x11auxiliaryMetadataB6Z4github.com/buildbarn/bonanza/pkg/proto/model/commandb\x06proto3"
 
 var (

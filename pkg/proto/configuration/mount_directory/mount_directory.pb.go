@@ -148,7 +148,7 @@ const file_pkg_proto_configuration_mount_directory_mount_directory_proto_rawDesc
 	"\vgrpc_client\x18\x04 \x01(\v21.buildbarn.configuration.grpc.ClientConfigurationR\n" +
 	"grpcClient\x12?\n" +
 	"\tnamespace\x18\x05 \x01(\v2!.bonanza.storage.object.NamespaceR\tnamespace\x12\x96\x01\n" +
-	"\x18root_directory_reference\x18\x06 \x01(\v2*.bonanza.model.core.WeakDecodableReferenceB0\xea\xd7 ,\x1a*bonanza.model.filesystem.DirectoryContentsR\x16rootDirectoryReference\x12T\n" +
+	"\x18root_directory_reference\x18\x06 \x01(\v2*.bonanza.model.core.WeakDecodableReferenceB0\xea\xd7 ,\x12*bonanza.model.filesystem.DirectoryContentsR\x16rootDirectoryReference\x12T\n" +
 	"\x12directory_encoders\x18\a \x03(\v2%.bonanza.model.encoding.BinaryEncoderR\x11directoryEncoders\x12U\n" +
 	"\x13small_file_encoders\x18\b \x03(\v2%.bonanza.model.encoding.BinaryEncoderR\x11smallFileEncoders\x12c\n" +
 	"\x1aconcatenated_file_encoders\x18\t \x03(\v2%.bonanza.model.encoding.BinaryEncoderR\x18concatenatedFileEncodersBFZDgithub.com/buildbarn/bonanza/pkg/proto/configuration/mount_directoryb\x06proto3"

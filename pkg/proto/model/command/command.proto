@@ -157,13 +157,13 @@ message Action {
   // process to launch and files to capture.
   bonanza.model.core.WeakDecodableReference command_reference = 3
       [(bonanza.model.core.object_format) = {
-        proto_list_type_name:
+        proto_type_name:
           "bonanza.model.command.Command";
       }];
 
   bonanza.model.core.WeakDecodableReference input_root_reference = 4
       [(bonanza.model.core.object_format) = {
-        proto_list_type_name:
+        proto_type_name:
           "bonanza.model.filesystem.DirectoryContents";
       }];
 }
@@ -179,7 +179,7 @@ message Result {
   // the same way as directories.
   bonanza.model.core.WeakDecodableReference outputs_reference = 3
       [(bonanza.model.core.object_format) = {
-        proto_list_type_name:
+        proto_type_name:
           "bonanza.model.command.Outputs";
       }];
 
