@@ -217,7 +217,7 @@ type targetActionResultCopier[TReference object.BasicReference, TMetadata model_
 func (c *targetActionResultCopier[TReference, TMetadata]) copyFileAndDependencies(
 	originalOutputDirectory *changeTrackingDirectory[TReference, TMetadata],
 	filePath string,
-	fileType model_starlark_pb.File_Type,
+	fileType model_starlark_pb.File_Owner_Type,
 ) (*changeTrackingDirectory[TReference, TMetadata], error) {
 	resolver := changeTrackingDirectorySymlinkFollowingResolver[TReference, TMetadata]{
 		loadOptions: c.loadOptions,
@@ -241,7 +241,7 @@ func (c *targetActionResultCopier[TReference, TMetadata]) copyFileAndDependencie
 	// Copy over the regular file or directory they point to as
 	// well.
 	switch fileType {
-	case model_starlark_pb.File_FILE:
+	case model_starlark_pb.File_Owner_FILE:
 		if resolver.file == nil {
 			return nil, errors.New("target action output is a directory, while a file was expected")
 		}
@@ -252,7 +252,7 @@ func (c *targetActionResultCopier[TReference, TMetadata]) copyFileAndDependencie
 		); err != nil {
 			return nil, err
 		}
-	case model_starlark_pb.File_DIRECTORY:
+	case model_starlark_pb.File_Owner_DIRECTORY:
 		if resolver.file != nil {
 			return nil, errors.New("target action output is a file, while a directory was expected")
 		}
@@ -471,7 +471,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 				loadOptions:        loadOptions,
 				directoriesScanned: map[*changeTrackingDirectory[TReference, TMetadata]]struct{}{},
 			}
-			trimmedOutputRootDirectory, err := copier.copyFileAndDependencies(&originalOutputRootDirectory, filePath, f.Message.Type)
+			trimmedOutputRootDirectory, err := copier.copyFileAndDependencies(&originalOutputRootDirectory, filePath, o.Type)
 			if err != nil {
 				if !errors.Is(err, errChangeTrackingDirectorySymlinkFollowingResolverFileNotFound) {
 					return PatchedFileRootValue{}, err
@@ -517,7 +517,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 					loadOptions:        loadOptions,
 					directoriesScanned: map[*changeTrackingDirectory[TReference, TMetadata]]struct{}{},
 				}
-				trimmedOutputRootDirectory, err = copier.copyFileAndDependencies(&originalOutputRootDirectory, filePath, f.Message.Type)
+				trimmedOutputRootDirectory, err = copier.copyFileAndDependencies(&originalOutputRootDirectory, filePath, o.Type)
 				if err != nil {
 					return PatchedFileRootValue{}, err
 				}
@@ -794,7 +794,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 				return PatchedFileRootValue{}, fmt.Errorf("failed to create symlink at %#v: %w", symlinkPath, err)
 			}
 
-			// TODO: Validate IsExecutable!
+			// TODO: Validate file type and IsExecutable!
 
 			return createFileRootFromChangeTrackingDirectory(
 				ctx,
@@ -813,10 +813,6 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 	// on following them until we reach a file. Create a directory
 	// hierarchy that contains the resulting file and all of the
 	// symbolic links that we encountered along the way.
-	if f.Message.Type != model_starlark_pb.File_FILE {
-		return PatchedFileRootValue{}, errors.New("source files can only be regular files")
-	}
-
 	directoryCreationParameters, gotDirectoryCreationParameters := e.GetDirectoryCreationParametersObjectValue(&model_analysis_pb.DirectoryCreationParametersObject_Key{})
 	directoryReaders, gotDirectoryReaders := e.GetDirectoryReadersValue(&model_analysis_pb.DirectoryReaders_Key{})
 	if !gotDirectoryCreationParameters || !gotDirectoryReaders {

@@ -565,9 +565,9 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 					Owner: &model_starlark_pb.File_Owner{
 						ConfigurationReference: key.Message.ConfigurationReference,
 						TargetName:             targetKind.PredeclaredOutputFileTarget.OwnerTargetName,
+						Type:                   model_starlark_pb.File_Owner_FILE,
 					},
 					Label: targetLabel.String(),
-					Type:  model_starlark_pb.File_FILE,
 				},
 			),
 			identifierGenerator,
@@ -745,11 +745,8 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 		ruleTargetPublicAttrValues = ruleTarget.PublicAttrValues
 		targetPackage := targetLabel.GetCanonicalPackage()
 		outputRegistrar := targetOutputRegistrar[TReference, TMetadata]{
-			owner: model_core.Nested(configurationReference, &model_starlark_pb.File_Owner{
-				ConfigurationReference: configurationReference.Message,
-				TargetName:             targetLabel.GetTargetName().String(),
-			}),
-			targetPackage: targetPackage,
+			configurationReference: configurationReference,
+			targetLabel:            targetLabel,
 
 			outputsByPackageRelativePath: map[string]*targetOutput[TMetadata]{},
 			outputsByFile:                map[*model_starlark.File[TReference, TMetadata]]*targetOutput[TMetadata]{},
@@ -803,7 +800,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 							if canonicalPackage != targetPackage {
 								return nil, fmt.Errorf("output attr %#v contains to label %#v, which refers to a different package", namedAttr.Name, canonicalLabel.String())
 							}
-							f, err := outputRegistrar.registerOutput(canonicalLabel.GetTargetName(), nil, model_starlark_pb.File_FILE)
+							f, err := outputRegistrar.registerOutput(canonicalLabel.GetTargetName(), nil, model_starlark_pb.File_Owner_FILE)
 							if err != nil {
 								return nil, fmt.Errorf("output attr %#v: %w", err)
 							}
@@ -1559,7 +1556,6 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 			model_core.NewSimpleMessage[TReference](
 				&model_starlark_pb.File{
 					Label: targetLabel.String(),
-					Type:  model_starlark_pb.File_FILE,
 				},
 			),
 			identifierGenerator,
@@ -1572,7 +1568,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 type targetOutput[TMetadata model_core.ReferenceMetadata] struct {
 	// Constant fields.
 	packageRelativePath label.TargetName
-	fileType            model_starlark_pb.File_Type
+	fileType            model_starlark_pb.File_Owner_Type
 
 	// Variable fields.
 	definition model_core.PatchedMessage[*model_analysis_pb.TargetOutputDefinition, TMetadata]
@@ -1587,14 +1583,14 @@ func (o *targetOutput[TMetadata]) setDefinition(definition model_core.PatchedMes
 }
 
 type targetOutputRegistrar[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata] struct {
-	owner         model_core.Message[*model_starlark_pb.File_Owner, TReference]
-	targetPackage label.CanonicalPackage
+	configurationReference model_core.Message[*model_core_pb.DecodableReference, TReference]
+	targetLabel            label.CanonicalLabel
 
 	outputsByPackageRelativePath map[string]*targetOutput[TMetadata]
 	outputsByFile                map[*model_starlark.File[TReference, TMetadata]]*targetOutput[TMetadata]
 }
 
-func (or *targetOutputRegistrar[TReference, TMetadata]) registerOutput(filename label.TargetName, sibling *model_starlark.File[TReference, TMetadata], fileType model_starlark_pb.File_Type) (starlark.Value, error) {
+func (or *targetOutputRegistrar[TReference, TMetadata]) registerOutput(filename label.TargetName, sibling *model_starlark.File[TReference, TMetadata], fileType model_starlark_pb.File_Owner_Type) (starlark.Value, error) {
 	// If a sibling is provided, path resolution needs to start in
 	// the directory containing containing the sibling.
 	if sibling != nil {
@@ -1603,7 +1599,7 @@ func (or *targetOutputRegistrar[TReference, TMetadata]) registerOutput(filename 
 		if err != nil {
 			return nil, fmt.Errorf("invalid label for sibling %#v: %w", siblingLabelStr)
 		}
-		if siblingPackage := siblingLabel.GetCanonicalPackage(); siblingPackage != or.targetPackage {
+		if siblingLabel.GetCanonicalPackage() != or.targetLabel.GetCanonicalPackage() {
 			return nil, fmt.Errorf("sibling %#v is not declared in the same package", siblingLabel.String())
 		}
 		filename = siblingLabel.GetTargetName().GetSibling(filename)
@@ -1615,10 +1611,13 @@ func (or *targetOutputRegistrar[TReference, TMetadata]) registerOutput(filename 
 	}
 	or.outputsByPackageRelativePath[filename.String()] = o
 	f := model_starlark.NewFile[TReference, TMetadata](
-		model_core.Nested(or.owner, &model_starlark_pb.File{
-			Owner: or.owner.Message,
-			Label: or.targetPackage.AppendTargetName(filename).String(),
-			Type:  fileType,
+		model_core.Nested(or.configurationReference, &model_starlark_pb.File{
+			Owner: &model_starlark_pb.File_Owner{
+				ConfigurationReference: or.configurationReference.Message,
+				TargetName:             or.targetLabel.GetTargetName().String(),
+				Type:                   fileType,
+			},
+			Label: or.targetLabel.GetCanonicalPackage().AppendTargetName(filename).String(),
 		}),
 	)
 	or.outputsByFile[f] = o
@@ -1786,9 +1785,9 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 				&model_starlark_pb.File{
 					Owner: &model_starlark_pb.File_Owner{
 						TargetName: "stamp",
+						Type:       model_starlark_pb.File_Owner_FILE,
 					},
 					Label: "@@builtins_core+//:stable-status.txt",
-					Type:  model_starlark_pb.File_FILE,
 				},
 			),
 		), nil
@@ -1805,9 +1804,9 @@ func (rc *ruleContext[TReference, TMetadata]) Attr(thread *starlark.Thread, name
 				&model_starlark_pb.File{
 					Owner: &model_starlark_pb.File_Owner{
 						TargetName: "stamp",
+						Type:       model_starlark_pb.File_Owner_FILE,
 					},
 					Label: "@@builtins_core+//:volatile-status.txt",
-					Type:  model_starlark_pb.File_FILE,
 				},
 			),
 		), nil
@@ -2016,7 +2015,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doDeclareDirectory(thread 
 		return nil, err
 	}
 
-	return rc.outputRegistrar.registerOutput(filename, sibling, model_starlark_pb.File_DIRECTORY)
+	return rc.outputRegistrar.registerOutput(filename, sibling, model_starlark_pb.File_Owner_DIRECTORY)
 }
 
 func (rca *ruleContextActions[TReference, TMetadata]) doDeclareFile(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -2034,7 +2033,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doDeclareFile(thread *star
 		return nil, err
 	}
 
-	return rc.outputRegistrar.registerOutput(filename, sibling, model_starlark_pb.File_FILE)
+	return rc.outputRegistrar.registerOutput(filename, sibling, model_starlark_pb.File_Owner_FILE)
 }
 
 func (rca *ruleContextActions[TReference, TMetadata]) doDeclareSymlink(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -2052,7 +2051,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doDeclareSymlink(thread *s
 		return nil, err
 	}
 
-	return rc.outputRegistrar.registerOutput(filename, sibling, model_starlark_pb.File_SYMLINK)
+	return rc.outputRegistrar.registerOutput(filename, sibling, model_starlark_pb.File_Owner_SYMLINK)
 }
 
 func (rca *ruleContextActions[TReference, TMetadata]) doExpandTemplate(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -2085,7 +2084,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doExpandTemplate(thread *s
 		})
 	}
 
-	if output.fileType != model_starlark_pb.File_FILE {
+	if output.fileType != model_starlark_pb.File_Owner_FILE {
 		return nil, errors.New("output was not declared as a regular file")
 	}
 	patchedTemplate := model_core.Patch(rc.environment, template.GetDefinition())
@@ -2547,7 +2546,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 	for _, output := range outputs {
 		stack := util.NewNonEmptyStack(&initialOutputDirectory)
 		var r path.ScopeWalker
-		if output.fileType == model_starlark_pb.File_DIRECTORY {
+		if output.fileType == model_starlark_pb.File_Owner_DIRECTORY {
 			// For directory outputs, Bazel also creates the
 			// directory itself. Not just its parents.
 			r = &changeTrackingDirectoryNewDirectoryResolver[TReference, TMetadata]{stack: stack}
@@ -2808,7 +2807,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doSymlink(thread *starlark
 	if useExecRootForSource {
 		return nil, errors.New("this implementation does not support use_exec_root_for_source=True")
 	}
-	if isExecutable && output.fileType != model_starlark_pb.File_FILE {
+	if isExecutable && output.fileType != model_starlark_pb.File_Owner_FILE {
 		return nil, errors.New("is_executable=True can only be used in combination with regular file outputs")
 	}
 
@@ -2816,11 +2815,11 @@ func (rca *ruleContextActions[TReference, TMetadata]) doSymlink(thread *starlark
 		if targetPath != nil {
 			return nil, errors.New("target_file and target_path cannot be specified at the same time")
 		}
-		if output.fileType != model_starlark_pb.File_DIRECTORY && output.fileType != model_starlark_pb.File_FILE {
+		if output.fileType != model_starlark_pb.File_Owner_DIRECTORY && output.fileType != model_starlark_pb.File_Owner_FILE {
 			return nil, errors.New("target_file can only be used in combination with outputs that are declared as directories or regular files")
 		}
 		targetFileDefinition := targetFile.GetDefinition()
-		if output.fileType != targetFileDefinition.Message.Type {
+		if o := targetFileDefinition.Message.Owner; o != nil && output.fileType != o.Type {
 			return nil, errors.New("output and target_file have different file types")
 		}
 
@@ -2843,7 +2842,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doSymlink(thread *starlark
 	if targetPath == nil {
 		return nil, errors.New("one of target_file or target_path needs to be specified")
 	}
-	if output.fileType != model_starlark_pb.File_SYMLINK {
+	if output.fileType != model_starlark_pb.File_Owner_SYMLINK {
 		return nil, errors.New("target_path can only be used in combination with outputs that are declared as symbolic links")
 	}
 
@@ -2917,7 +2916,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doWrite(thread *starlark.T
 		return nil, err
 	}
 
-	if output.fileType != model_starlark_pb.File_FILE {
+	if output.fileType != model_starlark_pb.File_Owner_FILE {
 		return nil, errors.New("output was not declared as a regular file")
 	}
 

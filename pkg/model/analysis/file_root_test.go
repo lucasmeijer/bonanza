@@ -100,7 +100,6 @@ func TestFileRoot(t *testing.T) {
 					DirectoryLayout: model_analysis_pb.DirectoryLayout_INPUT_ROOT,
 					File: &model_starlark_pb.File{
 						Label: "this is not a valid label",
-						Type:  model_starlark_pb.File_FILE,
 					},
 				},
 			),
@@ -110,37 +109,6 @@ func TestFileRoot(t *testing.T) {
 	})
 
 	t.Run("NoOwner", func(t *testing.T) {
-		t.Run("NonFile", func(t *testing.T) {
-			// Bazel only has the ability to create File
-			// objects referring to individual source files.
-			// It is not possible to refer to directories.
-			// It is only possible to call glob(), which
-			// (when provided to a label list attribute)
-			// ends up creating a list of File objects.
-			//
-			// Eventually we might want to provide an
-			// extension to support the creation of "source
-			// directories", as this can be advantageous for
-			// things like prebuilt SDKs. For now we stick
-			// to the same API as Bazel.
-			e := NewMockFileRootEnvironmentForTesting(ctrl)
-
-			_, err := bct.computer.ComputeFileRootValue(
-				ctx,
-				model_core.NewSimpleMessage[model_core.CreatedObjectTree](
-					&model_analysis_pb.FileRoot_Key{
-						DirectoryLayout: model_analysis_pb.DirectoryLayout_INPUT_ROOT,
-						File: &model_starlark_pb.File{
-							Label: "@@myrepo+//a/b:c",
-							Type:  model_starlark_pb.File_DIRECTORY,
-						},
-					},
-				),
-				e,
-			)
-			require.EqualError(t, err, "source files can only be regular files")
-		})
-
 		t.Run("NonExistent", func(t *testing.T) {
 			// Labels that refer to non-existent files
 			// should cause the creation of a file root to
@@ -180,7 +148,6 @@ func TestFileRoot(t *testing.T) {
 						DirectoryLayout: model_analysis_pb.DirectoryLayout_INPUT_ROOT,
 						File: &model_starlark_pb.File{
 							Label: "@@myrepo+//:foo",
-							Type:  model_starlark_pb.File_FILE,
 						},
 					},
 				),
@@ -224,7 +191,6 @@ func TestFileRoot(t *testing.T) {
 						DirectoryLayout: model_analysis_pb.DirectoryLayout_INPUT_ROOT,
 						File: &model_starlark_pb.File{
 							Label: "@@myrepo+//:foo",
-							Type:  model_starlark_pb.File_FILE,
 						},
 					},
 				),
@@ -280,7 +246,6 @@ func TestFileRoot(t *testing.T) {
 							DirectoryLayout: directoryLayout,
 							File: &model_starlark_pb.File{
 								Label: "@@myrepo+//:bar",
-								Type:  model_starlark_pb.File_FILE,
 							},
 						},
 					),
@@ -446,10 +411,10 @@ func TestFileRoot(t *testing.T) {
 							DirectoryLayout: directoryLayout,
 							File: &model_starlark_pb.File{
 								Label: "@@myrepo+//:foo.o",
-								Type:  model_starlark_pb.File_FILE,
 								Owner: &model_starlark_pb.File_Owner{
 									ConfigurationReference: attachObject(patcher, exampleConfiguration),
 									TargetName:             "foo",
+									Type:                   model_starlark_pb.File_Owner_FILE,
 								},
 							},
 						}
@@ -633,10 +598,10 @@ func TestFileRoot(t *testing.T) {
 							DirectoryLayout: directoryLayout,
 							File: &model_starlark_pb.File{
 								Label: "@@myrepo+//:mydir",
-								Type:  model_starlark_pb.File_DIRECTORY,
 								Owner: &model_starlark_pb.File_Owner{
 									ConfigurationReference: attachObject(patcher, exampleConfiguration),
 									TargetName:             "generate_dir",
+									Type:                   model_starlark_pb.File_Owner_DIRECTORY,
 								},
 							},
 						}
@@ -796,10 +761,10 @@ func TestFileRoot(t *testing.T) {
 							DirectoryLayout: directoryLayout,
 							File: &model_starlark_pb.File{
 								Label: "@@myrepo+//:bar",
-								Type:  model_starlark_pb.File_FILE,
 								Owner: &model_starlark_pb.File_Owner{
 									ConfigurationReference: attachObject(patcher, exampleConfiguration),
 									TargetName:             "foo",
+									Type:                   model_starlark_pb.File_Owner_FILE,
 								},
 							},
 						}
@@ -1006,10 +971,10 @@ func TestFileRoot(t *testing.T) {
 							DirectoryLayout: directoryLayout,
 							File: &model_starlark_pb.File{
 								Label: "@@myrepo+//:bar",
-								Type:  model_starlark_pb.File_FILE,
 								Owner: &model_starlark_pb.File_Owner{
 									ConfigurationReference: attachObject(patcher, exampleConfiguration),
 									TargetName:             "foo",
+									Type:                   model_starlark_pb.File_Owner_FILE,
 								},
 							},
 						}
@@ -1202,10 +1167,10 @@ func TestFileRoot(t *testing.T) {
 							DirectoryLayout: directoryLayout,
 							File: &model_starlark_pb.File{
 								Label: "@@myrepo+//:dir1",
-								Type:  model_starlark_pb.File_DIRECTORY,
 								Owner: &model_starlark_pb.File_Owner{
 									ConfigurationReference: attachObject(patcher, exampleConfiguration),
 									TargetName:             "foo",
+									Type:                   model_starlark_pb.File_Owner_DIRECTORY,
 								},
 							},
 						}
@@ -1379,7 +1344,6 @@ func TestFileRoot(t *testing.T) {
 								ExpandTemplate: &model_analysis_pb.TargetOutputDefinition_ExpandTemplate{
 									Template: &model_starlark_pb.File{
 										Label: "@@myrepo+//:template",
-										Type:  model_starlark_pb.File_FILE,
 									},
 									IsExecutable: true,
 									Substitutions: []*model_analysis_pb.TargetOutputDefinition_ExpandTemplate_Substitution{
@@ -1397,7 +1361,6 @@ func TestFileRoot(t *testing.T) {
 							DirectoryLayout: model_analysis_pb.DirectoryLayout_INPUT_ROOT,
 							File: &model_starlark_pb.File{
 								Label: "@@myrepo+//:template",
-								Type:  model_starlark_pb.File_FILE,
 							},
 						}
 					}),
@@ -1444,10 +1407,10 @@ func TestFileRoot(t *testing.T) {
 							DirectoryLayout: directoryLayout,
 							File: &model_starlark_pb.File{
 								Label: "@@myrepo+//:output",
-								Type:  model_starlark_pb.File_FILE,
 								Owner: &model_starlark_pb.File_Owner{
 									ConfigurationReference: attachObject(patcher, exampleConfiguration),
 									TargetName:             "generate",
+									Type:                   model_starlark_pb.File_Owner_FILE,
 								},
 							},
 						}
@@ -1591,10 +1554,10 @@ func TestFileRoot(t *testing.T) {
 							DirectoryLayout: directoryLayout,
 							File: &model_starlark_pb.File{
 								Label: "@@myrepo+//:passwd",
-								Type:  model_starlark_pb.File_FILE,
 								Owner: &model_starlark_pb.File_Owner{
 									ConfigurationReference: attachObject(patcher, exampleConfiguration),
 									TargetName:             "create_symlink",
+									Type:                   model_starlark_pb.File_Owner_FILE,
 								},
 							},
 						}
@@ -1698,7 +1661,6 @@ func TestFileRoot(t *testing.T) {
 								Symlink: &model_analysis_pb.TargetOutputDefinition_Symlink{
 									Target: &model_starlark_pb.File{
 										Label: "@@myrepo+//:a",
-										Type:  model_starlark_pb.File_FILE,
 									},
 								},
 							},
@@ -1711,7 +1673,6 @@ func TestFileRoot(t *testing.T) {
 							DirectoryLayout: directoryLayout,
 							File: &model_starlark_pb.File{
 								Label: "@@myrepo+//:a",
-								Type:  model_starlark_pb.File_FILE,
 							},
 						}
 					}),
@@ -1728,10 +1689,10 @@ func TestFileRoot(t *testing.T) {
 							DirectoryLayout: directoryLayout,
 							File: &model_starlark_pb.File{
 								Label: "@@myrepo+//:b",
-								Type:  model_starlark_pb.File_FILE,
 								Owner: &model_starlark_pb.File_Owner{
 									ConfigurationReference: attachObject(patcher, exampleConfiguration),
 									TargetName:             "create_symlink",
+									Type:                   model_starlark_pb.File_Owner_FILE,
 								},
 							},
 						}

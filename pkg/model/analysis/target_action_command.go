@@ -191,7 +191,7 @@ func expandFileIfDirectory[TReference object.BasicReference, TMetadata BaseCompu
 	errOut *error,
 ) iter.Seq[*model_starlark.File[TReference, TMetadata]] {
 	fileDefinition := file.GetDefinition()
-	if fileDefinition.Message.Type != model_starlark_pb.File_DIRECTORY {
+	if o := fileDefinition.Message.Owner; o == nil || o.Type != model_starlark_pb.File_Owner_DIRECTORY {
 		return func(yield func(*model_starlark.File[TReference, TMetadata]) bool) {
 			yield(file)
 		}

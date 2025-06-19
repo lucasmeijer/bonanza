@@ -331,6 +331,20 @@ message File {
     // Name of the target inside the canonical package that creates
     // this file.
     string target_name = 2;
+
+    enum Type {
+      // Regular file declared through ctx.actions.declare_file().
+      FILE = 0;
+
+      // Directory declared through ctx.actions.declare_directory().
+      DIRECTORY = 1;
+
+      // Symbolic link declared through ctx.actions.declare_symlink().
+      SYMLINK = 2;
+    }
+
+    // The type of the file.
+    Type type = 3;
   }
 
   // If set, the file is the output of a configured target. Otherwise,
@@ -340,20 +354,6 @@ message File {
   // Canonical package that contains the directory, file or symlink, and
   // its name relative to the package's directory.
   string label = 2;
-
-  enum Type {
-    // Regular file declared through ctx.actions.declare_file().
-    FILE = 0;
-
-    // Directory declared through ctx.actions.declare_directory().
-    DIRECTORY = 1;
-
-    // Symbolic link declared through ctx.actions.declare_symlink().
-    SYMLINK = 2;
-  }
-
-  // The type of the file.
-  Type type = 3;
 }
 
 message Function {

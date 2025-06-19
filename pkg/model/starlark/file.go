@@ -163,11 +163,11 @@ func (f *File[TReference, TMetadata]) Attr(thread *starlark.Thread, name string)
 		// For files created by DirectoryExpander, the
 		// definition still refers to the directory from which
 		// the files originated.
-		return starlark.Bool(d.Type == model_starlark_pb.File_DIRECTORY && f.treeRelativePath == nil), nil
+		return starlark.Bool(d.Owner != nil && d.Owner.Type == model_starlark_pb.File_Owner_DIRECTORY && f.treeRelativePath == nil), nil
 	case "is_source":
 		return starlark.Bool(d.Owner == nil), nil
 	case "is_symlink":
-		return starlark.Bool(d.Type == model_starlark_pb.File_SYMLINK), nil
+		return starlark.Bool(d.Owner != nil && d.Owner.Type == model_starlark_pb.File_Owner_SYMLINK), nil
 	case "owner":
 		canonicalLabel, err := pg_label.NewCanonicalLabel(d.Label)
 		if err != nil {
