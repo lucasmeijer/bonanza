@@ -221,7 +221,7 @@ func (c *Client[TAction, TActionPtr]) startExecution(desiredState *remoteworker_
 	}
 	plaintext, err := actionAEAD.Open(nil, action.Nonce, action.Ciphertext, marshaledAdditionalData)
 	if err != nil {
-		return util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to decrypting action")
+		return util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to decrypt action")
 	}
 	var plaintextAny anypb.Any
 	if err := proto.Unmarshal(plaintext, &plaintextAny); err != nil {
