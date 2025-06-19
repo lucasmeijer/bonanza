@@ -762,14 +762,49 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 				directoryContentsReader: directoryReaders.DirectoryContents,
 				leavesReader:            directoryReaders.Leaves,
 			}
-			r := &changeTrackingDirectoryNewFileResolver[TReference, TMetadata]{
+
+			// Validate the type and properties of the target file.
+			targetPath, err := fileGetPathInDirectoryLayout(symlinkTargetFile, key.Message.DirectoryLayout)
+			if err != nil {
+				return PatchedFileRootValue{}, err
+			}
+			targetResolver := changeTrackingDirectorySymlinkFollowingResolver[TReference, TMetadata]{
 				loadOptions: loadOptions,
 				stack:       util.NewNonEmptyStack(&rootDirectory),
 			}
-			if err := path.Resolve(path.UNIXFormat.NewParser(symlinkPath), r); err != nil {
+			if err := path.Resolve(
+				path.UNIXFormat.NewParser(targetPath),
+				path.NewLoopDetectingScopeWalker(
+					path.NewRelativeScopeWalker(&targetResolver),
+				),
+			); err != nil {
+				return PatchedFileRootValue{}, fmt.Errorf("cannot resolve %#v: %w", targetPath, err)
+			}
+			targetFile := targetResolver.file
+			switch o.Type {
+			case model_starlark_pb.File_Owner_FILE:
+				if targetFile == nil {
+					return PatchedFileRootValue{}, fmt.Errorf("path %#v resolves to a directory, while a file was expected", targetPath)
+				}
+				if source.Symlink.IsExecutable && !targetFile.isExecutable {
+					return PatchedFileRootValue{}, fmt.Errorf("file at path %#v is not executable, even though it should be", targetPath)
+				}
+			case model_starlark_pb.File_Owner_DIRECTORY:
+				if targetFile != nil {
+					return PatchedFileRootValue{}, fmt.Errorf("path %#v resolves to a file, while a directory was expected", targetPath)
+				}
+			default:
+				return PatchedFileRootValue{}, errors.New("unknown file type")
+			}
+
+			symlinkResolver := changeTrackingDirectoryNewFileResolver[TReference, TMetadata]{
+				loadOptions: loadOptions,
+				stack:       util.NewNonEmptyStack(&rootDirectory),
+			}
+			if err := path.Resolve(path.UNIXFormat.NewParser(symlinkPath), &symlinkResolver); err != nil {
 				return PatchedFileRootValue{}, fmt.Errorf("cannot resolve %#v: %w", symlinkPath, err)
 			}
-			if r.TerminalName == nil {
+			if symlinkResolver.TerminalName == nil {
 				return PatchedFileRootValue{}, fmt.Errorf("%#v does not resolve to a file", symlinkPath)
 			}
 
@@ -777,10 +812,6 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 			// the directory in which it is contained.
 			// Remove leading components of the target that
 			// are equal to those of the symlink's path.
-			targetPath, err := fileGetPathInDirectoryLayout(symlinkTargetFile, key.Message.DirectoryLayout)
-			if err != nil {
-				return PatchedFileRootValue{}, err
-			}
 			equalComponentsBytes := 0
 			for i := 0; i < len(symlinkPath) && i < len(targetPath) && symlinkPath[i] == targetPath[i]; i++ {
 				if symlinkPath[i] == '/' {
@@ -789,12 +820,10 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 			}
 			relativeTargetPath := strings.Repeat("../", strings.Count(symlinkPath[equalComponentsBytes:], "/")) + targetPath[equalComponentsBytes:]
 
-			d := r.stack.Peek()
-			if err := d.setSymlink(loadOptions, *r.TerminalName, path.UNIXFormat.NewParser(relativeTargetPath)); err != nil {
+			d := symlinkResolver.stack.Peek()
+			if err := d.setSymlink(loadOptions, *symlinkResolver.TerminalName, path.UNIXFormat.NewParser(relativeTargetPath)); err != nil {
 				return PatchedFileRootValue{}, fmt.Errorf("failed to create symlink at %#v: %w", symlinkPath, err)
 			}
-
-			// TODO: Validate file type and IsExecutable!
 
 			return createFileRootFromChangeTrackingDirectory(
 				ctx,

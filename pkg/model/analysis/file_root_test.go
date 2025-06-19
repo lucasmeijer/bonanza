@@ -1633,6 +1633,244 @@ func TestFileRoot(t *testing.T) {
 	t.Run("Symlink", func(t *testing.T) {
 		// TODO: Test error cases.
 
+		t.Run("FileWhileDirectoryWasExpected", func(t *testing.T) {
+			// If ctx.actions.symlink() is provided an
+			// output of type directory, then the target
+			// should resolve to a directory as well.
+			e := NewMockFileRootEnvironmentForTesting(ctrl)
+			bct.expectCaptureExistingObject(e)
+			bct.expectGetDirectoryCreationParametersObjectValue(t, e)
+			bct.expectGetDirectoryReadersValue(t, e)
+			e.EXPECT().GetTargetOutputValue(
+				eqPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.TargetOutput_Key {
+					return &model_analysis_pb.TargetOutput_Key{
+						Label:                  "@@myrepo+//:create_symlink",
+						ConfigurationReference: attachObject(patcher, exampleConfiguration),
+						PackageRelativePath:    "b",
+					}
+				}),
+			).Return(newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.TargetOutput_Value {
+				return &model_analysis_pb.TargetOutput_Value{
+					Definition: &model_analysis_pb.TargetOutputDefinition{
+						Source: &model_analysis_pb.TargetOutputDefinition_Symlink_{
+							Symlink: &model_analysis_pb.TargetOutputDefinition_Symlink{
+								Target: &model_starlark_pb.File{
+									Label: "@@myrepo+//:a",
+								},
+							},
+						},
+					},
+				}
+			}))
+			e.EXPECT().GetFileRootValue(
+				eqPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Key {
+					return &model_analysis_pb.FileRoot_Key{
+						DirectoryLayout: model_analysis_pb.DirectoryLayout_INPUT_ROOT,
+						File: &model_starlark_pb.File{
+							Label: "@@myrepo+//:a",
+						},
+					}
+				}),
+			).Return(newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Value {
+				return &model_analysis_pb.FileRoot_Value{
+					RootDirectory: singleChildDirectoryContents(
+						"external",
+						singleChildDirectoryContents(
+							"myrepo+",
+							&model_filesystem_pb.DirectoryContents{
+								Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+									LeavesInline: &model_filesystem_pb.Leaves{
+										Files: []*model_filesystem_pb.FileNode{
+											{
+												Name:       "a",
+												Properties: &model_filesystem_pb.FileProperties{},
+											},
+										},
+									},
+								},
+							},
+						),
+					),
+				}
+			}))
+
+			_, err := bct.computer.ComputeFileRootValue(
+				ctx,
+				newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Key {
+					return &model_analysis_pb.FileRoot_Key{
+						DirectoryLayout: model_analysis_pb.DirectoryLayout_INPUT_ROOT,
+						File: &model_starlark_pb.File{
+							Label: "@@myrepo+//:b",
+							Owner: &model_starlark_pb.File_Owner{
+								ConfigurationReference: attachObject(patcher, exampleConfiguration),
+								TargetName:             "create_symlink",
+								Type:                   model_starlark_pb.File_Owner_DIRECTORY,
+							},
+						},
+					}
+				}),
+				e,
+			)
+			require.EqualError(t, err, "path \"external/myrepo+/a\" resolves to a file, while a directory was expected")
+		})
+
+		t.Run("DirectoryWhileFileWasExpected", func(t *testing.T) {
+			// If ctx.actions.symlink() is provided an
+			// output of type file, then the target should
+			// resolve to a file as well.
+			e := NewMockFileRootEnvironmentForTesting(ctrl)
+			bct.expectCaptureExistingObject(e)
+			bct.expectGetDirectoryCreationParametersObjectValue(t, e)
+			bct.expectGetDirectoryReadersValue(t, e)
+			e.EXPECT().GetTargetOutputValue(
+				eqPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.TargetOutput_Key {
+					return &model_analysis_pb.TargetOutput_Key{
+						Label:                  "@@myrepo+//:create_symlink",
+						ConfigurationReference: attachObject(patcher, exampleConfiguration),
+						PackageRelativePath:    "b",
+					}
+				}),
+			).Return(newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.TargetOutput_Value {
+				return &model_analysis_pb.TargetOutput_Value{
+					Definition: &model_analysis_pb.TargetOutputDefinition{
+						Source: &model_analysis_pb.TargetOutputDefinition_Symlink_{
+							Symlink: &model_analysis_pb.TargetOutputDefinition_Symlink{
+								Target: &model_starlark_pb.File{
+									Label: "@@myrepo+//:a",
+								},
+							},
+						},
+					},
+				}
+			}))
+			e.EXPECT().GetFileRootValue(
+				eqPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Key {
+					return &model_analysis_pb.FileRoot_Key{
+						DirectoryLayout: model_analysis_pb.DirectoryLayout_INPUT_ROOT,
+						File: &model_starlark_pb.File{
+							Label: "@@myrepo+//:a",
+						},
+					}
+				}),
+			).Return(newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Value {
+				return &model_analysis_pb.FileRoot_Value{
+					RootDirectory: singleChildDirectoryContents(
+						"external",
+						singleChildDirectoryContents(
+							"myrepo+",
+							singleChildDirectoryContents(
+								"a",
+								&model_filesystem_pb.DirectoryContents{
+									Leaves: emptyLeaves,
+								},
+							),
+						),
+					),
+				}
+			}))
+
+			_, err := bct.computer.ComputeFileRootValue(
+				ctx,
+				newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Key {
+					return &model_analysis_pb.FileRoot_Key{
+						DirectoryLayout: model_analysis_pb.DirectoryLayout_INPUT_ROOT,
+						File: &model_starlark_pb.File{
+							Label: "@@myrepo+//:b",
+							Owner: &model_starlark_pb.File_Owner{
+								ConfigurationReference: attachObject(patcher, exampleConfiguration),
+								TargetName:             "create_symlink",
+								Type:                   model_starlark_pb.File_Owner_FILE,
+							},
+						},
+					}
+				}),
+				e,
+			)
+			require.EqualError(t, err, "path \"external/myrepo+/a\" resolves to a directory, while a file was expected")
+		})
+
+		t.Run("FileMissingIsExecutable", func(t *testing.T) {
+			// If ctx.actions.symlink() is called with
+			// is_executable=True, then the target should
+			// resolve to a file that is executable as well.
+			e := NewMockFileRootEnvironmentForTesting(ctrl)
+			bct.expectCaptureExistingObject(e)
+			bct.expectGetDirectoryCreationParametersObjectValue(t, e)
+			bct.expectGetDirectoryReadersValue(t, e)
+			e.EXPECT().GetTargetOutputValue(
+				eqPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.TargetOutput_Key {
+					return &model_analysis_pb.TargetOutput_Key{
+						Label:                  "@@myrepo+//:create_symlink",
+						ConfigurationReference: attachObject(patcher, exampleConfiguration),
+						PackageRelativePath:    "b",
+					}
+				}),
+			).Return(newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.TargetOutput_Value {
+				return &model_analysis_pb.TargetOutput_Value{
+					Definition: &model_analysis_pb.TargetOutputDefinition{
+						Source: &model_analysis_pb.TargetOutputDefinition_Symlink_{
+							Symlink: &model_analysis_pb.TargetOutputDefinition_Symlink{
+								Target: &model_starlark_pb.File{
+									Label: "@@myrepo+//:a",
+								},
+								IsExecutable: true,
+							},
+						},
+					},
+				}
+			}))
+			e.EXPECT().GetFileRootValue(
+				eqPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Key {
+					return &model_analysis_pb.FileRoot_Key{
+						DirectoryLayout: model_analysis_pb.DirectoryLayout_INPUT_ROOT,
+						File: &model_starlark_pb.File{
+							Label: "@@myrepo+//:a",
+						},
+					}
+				}),
+			).Return(newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Value {
+				return &model_analysis_pb.FileRoot_Value{
+					RootDirectory: singleChildDirectoryContents(
+						"external",
+						singleChildDirectoryContents(
+							"myrepo+",
+							&model_filesystem_pb.DirectoryContents{
+								Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+									LeavesInline: &model_filesystem_pb.Leaves{
+										Files: []*model_filesystem_pb.FileNode{
+											{
+												Name:       "a",
+												Properties: &model_filesystem_pb.FileProperties{},
+											},
+										},
+									},
+								},
+							},
+						),
+					),
+				}
+			}))
+
+			_, err := bct.computer.ComputeFileRootValue(
+				ctx,
+				newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Key {
+					return &model_analysis_pb.FileRoot_Key{
+						DirectoryLayout: model_analysis_pb.DirectoryLayout_INPUT_ROOT,
+						File: &model_starlark_pb.File{
+							Label: "@@myrepo+//:b",
+							Owner: &model_starlark_pb.File_Owner{
+								ConfigurationReference: attachObject(patcher, exampleConfiguration),
+								TargetName:             "create_symlink",
+								Type:                   model_starlark_pb.File_Owner_FILE,
+							},
+						},
+					}
+				}),
+				e,
+			)
+			require.EqualError(t, err, "file at path \"external/myrepo+/a\" is not executable, even though it should be")
+		})
+
 		t.Run("Success", func(t *testing.T) {
 			// Simulate the computation of the output of:
 			//
