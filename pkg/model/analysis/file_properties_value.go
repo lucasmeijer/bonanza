@@ -64,6 +64,9 @@ func (r *reposFilePropertiesResolver[TReference, TMetadata]) setCurrentRepo(name
 }
 
 func (r *reposFilePropertiesResolver[TReference, TMetadata]) OnDirectory(name path.Component) (path.GotDirectoryOrSymlink, error) {
+	if r.currentRepo != nil {
+		return r.currentRepo.OnDirectory(name)
+	}
 	if err := r.setCurrentRepo(name.String()); err != nil {
 		return nil, err
 	}
@@ -78,6 +81,9 @@ func (r *reposFilePropertiesResolver[TReference, TMetadata]) OnTerminal(name pat
 }
 
 func (r *reposFilePropertiesResolver[TReference, TMetadata]) OnUp() (path.ComponentWalker, error) {
+	if r.currentRepo != nil {
+		return r.currentRepo.OnUp()
+	}
 	return nil, errors.New("path escapes repositories directory")
 }
 

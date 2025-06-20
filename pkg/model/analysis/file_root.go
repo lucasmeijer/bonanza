@@ -202,70 +202,89 @@ func (r *changeTrackingDirectorySymlinkFollowingResolver[TReference, TMetadata])
 	return r, nil
 }
 
-// targetActionResultCopier is responsible for copying files out of
-// the output root directories of target action results to a new
-// directory hierarchy. This is used to extract individual outputs out
-// of target action results (e.g., just "foo.o", even though the action
-// also yields a "foo.d").
-type targetActionResultCopier[TReference object.BasicReference, TMetadata model_core.ReferenceMetadata] struct {
+// fileAndDependenciesCopierSource is used by instances of
+// fileAndDependenciesCopier as a source for files that need to be
+// copied into file roots. A source can either be a repo or the output
+// root directory of a target action result.
+type fileAndDependenciesCopierSource[TReference object.BasicReference, TMetadata model_core.ReferenceMetadata] interface {
+	path.ComponentWalker
+	clone() (fileAndDependenciesCopierSource[TReference, TMetadata], error)
+	getCurrentFile() (*changeTrackingFile[TReference, TMetadata], error)
+	mergeCurrentDirectoryInto(*changeTrackingDirectory[TReference, TMetadata]) error
+	pushDirectory(name path.Component) error
+	popDirectory() error
+}
+
+// fileAndDependenciesCopier is responsible for copying files out of
+// repos or the output root directories of target action results to a
+// new directory hierarchy. This is used to extract individual files
+// out of repos or target action results (e.g., just "foo.o", even
+// though a target action also yields a "foo.d").
+type fileAndDependenciesCopier[TReference object.BasicReference, TMetadata model_core.ReferenceMetadata] struct {
 	loadOptions        *changeTrackingDirectoryLoadOptions[TReference]
 	directoriesScanned map[*changeTrackingDirectory[TReference, TMetadata]]struct{}
 }
 
+func newFileAndDependenciesCopier[TReference object.BasicReference, TMetadata model_core.ReferenceMetadata](
+	loadOptions *changeTrackingDirectoryLoadOptions[TReference],
+) *fileAndDependenciesCopier[TReference, TMetadata] {
+	return &fileAndDependenciesCopier[TReference, TMetadata]{
+		loadOptions:        loadOptions,
+		directoriesScanned: map[*changeTrackingDirectory[TReference, TMetadata]]struct{}{},
+	}
+}
+
 // copyFileAndDependencies extracts a single file or directory from the
 // output root directory and places it in a new directory hierarchy.
-func (c *targetActionResultCopier[TReference, TMetadata]) copyFileAndDependencies(
-	originalOutputDirectory *changeTrackingDirectory[TReference, TMetadata],
-	filePath string,
-	fileType model_starlark_pb.File_Owner_Type,
-) (*changeTrackingDirectory[TReference, TMetadata], error) {
-	resolver := changeTrackingDirectorySymlinkFollowingResolver[TReference, TMetadata]{
-		loadOptions: c.loadOptions,
-		stack:       util.NewNonEmptyStack(originalOutputDirectory),
-	}
-	var trimmedOutputRootDirectory changeTrackingDirectory[TReference, TMetadata]
+func (c *fileAndDependenciesCopier[TReference, TMetadata]) copyFileAndDependencies(
+	source fileAndDependenciesCopierSource[TReference, TMetadata],
+	trimmedOutputDirectories util.NonEmptyStack[*changeTrackingDirectory[TReference, TMetadata]],
+	filePath path.Parser,
+	fileType *model_starlark_pb.File_Owner_Type,
+) error {
 	symlinkRecordingComponentWalker := symlinkRecordingComponentWalker[TReference, TMetadata]{
-		base:  &resolver,
-		stack: util.NewNonEmptyStack(&trimmedOutputRootDirectory),
+		base:  source,
+		stack: trimmedOutputDirectories,
 	}
 	if err := path.Resolve(
-		path.UNIXFormat.NewParser(filePath),
+		filePath,
 		path.NewLoopDetectingScopeWalker(
 			path.NewRelativeScopeWalker(&symlinkRecordingComponentWalker),
 		),
 	); err != nil {
-		return nil, fmt.Errorf("failed to resolve path: %w", err)
+		return fmt.Errorf("failed to resolve path: %w", err)
 	}
 
 	// Resolving the file created all intermediate symbolic links.
 	// Copy over the regular file or directory they point to as
 	// well.
-	switch fileType {
-	case model_starlark_pb.File_Owner_FILE:
-		if resolver.file == nil {
-			return nil, errors.New("target action output is a directory, while a file was expected")
+	file, err := source.getCurrentFile()
+	if err != nil {
+		return err
+	}
+	if file != nil {
+		if fileType != nil && *fileType != model_starlark_pb.File_Owner_FILE {
+			return fmt.Errorf("path %#v resolves to a file, while a directory was expected", filePath)
 		}
 		if err := symlinkRecordingComponentWalker.stack.Peek().setFile(
 			c.loadOptions,
 			*symlinkRecordingComponentWalker.terminalName,
-			resolver.file,
+			file,
 		); err != nil {
-			return nil, err
+			return err
 		}
-	case model_starlark_pb.File_Owner_DIRECTORY:
-		if resolver.file != nil {
-			return nil, errors.New("target action output is a file, while a directory was expected")
+	} else {
+		if fileType != nil && *fileType != model_starlark_pb.File_Owner_DIRECTORY {
+			return fmt.Errorf("path %#v resolves to a directory, while a file was expected", filePath)
 		}
 		if err := c.copyDirectoryAndDependencies(
-			resolver.stack,
+			source,
 			&symlinkRecordingComponentWalker,
 		); err != nil {
-			return nil, err
+			return err
 		}
-	default:
-		return nil, errors.New("unknown file type")
 	}
-	return &trimmedOutputRootDirectory, nil
+	return nil
 }
 
 // copyDirectoryAndDependencies is invoked by copyFileAndDependencies()
@@ -273,8 +292,8 @@ func (c *targetActionResultCopier[TReference, TMetadata]) copyFileAndDependencie
 // directory hierarchy. It also traverses the resulting directory to
 // copy any files referenced via symbolic links contained within the
 // directory.
-func (c *targetActionResultCopier[TReference, TMetadata]) copyDirectoryAndDependencies(
-	originalOutputDirectories util.NonEmptyStack[*changeTrackingDirectory[TReference, TMetadata]],
+func (c *fileAndDependenciesCopier[TReference, TMetadata]) copyDirectoryAndDependencies(
+	source fileAndDependenciesCopierSource[TReference, TMetadata],
 	trimmedOutputComponentWalker *symlinkRecordingComponentWalker[TReference, TMetadata],
 ) error {
 	trimmedOutputDirectories := trimmedOutputComponentWalker.stack
@@ -296,17 +315,17 @@ func (c *targetActionResultCopier[TReference, TMetadata]) copyDirectoryAndDepend
 		trimmedOutputDirectories = trimmedOutputDirectories.Copy()
 		trimmedOutputDirectories.Push(newDirectory)
 	}
-	if err := newDirectory.mergeDirectory(originalOutputDirectories.Peek(), c.loadOptions); err != nil {
+	if err := source.mergeCurrentDirectoryInto(newDirectory); err != nil {
 		return err
 	}
-	return c.scanDirectoryDependencies(originalOutputDirectories, trimmedOutputDirectories, 0)
+	return c.scanDirectoryDependencies(source, trimmedOutputDirectories, 0)
 }
 
 // scanDirectoryDependencies visits all symbolic links in a directory
 // hierarchy and ensures their targets are copied over into the newly
 // created directory hierarchy as well.
-func (c *targetActionResultCopier[TReference, TMetadata]) scanDirectoryDependencies(
-	originalOutputDirectories util.NonEmptyStack[*changeTrackingDirectory[TReference, TMetadata]],
+func (c *fileAndDependenciesCopier[TReference, TMetadata]) scanDirectoryDependencies(
+	source fileAndDependenciesCopierSource[TReference, TMetadata],
 	trimmedOutputDirectories util.NonEmptyStack[*changeTrackingDirectory[TReference, TMetadata]],
 	maximumEscapementLevels uint32,
 ) error {
@@ -324,68 +343,145 @@ func (c *targetActionResultCopier[TReference, TMetadata]) scanDirectoryDependenc
 		return nil
 	}
 
-	originalOutputDirectory := originalOutputDirectories.Peek()
-	if err := originalOutputDirectory.maybeLoadContents(c.loadOptions); err != nil {
-		return err
-	}
 	if err := trimmedOutputDirectory.maybeLoadContents(c.loadOptions); err != nil {
 		return err
 	}
 
 	for name, trimmedOutputChildDirectory := range trimmedOutputDirectory.directories {
-		originalOutputDirectories.Push(originalOutputDirectory.directories[name])
+		if err := source.pushDirectory(name); err != nil {
+			return err
+		}
 		trimmedOutputDirectories.Push(trimmedOutputChildDirectory)
 		if err := c.scanDirectoryDependencies(
-			originalOutputDirectories,
+			source,
 			trimmedOutputDirectories,
 			maximumEscapementLevels+1,
 		); err != nil {
 			return err
 		}
-		if _, ok := originalOutputDirectories.PopSingle(); !ok {
-			panic("bad directory stack handling")
+		if err := source.popDirectory(); err != nil {
+			return err
 		}
 		if _, ok := trimmedOutputDirectories.PopSingle(); !ok {
 			panic("bad directory stack handling")
 		}
 	}
 
-	for name, target := range trimmedOutputDirectory.symlinks {
-		resolver := changeTrackingDirectorySymlinkFollowingResolver[TReference, TMetadata]{
-			loadOptions: c.loadOptions,
-			stack:       originalOutputDirectories.Copy(),
+	for _, target := range trimmedOutputDirectory.symlinks {
+		clonedSource, err := source.clone()
+		if err != nil {
+			return err
 		}
-		symlinkRecordingComponentWalker := symlinkRecordingComponentWalker[TReference, TMetadata]{
-			base:  &resolver,
-			stack: trimmedOutputDirectories.Copy(),
-		}
-		if err := path.Resolve(
+		if err := c.copyFileAndDependencies(
+			clonedSource,
+			trimmedOutputDirectories.Copy(),
 			target,
-			path.NewLoopDetectingScopeWalker(
-				path.NewRelativeScopeWalker(&symlinkRecordingComponentWalker),
-			),
+			/* fileType = */ nil,
 		); err != nil {
-			return fmt.Errorf("failed to resolve symlink %#v: %w", name.String(), err)
-		}
-
-		if resolver.file != nil {
-			if err := symlinkRecordingComponentWalker.stack.Peek().setFile(
-				c.loadOptions,
-				*symlinkRecordingComponentWalker.terminalName,
-				resolver.file,
-			); err != nil {
-				return err
-			}
-		} else {
-			if err := c.copyDirectoryAndDependencies(
-				resolver.stack,
-				&symlinkRecordingComponentWalker,
-			); err != nil {
-				return err
-			}
+			return err
 		}
 	}
 	return nil
+}
+
+// targetActionFileAndDependenciesCopierSource can be used by
+// fileAndDependenciesCopier to copy files out of the output root
+// directory of a target action.
+type targetActionFileAndDependenciesCopierSource[TReference object.BasicReference, TMetadata model_core.ReferenceMetadata] struct {
+	changeTrackingDirectorySymlinkFollowingResolver[TReference, TMetadata]
+}
+
+func (s *targetActionFileAndDependenciesCopierSource[TReference, TMetadata]) clone() (fileAndDependenciesCopierSource[TReference, TMetadata], error) {
+	return &targetActionFileAndDependenciesCopierSource[TReference, TMetadata]{
+		changeTrackingDirectorySymlinkFollowingResolver: changeTrackingDirectorySymlinkFollowingResolver[TReference, TMetadata]{
+			loadOptions: s.loadOptions,
+			stack:       s.stack.Copy(),
+		},
+	}, nil
+}
+
+func (s *targetActionFileAndDependenciesCopierSource[TReference, TMetadata]) getCurrentFile() (*changeTrackingFile[TReference, TMetadata], error) {
+	return s.file, nil
+}
+
+func (s *targetActionFileAndDependenciesCopierSource[TReference, TMetadata]) mergeCurrentDirectoryInto(target *changeTrackingDirectory[TReference, TMetadata]) error {
+	return target.mergeDirectory(s.stack.Peek(), s.loadOptions)
+}
+
+func (s *targetActionFileAndDependenciesCopierSource[TReference, TMetadata]) pushDirectory(name path.Component) error {
+	d := s.stack.Peek()
+	if err := d.maybeLoadContents(s.loadOptions); err != nil {
+		return err
+	}
+	s.stack.Push(d.directories[name])
+	return nil
+}
+
+func (s *targetActionFileAndDependenciesCopierSource[TReference, TMetadata]) popDirectory() error {
+	if _, ok := s.stack.PopSingle(); !ok {
+		panic("calls to popDirectory() should match pushDirectory()")
+	}
+	return nil
+}
+
+// sourceFileAndDependenciesCopierSource can be used by
+// fileAndDependenciesCopier to copy files out of one or more repos.
+type sourceFileAndDependenciesCopierSource[TReference object.BasicReference, TMetadata model_core.ReferenceMetadata] struct {
+	reposFilePropertiesResolver[TReference, TMetadata]
+	loadOptions *changeTrackingDirectoryLoadOptions[TReference]
+}
+
+func (s *sourceFileAndDependenciesCopierSource[TReference, TMetadata]) clone() (fileAndDependenciesCopierSource[TReference, TMetadata], error) {
+	currentDirectories, err := s.currentRepo.GetCurrentDirectoriesStack()
+	if err != nil {
+		return nil, err
+	}
+	newSource := &sourceFileAndDependenciesCopierSource[TReference, TMetadata]{
+		reposFilePropertiesResolver: reposFilePropertiesResolver[TReference, TMetadata]{
+			context:          s.context,
+			directoryReaders: s.directoryReaders,
+			environment:      s.environment,
+		},
+		loadOptions: s.loadOptions,
+	}
+	newSource.currentRepo = model_filesystem.NewDirectoryComponentWalker[TReference](
+		newSource.context,
+		newSource.directoryReaders.DirectoryContents,
+		newSource.directoryReaders.Leaves,
+		newSource.handleRepoOnUp,
+		model_core.Message[*model_filesystem_pb.Directory, TReference]{},
+		currentDirectories,
+	)
+	return newSource, nil
+}
+
+func (s *sourceFileAndDependenciesCopierSource[TReference, TMetadata]) getCurrentFile() (*changeTrackingFile[TReference, TMetadata], error) {
+	if s.currentRepo == nil {
+		return nil, nil
+	}
+	fileProperties := s.currentRepo.GetCurrentFileProperties()
+	if !fileProperties.IsSet() {
+		return nil, nil
+	}
+	return newChangeTrackingFileFromFileProperties[TReference, TMetadata](fileProperties)
+}
+
+func (s *sourceFileAndDependenciesCopierSource[TReference, TMetadata]) mergeCurrentDirectoryInto(target *changeTrackingDirectory[TReference, TMetadata]) error {
+	if s.currentRepo == nil {
+		return errors.New("not inside a repo")
+	}
+	// TODO: We should omit directories belonging to different packages.
+	return target.mergeDirectoryMessage(s.currentRepo.GetCurrentDirectory(), s.loadOptions)
+}
+
+func (s *sourceFileAndDependenciesCopierSource[TReference, TMetadata]) pushDirectory(name path.Component) error {
+	_, err := s.currentRepo.OnDirectory(name)
+	return err
+}
+
+func (s *sourceFileAndDependenciesCopierSource[TReference, TMetadata]) popDirectory() error {
+	_, err := s.currentRepo.OnUp()
+	return err
 }
 
 func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.Context, key model_core.Message[*model_analysis_pb.FileRoot_Key, TReference], e FileRootEnvironment[TReference, TMetadata]) (PatchedFileRootValue, error) {
@@ -462,17 +558,25 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 			if err != nil {
 				return PatchedFileRootValue{}, err
 			}
+			filePathParser := path.UNIXFormat.NewParser(filePath)
 			loadOptions := &changeTrackingDirectoryLoadOptions[TReference]{
 				context:                 ctx,
 				directoryContentsReader: directoryReaders.DirectoryContents,
 				leavesReader:            directoryReaders.Leaves,
 			}
-			copier := targetActionResultCopier[TReference, TMetadata]{
-				loadOptions:        loadOptions,
-				directoriesScanned: map[*changeTrackingDirectory[TReference, TMetadata]]struct{}{},
-			}
-			trimmedOutputRootDirectory, err := copier.copyFileAndDependencies(&originalOutputRootDirectory, filePath, o.Type)
-			if err != nil {
+			trimmedOutputRootDirectory := &changeTrackingDirectory[TReference, TMetadata]{}
+			copier := newFileAndDependenciesCopier[TReference, TMetadata](loadOptions)
+			if err := copier.copyFileAndDependencies(
+				&targetActionFileAndDependenciesCopierSource[TReference, TMetadata]{
+					changeTrackingDirectorySymlinkFollowingResolver: changeTrackingDirectorySymlinkFollowingResolver[TReference, TMetadata]{
+						loadOptions: loadOptions,
+						stack:       util.NewNonEmptyStack(&originalOutputRootDirectory),
+					},
+				},
+				util.NewNonEmptyStack(trimmedOutputRootDirectory),
+				filePathParser,
+				&o.Type,
+			); err != nil {
 				if !errors.Is(err, errChangeTrackingDirectorySymlinkFollowingResolverFileNotFound) {
 					return PatchedFileRootValue{}, err
 				}
@@ -513,12 +617,19 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 					return PatchedFileRootValue{}, err
 				}
 
-				copier := targetActionResultCopier[TReference, TMetadata]{
-					loadOptions:        loadOptions,
-					directoriesScanned: map[*changeTrackingDirectory[TReference, TMetadata]]struct{}{},
-				}
-				trimmedOutputRootDirectory, err = copier.copyFileAndDependencies(&originalOutputRootDirectory, filePath, o.Type)
-				if err != nil {
+				copier := newFileAndDependenciesCopier[TReference, TMetadata](loadOptions)
+				trimmedOutputRootDirectory = &changeTrackingDirectory[TReference, TMetadata]{}
+				if err = copier.copyFileAndDependencies(
+					&targetActionFileAndDependenciesCopierSource[TReference, TMetadata]{
+						changeTrackingDirectorySymlinkFollowingResolver: changeTrackingDirectorySymlinkFollowingResolver[TReference, TMetadata]{
+							loadOptions: loadOptions,
+							stack:       util.NewNonEmptyStack(&originalOutputRootDirectory),
+						},
+					},
+					util.NewNonEmptyStack(trimmedOutputRootDirectory),
+					filePathParser,
+					&o.Type,
+				); err != nil {
 					return PatchedFileRootValue{}, err
 				}
 			}
@@ -847,42 +958,25 @@ func (c *baseComputer[TReference, TMetadata]) ComputeFileRootValue(ctx context.C
 	if !gotDirectoryCreationParameters || !gotDirectoryReaders {
 		return PatchedFileRootValue{}, evaluation.ErrMissingDependency
 	}
-	resolver := reposFilePropertiesResolver[TReference, TMetadata]{
-		context:          ctx,
-		directoryReaders: directoryReaders,
-		environment:      e,
+	loadOptions := &changeTrackingDirectoryLoadOptions[TReference]{
+		context:                 ctx,
+		directoryContentsReader: directoryReaders.DirectoryContents,
+		leavesReader:            directoryReaders.Leaves,
 	}
-
+	copier := newFileAndDependenciesCopier[TReference, TMetadata](loadOptions)
 	var externalDirectory changeTrackingDirectory[TReference, TMetadata]
-	symlinkRecordingComponentWalker := symlinkRecordingComponentWalker[TReference, TMetadata]{
-		base:  &resolver,
-		stack: util.NewNonEmptyStack(&externalDirectory),
-	}
-
-	if err := path.Resolve(
+	if err := copier.copyFileAndDependencies(
+		&sourceFileAndDependenciesCopierSource[TReference, TMetadata]{
+			reposFilePropertiesResolver: reposFilePropertiesResolver[TReference, TMetadata]{
+				context:          ctx,
+				directoryReaders: directoryReaders,
+				environment:      e,
+			},
+			loadOptions: loadOptions,
+		},
+		util.NewNonEmptyStack(&externalDirectory),
 		path.UNIXFormat.NewParser(fileLabel.GetExternalRelativePath()),
-		path.NewLoopDetectingScopeWalker(
-			path.NewRelativeScopeWalker(&symlinkRecordingComponentWalker),
-		),
-	); err != nil {
-		return PatchedFileRootValue{}, fmt.Errorf("failed to resolve path: %w", err)
-	}
-
-	resolvedFileProperties, err := resolver.getCurrentFileProperties()
-	if err != nil {
-		return PatchedFileRootValue{}, err
-	}
-	resolvedFile, err := newChangeTrackingFileFromFileProperties[TReference, TMetadata](resolvedFileProperties)
-	if err != nil {
-		return PatchedFileRootValue{}, err
-	}
-
-	// Resolving the file created all intermediate symbolic links.
-	// Copy over the file they point to as well.
-	if err := symlinkRecordingComponentWalker.stack.Peek().setFile(
-		nil,
-		*symlinkRecordingComponentWalker.terminalName,
-		resolvedFile,
+		/* fileType = */ nil,
 	); err != nil {
 		return PatchedFileRootValue{}, err
 	}

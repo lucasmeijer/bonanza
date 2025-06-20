@@ -108,7 +108,7 @@ func TestFileRoot(t *testing.T) {
 		require.ErrorContains(t, err, "invalid file label: ")
 	})
 
-	t.Run("NoOwner", func(t *testing.T) {
+	t.Run("SourceFile", func(t *testing.T) {
 		t.Run("NonExistent", func(t *testing.T) {
 			// Labels that refer to non-existent files
 			// should cause the creation of a file root to
@@ -154,49 +154,6 @@ func TestFileRoot(t *testing.T) {
 				e,
 			)
 			require.ErrorContains(t, err, "Path does not exist")
-		})
-
-		t.Run("FileResolvesToDirectory", func(t *testing.T) {
-			// If the type of the File object is a regular
-			// file, the path to which it resolves should
-			// also be a regular file.
-			e := NewMockFileRootEnvironmentForTesting(ctrl)
-			bct.expectGetDirectoryCreationParametersObjectValue(t, e)
-			bct.expectGetDirectoryReadersValue(t, e)
-			e.EXPECT().GetRepoValue(
-				testutil.EqProto(t, &model_analysis_pb.Repo_Key{
-					CanonicalRepo: "myrepo+",
-				}),
-			).Return(newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.Repo_Value {
-				return &model_analysis_pb.Repo_Value{
-					RootDirectoryReference: &model_filesystem_pb.DirectoryReference{
-						Reference: attachObject(patcher, newObject(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) model_core.Marshalable {
-							return model_core.NewProtoMarshalable(singleChildDirectoryContents(
-								"foo",
-								&model_filesystem_pb.DirectoryContents{
-									Leaves: emptyLeaves,
-								},
-							))
-						})),
-						DirectoriesCount:               0,
-						MaximumSymlinkEscapementLevels: &wrapperspb.UInt32Value{Value: 0},
-					},
-				}
-			}))
-
-			_, err := bct.computer.ComputeFileRootValue(
-				ctx,
-				model_core.NewSimpleMessage[model_core.CreatedObjectTree](
-					&model_analysis_pb.FileRoot_Key{
-						DirectoryLayout: model_analysis_pb.DirectoryLayout_INPUT_ROOT,
-						File: &model_starlark_pb.File{
-							Label: "@@myrepo+//:foo",
-						},
-					},
-				),
-				e,
-			)
-			require.EqualError(t, err, "path resolves to a directory, while a file was expected")
 		})
 
 		t.Run("SuccessSimple", func(t *testing.T) {
@@ -312,10 +269,280 @@ func TestFileRoot(t *testing.T) {
 				fileRoot.Discard()
 			})
 		})
+
+		t.Run("SuccessComplexDirectory", func(t *testing.T) {
+			// Bazel also allows source files to refer to
+			// directories. In older versions of Bazel this
+			// was unsound, but in recent versions they have
+			// made various improvements.
+			//
+			// These directories may contain symbolic links,
+			// which may escape the containing directory or
+			// even repository root directory. Referencing
+			// files in other repos should cause them to be
+			// loaded as well.
+			run := func(t *testing.T, directoryLayout model_analysis_pb.DirectoryLayout) model_analysis.PatchedFileRootValue {
+				e := NewMockFileRootEnvironmentForTesting(ctrl)
+				bct.expectGetDirectoryCreationParametersObjectValue(t, e)
+				bct.expectGetDirectoryReadersValue(t, e)
+				e.EXPECT().GetRepoValue(
+					testutil.EqProto(t, &model_analysis_pb.Repo_Key{
+						CanonicalRepo: "myrepo+",
+					}),
+				).Return(newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.Repo_Value {
+					return &model_analysis_pb.Repo_Value{
+						RootDirectoryReference: &model_filesystem_pb.DirectoryReference{
+							Reference: attachObject(patcher, newObject(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) model_core.Marshalable {
+								return model_core.NewProtoMarshalable(&model_filesystem_pb.DirectoryContents{
+									Directories: []*model_filesystem_pb.DirectoryNode{
+										directoryNode("dir1", &model_filesystem_pb.DirectoryContents{
+											Directories: []*model_filesystem_pb.DirectoryNode{
+												directoryNode("nested", &model_filesystem_pb.DirectoryContents{
+													Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+														LeavesInline: &model_filesystem_pb.Leaves{
+															Symlinks: []*model_filesystem_pb.SymlinkNode{
+																{Name: "file3", Target: "../../file3"},
+															},
+														},
+													},
+												}),
+												// TODO: Directories belonging to other packages should
+												// likely be removed.
+												/*
+													directoryNode("other_package", &model_filesystem_pb.DirectoryContents{
+														Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+															LeavesInline: &model_filesystem_pb.Leaves{
+																Files: []*model_filesystem_pb.FileNode{
+																	{Name: "BUILD.bazel", Properties: &model_filesystem_pb.FileProperties{}},
+																	{Name: "foo", Properties: &model_filesystem_pb.FileProperties{}},
+																},
+															},
+														},
+													}),
+												*/
+											},
+											Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+												LeavesInline: &model_filesystem_pb.Leaves{
+													Symlinks: []*model_filesystem_pb.SymlinkNode{
+														{Name: "dir2", Target: "../dir2"},
+														{Name: "file1", Target: "../file1"},
+														{Name: "file5", Target: "../../otherrepo+/file5"},
+													},
+												},
+											},
+										}),
+										directoryNode("dir2", &model_filesystem_pb.DirectoryContents{
+											Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+												LeavesInline: &model_filesystem_pb.Leaves{
+													Symlinks: []*model_filesystem_pb.SymlinkNode{
+														{Name: "file2", Target: "../file2"},
+														{Name: "self", Target: "."},
+													},
+												},
+											},
+										}),
+									},
+									Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+										LeavesInline: &model_filesystem_pb.Leaves{
+											Files: []*model_filesystem_pb.FileNode{
+												{Name: "file1", Properties: &model_filesystem_pb.FileProperties{}},
+												{Name: "file2", Properties: &model_filesystem_pb.FileProperties{}},
+												{Name: "file3", Properties: &model_filesystem_pb.FileProperties{}},
+												{Name: "file4", Properties: &model_filesystem_pb.FileProperties{}},
+											},
+										},
+									},
+								})
+							})),
+							DirectoriesCount:               0,
+							MaximumSymlinkEscapementLevels: &wrapperspb.UInt32Value{Value: 0},
+						},
+					}
+				}))
+				e.EXPECT().GetRepoValue(
+					testutil.EqProto(t, &model_analysis_pb.Repo_Key{
+						CanonicalRepo: "otherrepo+",
+					}),
+				).Return(newMessage(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.Repo_Value {
+					return &model_analysis_pb.Repo_Value{
+						RootDirectoryReference: &model_filesystem_pb.DirectoryReference{
+							Reference: attachObject(patcher, newObject(func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) model_core.Marshalable {
+								return model_core.NewProtoMarshalable(&model_filesystem_pb.DirectoryContents{
+									Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+										LeavesInline: &model_filesystem_pb.Leaves{
+											Files: []*model_filesystem_pb.FileNode{
+												{Name: "file5", Properties: &model_filesystem_pb.FileProperties{}},
+												{Name: "file6", Properties: &model_filesystem_pb.FileProperties{}},
+											},
+										},
+									},
+								})
+							})),
+							DirectoriesCount:               0,
+							MaximumSymlinkEscapementLevels: &wrapperspb.UInt32Value{Value: 0},
+						},
+					}
+				}))
+
+				fileRoot, err := bct.computer.ComputeFileRootValue(
+					ctx,
+					model_core.NewSimpleMessage[model_core.CreatedObjectTree](
+						&model_analysis_pb.FileRoot_Key{
+							DirectoryLayout: directoryLayout,
+							File: &model_starlark_pb.File{
+								Label: "@@myrepo+//:dir1",
+							},
+						},
+					),
+					e,
+				)
+				require.NoError(t, err)
+				return fileRoot
+			}
+
+			t.Run("InputRoot", func(t *testing.T) {
+				fileRoot := run(t, model_analysis_pb.DirectoryLayout_INPUT_ROOT)
+				requireEqualPatchedMessage(t, func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Value {
+					return &model_analysis_pb.FileRoot_Value{
+						RootDirectory: singleChildDirectoryContents(
+							"external",
+							&model_filesystem_pb.DirectoryContents{
+								Directories: []*model_filesystem_pb.DirectoryNode{
+									directoryNode("myrepo+", &model_filesystem_pb.DirectoryContents{
+										Directories: []*model_filesystem_pb.DirectoryNode{
+											directoryNode("dir1", &model_filesystem_pb.DirectoryContents{
+												Directories: []*model_filesystem_pb.DirectoryNode{
+													directoryNode("nested", &model_filesystem_pb.DirectoryContents{
+														Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+															LeavesInline: &model_filesystem_pb.Leaves{
+																Symlinks: []*model_filesystem_pb.SymlinkNode{
+																	{Name: "file3", Target: "../../file3"},
+																},
+															},
+														},
+													}),
+												},
+												Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+													LeavesInline: &model_filesystem_pb.Leaves{
+														Symlinks: []*model_filesystem_pb.SymlinkNode{
+															{Name: "dir2", Target: "../dir2"},
+															{Name: "file1", Target: "../file1"},
+															{Name: "file5", Target: "../../otherrepo+/file5"},
+														},
+													},
+												},
+											}),
+											directoryNode("dir2", &model_filesystem_pb.DirectoryContents{
+												Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+													LeavesInline: &model_filesystem_pb.Leaves{
+														Symlinks: []*model_filesystem_pb.SymlinkNode{
+															{Name: "file2", Target: "../file2"},
+															{Name: "self", Target: "."},
+														},
+													},
+												},
+											}),
+										},
+										Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+											LeavesInline: &model_filesystem_pb.Leaves{
+												Files: []*model_filesystem_pb.FileNode{
+													{Name: "file1", Properties: &model_filesystem_pb.FileProperties{}},
+													{Name: "file2", Properties: &model_filesystem_pb.FileProperties{}},
+													{Name: "file3", Properties: &model_filesystem_pb.FileProperties{}},
+												},
+											},
+										},
+									}),
+									directoryNode("otherrepo+", &model_filesystem_pb.DirectoryContents{
+										Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+											LeavesInline: &model_filesystem_pb.Leaves{
+												Files: []*model_filesystem_pb.FileNode{
+													{Name: "file5", Properties: &model_filesystem_pb.FileProperties{}},
+												},
+											},
+										},
+									}),
+								},
+								Leaves: emptyLeaves,
+							},
+						),
+					}
+				}, fileRoot)
+				fileRoot.Discard()
+			})
+
+			t.Run("Runfiles", func(t *testing.T) {
+				fileRoot := run(t, model_analysis_pb.DirectoryLayout_RUNFILES)
+				requireEqualPatchedMessage(t, func(patcher *model_core.ReferenceMessagePatcher[model_core.CreatedObjectTree]) *model_analysis_pb.FileRoot_Value {
+					return &model_analysis_pb.FileRoot_Value{
+						RootDirectory: &model_filesystem_pb.DirectoryContents{
+							Directories: []*model_filesystem_pb.DirectoryNode{
+								directoryNode("myrepo+", &model_filesystem_pb.DirectoryContents{
+									Directories: []*model_filesystem_pb.DirectoryNode{
+										directoryNode("dir1", &model_filesystem_pb.DirectoryContents{
+											Directories: []*model_filesystem_pb.DirectoryNode{
+												directoryNode("nested", &model_filesystem_pb.DirectoryContents{
+													Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+														LeavesInline: &model_filesystem_pb.Leaves{
+															Symlinks: []*model_filesystem_pb.SymlinkNode{
+																{Name: "file3", Target: "../../file3"},
+															},
+														},
+													},
+												}),
+											},
+											Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+												LeavesInline: &model_filesystem_pb.Leaves{
+													Symlinks: []*model_filesystem_pb.SymlinkNode{
+														{Name: "dir2", Target: "../dir2"},
+														{Name: "file1", Target: "../file1"},
+														{Name: "file5", Target: "../../otherrepo+/file5"},
+													},
+												},
+											},
+										}),
+										directoryNode("dir2", &model_filesystem_pb.DirectoryContents{
+											Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+												LeavesInline: &model_filesystem_pb.Leaves{
+													Symlinks: []*model_filesystem_pb.SymlinkNode{
+														{Name: "file2", Target: "../file2"},
+														{Name: "self", Target: "."},
+													},
+												},
+											},
+										}),
+									},
+									Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+										LeavesInline: &model_filesystem_pb.Leaves{
+											Files: []*model_filesystem_pb.FileNode{
+												{Name: "file1", Properties: &model_filesystem_pb.FileProperties{}},
+												{Name: "file2", Properties: &model_filesystem_pb.FileProperties{}},
+												{Name: "file3", Properties: &model_filesystem_pb.FileProperties{}},
+											},
+										},
+									},
+								}),
+								directoryNode("otherrepo+", &model_filesystem_pb.DirectoryContents{
+									Leaves: &model_filesystem_pb.DirectoryContents_LeavesInline{
+										LeavesInline: &model_filesystem_pb.Leaves{
+											Files: []*model_filesystem_pb.FileNode{
+												{Name: "file5", Properties: &model_filesystem_pb.FileProperties{}},
+											},
+										},
+									},
+								}),
+							},
+							Leaves: emptyLeaves,
+						},
+					}
+				}, fileRoot)
+				fileRoot.Discard()
+			})
+		})
 	})
 
 	t.Run("Action", func(t *testing.T) {
-		// TODO!
+		// TODO: Test error cases.
 
 		t.Run("SuccessSimpleFile", func(t *testing.T) {
 			// Request an output file belonging to an action
