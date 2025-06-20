@@ -77,16 +77,19 @@ of command line flags and `.bazelrc` files.
 
 ## Status
 
-Bonanza is at this point still highly experimental. It is currently
-capable of analyzing a slightly altered copy of the bb-storage source
-tree and configuring all of the targets contained within. This means
-that Bonanza is already complete enough that Starlark rules such as ones
-provided by rules\_go, rules\_js, rules\_oci, and rules\_python can be
-evaluated and run to completion.
+Bonanza is at this point still highly experimental. However, it is
+already capable of building all targets inside a slightly altered copy
+of the bb-storage source tree. This means that Bonanza is already
+complete enough that C++ compilation works (at least good enough to
+build a functioning copy of `protoc`), and that Starlark rules such as
+ones provided by bazel-gazelle, rules\_go, rules\_js, rules\_oci, and
+rules\_python tend to work as expected.
 
-Calls to `ctx.actions.*()` made by rule implementations are currently
-still no-ops, meaning that no build graph at the action level is being
-constructed. Work on implementing this is expected to start soon.
+Bonanza is currently unable to cache build results. This means that
+every invocation of `bonanza_bazel` behaves as if a clean build is
+performed. Furthermore, Bonanza's storage nodes can only store data in
+memory and are unable to evict data if needed. Work on addressing these
+limitations will start soon.
 
 ## Running Bonanza
 
