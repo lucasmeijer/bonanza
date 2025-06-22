@@ -32,6 +32,7 @@ export GROUP_ID=$(id -g)
 set -m
 for replica in a b; do
   for shard in 0 1 2 3; do
+    mkdir -p "${STATE_PATH}/bonanza_storage_shard_${replica}${shard}/persistent_state"
     REPLICA="${replica}" SHARD="${shard}" \
     "$(rlocation build_bonanza/cmd/bonanza_storage_shard/bonanza_storage_shard_/bonanza_storage_shard)" \
         "$(rlocation build_bonanza/deployments/demo/bonanza_storage_shard.jsonnet)" &

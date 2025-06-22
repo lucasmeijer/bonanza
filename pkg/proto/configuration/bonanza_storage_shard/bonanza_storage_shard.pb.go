@@ -7,6 +7,7 @@
 package bonanza_storage_shard
 
 import (
+	local "bonanza.build/pkg/proto/configuration/storage/object/local"
 	global "github.com/buildbarn/bb-storage/pkg/proto/configuration/global"
 	grpc "github.com/buildbarn/bb-storage/pkg/proto/configuration/grpc"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -32,6 +33,7 @@ type ApplicationConfiguration struct {
 	LeasesMapLeaseCompletenessDuration *durationpb.Duration        `protobuf:"bytes,4,opt,name=leases_map_lease_completeness_duration,json=leasesMapLeaseCompletenessDuration,proto3" json:"leases_map_lease_completeness_duration,omitempty"`
 	LeasesMapMaximumGetAttempts        uint32                      `protobuf:"varint,5,opt,name=leases_map_maximum_get_attempts,json=leasesMapMaximumGetAttempts,proto3" json:"leases_map_maximum_get_attempts,omitempty"`
 	LeasesMapMaximumPutAttempts        int64                       `protobuf:"varint,6,opt,name=leases_map_maximum_put_attempts,json=leasesMapMaximumPutAttempts,proto3" json:"leases_map_maximum_put_attempts,omitempty"`
+	LocalObjectStore                   *local.StoreConfiguration   `protobuf:"bytes,7,opt,name=local_object_store,json=localObjectStore,proto3" json:"local_object_store,omitempty"`
 	unknownFields                      protoimpl.UnknownFields
 	sizeCache                          protoimpl.SizeCache
 }
@@ -108,18 +110,26 @@ func (x *ApplicationConfiguration) GetLeasesMapMaximumPutAttempts() int64 {
 	return 0
 }
 
+func (x *ApplicationConfiguration) GetLocalObjectStore() *local.StoreConfiguration {
+	if x != nil {
+		return x.LocalObjectStore
+	}
+	return nil
+}
+
 var File_pkg_proto_configuration_bonanza_storage_shard_bonanza_storage_shard_proto protoreflect.FileDescriptor
 
 const file_pkg_proto_configuration_bonanza_storage_shard_bonanza_storage_shard_proto_rawDesc = "" +
 	"\n" +
-	"Ipkg/proto/configuration/bonanza_storage_shard/bonanza_storage_shard.proto\x12+bonanza.configuration.bonanza_storage_shard\x1a\x1egoogle/protobuf/duration.proto\x1a+pkg/proto/configuration/global/global.proto\x1a'pkg/proto/configuration/grpc/grpc.proto\"\xeb\x03\n" +
+	"Ipkg/proto/configuration/bonanza_storage_shard/bonanza_storage_shard.proto\x12+bonanza.configuration.bonanza_storage_shard\x1a\x1egoogle/protobuf/duration.proto\x1a+pkg/proto/configuration/global/global.proto\x1a'pkg/proto/configuration/grpc/grpc.proto\x1a8pkg/proto/configuration/storage/object/local/local.proto\"\xd9\x04\n" +
 	"\x18ApplicationConfiguration\x12E\n" +
 	"\x06global\x18\x01 \x01(\v2-.buildbarn.configuration.global.ConfigurationR\x06global\x12T\n" +
 	"\fgrpc_servers\x18\x02 \x03(\v21.buildbarn.configuration.grpc.ServerConfigurationR\vgrpcServers\x127\n" +
 	"\x18leases_map_records_count\x18\x03 \x01(\x04R\x15leasesMapRecordsCount\x12m\n" +
 	"&leases_map_lease_completeness_duration\x18\x04 \x01(\v2\x19.google.protobuf.DurationR\"leasesMapLeaseCompletenessDuration\x12D\n" +
 	"\x1fleases_map_maximum_get_attempts\x18\x05 \x01(\rR\x1bleasesMapMaximumGetAttempts\x12D\n" +
-	"\x1fleases_map_maximum_put_attempts\x18\x06 \x01(\x03R\x1bleasesMapMaximumPutAttemptsB=Z;bonanza.build/pkg/proto/configuration/bonanza_storage_shardb\x06proto3"
+	"\x1fleases_map_maximum_put_attempts\x18\x06 \x01(\x03R\x1bleasesMapMaximumPutAttempts\x12l\n" +
+	"\x12local_object_store\x18\a \x01(\v2>.bonanza.configuration.storage.object.local.StoreConfigurationR\x10localObjectStoreB=Z;bonanza.build/pkg/proto/configuration/bonanza_storage_shardb\x06proto3"
 
 var (
 	file_pkg_proto_configuration_bonanza_storage_shard_bonanza_storage_shard_proto_rawDescOnce sync.Once
@@ -139,16 +149,18 @@ var file_pkg_proto_configuration_bonanza_storage_shard_bonanza_storage_shard_pro
 	(*global.Configuration)(nil),     // 1: buildbarn.configuration.global.Configuration
 	(*grpc.ServerConfiguration)(nil), // 2: buildbarn.configuration.grpc.ServerConfiguration
 	(*durationpb.Duration)(nil),      // 3: google.protobuf.Duration
+	(*local.StoreConfiguration)(nil), // 4: bonanza.configuration.storage.object.local.StoreConfiguration
 }
 var file_pkg_proto_configuration_bonanza_storage_shard_bonanza_storage_shard_proto_depIdxs = []int32{
 	1, // 0: bonanza.configuration.bonanza_storage_shard.ApplicationConfiguration.global:type_name -> buildbarn.configuration.global.Configuration
 	2, // 1: bonanza.configuration.bonanza_storage_shard.ApplicationConfiguration.grpc_servers:type_name -> buildbarn.configuration.grpc.ServerConfiguration
 	3, // 2: bonanza.configuration.bonanza_storage_shard.ApplicationConfiguration.leases_map_lease_completeness_duration:type_name -> google.protobuf.Duration
-	3, // [3:3] is the sub-list for method output_type
-	3, // [3:3] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	4, // 3: bonanza.configuration.bonanza_storage_shard.ApplicationConfiguration.local_object_store:type_name -> bonanza.configuration.storage.object.local.StoreConfiguration
+	4, // [4:4] is the sub-list for method output_type
+	4, // [4:4] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_pkg_proto_configuration_bonanza_storage_shard_bonanza_storage_shard_proto_init() }

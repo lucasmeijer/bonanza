@@ -5,6 +5,7 @@ package bonanza.configuration.bonanza_storage_shard;
 import "google/protobuf/duration.proto";
 import "pkg/proto/configuration/global/global.proto";
 import "pkg/proto/configuration/grpc/grpc.proto";
+import "pkg/proto/configuration/storage/object/local/local.proto";
 
 option go_package = "bonanza.build/pkg/proto/configuration/bonanza_storage_shard";
 
@@ -84,4 +85,8 @@ message ApplicationConfiguration {
   //
   // Recommended value: 64
   int64 leases_map_maximum_put_attempts = 6;
+
+  // Configuration options for writing objects to disk.
+  bonanza.configuration.storage.object.local.StoreConfiguration
+      local_object_store = 7;
 }

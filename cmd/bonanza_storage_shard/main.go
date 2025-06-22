@@ -47,6 +47,14 @@ func main() {
 		// in-memory store for leases in front of it, so that
 		// UploadDag() can reliably enforce that clients upload
 		// complete DAGs.
+		localObjectStore, err := object_local.NewStoreFromConfiguration(
+			dependenciesGroup,
+			configuration.LocalObjectStore,
+		)
+		if err != nil {
+			return util.StatusWrap(err, "Failed to create local object store")
+		}
+
 		leaseCompletenessDuration := configuration.LeasesMapLeaseCompletenessDuration
 		if err := leaseCompletenessDuration.CheckValid(); err != nil {
 			return util.StatusWrap(err, "Invalid leases map lease completeness duration")
@@ -60,9 +68,9 @@ func main() {
 			}
 			return 0
 		}
-		hashInitialization := rand.Uint64()
-		objectStore := object_flatbacked.NewStore(
-			object_local.NewStore(),
+		flatBackedObjectStoreHashInitialization := rand.Uint64()
+		flatBackedObjectStore := object_flatbacked.NewStore(
+			localObjectStore,
 			clock.SystemClock,
 			leaseCompletenessDuration.AsDuration(),
 			lossymap.NewHashMap(
@@ -71,7 +79,7 @@ func main() {
 					leaseComparator,
 				),
 				/* recordKeyHasher = */ func(k *lossymap.RecordKey[object.LocalReference]) uint64 {
-					h := hashInitialization
+					h := flatBackedObjectStoreHashInitialization
 					for _, c := range k.Key.GetRawReference() {
 						h ^= uint64(c)
 						h *= 1099511628211
@@ -101,7 +109,7 @@ func main() {
 					s,
 					object.NewDownloaderServer(
 						object_namespacemapping.NewNamespaceRemovingDownloader[object.GlobalReference](
-							objectStore,
+							flatBackedObjectStore,
 						),
 					),
 				)
@@ -110,7 +118,7 @@ func main() {
 					object.NewUploaderServer(
 						object_leasemarshaling.NewUploader(
 							object_namespacemapping.NewNamespaceRemovingUploader[object.GlobalReference](
-								objectStore,
+								flatBackedObjectStore,
 							),
 							leaseMarshaler,
 						),

@@ -1,9 +1,12 @@
 package object
 
 import (
-	"encoding/binary"
 	"encoding/hex"
+
+	"github.com/buildbarn/bb-storage/pkg/util"
 )
+
+const SHA256V1FlatReferenceSizeBytes = 35
 
 // FlatReference is a simplified version of LocalReference that assumes
 // that the height and degree of an object are zero. This means that
@@ -17,25 +20,55 @@ import (
 // FlatReference is sufficient for the read caching and local storage
 // backends, which are oblivious of references between objects.
 type FlatReference struct {
-	rawReference [35]byte
+	rawReference [SHA256V1FlatReferenceSizeBytes]byte
 }
 
 // MustNewSHA256V1LocalReference creates a flat reference that uses
 // reference format SHA256_V1. This function can be used as part of
 // tests.
 func MustNewSHA256V1FlatReference(hash string, sizeBytes uint32) (flatReference FlatReference) {
-	var rawReference [36]byte
+	var rawReference [35]byte
 	if n, err := hex.Decode(rawReference[:], []byte(hash)); err != nil {
 		panic(err)
 	} else if n != 32 {
 		panic("Wrong hash length")
 	}
-	binary.LittleEndian.PutUint32(rawReference[32:], sizeBytes)
-	copy(flatReference.rawReference[:], rawReference[:])
-	return
+	rawReference[32] = byte(sizeBytes)
+	rawReference[33] = byte(sizeBytes >> 8)
+	rawReference[34] = byte(sizeBytes >> 16)
+
+	return util.Must(SHA256V1ReferenceFormat.NewFlatReference(rawReference[:]))
 }
 
+// GetReferenceFormat returns the reference format that was used to
+// generate the reference.
+func (FlatReference) GetReferenceFormat() ReferenceFormat {
+	return ReferenceFormat{}
+}
+
+// GetRawFlatReference returns the flat reference in binary form, so
+// that it may be embedded into gRPC request bodies.
+func (r FlatReference) GetRawFlatReference() []byte {
+	return r.rawReference[:]
+}
+
+// GetLocalReference converts a flat reference to a corresponding local
+// reference having height zero.
 func (r FlatReference) GetLocalReference() (localReference LocalReference) {
 	copy(localReference.rawReference[:], r.rawReference[:])
 	return
+}
+
+// GetHash returns the hash of the contents of the object associated
+// with the flat reference.
+func (r FlatReference) GetHash() []byte {
+	return r.rawReference[:32]
+}
+
+// GetSizeBytes returns the size of the object associated with the flat
+// reference.
+func (r FlatReference) GetSizeBytes() int {
+	return int(r.rawReference[32]) |
+		(int(r.rawReference[33]) << 8) |
+		(int(r.rawReference[34]) << 16)
 }

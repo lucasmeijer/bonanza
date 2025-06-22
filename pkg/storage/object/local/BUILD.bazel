@@ -1,18 +1,131 @@
-load("@rules_go//go:def.bzl", "go_library")
+load("@rules_go//extras:gomock.bzl", "gomock")
+load("@rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "local",
     srcs = [
-        "lease.go",
+        "block_device_backed_location_blob_map.go",
+        "block_device_backed_reference_location_record_array.go",
+        "configuration.go",
+        "directory_backed_persistent_state_store.go",
+        "epoch_id_resolver.go",
+        "epoch_list.go",
+        "in_memory_location_blob_map.go",
+        "in_memory_reference_location_record_array.go",
+        "location_blob_map.go",
+        "periodic_syncer.go",
+        "persistent_epoch_list.go",
+        "persistent_state_source.go",
+        "persistent_state_store.go",
+        "reference_location_record_array.go",
         "store.go",
+        "volatile_epoch_list.go",
     ],
     importpath = "bonanza.build/pkg/storage/object/local",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/encoding/varint",
+        "//pkg/ds/lossymap",
+        "//pkg/proto/configuration/storage/object/local",
+        "//pkg/proto/storage/object",
+        "//pkg/proto/storage/object/local",
         "//pkg/storage/object",
-        "//pkg/storage/object/leasemarshaling",
+        "@com_github_buildbarn_bb_storage//pkg/blockdevice",
+        "@com_github_buildbarn_bb_storage//pkg/clock",
+        "@com_github_buildbarn_bb_storage//pkg/filesystem",
+        "@com_github_buildbarn_bb_storage//pkg/filesystem/path",
+        "@com_github_buildbarn_bb_storage//pkg/program",
+        "@com_github_buildbarn_bb_storage//pkg/random",
+        "@com_github_buildbarn_bb_storage//pkg/util",
         "@org_golang_google_grpc//codes",
         "@org_golang_google_grpc//status",
+        "@org_golang_google_protobuf//proto",
     ],
+)
+
+go_test(
+    name = "local_test",
+    srcs = [
+        "block_device_backed_location_blob_map_test.go",
+        "directory_backed_persistent_state_store_test.go",
+        "in_memory_location_blob_map_test.go",
+        "mocks_blockdevice_test.go",
+        "mocks_clock_test.go",
+        "mocks_filesystem_test.go",
+        "mocks_local_test.go",
+        "mocks_util_test.go",
+        "periodic_syncer_test.go",
+    ],
+    embed = [":local"],
+    deps = [
+        "//pkg/proto/storage/object/local",
+        "@com_github_buildbarn_bb_storage//pkg/clock",  # keep
+        "@com_github_buildbarn_bb_storage//pkg/filesystem",
+        "@com_github_buildbarn_bb_storage//pkg/filesystem/path",
+        "@com_github_buildbarn_bb_storage//pkg/testutil",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_google_grpc//codes",
+        "@org_golang_google_grpc//status",
+        "@org_uber_go_mock//gomock",
+    ],
+)
+
+gomock(
+    name = "mocks_blockdevice",
+    out = "mocks_blockdevice_test.go",
+    interfaces = ["BlockDevice"],
+    library = "@com_github_buildbarn_bb_storage//pkg/blockdevice",
+    mockgen_model_library = "@org_uber_go_mock//mockgen/model",
+    mockgen_tool = "@org_uber_go_mock//mockgen",
+    package = "local_test",
+)
+
+gomock(
+    name = "mocks_clock",
+    out = "mocks_clock_test.go",
+    interfaces = [
+        "Clock",
+        "Timer",
+    ],
+    library = "@com_github_buildbarn_bb_storage//pkg/clock",
+    mockgen_model_library = "@org_uber_go_mock//mockgen/model",
+    mockgen_tool = "@org_uber_go_mock//mockgen",
+    package = "local_test",
+)
+
+gomock(
+    name = "mocks_filesystem",
+    out = "mocks_filesystem_test.go",
+    interfaces = [
+        "Directory",
+        "FileAppender",
+        "FileReader",
+    ],
+    library = "@com_github_buildbarn_bb_storage//pkg/filesystem",
+    mockgen_model_library = "@org_uber_go_mock//mockgen/model",
+    mockgen_tool = "@org_uber_go_mock//mockgen",
+    package = "local_test",
+)
+
+gomock(
+    name = "mocks_local_test",
+    out = "mocks_local_test.go",
+    interfaces = [
+        "DataSyncer",
+        "PersistentStateSource",
+        "PersistentStateStore",
+    ],
+    library = "//pkg/storage/object/local",
+    mockgen_model_library = "@org_uber_go_mock//mockgen/model",
+    mockgen_tool = "@org_uber_go_mock//mockgen",
+    package = "local_test",
+)
+
+gomock(
+    name = "mocks_util",
+    out = "mocks_util_test.go",
+    interfaces = ["ErrorLogger"],
+    library = "@com_github_buildbarn_bb_storage//pkg/util",
+    mockgen_model_library = "@org_uber_go_mock//mockgen/model",
+    mockgen_tool = "@org_uber_go_mock//mockgen",
+    package = "local_test",
 )

@@ -16,6 +16,10 @@ import (
 // supported, called "SHA256_V1".
 type ReferenceFormat struct{}
 
+// SHA256V1ReferenceFormat is a predeclared instance of ReferenceFormat
+// that uses algorithm "SHA256_V1".
+var SHA256V1ReferenceFormat = ReferenceFormat{}
+
 // NewReferenceFormat converts a ReferenceFormat enumeration value that
 // is used as part of gRPC requests to a native type. Right now it
 // merely validates that the provided enumeration value corresponds to
@@ -96,6 +100,32 @@ func (ReferenceFormat) NewLocalReference(rawReference []byte) (r LocalReference,
 			height,
 			float16.ToUint64(bounds.minimum),
 			float16.ToUint64(bounds.maximum),
+		)
+	}
+
+	return
+}
+
+func (ReferenceFormat) NewFlatReference(rawReference []byte) (r FlatReference, err error) {
+	// Construct the reference.
+	if len(rawReference) != SHA256V1FlatReferenceSizeBytes {
+		return FlatReference{}, status.Errorf(
+			codes.InvalidArgument,
+			"Reference is %d bytes in size, while SHA256_V1 flat references are %d bytes in size",
+			len(rawReference),
+			SHA256V1FlatReferenceSizeBytes,
+		)
+	}
+	r.rawReference = *(*[SHA256V1FlatReferenceSizeBytes]byte)(rawReference)
+
+	sizeBytes := r.GetSizeBytes()
+	if sizeBytes < minimumObjectSizeBytes || sizeBytes > maximumObjectSizeBytes {
+		return FlatReference{}, status.Errorf(
+			codes.InvalidArgument,
+			"Size is %d bytes, which lies outside the permitted range of [%d, %d] bytes",
+			sizeBytes,
+			minimumObjectSizeBytes,
+			maximumObjectSizeBytes,
 		)
 	}
 

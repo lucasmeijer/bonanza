@@ -12,4 +12,28 @@ local shard = std.extVar('SHARD');
   leasesMapLeaseCompletenessDuration: '120s',
   leasesMapMaximumGetAttempts: 16,
   leasesMapMaximumPutAttempts: 64,
+
+  local dataPath = '%s/bonanza_storage_shard_%s%s' % [statePath, replica, shard],
+  localObjectStore: {
+    referenceLocationMapOnBlockDevice: { file: {
+      path: dataPath + '/reference_location_map',
+      sizeBytes: 1e8,
+    } },
+    referenceLocationMapMaximumGetAttempts: 16,
+    referenceLocationMapMaximumPutAttempts: 64,
+
+    locationBlobMapOnBlockDevice: { file: {
+      path: dataPath + '/location_blob_map',
+      sizeBytes: 1e10,
+    } },
+
+    oldRegionSizeRatio: 1,
+    currentRegionSizeRatio: 1,
+    newRegionSizeRatio: 3,
+
+    persistent: {
+      stateDirectoryPath: dataPath + '/persistent_state',
+      minimumEpochInterval: '300s',
+    },
+  },
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	"bonanza.build/pkg/ds/lossymap"
 	"bonanza.build/pkg/storage/object"
 
 	"google.golang.org/grpc/codes"
@@ -11,38 +12,149 @@ import (
 )
 
 type store struct {
-	lock    sync.Mutex
-	objects map[object.FlatReference]*object.Contents
+	lock                 *sync.RWMutex
+	referenceLocationMap lossymap.Map[object.FlatReference, uint64, EpochIDResolver]
+	locationBlobMap      LocationBlobMap
+	epochList            EpochList
+
+	writeLocks [1 << 8]sync.Mutex
 }
 
 // NewStore creates an object store that uses locally connected disks as
 // its backing store.
-func NewStore() object.Store[object.FlatReference, struct{}] {
+func NewStore(
+	lock *sync.RWMutex,
+	referenceLocationMap lossymap.Map[object.FlatReference, uint64, EpochIDResolver],
+	locationBlobMap LocationBlobMap,
+	epochList EpochList,
+) object.Store[object.FlatReference, struct{}] {
 	return &store{
-		objects: map[object.FlatReference]*object.Contents{},
+		lock:                 lock,
+		referenceLocationMap: referenceLocationMap,
+		locationBlobMap:      locationBlobMap,
+		epochList:            epochList,
 	}
 }
 
-func (s *store) DownloadObject(ctx context.Context, reference object.FlatReference) (*object.Contents, error) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+func (s *store) getObjectLocation(reference object.FlatReference) (uint64, bool, error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 
-	contents, ok := s.objects[reference]
-	if !ok {
-		return nil, status.Error(codes.NotFound, "Object not found")
+	location, err := s.referenceLocationMap.Get(reference, s.epochList)
+	// TODO: Determine whether object needs to be refreshed.
+	return location, false, err
+}
+
+func (s *store) readObjectAtLocation(reference object.FlatReference, location uint64) (*object.Contents, error) {
+	sizeBytes := reference.GetSizeBytes()
+	data, err := s.locationBlobMap.Get(location, sizeBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	contents, err := object.NewContentsFromFullData(reference.GetLocalReference(), data)
+	if err != nil {
+		// The data we read from disk was corrupted. This can
+		// happen due to misconfiguration (e.g., pointing
+		// multiple storage backends to the same block device)
+		// or actual data loss. It can also happen under normal
+		// operation if the object was positioned right after
+		// the write cursor, and additional objects were
+		// uploaded while the object was being read. This causes
+		// the object to be overwritten.
+		//
+		// Report the object as being absent. Also discard all
+		// data up to and including this object, as we can no
+		// longer trust that data.
+		s.lock.Lock()
+		s.epochList.DiscardUpToLocation(location + uint64(sizeBytes))
+		s.lock.Unlock()
+		return nil, status.Error(codes.NotFound, "Object was assumed to exist, but its contents were invalid")
+	}
+	return contents, nil
+}
+
+// maybeWriteObject writes an object to storage, if and only if it does
+// not exist or needs to be refreshed. This filters out redundant object
+// uploads or refreshes, which may occur if multiple clients interact
+// with the same object.
+func (s *store) maybeWriteObject(reference object.FlatReference, contents *object.Contents) error {
+	// Acquire a lock throughout the entire process to ensure that
+	// no data is written redundantly. Let the first byte of the
+	// reference determine which lock to acquire, so that we can
+	// still upload objects in parallel.
+	writeLock := &s.writeLocks[reference.GetRawFlatReference()[0]]
+	writeLock.Lock()
+	defer writeLock.Unlock()
+
+	// Check whether the object exists or needs to be refreshed.
+	if _, needsRefresh, err := s.getObjectLocation(reference); err != nil {
+		if status.Code(err) != codes.NotFound {
+			return err
+		}
+	} else if !needsRefresh {
+		return nil
+	}
+
+	// Object does not exist. Allocate space for storing the object
+	// and write its contents to disk.
+	data := contents.GetFullData()
+	location, err := s.locationBlobMap.Put(data)
+	if err != nil {
+		return err
+	}
+
+	s.lock.Lock()
+	err = s.epochList.FinalizeWriteUpToLocation(location + uint64(len(data)))
+	if err == nil {
+		err = s.referenceLocationMap.Put(reference, location, s.epochList)
+	}
+	s.lock.Unlock()
+	return err
+}
+
+func (s *store) DownloadObject(ctx context.Context, reference object.FlatReference) (*object.Contents, error) {
+	location, needsRefresh, err := s.getObjectLocation(reference)
+	if err != nil {
+		return nil, err
+	}
+	contents, err := s.readObjectAtLocation(reference, location)
+	if err != nil {
+		return nil, err
+	}
+	if needsRefresh {
+		if err := s.maybeWriteObject(reference, contents); err != nil {
+			return nil, err
+		}
 	}
 	return contents, nil
 }
 
 func (s *store) UploadObject(ctx context.Context, reference object.FlatReference, contents *object.Contents, childrenLeases []struct{}, wantContentsIfIncomplete bool) (object.UploadObjectResult[struct{}], error) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	if location, needsRefresh, err := s.getObjectLocation(reference); err != nil {
+		if status.Code(err) != codes.NotFound {
+			return nil, err
+		}
 
-	if _, ok := s.objects[reference]; !ok {
 		if contents == nil {
 			return object.UploadObjectMissing[struct{}]{}, nil
 		}
-		s.objects[reference] = contents
+		if err := s.maybeWriteObject(reference, contents); err != nil {
+			return nil, err
+		}
+	} else if needsRefresh {
+		if contents == nil {
+			contents, err = s.readObjectAtLocation(reference, location)
+			if err != nil {
+				if status.Code(err) != codes.NotFound {
+					return nil, err
+				}
+				return object.UploadObjectMissing[struct{}]{}, nil
+			}
+		}
+		if err := s.maybeWriteObject(reference, contents); err != nil {
+			return nil, err
+		}
 	}
 	return object.UploadObjectComplete[struct{}]{}, nil
 }

@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package bonanza.storage.object.local;
+
+option go_package = "bonanza.build/pkg/proto/storage/object/local";
+
+message EpochState {
+  // The randomized hash seed of the current epoch. The hash seed is
+  // necessary to validate the integrity of reference-location map
+  // entries.
+  fixed64 hash_seed = 1;
+
+  // The total number of bytes by which the offset at which locations to
+  // store objects was increased during this epoch.
+  uint64 location_increase = 2;
+}
+
+message PersistentState {
+  // The minimum epoch ID for which entries in the reference-location
+  // map may be interpreted. The next usable epoch ID can be computed as
+  // follows:
+  //
+  //     next_epoch_id = minimum_epoch_id + len(epochs)
+  uint32 minimum_epoch_id = 1;
+
+  // The minimum location for which entries in the reference-location
+  // map may be interpreted. The next usable location for writing new
+  // objects can be computed as follows:
+  //
+  //     next_location = minimum_location +
+  //                     sum(s.location_increase for s in epochs)
+  uint64 minimum_location = 2;
+
+  // The randomized hash seed that is used by the reference-location
+  // map. It needs to be preserved to ensure entries created by previous
+  // invocations can still be located.
+  uint64 reference_location_map_hash_initialization = 3;
+
+  // Epochs for which entries in the reference-location map exist that
+  // may point to valid locations in the objects block device.
+  //
+  // As epochs for which all entries in the reference-location map have
+  // expired are automatically removed, the following expression should
+  // not yield a value that exceeds the size of the block device:
+  //
+  //     sum(s.location_increase for s in epochs)
+  repeated EpochState epochs = 4;
+}

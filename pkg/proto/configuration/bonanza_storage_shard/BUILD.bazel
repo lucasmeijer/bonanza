@@ -7,6 +7,7 @@ proto_library(
     srcs = ["bonanza_storage_shard.proto"],
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/proto/configuration/storage/object/local:local_proto",
         "@com_github_buildbarn_bb_storage//pkg/proto/configuration/global:global_proto",
         "@com_github_buildbarn_bb_storage//pkg/proto/configuration/grpc:grpc_proto",
         "@protobuf//:duration_proto",
@@ -19,6 +20,7 @@ go_proto_library(
     proto = ":bonanza_storage_shard_proto",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/proto/configuration/storage/object/local",
         "@com_github_buildbarn_bb_storage//pkg/proto/configuration/global",
         "@com_github_buildbarn_bb_storage//pkg/proto/configuration/grpc",
     ],

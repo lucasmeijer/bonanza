@@ -1,0 +1,193 @@
+syntax = "proto3";
+
+package bonanza.configuration.storage.object.local;
+
+import "google/protobuf/duration.proto";
+import "pkg/proto/configuration/blockdevice/blockdevice.proto";
+
+option go_package = "bonanza.build/pkg/proto/configuration/storage/object/local";
+
+// The local object storage backend is responsible for storing objects
+// either in memory or on disk. It works by writing all objects to a
+// ring buffer named the location-blob map. A hash map named the
+// reference-location map is subsequently used to store where a given
+// record is stored in the location-blob map.
+//
+// The ring buffer is partitioned into three regions named "old",
+// "current" and "new". These regions denote how likely it is that the
+// data is overwritten in the nearby future. Data in the "new" region is
+// unlikely to be overwritten, while data in the "old" region is at
+// risk. This is why objects stored in the "old" region will be
+// refreshed (i.e., copied to the end of the ring buffer) when accessed.
+// Data in the "new" region will not be refreshed. Data in the "current"
+// region is refreshed with a linear probability that increases the
+// closer the object gets to the "old" region, which is done to amortize
+// the amount of refreshing that is performed.
+//
+// Below is an illustration of how the location-blob map may be laid out
+// at a given point in time.
+//
+//      ← Over time, data moves from "new" to "current" to "old" ←
+//                    Old     │   Current   │     New
+//               █████████████│█████████████│█████████████
+//               ↓↓↓↓↓↓↓↓↓↓↓↓↓│↓ ↓   ↓     ↓│             ↑
+//               └┴┴┴┴┴┴┴┴┴┴┴┴─┴─┴───┴─────┴──────────────┘
+//    Data is copied from "old" and "current" past "new" when requested.
+//
+// The size of the "old" region should not be too small, as this would
+// cause this storage backend to become a FIFO instead of being
+// LRU-like. Making "old" and "current" too large is also not
+// recommended, as this would increase redundancy in the data stored.
+message StoreConfiguration {
+  message ReferenceLocationMapInMemory {
+    // The reference-location map is a hash table that is used by this
+    // storage backend to resolve references to locations where data is
+    // stored. This option determines the size of this hash table.
+    // Because entries are small (56 bytes in size), it is recommended
+    // to make this map relatively large to reduce collisions.
+    //
+    // Recommended value: between 2 and 10 times the expected number of
+    // objects stored.
+    uint64 entries = 1;
+  }
+
+  // Data store for the metadata of objects. The following Prometheus
+  // queries may be used to determine whether insertion into the
+  // reference-location map caused other entries to be displaced
+  // prematurely:
+  //
+  // bonanza_lossymap_hash_map_put_iterations_count{name="ReferenceLocationMap",outcome="TooManyAttempts"}
+  // bonanza_lossymap_hash_map_put_too_many_iterations_total{name="ReferenceLocationMap"}
+  //
+  // If this query yields values greater than zero, you may need to
+  // increase this data store's size (or reduce the size of the
+  // location-blob map).
+  //
+  // Note that restarting bonanza_storage_shard causes these metrics to
+  // be reset, meaning that you may need to run bonanza_storage_shard
+  // for a longer amount of time to get better insight in whether
+  // objects are discarded prematurely.
+  oneof reference_location_map_backend {
+    // Store the reference-location map in memory.
+    ReferenceLocationMapInMemory reference_location_map_in_memory = 1;
+
+    // Store the reference-location map on a block device. The size of
+    // the block device determines the number of entries stored.
+    buildbarn.configuration.blockdevice.Configuration
+        reference_location_map_on_block_device = 2;
+  }
+
+  // The number of indices a Get() call on the reference-location map
+  // may attempt to access. The lower the utilization rate of the
+  // reference-location map, the lower this value may be set. For
+  // example, if the size of the reference-location map is set in such a
+  // way that it is only utilized by 10% (factor 0.1), setting this
+  // field to 16 means there is only a 0.1^16 chance that inserting an
+  // entry prematurely displaces another object from storage.
+  //
+  // Recommended value: 16
+  uint32 reference_location_map_maximum_get_attempts = 3;
+
+  // The number of mutations that a Put() on the reference-location map
+  // may perform. Because the reference-location map uses a scheme
+  // similar to Robin Hood hashing, insertions may cause other entries
+  // to be displaced. Those entries may then cause even more entries to
+  // be displaced. Because of that, it is recommended to set this field
+  // to a small multiple of the maximum Get() attempts.
+  //
+  // Recommended value: 64
+  int64 reference_location_map_maximum_put_attempts = 4;
+
+  message LocationBlobMapInMemory {
+    // The total size of the location-blob map, in bytes.
+    uint64 size_bytes = 1;
+  }
+
+  // The location-blob map is a data store for the actual contents of
+  // objects. The following Prometheus query may be used to determine
+  // the worst-case retention of this data store in seconds:
+  //
+  // [ TODO: Re-add metrics for this! ]
+  //
+  // If this query yields a value that is lower than desired, you may
+  // need to increase this data store's size.
+  //
+  // Note that restarting bonanza_storage_shard causes this metric to be
+  // reset, meaning that you may need to run bonanza_storage_shard for a
+  // longer amount of time to get better insight in the worst-case
+  // retention.
+  oneof location_blob_map_backend {
+    // Store all data in memory. For larger setups, this may place a lot
+    // of pressure on Go's garbage collector. It may be necessary to
+    // reduce the value of GOGC to use this option reliably.
+    LocationBlobMapInMemory location_blob_map_in_memory = 5;
+
+    // Store all data on a block device.
+    buildbarn.configuration.blockdevice.Configuration
+        location_blob_map_on_block_device = 6;
+  }
+
+  // The size of the "old" region in the location-blob map relative to
+  // that of the "current" and "new" regions.
+  //
+  // Recommended value: 1
+  uint32 old_region_size_ratio = 7;
+
+  // The size of the "current" region in the location-blob map relative
+  // to that of the "old" and "new" regions.
+  //
+  // Recommended value: 1
+  uint32 current_region_size_ratio = 8;
+
+  // The size of the "new" region in the location-blob map relative to
+  // that of the "old" and "current" regions.
+  //
+  // Recommended value: 3
+  uint32 new_region_size_ratio = 9;
+
+  message Persistent {
+    // Path to a directory on disk where metadata can be stored to be
+    // able to persist. This metadata needs to be reloaded on startup to
+    // be able to access previous data.
+    //
+    // This directory will hold a single file named "state", containing
+    // a Protobuf message of type
+    // bonanza.storage.object.local.PersistentState. It is not
+    // recommended to use this directory for any purpose other than
+    // storing the persistent state file, as fsync() is called on it
+    // regularly.
+    string state_directory_path = 1;
+
+    // The amount of time between fsync() calls against the block device
+    // used by the location-blob map. Setting this option to a lower
+    // value reduces the amount of data that may get lost across unclean
+    // shutdowns.
+    //
+    // This option acts as a lower bound on the amount of time between
+    // fsync() calls. No calls to fsync() are made if the system is
+    // idle, nor are multiple calls performed in parallel in case they
+    // take longer to complete than the configured interval.
+    //
+    // Care should be taken that this value is not set too low. Every
+    // epoch that still references valid data consumes 16 bytes of
+    // memory and increases the size of the state file by a similar
+    // amount. This means that if this option is set to '300s', epoch
+    // bookkeeping consumes up to 12*24*365*16 B = ~1.68 MB of space if
+    // the system were to operate for a full year without old data
+    // getting overwritten. Setting this to '1s' blows this up by a
+    // factor 300.
+    //
+    // Recommended value: '300s'
+    google.protobuf.Duration minimum_epoch_interval = 2;
+  }
+
+  // When set, persist data across restarts. This feature is only
+  // available when both the reference-location map and location-blob
+  // map are stored on a block device.
+  //
+  // When not set, data is not persisted. The data store will be empty
+  // every time the application is restarted. Existing entries in the
+  // reference-location map and location-blob map will be ignored, even
+  // if their contents are valid.
+  Persistent persistent = 10;
+}
