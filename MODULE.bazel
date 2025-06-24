@@ -26,13 +26,13 @@ git_override(
 
 git_override(
     module_name = "com_github_buildbarn_bb_remote_execution",
-    commit = "b66a0fb88d369f4b32cd76a8c83e1c719e778216",
+    commit = "9026467fdbe62ad29b5a52edea07111fac084bab",
     remote = "https://github.com/buildbarn/bb-remote-execution.git",
 )
 
 git_override(
     module_name = "com_github_buildbarn_bb_storage",
-    commit = "87ea1750ca4cd8716c5961bbb70637d9839a536b",
+    commit = "e5c5728f9dc5e0245931cc68ea4d46494766570c",
     patches = ["//:patches/com_github_buildbarn_bb_storage/no-golint.diff"],
     remote = "https://github.com/buildbarn/bb-storage.git",
 )
@@ -125,7 +125,7 @@ go_deps_dev.module_override(
 )
 go_deps_dev.module_override(
     patches = [
-        "@com_github_buildbarn_bb_remote_execution//:patches/org_uber_go_mock/generics.diff",
+        "@com_github_buildbarn_bb_storage//:patches/org_uber_go_mock/generics.diff",
         "@com_github_buildbarn_bb_storage//:patches/org_uber_go_mock/mocks-for-funcs.diff",
     ],
     path = "go.uber.org/mock",
