@@ -162,6 +162,7 @@ func TestUploader(t *testing.T) {
 					object.MustNewSHA256V1LocalReference("348a1c1a72e1a3dece7fabff7ac7c78faa06c8994b1573c929fad20da209890d", 95938, 13, 1, 958050),
 					object.MustNewSHA256V1LocalReference("4179d172c91a7487c2260c88b28b9892fc1305a904bac4e27af3b43464a08812", 774, 8, 2, 69493),
 					object.MustNewSHA256V1LocalReference("48b0846063ab6897a9cd156f11c7de1c07dabfeb02e0b60f1dca1f40e6d3ca2a", 5784, 10, 10, 85439),
+					object.MustNewSHA256V1LocalReference("9ac1fefc063b1334861bfe138a89259785df02cef445c36f7e33c8f7c9b56a2c", 48583, 0, 0, 0),
 				},
 				[]byte("Hello"),
 			)
@@ -177,7 +178,16 @@ func TestUploader(t *testing.T) {
 					/* wantContentsIfIncomplete = */ true,
 				).Return(object.UploadObjectIncomplete[any]{
 					Contents:                     contents,
-					WantOutgoingReferencesLeases: []int{1, 2},
+					WantOutgoingReferencesLeases: []int{1, 2, 3},
+				}, nil),
+				baseUploader.EXPECT().UploadObject(
+					gomock.Any(),
+					object.MustNewSHA256V1GlobalReference("hello/world", "9ac1fefc063b1334861bfe138a89259785df02cef445c36f7e33c8f7c9b56a2c", 48583, 0, 0, 0),
+					/* contents = */ nil,
+					/* childrenLeases = */ nil,
+					/* wantContentsIfIncomplete = */ false,
+				).Return(object.UploadObjectComplete[any]{
+					Lease: "Lease 1",
 				}, nil),
 				baseUploader.EXPECT().UploadObject(
 					gomock.Any(),
@@ -193,7 +203,7 @@ func TestUploader(t *testing.T) {
 					/* childrenLeases = */ nil,
 					/* wantContentsIfIncomplete = */ true,
 				).Return(object.UploadObjectComplete[any]{
-					Lease: "Lease 1",
+					Lease: "Lease 2",
 				}, nil),
 				baseUploader.EXPECT().UploadObject(
 					gomock.Any(),
@@ -205,16 +215,17 @@ func TestUploader(t *testing.T) {
 					[]any{
 						nil,
 						nil,
+						"Lease 2",
 						"Lease 1",
 					},
 					/* wantContentsIfIncomplete = */ false,
 				).Return(object.UploadObjectComplete[any]{
-					Lease: "Lease 2",
+					Lease: "Lease 3",
 				}, nil),
 			)
 
 			go func() {
-				for i := 0; i < 3; i++ {
+				for i := 0; i < 4; i++ {
 					require.True(t, uploader.ProcessSingleObject(ctx))
 				}
 			}()
@@ -230,7 +241,7 @@ func TestUploader(t *testing.T) {
 			)
 			require.NoError(t, err)
 			require.Equal(t, object.UploadObjectComplete[any]{
-				Lease: "Lease 2",
+				Lease: "Lease 3",
 			}, result)
 		})
 

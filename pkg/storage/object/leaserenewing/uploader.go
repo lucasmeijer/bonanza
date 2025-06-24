@@ -278,7 +278,7 @@ func (u *Uploader[TReference, TLease]) ProcessSingleObject(ctx context.Context) 
 			o.reference,
 			/* contents = */ nil,
 			/* childrenLeases = */ nil,
-			/* wantContentsIfIncomplete = */ true,
+			/* wantContentsIfIncomplete = */ o.reference.GetDegree() > 0,
 		)
 		u.objectStoreSemaphore.Release(1)
 
