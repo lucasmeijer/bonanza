@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package bonanza.configuration.bonanza_storage_shard;
 
+import "google/protobuf/duration.proto";
 import "pkg/proto/configuration/global/global.proto";
 import "pkg/proto/configuration/grpc/grpc.proto";
 
@@ -13,4 +14,74 @@ message ApplicationConfiguration {
 
   // gRPC servers to spawn to listen for requests from clients.
   repeated buildbarn.configuration.grpc.ServerConfiguration grpc_servers = 2;
+
+  // The size of the leases map.
+  //
+  // The leases map is an in-memory data structure that stores leases of
+  // all children of objects stored in the current shard. These leases
+  // track the completeness of graphs of objects, which is necessary for
+  // UploadDag() operations against the storage frontend to run
+  // efficiently.
+  //
+  // Each record of the leases map is less than 64 bytes in size, and
+  // records are stored contiguously. This means that it is generally
+  // safe to set this option to millions or more.
+  //
+  // The leases map needs to be large enough to not lose any records
+  // that haven't expired yet. The following Prometheus queries may be
+  // used to determine insertions into the leases map caused other
+  // records to be displaced prematurely:
+  //
+  // bonanza_lossymap_hash_map_put_iterations_count{name="LeasesMap",outcome="TooManyAttempts"}
+  // bonanza_lossymap_hash_map_put_too_many_iterations_total{name="LeasesMap"}
+  uint64 leases_map_records_count = 3;
+
+  // The maximum age a lease may have for a parent object using the
+  // lease to be considered complete.
+  //
+  // If a parent object references one or more children for which the
+  // lease's age exceeds twice this value, the storage frontend is
+  // instructed to renew the leases whose age exceeds this value.
+  //
+  // More concretely speaking, consider the case in which this option is
+  // set to the recommended value of 2 minutes. In this case a parent
+  // object is considered to be complete if the leases of all of its
+  // children are less than 4 minutes old. If one or more leases are
+  // more than 4 minutes old (or missing), the storage frontend has to
+  // renew all the leases that are at least 2 minutes old (or
+  // missing) to make the parent object complete again.
+  //
+  // What this means in practice is that for UploadDag() to work
+  // reliably (i.e., not reporting graphs as being present while in
+  // reality they are not), a storage replica may only be restarted if
+  // the other replica is healthy for at least
+  // 'height*leases_map_lease_completeness_duration' time, where
+  // 'height' refers to the height of the root node of the DAG that is
+  // being uploaded.
+  //
+  // Recommended value: 120s
+  google.protobuf.Duration leases_map_lease_completeness_duration = 4;
+
+  // The number of records a Get() call on the leases map may attempt
+  // to access.
+  //
+  // The lower the utilization rate of the leases map, the lower this
+  // value may be set. For example, if the size of the leases map is set
+  // in such a way that it is only utilized by 10% (factor 0.1), setting
+  // this field to 16 means there is only a 0.1^16 chance that inserting
+  // a record prematurely displaces another valid lease.
+  //
+  // Recommended value: 16
+  uint32 leases_map_maximum_get_attempts = 5;
+
+  // The number of mutations that a Put() on the leases map may perform.
+  //
+  // Because the leases map uses a scheme similar to Robin Hood hashing,
+  // insertions may cause other records to be displaced. Those records
+  // may then cause even more records to be displaced. Because of that,
+  // it is recommended to set this field to a small multiple of the
+  // maximum Get() attempts.
+  //
+  // Recommended value: 64
+  int64 leases_map_maximum_put_attempts = 6;
 }

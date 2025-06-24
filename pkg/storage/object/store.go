@@ -22,3 +22,7 @@ func NewStore[TReference, TLease any](downloader Downloader[TReference], uploade
 // StoreForTesting is an instantiation of Store for generating mocks to
 // be used by tests.
 type StoreForTesting Store[GlobalReference, any]
+
+// FlatStoreForTesting is an instantiation of Store for generating mocks
+// to be used by tests that use flat references.
+type FlatStoreForTesting Store[FlatReference, struct{}]

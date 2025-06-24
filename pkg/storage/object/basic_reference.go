@@ -15,6 +15,7 @@ type BasicReference interface {
 	GetReferenceFormat() ReferenceFormat
 	GetRawReference() []byte
 
-	// Conversion to a LocalReference with the same value.
+	// Conversion to other reference types with the same value.
 	GetLocalReference() LocalReference
+	Flatten() FlatReference
 }

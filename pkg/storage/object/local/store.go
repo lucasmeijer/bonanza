@@ -10,51 +10,39 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type storeObject struct {
-	contents *object.Contents
-	leases   []Lease
-}
-
 type store struct {
 	lock    sync.Mutex
-	objects map[object.LocalReference]*storeObject
+	objects map[object.FlatReference]*object.Contents
 }
 
 // NewStore creates an object store that uses locally connected disks as
 // its backing store.
-func NewStore() object.Store[object.LocalReference, Lease] {
+func NewStore() object.Store[object.FlatReference, struct{}] {
 	return &store{
-		objects: map[object.LocalReference]*storeObject{},
+		objects: map[object.FlatReference]*object.Contents{},
 	}
 }
 
-func (s *store) DownloadObject(ctx context.Context, reference object.LocalReference) (*object.Contents, error) {
+func (s *store) DownloadObject(ctx context.Context, reference object.FlatReference) (*object.Contents, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	o, ok := s.objects[reference]
+	contents, ok := s.objects[reference]
 	if !ok {
 		return nil, status.Error(codes.NotFound, "Object not found")
 	}
-	return o.contents, nil
+	return contents, nil
 }
 
-func (s *store) UploadObject(ctx context.Context, reference object.LocalReference, contents *object.Contents, childrenLeases []Lease, wantContentsIfIncomplete bool) (object.UploadObjectResult[Lease], error) {
+func (s *store) UploadObject(ctx context.Context, reference object.FlatReference, contents *object.Contents, childrenLeases []struct{}, wantContentsIfIncomplete bool) (object.UploadObjectResult[struct{}], error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	o, ok := s.objects[reference]
-	if !ok {
+	if _, ok := s.objects[reference]; !ok {
 		if contents == nil {
-			return object.UploadObjectMissing[Lease]{}, nil
+			return object.UploadObjectMissing[struct{}]{}, nil
 		}
-		o = &storeObject{
-			contents: contents,
-			leases:   make([]Lease, reference.GetDegree()),
-		}
-		s.objects[reference] = o
+		s.objects[reference] = contents
 	}
-
-	// TODO: Update leases, and report which ones are incomplete!
-	return object.UploadObjectComplete[Lease]{}, nil
+	return object.UploadObjectComplete[struct{}]{}, nil
 }

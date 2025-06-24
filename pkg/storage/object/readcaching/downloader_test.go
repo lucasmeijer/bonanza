@@ -20,14 +20,14 @@ func TestDownloader(t *testing.T) {
 	ctrl, ctx := gomock.WithContext(context.Background(), t)
 
 	slowDownloader := NewMockDownloaderForTesting(ctrl)
-	fastStore := NewMockStoreForTesting(ctrl)
+	fastStore := NewMockFlatStoreForTesting(ctrl)
 	downloader := readcaching.NewDownloader(slowDownloader, fastStore)
 
 	t.Run("FastBackendGetFailure", func(t *testing.T) {
 		// Internal errors returned by the fast storage backend
 		// should be propagated immediately.
 		fastStore.EXPECT().
-			DownloadObject(ctx, object.MustNewSHA256V1GlobalReference("example", "185f8db32271fe25f561a6fc938b2e264306ec304eda518007d1764826381969", 5038, 0, 0, 0)).
+			DownloadObject(ctx, object.MustNewSHA256V1FlatReference("185f8db32271fe25f561a6fc938b2e264306ec304eda518007d1764826381969", 5038)).
 			Return(nil, status.Error(codes.Internal, "Node unreachable"))
 
 		_, err := downloader.DownloadObject(ctx, object.MustNewSHA256V1GlobalReference("example", "185f8db32271fe25f561a6fc938b2e264306ec304eda518007d1764826381969", 5038, 1, 6, 0))
@@ -40,7 +40,7 @@ func TestDownloader(t *testing.T) {
 		// an object, we must manually validate the outgoing
 		// references contained in the object.
 		fastStore.EXPECT().
-			DownloadObject(ctx, object.MustNewSHA256V1GlobalReference("example", "527deddd1ace8a41a54d3768bfc35b41a5ab2a59be011b84b48fdee0753bdf5c", 45, 0, 0, 0)).
+			DownloadObject(ctx, object.MustNewSHA256V1FlatReference("527deddd1ace8a41a54d3768bfc35b41a5ab2a59be011b84b48fdee0753bdf5c", 45)).
 			Return(
 				object.MustNewContents(
 					object_pb.ReferenceFormat_SHA256_V1,
@@ -76,7 +76,7 @@ func TestDownloader(t *testing.T) {
 		// that can be unflattened into an object that matches
 		// the originally provided reference.
 		fastStore.EXPECT().
-			DownloadObject(ctx, object.MustNewSHA256V1GlobalReference("example", "796527480ab3eacff7e5fbe0d828527c9a0f06b448a2b200de9774e0efa1bb68", 85, 0, 0, 0)).
+			DownloadObject(ctx, object.MustNewSHA256V1FlatReference("796527480ab3eacff7e5fbe0d828527c9a0f06b448a2b200de9774e0efa1bb68", 85)).
 			Return(
 				object.MustNewContents(
 					object_pb.ReferenceFormat_SHA256_V1,
@@ -130,7 +130,7 @@ func TestDownloader(t *testing.T) {
 		// should be forwarded to the slow backend. Any errors
 		// returned by the slow backend should be propagated.
 		fastStore.EXPECT().
-			DownloadObject(ctx, object.MustNewSHA256V1GlobalReference("example", "b3a5b373cc386887a03d0c10e5d78c198480015c4c902b03267aed6a41f99fa5", 241, 0, 0, 0)).
+			DownloadObject(ctx, object.MustNewSHA256V1FlatReference("b3a5b373cc386887a03d0c10e5d78c198480015c4c902b03267aed6a41f99fa5", 241)).
 			Return(nil, status.Error(codes.NotFound, "Object not found"))
 		slowDownloader.EXPECT().
 			DownloadObject(ctx, object.MustNewSHA256V1GlobalReference("example", "b3a5b373cc386887a03d0c10e5d78c198480015c4c902b03267aed6a41f99fa5", 241, 12, 3, 51023)).
@@ -146,7 +146,7 @@ func TestDownloader(t *testing.T) {
 		// that outgoing references should now be stored at the
 		// start of the payload. Make the write fail.
 		fastStore.EXPECT().
-			DownloadObject(ctx, object.MustNewSHA256V1GlobalReference("example", "16cdd68fd8f9ccc88a1346a7faf8f36cc3935babc8a99d609a9725bf071c6a6f", 85, 0, 0, 0)).
+			DownloadObject(ctx, object.MustNewSHA256V1FlatReference("16cdd68fd8f9ccc88a1346a7faf8f36cc3935babc8a99d609a9725bf071c6a6f", 85)).
 			Return(nil, status.Error(codes.NotFound, "Object not found"))
 		slowDownloader.EXPECT().
 			DownloadObject(ctx, object.MustNewSHA256V1GlobalReference("example", "16cdd68fd8f9ccc88a1346a7faf8f36cc3935babc8a99d609a9725bf071c6a6f", 85, 15, 2, 585697)).
@@ -162,8 +162,8 @@ func TestDownloader(t *testing.T) {
 				nil,
 			)
 		fastStore.EXPECT().
-			UploadObject(ctx, object.MustNewSHA256V1GlobalReference("example", "16cdd68fd8f9ccc88a1346a7faf8f36cc3935babc8a99d609a9725bf071c6a6f", 85, 0, 0, 0), gomock.Any(), gomock.Len(0), false).
-			DoAndReturn(func(ctx context.Context, reference object.GlobalReference, objectContents *object.Contents, leases []any, wantContentsIfIncomplete bool) (object.UploadObjectResult[any], error) {
+			UploadObject(ctx, object.MustNewSHA256V1FlatReference("16cdd68fd8f9ccc88a1346a7faf8f36cc3935babc8a99d609a9725bf071c6a6f", 85), gomock.Any(), gomock.Len(0), false).
+			DoAndReturn(func(ctx context.Context, reference object.FlatReference, objectContents *object.Contents, leases []struct{}, wantContentsIfIncomplete bool) (object.UploadObjectResult[struct{}], error) {
 				require.Equal(t, object.MustNewSHA256V1LocalReference("16cdd68fd8f9ccc88a1346a7faf8f36cc3935babc8a99d609a9725bf071c6a6f", 85, 0, 0, 0), objectContents.GetLocalReference())
 				require.Equal(t, []byte{
 					// SHA-256 hash.
@@ -209,7 +209,7 @@ func TestDownloader(t *testing.T) {
 		// Request to object that did not exist in the fast backend,
 		// and got mirrored from the slow backend successfully.
 		fastStore.EXPECT().
-			DownloadObject(ctx, object.MustNewSHA256V1GlobalReference("example", "e0643f027c868b649cba8f131459b5f1217c9897080a11391f1f9f6e53e7aa68", 45, 0, 0, 0)).
+			DownloadObject(ctx, object.MustNewSHA256V1FlatReference("e0643f027c868b649cba8f131459b5f1217c9897080a11391f1f9f6e53e7aa68", 45)).
 			Return(nil, status.Error(codes.NotFound, "Object not found"))
 		slowDownloader.EXPECT().
 			DownloadObject(ctx, object.MustNewSHA256V1GlobalReference("example", "e0643f027c868b649cba8f131459b5f1217c9897080a11391f1f9f6e53e7aa68", 45, 2, 1, 50)).
@@ -224,8 +224,8 @@ func TestDownloader(t *testing.T) {
 				nil,
 			)
 		fastStore.EXPECT().
-			UploadObject(ctx, object.MustNewSHA256V1GlobalReference("example", "e0643f027c868b649cba8f131459b5f1217c9897080a11391f1f9f6e53e7aa68", 45, 0, 0, 0), gomock.Any(), gomock.Len(0), false).
-			DoAndReturn(func(ctx context.Context, reference object.GlobalReference, objectContents *object.Contents, leases []any, wantContentsIfIncomplete bool) (object.UploadObjectResult[any], error) {
+			UploadObject(ctx, object.MustNewSHA256V1FlatReference("e0643f027c868b649cba8f131459b5f1217c9897080a11391f1f9f6e53e7aa68", 45), gomock.Any(), gomock.Len(0), false).
+			DoAndReturn(func(ctx context.Context, reference object.FlatReference, objectContents *object.Contents, leases []struct{}, wantContentsIfIncomplete bool) (object.UploadObjectResult[struct{}], error) {
 				require.Equal(t, object.MustNewSHA256V1LocalReference("e0643f027c868b649cba8f131459b5f1217c9897080a11391f1f9f6e53e7aa68", 45, 0, 0, 0), objectContents.GetLocalReference())
 				require.Equal(t, []byte{
 					// SHA-256 hash.
@@ -246,9 +246,7 @@ func TestDownloader(t *testing.T) {
 					0x48, 0x65, 0x6c, 0x6c, 0x6f,
 				}, objectContents.GetPayload())
 
-				return object.UploadObjectComplete[any]{
-					Lease: "Lease",
-				}, nil
+				return object.UploadObjectComplete[struct{}]{}, nil
 			})
 
 		objectContents, err := downloader.DownloadObject(ctx, object.MustNewSHA256V1GlobalReference("example", "e0643f027c868b649cba8f131459b5f1217c9897080a11391f1f9f6e53e7aa68", 45, 2, 1, 50))

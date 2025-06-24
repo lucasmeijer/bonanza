@@ -28,19 +28,6 @@ func (r GlobalReference) GetNamespace() Namespace {
 	}
 }
 
-// Flatten a reference, so that its height and degree are both zero.
-//
-// This is used by the read caching backend, where we want to cache
-// individual objects as opposed to graphs. When writing objects to the
-// local cache, we set the height and degree to zero, so that there is
-// no need to track any leases.
-func (r GlobalReference) Flatten() GlobalReference {
-	return GlobalReference{
-		InstanceName:   r.InstanceName,
-		LocalReference: r.LocalReference.Flatten(),
-	}
-}
-
 // CompareByHeight returns -1 if the reference comes before another
 // reference along a total order based on the references' height and
 // maximum total parents size. Conversely, it returns 1 if the reference

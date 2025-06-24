@@ -1,0 +1,76 @@
+load("@rules_go//extras:gomock.bzl", "gomock")
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "flatbacked",
+    srcs = [
+        "lease.go",
+        "store.go",
+    ],
+    importpath = "github.com/buildbarn/bonanza/pkg/storage/object/flatbacked",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/ds/lossymap",
+        "//pkg/encoding/varint",
+        "//pkg/storage/object",
+        "//pkg/storage/object/leasemarshaling",
+        "@com_github_buildbarn_bb_storage//pkg/clock",
+        "@com_github_buildbarn_bb_storage//pkg/util",
+        "@org_golang_google_grpc//codes",
+        "@org_golang_google_grpc//status",
+    ],
+)
+
+go_test(
+    name = "flatbacked_test",
+    srcs = [
+        "mocks_clock_test.go",
+        "mocks_flatbacked_test.go",
+        "mocks_object_test.go",
+        "store_test.go",
+    ],
+    embed = [":flatbacked"],
+    deps = [
+        "//pkg/proto/storage/object",
+        "//pkg/storage/object",
+        "@com_github_buildbarn_bb_storage//pkg/clock",  # keep
+        "@com_github_buildbarn_bb_storage//pkg/testutil",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_google_grpc//codes",
+        "@org_golang_google_grpc//status",
+        "@org_uber_go_mock//gomock",
+    ],
+)
+
+gomock(
+    name = "mocks_clock",
+    out = "mocks_clock_test.go",
+    interfaces = ["Clock"],
+    library = "@com_github_buildbarn_bb_storage//pkg/clock",
+    mockgen_model_library = "@org_uber_go_mock//mockgen/model",
+    mockgen_tool = "@org_uber_go_mock//mockgen",
+    package = "flatbacked_test",
+)
+
+gomock(
+    name = "mocks_flatbacked",
+    out = "mocks_flatbacked_test.go",
+    interfaces = ["LeasesMap"],
+    library = "//pkg/storage/object/flatbacked",
+    mockgen_model_library = "@org_uber_go_mock//mockgen/model",
+    mockgen_tool = "@org_uber_go_mock//mockgen",
+    package = "flatbacked_test",
+)
+
+gomock(
+    name = "mocks_object",
+    out = "mocks_object_test.go",
+    interfaces = [
+        "DownloaderForTesting",
+        "FlatStoreForTesting",
+    ],
+    library = "//pkg/storage/object",
+    mockgen_model_library = "@org_uber_go_mock//mockgen/model",
+    mockgen_tool = "@org_uber_go_mock//mockgen",
+    package = "flatbacked_test",
+)

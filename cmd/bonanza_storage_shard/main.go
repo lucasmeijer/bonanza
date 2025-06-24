@@ -2,16 +2,20 @@ package main
 
 import (
 	"context"
+	"math/rand/v2"
 	"os"
 
+	"github.com/buildbarn/bb-storage/pkg/clock"
 	"github.com/buildbarn/bb-storage/pkg/global"
 	bb_grpc "github.com/buildbarn/bb-storage/pkg/grpc"
 	"github.com/buildbarn/bb-storage/pkg/program"
 	"github.com/buildbarn/bb-storage/pkg/util"
+	"github.com/buildbarn/bonanza/pkg/ds/lossymap"
 	"github.com/buildbarn/bonanza/pkg/proto/configuration/bonanza_storage_shard"
 	object_pb "github.com/buildbarn/bonanza/pkg/proto/storage/object"
 	tag_pb "github.com/buildbarn/bonanza/pkg/proto/storage/tag"
 	"github.com/buildbarn/bonanza/pkg/storage/object"
+	object_flatbacked "github.com/buildbarn/bonanza/pkg/storage/object/flatbacked"
 	object_leasemarshaling "github.com/buildbarn/bonanza/pkg/storage/object/leasemarshaling"
 	object_local "github.com/buildbarn/bonanza/pkg/storage/object/local"
 	object_namespacemapping "github.com/buildbarn/bonanza/pkg/storage/object/namespacemapping"
@@ -38,9 +42,56 @@ func main() {
 			return util.StatusWrap(err, "Failed to apply global configuration options")
 		}
 
-		objectStore := object_local.NewStore()
+		// Construct a flat storage backend for objects. Put an
+		// in-memory store for leases in front of it, so that
+		// UploadDag() can reliably enforce that clients upload
+		// complete DAGs.
+		leaseCompletenessDuration := configuration.LeasesMapLeaseCompletenessDuration
+		if err := leaseCompletenessDuration.CheckValid(); err != nil {
+			return util.StatusWrap(err, "Invalid leases map lease completeness duration")
+		}
+		leaseComparator := func(a, b *object_flatbacked.Lease) int {
+			if *a < *b {
+				return -1
+			}
+			if *a > *b {
+				return 1
+			}
+			return 0
+		}
+		hashInitialization := rand.Uint64()
+		objectStore := object_flatbacked.NewStore(
+			object_local.NewStore(),
+			clock.SystemClock,
+			leaseCompletenessDuration.AsDuration(),
+			lossymap.NewHashMap(
+				lossymap.NewSimpleRecordArray[object.LocalReference](
+					int(configuration.LeasesMapRecordsCount),
+					leaseComparator,
+				),
+				/* recordKeyHasher = */ func(k *lossymap.RecordKey[object.LocalReference]) uint64 {
+					h := hashInitialization
+					for _, c := range k.Key.GetRawReference() {
+						h ^= uint64(c)
+						h *= 1099511628211
+					}
+					attempt := k.Attempt
+					for i := 0; i < 4; i++ {
+						h ^= uint64(attempt & 0xff)
+						h *= 1099511628211
+						attempt >>= 8
+					}
+					return h
+				},
+				configuration.LeasesMapRecordsCount,
+				leaseComparator,
+				configuration.LeasesMapMaximumGetAttempts,
+				int(configuration.LeasesMapMaximumPutAttempts),
+				"LeasesMap",
+			),
+		)
 		tagStore := tag_local.NewStore()
-		leaseMarshaler := object_local.LeaseMarshaler
+		leaseMarshaler := object_flatbacked.LeaseMarshaler
 
 		if err := bb_grpc.NewServersFromConfigurationAndServe(
 			configuration.GrpcServers,

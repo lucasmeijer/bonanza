@@ -10,19 +10,9 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// Reference is a constraint on reference types accepted by
-// NewDownloader(). This backend is only capable of accepting references
-// that can be flattened (i.e., have their outgoing references be
-// stripped and height reduced to zero).
-type Reference[T any] interface {
-	object.BasicReference
-
-	Flatten() T
-}
-
-type downloader[TReference Reference[TReference], TLeaseFast any] struct {
+type downloader[TReference object.BasicReference, TLeaseFast any] struct {
 	slow object.Downloader[TReference]
-	fast object.Store[TReference, TLeaseFast]
+	fast object.Store[object.FlatReference, TLeaseFast]
 }
 
 // NewDownloader creates a decorator for object.Downloader that adds
@@ -33,7 +23,7 @@ type downloader[TReference Reference[TReference], TLeaseFast any] struct {
 // the fast backend prior to returning.
 //
 // Writes always go to the fast backend.
-func NewDownloader[TReference Reference[TReference], TLeaseFast any](slow object.Downloader[TReference], fast object.Store[TReference, TLeaseFast]) object.Downloader[TReference] {
+func NewDownloader[TReference object.BasicReference, TLeaseFast any](slow object.Downloader[TReference], fast object.Store[object.FlatReference, TLeaseFast]) object.Downloader[TReference] {
 	return &downloader[TReference, TLeaseFast]{
 		slow: slow,
 		fast: fast,
@@ -65,7 +55,7 @@ func (d *downloader[TReference, TLeaseFast]) DownloadObject(ctx context.Context,
 	result, err := d.fast.UploadObject(
 		ctx,
 		flatReference,
-		objectContents.Flatten(),
+		objectContents.FlattenContents(),
 		/* childrenLeases = */ nil,
 		/* wantContentsIfIncomplete = */ false,
 	)

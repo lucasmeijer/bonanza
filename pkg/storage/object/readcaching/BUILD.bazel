@@ -17,8 +17,8 @@ go_library(
 go_test(
     name = "readcaching_test",
     srcs = [
+        "downloader_test.go",
         "mocks_object_test.go",
-        "read_caching_downloader_test.go",
     ],
     embed = [":readcaching"],
     deps = [
@@ -37,7 +37,7 @@ gomock(
     out = "mocks_object_test.go",
     interfaces = [
         "DownloaderForTesting",
-        "StoreForTesting",
+        "FlatStoreForTesting",
     ],
     library = "//pkg/storage/object",
     mockgen_model_library = "@org_uber_go_mock//mockgen/model",

@@ -153,8 +153,8 @@ func (r LocalReference) GetMaximumTotalParentsSizeBytes(includeSelf bool) int {
 // individual objects as opposed to graphs. When writing objects to the
 // local cache, we set the height and degree to zero, so that there is
 // no need to track any leases.
-func (r LocalReference) Flatten() (flatReference LocalReference) {
-	copy(flatReference.rawReference[:35], r.rawReference[:35])
+func (r LocalReference) Flatten() (flatReference FlatReference) {
+	copy(flatReference.rawReference[:], r.rawReference[:])
 	return
 }
 

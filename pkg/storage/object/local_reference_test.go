@@ -169,7 +169,7 @@ func TestLocalReference(t *testing.T) {
 
 			// Flattening an object with degree 0 should
 			// have no effect.
-			require.Equal(t, reference, reference.Flatten())
+			require.Equal(t, reference, reference.Flatten().GetLocalReference())
 		})
 
 		t.Run("LargestPossibleObject", func(t *testing.T) {
@@ -218,7 +218,7 @@ func TestLocalReference(t *testing.T) {
 				0x00, 0x00,
 				// Maximum parents total size in bytes.
 				0x00, 0x00,
-			}, reference.Flatten().GetRawReference())
+			}, reference.Flatten().GetLocalReference().GetRawReference())
 		})
 	})
 }

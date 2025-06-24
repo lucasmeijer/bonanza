@@ -107,15 +107,15 @@ func (c *Contents) cloneWithReference(r LocalReference) *Contents {
 	}
 }
 
-// Flatten the reference of the object, so that its height and degree
-// are both zero.
+// FlattenContents flattens the reference of the object, so that its
+// height and degree are both zero.
 //
 // This is used by the read caching backend, where we want to cache
 // individual objects as opposed to graphs. When writing objects to the
 // local cache, we set the height and degree to zero, so that there is
 // no need to track any leases.
-func (c *Contents) Flatten() *Contents {
-	return c.cloneWithReference(c.LocalReference.Flatten())
+func (c *Contents) FlattenContents() *Contents {
+	return c.cloneWithReference(c.LocalReference.Flatten().GetLocalReference())
 }
 
 func (c *Contents) validateOutgoingReferences() error {

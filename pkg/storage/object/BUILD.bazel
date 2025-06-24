@@ -8,6 +8,7 @@ go_library(
         "contents.go",
         "downloader.go",
         "downloader_server.go",
+        "flat_reference.go",
         "global_reference.go",
         "instance_name.go",
         "limit.go",
