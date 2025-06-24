@@ -1,0 +1,49 @@
+load("@rules_go//extras:gomock.bzl", "gomock")
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "lossymap",
+    srcs = [
+        "hash_map.go",
+        "map.go",
+        "record_array.go",
+        "simple_record_array.go",
+    ],
+    importpath = "github.com/buildbarn/bonanza/pkg/ds/lossymap",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_prometheus_client_golang//prometheus",
+        "@org_golang_google_grpc//codes",
+        "@org_golang_google_grpc//status",
+    ],
+)
+
+go_test(
+    name = "lossymap_test",
+    srcs = [
+        "hash_map_test.go",
+        "mocks_lossymap_test.go",
+    ],
+    embed = [":lossymap"],
+    deps = [
+        "@com_github_buildbarn_bb_storage//pkg/testutil",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_google_grpc//codes",
+        "@org_golang_google_grpc//status",
+        "@org_uber_go_mock//gomock",
+    ],
+)
+
+gomock(
+    name = "mocks_lossymap",
+    out = "mocks_lossymap_test.go",
+    interfaces = [
+        "RecordArrayForTesting",
+        "RecordKeyHasherForTesting",
+        "ValueComparatorForTesting",
+    ],
+    library = "//pkg/ds/lossymap",
+    mockgen_model_library = "@org_uber_go_mock//mockgen/model",
+    mockgen_tool = "@org_uber_go_mock//mockgen",
+    package = "lossymap_test",
+)
