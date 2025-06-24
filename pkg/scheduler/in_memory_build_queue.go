@@ -48,8 +48,8 @@ var (
 
 	inMemoryBuildQueueInFlightDeduplicationsTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: "buildbarn",
-			Subsystem: "builder",
+			Namespace: "bonanza",
+			Subsystem: "scheduler",
 			Name:      "in_memory_build_queue_in_flight_deduplications_total",
 			Help:      "Number of times an Execute() request of a cacheable action was performed, and whether it was in-flight deduplicated against an existing task.",
 		},
@@ -57,32 +57,32 @@ var (
 
 	inMemoryBuildQueueInvocationsCreatedTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: "buildbarn",
-			Subsystem: "builder",
+			Namespace: "bonanza",
+			Subsystem: "scheduler",
 			Name:      "in_memory_build_queue_invocations_created_total",
 			Help:      "Number of times an invocation object was created by creating a size class queue or scheduling a task through Execute().",
 		},
 		[]string{"pkix_public_key", "size_class", "depth"})
 	inMemoryBuildQueueInvocationsActivatedTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: "buildbarn",
-			Subsystem: "builder",
+			Namespace: "bonanza",
+			Subsystem: "scheduler",
 			Name:      "in_memory_build_queue_invocations_activated_total",
 			Help:      "Number of times an invocation object transitioned from being idle to having queued or executing operations.",
 		},
 		[]string{"pkix_public_key", "size_class", "depth"})
 	inMemoryBuildQueueInvocationsDeactivatedTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: "buildbarn",
-			Subsystem: "builder",
+			Namespace: "bonanza",
+			Subsystem: "scheduler",
 			Name:      "in_memory_build_queue_invocations_deactivated_total",
 			Help:      "Number of times an invocation object transitioned from having queued or executing operations to being idle.",
 		},
 		[]string{"pkix_public_key", "size_class", "depth"})
 	inMemoryBuildQueueInvocationsRemovedTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: "buildbarn",
-			Subsystem: "builder",
+			Namespace: "bonanza",
+			Subsystem: "scheduler",
 			Name:      "in_memory_build_queue_invocations_removed_total",
 			Help:      "Number of times an invocation object was removed.",
 		},
@@ -90,16 +90,16 @@ var (
 
 	inMemoryBuildQueueTasksScheduledTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: "buildbarn",
-			Subsystem: "builder",
+			Namespace: "bonanza",
+			Subsystem: "scheduler",
 			Name:      "in_memory_build_queue_tasks_scheduled_total",
 			Help:      "Number of times tasks were scheduled, either by calling Execute() or through initial size class selection retries.",
 		},
 		[]string{"pkix_public_key", "size_class", "assignment"})
 	inMemoryBuildQueueTasksQueuedDurationSeconds = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Namespace: "buildbarn",
-			Subsystem: "builder",
+			Namespace: "bonanza",
+			Subsystem: "scheduler",
 			Name:      "in_memory_build_queue_tasks_queued_duration_seconds",
 			Help:      "Time in seconds that tasks were queued before executing.",
 			Buckets:   util.DecimalExponentialBuckets(-3, 6, 2),
@@ -107,8 +107,8 @@ var (
 		[]string{"pkix_public_key", "size_class"})
 	inMemoryBuildQueueTasksExecutingDurationSeconds = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Namespace: "buildbarn",
-			Subsystem: "builder",
+			Namespace: "bonanza",
+			Subsystem: "scheduler",
 			Name:      "in_memory_build_queue_tasks_executing_duration_seconds",
 			Help:      "Time in seconds that tasks were executing before completing.",
 			Buckets:   util.DecimalExponentialBuckets(-3, 6, 2),
@@ -116,8 +116,8 @@ var (
 		[]string{"pkix_public_key", "size_class", "result", "grpc_code"})
 	inMemoryBuildQueueTasksExecutingRetries = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Namespace: "buildbarn",
-			Subsystem: "builder",
+			Namespace: "bonanza",
+			Subsystem: "scheduler",
 			Name:      "in_memory_build_queue_tasks_executing_retries",
 			Help:      "Number of times that tasks were retried before completing.",
 			Buckets:   prometheus.LinearBuckets(0, 1, 11),
@@ -125,8 +125,8 @@ var (
 		[]string{"pkix_public_key", "size_class", "result", "grpc_code"})
 	inMemoryBuildQueueTasksCompletedDurationSeconds = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Namespace: "buildbarn",
-			Subsystem: "builder",
+			Namespace: "bonanza",
+			Subsystem: "scheduler",
 			Name:      "in_memory_build_queue_tasks_completed_duration_seconds",
 			Help:      "Time in seconds that tasks were completed before being removed.",
 			Buckets:   util.DecimalExponentialBuckets(-3, 6, 2),
@@ -135,24 +135,24 @@ var (
 
 	inMemoryBuildQueueWorkersCreatedTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: "buildbarn",
-			Subsystem: "builder",
+			Namespace: "bonanza",
+			Subsystem: "scheduler",
 			Name:      "in_memory_build_queue_workers_created_total",
 			Help:      "Number of workers created by Synchronize().",
 		},
 		[]string{"pkix_public_key", "size_class"})
 	inMemoryBuildQueueWorkersTerminatingTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: "buildbarn",
-			Subsystem: "builder",
+			Namespace: "bonanza",
+			Subsystem: "scheduler",
 			Name:      "in_memory_build_queue_workers_terminating_total",
 			Help:      "Number of workers that have entered the terminating state.",
 		},
 		[]string{"pkix_public_key", "size_class"})
 	inMemoryBuildQueueWorkersRemovedTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: "buildbarn",
-			Subsystem: "builder",
+			Namespace: "bonanza",
+			Subsystem: "scheduler",
 			Name:      "in_memory_build_queue_workers_removed_total",
 			Help:      "Number of workers removed due to expiration.",
 		},
@@ -160,8 +160,8 @@ var (
 
 	inMemoryBuildQueueWorkerInvocationStickinessRetained = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Namespace: "buildbarn",
-			Subsystem: "builder",
+			Namespace: "bonanza",
+			Subsystem: "scheduler",
 			Name:      "in_memory_build_queue_worker_invocation_stickiness_retained",
 			Help:      "How many levels of worker invocation stickiness were respected, as configured through worker_invocation_stickiness_limits.",
 			Buckets:   prometheus.LinearBuckets(0, 1, 11),
