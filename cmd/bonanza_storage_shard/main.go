@@ -85,7 +85,7 @@ func main() {
 				},
 				configuration.LeasesMapRecordsCount,
 				leaseComparator,
-				configuration.LeasesMapMaximumGetAttempts,
+				uint8(configuration.LeasesMapMaximumGetAttempts),
 				int(configuration.LeasesMapMaximumPutAttempts),
 				"LeasesMap",
 			),

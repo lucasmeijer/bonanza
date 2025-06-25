@@ -9,7 +9,7 @@ import (
 // the index at which the record is stored in the RecordArray.
 type RecordKey[TKey comparable] struct {
 	Key     TKey
-	Attempt uint32
+	Attempt uint8
 }
 
 // Record of a key-value pair to store in the RecordArray that backs the

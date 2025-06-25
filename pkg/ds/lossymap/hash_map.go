@@ -68,7 +68,7 @@ type hashMap[TKey comparable, TValue, TExpirationData any] struct {
 	recordCount        uint64
 	recordKeyHasher    RecordKeyHasher[TKey]
 	valueComparator    ValueComparator[TValue]
-	maximumGetAttempts uint32
+	maximumGetAttempts uint8
 	maximumPutAttempts int
 
 	getNotFound        prometheus.Observer
@@ -96,7 +96,7 @@ func NewHashMap[TKey comparable, TValue, TExpirationData any](
 	recordKeyHasher RecordKeyHasher[TKey],
 	recordCount uint64,
 	valueComparator ValueComparator[TValue],
-	maximumGetAttempts uint32,
+	maximumGetAttempts uint8,
 	maximumPutAttempts int,
 	name string,
 ) Map[TKey, TValue, TExpirationData] {
