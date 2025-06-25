@@ -187,7 +187,7 @@ func captureLog(ctx context.Context, buildDirectory virtual.PrepopulatedDirector
 		}
 		fileContents, err := model_filesystem.CreateChunkDiscardingFileMerkleTree(ctx, fileCreationParameters, openReadFrozen.Reader)
 		if err != nil {
-			return model_core.PatchedMessage[*model_filesystem_pb.FileContents, dag.ObjectContentsWalker]{}, util.StatusWrap(openReadFrozen.Err, "Failed to create file Merkle tree")
+			return model_core.PatchedMessage[*model_filesystem_pb.FileContents, dag.ObjectContentsWalker]{}, util.StatusWrap(err, "Failed to create file Merkle tree")
 		}
 		return fileContents, nil
 	}
