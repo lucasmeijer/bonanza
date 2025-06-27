@@ -496,7 +496,7 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 			url.PathEscape(instanceName.String()),
 			referenceFormat.ToProto().String(),
 			buildSpecificationReferenceStr,
-			"message",
+			"proto",
 			"bonanza.model.build.BuildSpecification",
 		); err == nil {
 			buildSpecificationLink = formatted.Link(buildSpecificationURL, buildSpecificationLink)
