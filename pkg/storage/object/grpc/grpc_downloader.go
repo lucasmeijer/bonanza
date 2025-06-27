@@ -3,9 +3,10 @@ package grpc
 import (
 	"context"
 
+	object_pb "bonanza.build/pkg/proto/storage/object"
+	"bonanza.build/pkg/storage/object"
+
 	"github.com/buildbarn/bb-storage/pkg/util"
-	object_pb "github.com/buildbarn/bonanza/pkg/proto/storage/object"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
 
 	"google.golang.org/grpc/codes"
 )

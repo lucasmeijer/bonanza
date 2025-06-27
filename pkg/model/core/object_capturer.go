@@ -1,8 +1,8 @@
 package core
 
 import (
-	"github.com/buildbarn/bonanza/pkg/storage/dag"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
+	"bonanza.build/pkg/storage/dag"
+	"bonanza.build/pkg/storage/object"
 
 	"google.golang.org/protobuf/proto"
 )

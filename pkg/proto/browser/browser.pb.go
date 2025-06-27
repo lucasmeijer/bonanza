@@ -7,7 +7,7 @@
 package browser
 
 import (
-	encoding "github.com/buildbarn/bonanza/pkg/proto/model/encoding"
+	encoding "bonanza.build/pkg/proto/model/encoding"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -193,7 +193,7 @@ const file_pkg_proto_browser_browser_proto_rawDesc = "" +
 	"\n" +
 	"field_name\x18\x03 \x01(\tR\tfieldName\"p\n" +
 	"\x06Cookie\x12f\n" +
-	"\x1arecently_observed_encoders\x18\x01 \x03(\v2(.bonanza.browser.RecentlyObservedEncoderR\x18recentlyObservedEncodersB0Z.github.com/buildbarn/bonanza/pkg/proto/browserb\x06proto3"
+	"\x1arecently_observed_encoders\x18\x01 \x03(\v2(.bonanza.browser.RecentlyObservedEncoderR\x18recentlyObservedEncodersB!Z\x1fbonanza.build/pkg/proto/browserb\x06proto3"
 
 var (
 	file_pkg_proto_browser_browser_proto_rawDescOnce sync.Once

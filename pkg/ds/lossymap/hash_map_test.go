@@ -3,8 +3,9 @@ package lossymap_test
 import (
 	"testing"
 
+	"bonanza.build/pkg/ds/lossymap"
+
 	"github.com/buildbarn/bb-storage/pkg/testutil"
-	"github.com/buildbarn/bonanza/pkg/ds/lossymap"
 	"github.com/stretchr/testify/require"
 
 	"google.golang.org/grpc/codes"

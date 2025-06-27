@@ -7,7 +7,7 @@
 package tag
 
 import (
-	object "github.com/buildbarn/bonanza/pkg/proto/storage/object"
+	object "bonanza.build/pkg/proto/storage/object"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	anypb "google.golang.org/protobuf/types/known/anypb"
@@ -225,7 +225,7 @@ const file_pkg_proto_storage_tag_tag_proto_rawDesc = "" +
 	"\n" +
 	"ResolveTag\x12&.bonanza.storage.tag.ResolveTagRequest\x1a'.bonanza.storage.tag.ResolveTagResponse2U\n" +
 	"\aUpdater\x12J\n" +
-	"\tUpdateTag\x12%.bonanza.storage.tag.UpdateTagRequest\x1a\x16.google.protobuf.EmptyB4Z2github.com/buildbarn/bonanza/pkg/proto/storage/tagb\x06proto3"
+	"\tUpdateTag\x12%.bonanza.storage.tag.UpdateTagRequest\x1a\x16.google.protobuf.EmptyB%Z#bonanza.build/pkg/proto/storage/tagb\x06proto3"
 
 var (
 	file_pkg_proto_storage_tag_tag_proto_rawDescOnce sync.Once

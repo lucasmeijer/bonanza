@@ -8,7 +8,7 @@ import "pkg/proto/configuration/grpc/grpc.proto";
 import "pkg/proto/configuration/http/http.proto";
 import "pkg/proto/configuration/model/parser/parser.proto";
 
-option go_package = "github.com/buildbarn/bonanza/pkg/proto/configuration/bonanza_builder";
+option go_package = "bonanza.build/pkg/proto/configuration/bonanza_builder";
 
 message ApplicationConfiguration {
   // Common configuration options that apply to all Buildbarn binaries.

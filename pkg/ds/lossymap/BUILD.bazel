@@ -9,7 +9,7 @@ go_library(
         "record_array.go",
         "simple_record_array.go",
     ],
-    importpath = "github.com/buildbarn/bonanza/pkg/ds/lossymap",
+    importpath = "bonanza.build/pkg/ds/lossymap",
     visibility = ["//visibility:public"],
     deps = [
         "@com_github_prometheus_client_golang//prometheus",

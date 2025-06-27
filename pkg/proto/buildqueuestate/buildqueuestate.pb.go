@@ -7,7 +7,7 @@
 package buildqueuestate
 
 import (
-	remoteexecution "github.com/buildbarn/bonanza/pkg/proto/remoteexecution"
+	remoteexecution "bonanza.build/pkg/proto/remoteexecution"
 	status "google.golang.org/genproto/googleapis/rpc/status"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -2172,7 +2172,7 @@ const file_pkg_proto_buildqueuestate_buildqueuestate_proto_rawDesc = "" +
 	"\n" +
 	"ListDrains\x12*.bonanza.buildqueuestate.ListDrainsRequest\x1a+.bonanza.buildqueuestate.ListDrainsResponse\x12T\n" +
 	"\bAddDrain\x120.bonanza.buildqueuestate.AddOrRemoveDrainRequest\x1a\x16.google.protobuf.Empty\x12W\n" +
-	"\vRemoveDrain\x120.bonanza.buildqueuestate.AddOrRemoveDrainRequest\x1a\x16.google.protobuf.EmptyB8Z6github.com/buildbarn/bonanza/pkg/proto/buildqueuestateb\x06proto3"
+	"\vRemoveDrain\x120.bonanza.buildqueuestate.AddOrRemoveDrainRequest\x1a\x16.google.protobuf.EmptyB)Z'bonanza.build/pkg/proto/buildqueuestateb\x06proto3"
 
 var (
 	file_pkg_proto_buildqueuestate_buildqueuestate_proto_rawDescOnce sync.Once

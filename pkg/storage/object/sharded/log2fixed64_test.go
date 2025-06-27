@@ -6,7 +6,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/buildbarn/bonanza/pkg/storage/object/sharded"
+	"bonanza.build/pkg/storage/object/sharded"
+
 	"github.com/stretchr/testify/assert"
 )
 

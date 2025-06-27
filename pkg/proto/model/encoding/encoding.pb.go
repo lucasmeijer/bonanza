@@ -158,7 +158,7 @@ const file_pkg_proto_model_encoding_encoding_proto_rawDesc = "" +
 	"\rBinaryEncoder\x12A\n" +
 	"\x0flzw_compressing\x18\x01 \x01(\v2\x16.google.protobuf.EmptyH\x00R\x0elzwCompressing\x12y\n" +
 	"\x18deterministic_encrypting\x18\x02 \x01(\v2<.bonanza.model.encoding.DeterministicEncryptingBinaryEncoderH\x00R\x17deterministicEncryptingB\t\n" +
-	"\aencoderB7Z5github.com/buildbarn/bonanza/pkg/proto/model/encodingb\x06proto3"
+	"\aencoderB(Z&bonanza.build/pkg/proto/model/encodingb\x06proto3"
 
 var (
 	file_pkg_proto_model_encoding_encoding_proto_rawDescOnce sync.Once

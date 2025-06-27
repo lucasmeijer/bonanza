@@ -4,9 +4,10 @@ import (
 	"context"
 	"testing"
 
+	"bonanza.build/pkg/storage/object"
+	"bonanza.build/pkg/storage/tag/leasemarshaling"
+
 	"github.com/buildbarn/bb-storage/pkg/testutil"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
-	"github.com/buildbarn/bonanza/pkg/storage/tag/leasemarshaling"
 	"github.com/stretchr/testify/require"
 
 	"google.golang.org/grpc/codes"

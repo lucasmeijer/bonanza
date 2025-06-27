@@ -5,9 +5,9 @@ import (
 	"math"
 	"sort"
 
-	"github.com/buildbarn/bonanza/pkg/ds"
-	"github.com/buildbarn/bonanza/pkg/proto/model/core"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
+	"bonanza.build/pkg/ds"
+	"bonanza.build/pkg/proto/model/core"
+	"bonanza.build/pkg/storage/object"
 
 	"google.golang.org/protobuf/reflect/protoreflect"
 )

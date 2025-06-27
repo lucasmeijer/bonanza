@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/buildbarn/bonanza/pkg/evaluation"
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
+	"bonanza.build/pkg/evaluation"
+	model_core "bonanza.build/pkg/model/core"
+	model_analysis_pb "bonanza.build/pkg/proto/model/analysis"
 )
 
 func (c *baseComputer[TReference, TMetadata]) ComputeSuccessfulActionResultValue(ctx context.Context, key model_core.Message[*model_analysis_pb.SuccessfulActionResult_Key, TReference], e SuccessfulActionResultEnvironment[TReference, TMetadata]) (PatchedSuccessfulActionResultValue, error) {

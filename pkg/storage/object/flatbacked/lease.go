@@ -1,8 +1,8 @@
 package flatbacked
 
 import (
-	"github.com/buildbarn/bonanza/pkg/encoding/varint"
-	"github.com/buildbarn/bonanza/pkg/storage/object/leasemarshaling"
+	"bonanza.build/pkg/encoding/varint"
+	"bonanza.build/pkg/storage/object/leasemarshaling"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

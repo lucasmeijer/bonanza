@@ -6,7 +6,7 @@ go_library(
         "lease.go",
         "store.go",
     ],
-    importpath = "github.com/buildbarn/bonanza/pkg/storage/object/local",
+    importpath = "bonanza.build/pkg/storage/object/local",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/encoding/varint",

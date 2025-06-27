@@ -3,7 +3,7 @@ package starlark
 import (
 	"fmt"
 
-	pg_label "github.com/buildbarn/bonanza/pkg/label"
+	pg_label "bonanza.build/pkg/label"
 
 	"go.starlark.net/starlark"
 )

@@ -1,8 +1,8 @@
 package filesystem
 
 import (
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
+	model_core "bonanza.build/pkg/model/core"
+	"bonanza.build/pkg/storage/object"
 )
 
 // FileMerkleTreeCapturer is provided by callers of CreateFileMerkleTree

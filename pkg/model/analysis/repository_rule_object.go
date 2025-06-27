@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/buildbarn/bonanza/pkg/evaluation"
-	"github.com/buildbarn/bonanza/pkg/label"
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	model_starlark "github.com/buildbarn/bonanza/pkg/model/starlark"
-	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
-	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
+	"bonanza.build/pkg/evaluation"
+	"bonanza.build/pkg/label"
+	model_core "bonanza.build/pkg/model/core"
+	model_starlark "bonanza.build/pkg/model/starlark"
+	model_analysis_pb "bonanza.build/pkg/proto/model/analysis"
+	model_starlark_pb "bonanza.build/pkg/proto/model/starlark"
 
 	"go.starlark.net/starlark"
 )

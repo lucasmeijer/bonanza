@@ -3,13 +3,13 @@ package analysis
 import (
 	"context"
 
-	"github.com/buildbarn/bonanza/pkg/evaluation"
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
-	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
-	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
-	model_command_pb "github.com/buildbarn/bonanza/pkg/proto/model/command"
-	model_filesystem_pb "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
+	"bonanza.build/pkg/evaluation"
+	model_core "bonanza.build/pkg/model/core"
+	model_filesystem "bonanza.build/pkg/model/filesystem"
+	model_parser "bonanza.build/pkg/model/parser"
+	model_analysis_pb "bonanza.build/pkg/proto/model/analysis"
+	model_command_pb "bonanza.build/pkg/proto/model/command"
+	model_filesystem_pb "bonanza.build/pkg/proto/model/filesystem"
 )
 
 // DirectoryReaders contains ParsedObjectReaders that can be used to

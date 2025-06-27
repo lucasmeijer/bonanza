@@ -267,7 +267,7 @@ const file_pkg_proto_configuration_scheduler_scheduler_proto_rawDesc = "" +
 	"\x17authentication_metadata\x18\x01 \x01(\v2\x16.google.protobuf.EmptyH\x00R\x16authenticationMetadataB\x06\n" +
 	"\x04kind\"~\n" +
 	"%InitialSizeClassAnalyzerConfiguration\x12U\n" +
-	"\x19maximum_execution_timeout\x18\x01 \x01(\v2\x19.google.protobuf.DurationR\x17maximumExecutionTimeoutB@Z>github.com/buildbarn/bonanza/pkg/proto/configuration/schedulerb\x06proto3"
+	"\x19maximum_execution_timeout\x18\x01 \x01(\v2\x19.google.protobuf.DurationR\x17maximumExecutionTimeoutB1Z/bonanza.build/pkg/proto/configuration/schedulerb\x06proto3"
 
 var (
 	file_pkg_proto_configuration_scheduler_scheduler_proto_rawDescOnce sync.Once

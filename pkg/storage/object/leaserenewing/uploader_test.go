@@ -4,10 +4,11 @@ import (
 	"context"
 	"testing"
 
+	object_pb "bonanza.build/pkg/proto/storage/object"
+	"bonanza.build/pkg/storage/object"
+	"bonanza.build/pkg/storage/object/leaserenewing"
+
 	"github.com/buildbarn/bb-storage/pkg/testutil"
-	object_pb "github.com/buildbarn/bonanza/pkg/proto/storage/object"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
-	"github.com/buildbarn/bonanza/pkg/storage/object/leaserenewing"
 	"github.com/stretchr/testify/require"
 
 	"golang.org/x/sync/semaphore"

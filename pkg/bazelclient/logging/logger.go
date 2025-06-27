@@ -3,8 +3,8 @@ package logging
 import (
 	"os"
 
-	"github.com/buildbarn/bonanza/pkg/bazelclient/arguments"
-	"github.com/buildbarn/bonanza/pkg/bazelclient/formatted"
+	"bonanza.build/pkg/bazelclient/arguments"
+	"bonanza.build/pkg/bazelclient/formatted"
 
 	"golang.org/x/term"
 )

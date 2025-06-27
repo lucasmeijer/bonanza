@@ -3,7 +3,8 @@ package glob_test
 import (
 	"testing"
 
-	"github.com/buildbarn/bonanza/pkg/glob"
+	"bonanza.build/pkg/glob"
+
 	"github.com/stretchr/testify/require"
 )
 

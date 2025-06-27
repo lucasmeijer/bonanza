@@ -408,7 +408,7 @@ const file_pkg_proto_model_core_core_proto_rawDesc = "" +
 	"\n" +
 	"references\x18\x02 \x01(\v2 .bonanza.model.core.ReferenceSetR\n" +
 	"references:f\n" +
-	"\robject_format\x12\x1d.google.protobuf.FieldOptions\x18\xfd\x8a\x04 \x01(\v2 .bonanza.model.core.ObjectFormatR\fobjectFormatB3Z1github.com/buildbarn/bonanza/pkg/proto/model/coreb\x06proto3"
+	"\robject_format\x12\x1d.google.protobuf.FieldOptions\x18\xfd\x8a\x04 \x01(\v2 .bonanza.model.core.ObjectFormatR\fobjectFormatB$Z\"bonanza.build/pkg/proto/model/coreb\x06proto3"
 
 var (
 	file_pkg_proto_model_core_core_proto_rawDescOnce sync.Once

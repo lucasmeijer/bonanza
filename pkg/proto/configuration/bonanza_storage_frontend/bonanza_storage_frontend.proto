@@ -6,7 +6,7 @@ import "pkg/proto/configuration/global/global.proto";
 import "pkg/proto/configuration/grpc/grpc.proto";
 import "pkg/proto/storage/object/object.proto";
 
-option go_package = "github.com/buildbarn/bonanza/pkg/proto/configuration/bonanza_storage_frontend";
+option go_package = "bonanza.build/pkg/proto/configuration/bonanza_storage_frontend";
 
 message ApplicationConfiguration {
   // Common configuration options that apply to all Buildbarn binaries.

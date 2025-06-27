@@ -3,12 +3,13 @@ package analysis_test
 import (
 	"testing"
 
+	model_analysis "bonanza.build/pkg/model/analysis"
+	model_core "bonanza.build/pkg/model/core"
+	model_analysis_pb "bonanza.build/pkg/proto/model/analysis"
+	model_filesystem_pb "bonanza.build/pkg/proto/model/filesystem"
+	model_starlark_pb "bonanza.build/pkg/proto/model/starlark"
+
 	"github.com/buildbarn/bb-storage/pkg/testutil"
-	model_analysis "github.com/buildbarn/bonanza/pkg/model/analysis"
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
-	model_filesystem_pb "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
-	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
 	"github.com/stretchr/testify/require"
 
 	"google.golang.org/protobuf/types/known/wrapperspb"

@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"io"
 
+	"bonanza.build/pkg/encoding/varint"
+	model_core "bonanza.build/pkg/model/core"
+	model_filesystem "bonanza.build/pkg/model/filesystem"
+	object_pb "bonanza.build/pkg/proto/storage/object"
+	"bonanza.build/pkg/storage/object"
+
 	"github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual"
-	"github.com/buildbarn/bonanza/pkg/encoding/varint"
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
-	object_pb "github.com/buildbarn/bonanza/pkg/proto/storage/object"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
 )
 
 type resolvableHandleAllocatingFileFactory struct {

@@ -7,10 +7,10 @@
 package build
 
 import (
-	core "github.com/buildbarn/bonanza/pkg/proto/model/core"
-	encoding "github.com/buildbarn/bonanza/pkg/proto/model/encoding"
-	filesystem "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
-	object "github.com/buildbarn/bonanza/pkg/proto/storage/object"
+	core "bonanza.build/pkg/proto/model/core"
+	encoding "bonanza.build/pkg/proto/model/encoding"
+	filesystem "bonanza.build/pkg/proto/model/filesystem"
+	object "bonanza.build/pkg/proto/storage/object"
 	status "google.golang.org/genproto/googleapis/rpc/status"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -497,7 +497,7 @@ const file_pkg_proto_model_build_build_proto_rawDesc = "" +
 	"\x15evaluations_reference\x18\x02 \x01(\v2*.bonanza.model.core.WeakDecodableReferenceB)\xea\xd7 %\x1a#bonanza.model.evaluation.EvaluationR\x14evaluationsReference\x1a_\n" +
 	"\aFailure\x12(\n" +
 	"\x10stack_trace_keys\x18\x01 \x03(\fR\x0estackTraceKeys\x12*\n" +
-	"\x06status\x18\x02 \x01(\v2\x12.google.rpc.StatusR\x06statusB4Z2github.com/buildbarn/bonanza/pkg/proto/model/buildb\x06proto3"
+	"\x06status\x18\x02 \x01(\v2\x12.google.rpc.StatusR\x06statusB%Z#bonanza.build/pkg/proto/model/buildb\x06proto3"
 
 var (
 	file_pkg_proto_model_build_build_proto_rawDescOnce sync.Once

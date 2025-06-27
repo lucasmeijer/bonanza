@@ -7,7 +7,7 @@
 package evaluation
 
 import (
-	core "github.com/buildbarn/bonanza/pkg/proto/model/core"
+	core "bonanza.build/pkg/proto/model/core"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -365,7 +365,7 @@ const file_pkg_proto_model_evaluation_evaluation_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\v2\x17.bonanza.model.core.AnyR\x03key\x12-\n" +
 	"\x05value\x18\x02 \x01(\v2\x17.bonanza.model.core.AnyR\x05value\x12H\n" +
 	"\fdependencies\x18\x03 \x03(\v2$.bonanza.model.evaluation.DependencyR\fdependenciesB\a\n" +
-	"\x05levelB9Z7github.com/buildbarn/bonanza/pkg/proto/model/evaluationb\x06proto3"
+	"\x05levelB*Z(bonanza.build/pkg/proto/model/evaluationb\x06proto3"
 
 var (
 	file_pkg_proto_model_evaluation_evaluation_proto_rawDescOnce sync.Once

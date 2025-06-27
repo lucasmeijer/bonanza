@@ -3,11 +3,11 @@ package analysis
 import (
 	"context"
 
-	"github.com/buildbarn/bonanza/pkg/evaluation"
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
-	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
-	model_command_pb "github.com/buildbarn/bonanza/pkg/proto/model/command"
+	"bonanza.build/pkg/evaluation"
+	model_core "bonanza.build/pkg/model/core"
+	model_parser "bonanza.build/pkg/model/parser"
+	model_analysis_pb "bonanza.build/pkg/proto/model/analysis"
+	model_command_pb "bonanza.build/pkg/proto/model/command"
 )
 
 // CommandReaders contains ParsedObjectReaders that can be used to

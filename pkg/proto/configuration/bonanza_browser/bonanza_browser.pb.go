@@ -7,10 +7,10 @@
 package bonanza_browser
 
 import (
+	parser "bonanza.build/pkg/proto/configuration/model/parser"
 	global "github.com/buildbarn/bb-storage/pkg/proto/configuration/global"
 	grpc "github.com/buildbarn/bb-storage/pkg/proto/configuration/grpc"
 	http "github.com/buildbarn/bb-storage/pkg/proto/configuration/http"
-	parser "github.com/buildbarn/bonanza/pkg/proto/configuration/model/parser"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -102,7 +102,7 @@ const file_pkg_proto_configuration_bonanza_browser_bonanza_browser_proto_rawDesc
 	"\x06global\x18\x01 \x01(\v2-.buildbarn.configuration.global.ConfigurationR\x06global\x12T\n" +
 	"\fhttp_servers\x18\x02 \x03(\v21.buildbarn.configuration.http.ServerConfigurationR\vhttpServers\x12a\n" +
 	"\x13storage_grpc_client\x18\x03 \x01(\v21.buildbarn.configuration.grpc.ClientConfigurationR\x11storageGrpcClient\x12b\n" +
-	"\x12parsed_object_pool\x18\x04 \x01(\v24.bonanza.configuration.model.parser.ParsedObjectPoolR\x10parsedObjectPoolBFZDgithub.com/buildbarn/bonanza/pkg/proto/configuration/bonanza_browserb\x06proto3"
+	"\x12parsed_object_pool\x18\x04 \x01(\v24.bonanza.configuration.model.parser.ParsedObjectPoolR\x10parsedObjectPoolB7Z5bonanza.build/pkg/proto/configuration/bonanza_browserb\x06proto3"
 
 var (
 	file_pkg_proto_configuration_bonanza_browser_bonanza_browser_proto_rawDescOnce sync.Once

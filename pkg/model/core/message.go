@@ -1,8 +1,8 @@
 package core
 
 import (
-	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
+	model_core_pb "bonanza.build/pkg/proto/model/core"
+	"bonanza.build/pkg/storage/object"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

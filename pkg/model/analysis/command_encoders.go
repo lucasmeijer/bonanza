@@ -3,11 +3,11 @@ package analysis
 import (
 	"context"
 
-	"github.com/buildbarn/bonanza/pkg/evaluation"
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	model_encoding "github.com/buildbarn/bonanza/pkg/model/encoding"
-	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
-	"github.com/buildbarn/bonanza/pkg/storage/dag"
+	"bonanza.build/pkg/evaluation"
+	model_core "bonanza.build/pkg/model/core"
+	model_encoding "bonanza.build/pkg/model/encoding"
+	model_analysis_pb "bonanza.build/pkg/proto/model/analysis"
+	"bonanza.build/pkg/storage/dag"
 )
 
 func (c *baseComputer[TReference, TMetadata]) ComputeCommandEncodersValue(ctx context.Context, key *model_analysis_pb.CommandEncoders_Key, e CommandEncodersEnvironment[TReference, TMetadata]) (PatchedCommandEncodersValue, error) {

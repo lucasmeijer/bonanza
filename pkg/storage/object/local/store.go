@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/buildbarn/bonanza/pkg/storage/object"
+	"bonanza.build/pkg/storage/object"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

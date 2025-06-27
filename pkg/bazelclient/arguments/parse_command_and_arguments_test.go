@@ -3,7 +3,8 @@ package arguments_test
 import (
 	"testing"
 
-	"github.com/buildbarn/bonanza/pkg/bazelclient/arguments"
+	"bonanza.build/pkg/bazelclient/arguments"
+
 	"github.com/stretchr/testify/require"
 )
 

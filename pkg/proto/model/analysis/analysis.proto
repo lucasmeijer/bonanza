@@ -12,7 +12,7 @@ import "pkg/proto/model/encoding/encoding.proto";
 import "pkg/proto/model/filesystem/filesystem.proto";
 import "pkg/proto/model/starlark/starlark.proto";
 
-option go_package = "github.com/buildbarn/bonanza/pkg/proto/model/analysis";
+option go_package = "bonanza.build/pkg/proto/model/analysis";
 
 message Action {
   // The X25519 public key that identifies the platform that should be

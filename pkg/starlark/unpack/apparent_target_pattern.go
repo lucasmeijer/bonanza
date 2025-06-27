@@ -3,8 +3,9 @@ package unpack
 import (
 	"fmt"
 
+	"bonanza.build/pkg/label"
+
 	"github.com/buildbarn/bb-storage/pkg/util"
-	"github.com/buildbarn/bonanza/pkg/label"
 
 	"go.starlark.net/starlark"
 	"go.starlark.net/syntax"

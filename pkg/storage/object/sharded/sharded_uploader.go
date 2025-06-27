@@ -3,8 +3,9 @@ package sharded
 import (
 	"context"
 
+	"bonanza.build/pkg/storage/object"
+
 	"github.com/buildbarn/bb-storage/pkg/util"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
 )
 
 type shardedUploader[TReference object.BasicReference, TLease any] struct {

@@ -5,7 +5,7 @@ package bonanza.model.starlark;
 import "google/protobuf/empty.proto";
 import "pkg/proto/model/core/core.proto";
 
-option go_package = "github.com/buildbarn/bonanza/pkg/proto/model/starlark";
+option go_package = "bonanza.build/pkg/proto/model/starlark";
 
 message CompiledProgram {
   Struct.Fields globals = 1;

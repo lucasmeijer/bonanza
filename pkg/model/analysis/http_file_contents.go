@@ -14,13 +14,14 @@ import (
 	"math"
 	"net/http"
 
+	"bonanza.build/pkg/evaluation"
+	model_core "bonanza.build/pkg/model/core"
+	model_filesystem "bonanza.build/pkg/model/filesystem"
+	model_analysis_pb "bonanza.build/pkg/proto/model/analysis"
+	"bonanza.build/pkg/storage/dag"
+
 	"github.com/buildbarn/bb-storage/pkg/filesystem"
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
-	"github.com/buildbarn/bonanza/pkg/evaluation"
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
-	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
-	"github.com/buildbarn/bonanza/pkg/storage/dag"
 )
 
 func (c *baseComputer[TReference, TMetadata]) ComputeHttpFileContentsValue(ctx context.Context, key *model_analysis_pb.HttpFileContents_Key, e HttpFileContentsEnvironment[TReference, TMetadata]) (PatchedHttpFileContentsValue, error) {

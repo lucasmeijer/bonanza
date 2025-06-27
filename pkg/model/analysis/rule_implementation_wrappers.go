@@ -5,12 +5,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/buildbarn/bonanza/pkg/evaluation"
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	model_starlark "github.com/buildbarn/bonanza/pkg/model/starlark"
-	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
-	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
+	"bonanza.build/pkg/evaluation"
+	model_core "bonanza.build/pkg/model/core"
+	model_starlark "bonanza.build/pkg/model/starlark"
+	model_analysis_pb "bonanza.build/pkg/proto/model/analysis"
+	model_starlark_pb "bonanza.build/pkg/proto/model/starlark"
+	"bonanza.build/pkg/storage/object"
 
 	"go.starlark.net/starlark"
 )

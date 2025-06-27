@@ -4,7 +4,8 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"github.com/buildbarn/bonanza/pkg/compress/simplelzw"
+	"bonanza.build/pkg/compress/simplelzw"
+
 	"github.com/stretchr/testify/require"
 )
 

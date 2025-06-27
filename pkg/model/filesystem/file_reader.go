@@ -4,10 +4,11 @@ import (
 	"context"
 	"io"
 
+	model_core "bonanza.build/pkg/model/core"
+	model_parser "bonanza.build/pkg/model/parser"
+	"bonanza.build/pkg/storage/object"
+
 	"github.com/buildbarn/bb-storage/pkg/util"
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

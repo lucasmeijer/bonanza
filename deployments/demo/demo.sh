@@ -33,27 +33,27 @@ set -m
 for replica in a b; do
   for shard in 0 1 2 3; do
     REPLICA="${replica}" SHARD="${shard}" \
-    "$(rlocation com_github_buildbarn_bonanza/cmd/bonanza_storage_shard/bonanza_storage_shard_/bonanza_storage_shard)" \
-        "$(rlocation com_github_buildbarn_bonanza/deployments/demo/bonanza_storage_shard.jsonnet)" &
+    "$(rlocation build_bonanza/cmd/bonanza_storage_shard/bonanza_storage_shard_/bonanza_storage_shard)" \
+        "$(rlocation build_bonanza/deployments/demo/bonanza_storage_shard.jsonnet)" &
   done
 done
 
-"$(rlocation com_github_buildbarn_bonanza/cmd/bonanza_storage_frontend/bonanza_storage_frontend_/bonanza_storage_frontend)" \
-    "$(rlocation com_github_buildbarn_bonanza/deployments/demo/bonanza_storage_frontend.jsonnet)" &
-"$(rlocation com_github_buildbarn_bonanza/cmd/bonanza_scheduler/bonanza_scheduler_/bonanza_scheduler)" \
-    "$(rlocation com_github_buildbarn_bonanza/deployments/demo/bonanza_scheduler.jsonnet)" &
-"$(rlocation com_github_buildbarn_bonanza/cmd/bonanza_browser/bonanza_browser_/bonanza_browser)" \
-    "$(rlocation com_github_buildbarn_bonanza/deployments/demo/bonanza_browser.jsonnet)" &
+"$(rlocation build_bonanza/cmd/bonanza_storage_frontend/bonanza_storage_frontend_/bonanza_storage_frontend)" \
+    "$(rlocation build_bonanza/deployments/demo/bonanza_storage_frontend.jsonnet)" &
+"$(rlocation build_bonanza/cmd/bonanza_scheduler/bonanza_scheduler_/bonanza_scheduler)" \
+    "$(rlocation build_bonanza/deployments/demo/bonanza_scheduler.jsonnet)" &
+"$(rlocation build_bonanza/cmd/bonanza_browser/bonanza_browser_/bonanza_browser)" \
+    "$(rlocation build_bonanza/deployments/demo/bonanza_browser.jsonnet)" &
 "$(rlocation com_github_buildbarn_bb_remote_execution/cmd/bb_runner/bb_runner_/bb_runner)" \
-    "$(rlocation com_github_buildbarn_bonanza/deployments/demo/bb_runner.jsonnet)" &
+    "$(rlocation build_bonanza/deployments/demo/bb_runner.jsonnet)" &
 
 # Launch processes that should be killed first.
 set +m
-"$(rlocation com_github_buildbarn_bonanza/cmd/bonanza_builder/bonanza_builder_/bonanza_builder)" \
-    "$(rlocation com_github_buildbarn_bonanza/deployments/demo/bonanza_builder.jsonnet)" &
+"$(rlocation build_bonanza/cmd/bonanza_builder/bonanza_builder_/bonanza_builder)" \
+    "$(rlocation build_bonanza/deployments/demo/bonanza_builder.jsonnet)" &
 builder_pid=$!
-"$(rlocation com_github_buildbarn_bonanza/cmd/bonanza_worker/bonanza_worker_/bonanza_worker)" \
-    "$(rlocation com_github_buildbarn_bonanza/deployments/demo/bonanza_worker.jsonnet)" &
+"$(rlocation build_bonanza/cmd/bonanza_worker/bonanza_worker_/bonanza_worker)" \
+    "$(rlocation build_bonanza/deployments/demo/bonanza_worker.jsonnet)" &
 worker_pid=$!
 
 # Install trap handler that first kills the builder and worker, and only

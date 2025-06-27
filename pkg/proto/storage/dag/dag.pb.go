@@ -7,7 +7,7 @@
 package dag
 
 import (
-	object "github.com/buildbarn/bonanza/pkg/proto/storage/object"
+	object "bonanza.build/pkg/proto/storage/object"
 	status "google.golang.org/genproto/googleapis/rpc/status"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -567,7 +567,7 @@ const file_pkg_proto_storage_dag_dag_proto_rawDesc = "" +
 	"\x04type2m\n" +
 	"\bUploader\x12a\n" +
 	"\n" +
-	"UploadDags\x12&.bonanza.storage.dag.UploadDagsRequest\x1a'.bonanza.storage.dag.UploadDagsResponse(\x010\x01B4Z2github.com/buildbarn/bonanza/pkg/proto/storage/dagb\x06proto3"
+	"UploadDags\x12&.bonanza.storage.dag.UploadDagsRequest\x1a'.bonanza.storage.dag.UploadDagsResponse(\x010\x01B%Z#bonanza.build/pkg/proto/storage/dagb\x06proto3"
 
 var (
 	file_pkg_proto_storage_dag_dag_proto_rawDescOnce sync.Once

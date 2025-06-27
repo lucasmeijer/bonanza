@@ -7,15 +7,16 @@ import (
 	"sort"
 	"strings"
 
+	"bonanza.build/pkg/evaluation"
+	"bonanza.build/pkg/label"
+	model_core "bonanza.build/pkg/model/core"
+	model_filesystem "bonanza.build/pkg/model/filesystem"
+	model_parser "bonanza.build/pkg/model/parser"
+	model_analysis_pb "bonanza.build/pkg/proto/model/analysis"
+	model_filesystem_pb "bonanza.build/pkg/proto/model/filesystem"
+	"bonanza.build/pkg/storage/dag"
+
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
-	"github.com/buildbarn/bonanza/pkg/evaluation"
-	"github.com/buildbarn/bonanza/pkg/label"
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
-	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
-	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
-	model_filesystem_pb "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
-	"github.com/buildbarn/bonanza/pkg/storage/dag"
 )
 
 type getPackageDirectoryEnvironment[TReference any] interface {

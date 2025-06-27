@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"strings"
 
+	pg_label "bonanza.build/pkg/label"
+	model_core "bonanza.build/pkg/model/core"
+	"bonanza.build/pkg/starlark/unpack"
+
 	bb_path "github.com/buildbarn/bb-storage/pkg/filesystem/path"
-	pg_label "github.com/buildbarn/bonanza/pkg/label"
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	"github.com/buildbarn/bonanza/pkg/starlark/unpack"
 
 	"go.starlark.net/starlark"
 	"go.starlark.net/syntax"

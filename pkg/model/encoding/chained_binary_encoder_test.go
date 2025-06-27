@@ -3,7 +3,8 @@ package encoding_test
 import (
 	"testing"
 
-	"github.com/buildbarn/bonanza/pkg/model/encoding"
+	"bonanza.build/pkg/model/encoding"
+
 	"github.com/stretchr/testify/require"
 
 	"go.uber.org/mock/gomock"

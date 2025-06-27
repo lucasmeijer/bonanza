@@ -3,8 +3,9 @@ package mirrored_test
 import (
 	"testing"
 
+	"bonanza.build/pkg/storage/object/mirrored"
+
 	"github.com/buildbarn/bb-storage/pkg/testutil"
-	"github.com/buildbarn/bonanza/pkg/storage/object/mirrored"
 	"github.com/stretchr/testify/require"
 
 	"google.golang.org/grpc/codes"

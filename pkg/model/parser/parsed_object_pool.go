@@ -4,9 +4,10 @@ import (
 	"context"
 	"sync"
 
+	model_core "bonanza.build/pkg/model/core"
+	"bonanza.build/pkg/storage/object"
+
 	"github.com/buildbarn/bb-storage/pkg/eviction"
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
 )
 
 type ParsedObjectEvictionKey struct {

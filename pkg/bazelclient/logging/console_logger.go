@@ -5,7 +5,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/buildbarn/bonanza/pkg/bazelclient/formatted"
+	"bonanza.build/pkg/bazelclient/formatted"
 )
 
 type FormattedNodeWriter func(message formatted.Node, w io.StringWriter) (int, error)

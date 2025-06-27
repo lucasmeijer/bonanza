@@ -4,7 +4,7 @@ load("@rules_go//go:def.bzl", "go_binary", "go_library")
 go_library(
     name = "bonanza_storage_frontend_lib",
     srcs = ["main.go"],
-    importpath = "github.com/buildbarn/bonanza/cmd/bonanza_storage_frontend",
+    importpath = "bonanza.build/cmd/bonanza_storage_frontend",
     visibility = ["//visibility:private"],
     deps = [
         "//pkg/proto/configuration/bonanza_storage_frontend",

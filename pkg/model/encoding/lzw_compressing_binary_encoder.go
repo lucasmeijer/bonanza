@@ -1,7 +1,7 @@
 package encoding
 
 import (
-	"github.com/buildbarn/bonanza/pkg/compress/simplelzw"
+	"bonanza.build/pkg/compress/simplelzw"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

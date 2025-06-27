@@ -3,10 +3,11 @@ package filesystem_test
 import (
 	"testing"
 
+	model_core "bonanza.build/pkg/model/core"
+	model_filesystem "bonanza.build/pkg/model/filesystem"
+	"bonanza.build/pkg/storage/object"
+
 	"github.com/buildbarn/bb-storage/pkg/testutil"
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"net/url"
 
+	"bonanza.build/pkg/label"
+	pg_starlark "bonanza.build/pkg/starlark"
+
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
-	"github.com/buildbarn/bonanza/pkg/label"
-	pg_starlark "github.com/buildbarn/bonanza/pkg/starlark"
 
 	"go.starlark.net/starlark"
 )

@@ -8,8 +8,9 @@ import (
 	"encoding/pem"
 	"iter"
 
+	remoteexecution_pb "bonanza.build/pkg/proto/remoteexecution"
+
 	"github.com/buildbarn/bb-storage/pkg/util"
-	remoteexecution_pb "github.com/buildbarn/bonanza/pkg/proto/remoteexecution"
 	"github.com/secure-io/siv-go"
 
 	"google.golang.org/grpc/codes"

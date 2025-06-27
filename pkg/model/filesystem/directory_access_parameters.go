@@ -1,10 +1,11 @@
 package filesystem
 
 import (
+	"bonanza.build/pkg/model/encoding"
+	model_filesystem_pb "bonanza.build/pkg/proto/model/filesystem"
+	"bonanza.build/pkg/storage/object"
+
 	"github.com/buildbarn/bb-storage/pkg/util"
-	"github.com/buildbarn/bonanza/pkg/model/encoding"
-	model_filesystem_pb "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

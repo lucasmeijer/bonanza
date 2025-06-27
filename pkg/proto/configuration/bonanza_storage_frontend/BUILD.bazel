@@ -15,7 +15,7 @@ proto_library(
 
 go_proto_library(
     name = "bonanza_storage_frontend_go_proto",
-    importpath = "github.com/buildbarn/bonanza/pkg/proto/configuration/bonanza_storage_frontend",
+    importpath = "bonanza.build/pkg/proto/configuration/bonanza_storage_frontend",
     proto = ":bonanza_storage_frontend_proto",
     visibility = ["//visibility:public"],
     deps = [
@@ -28,6 +28,6 @@ go_proto_library(
 go_library(
     name = "bonanza_storage_frontend",
     embed = [":bonanza_storage_frontend_go_proto"],
-    importpath = "github.com/buildbarn/bonanza/pkg/proto/configuration/bonanza_storage_frontend",
+    importpath = "bonanza.build/pkg/proto/configuration/bonanza_storage_frontend",
     visibility = ["//visibility:public"],
 )

@@ -3,9 +3,10 @@ package sharded
 import (
 	"context"
 
+	"bonanza.build/pkg/storage/object/sharded"
+	"bonanza.build/pkg/storage/tag"
+
 	"github.com/buildbarn/bb-storage/pkg/util"
-	"github.com/buildbarn/bonanza/pkg/storage/object/sharded"
-	"github.com/buildbarn/bonanza/pkg/storage/tag"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/protobuf/proto"

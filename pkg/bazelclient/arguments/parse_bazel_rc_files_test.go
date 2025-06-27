@@ -5,9 +5,10 @@ import (
 	"syscall"
 	"testing"
 
+	"bonanza.build/pkg/bazelclient/arguments"
+
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
 	"github.com/buildbarn/bb-storage/pkg/testutil"
-	"github.com/buildbarn/bonanza/pkg/bazelclient/arguments"
 	"github.com/stretchr/testify/require"
 
 	"google.golang.org/grpc/codes"

@@ -3,8 +3,9 @@ package encoding
 import (
 	"crypto/aes"
 
+	"bonanza.build/pkg/proto/model/encoding"
+
 	"github.com/buildbarn/bb-storage/pkg/util"
-	"github.com/buildbarn/bonanza/pkg/proto/model/encoding"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

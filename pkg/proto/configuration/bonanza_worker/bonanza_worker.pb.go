@@ -7,11 +7,11 @@
 package bonanza_worker
 
 import (
+	parser "bonanza.build/pkg/proto/configuration/model/parser"
 	filesystem "github.com/buildbarn/bb-remote-execution/pkg/proto/configuration/filesystem"
 	virtual "github.com/buildbarn/bb-remote-execution/pkg/proto/configuration/filesystem/virtual"
 	global "github.com/buildbarn/bb-storage/pkg/proto/configuration/global"
 	grpc "github.com/buildbarn/bb-storage/pkg/proto/configuration/grpc"
-	parser "github.com/buildbarn/bonanza/pkg/proto/configuration/model/parser"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	durationpb "google.golang.org/protobuf/types/known/durationpb"
@@ -367,7 +367,7 @@ const file_pkg_proto_configuration_bonanza_worker_bonanza_worker_proto_rawDesc =
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1aG\n" +
 	"\x19EnvironmentVariablesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01BEZCgithub.com/buildbarn/bonanza/pkg/proto/configuration/bonanza_workerb\x06proto3"
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B6Z4bonanza.build/pkg/proto/configuration/bonanza_workerb\x06proto3"
 
 var (
 	file_pkg_proto_configuration_bonanza_worker_bonanza_worker_proto_rawDescOnce sync.Once

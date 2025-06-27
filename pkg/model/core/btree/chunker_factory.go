@@ -1,8 +1,8 @@
 package btree
 
 import (
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	model_filesystem_pb "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
+	model_core "bonanza.build/pkg/model/core"
+	model_filesystem_pb "bonanza.build/pkg/proto/model/filesystem"
 
 	"google.golang.org/protobuf/proto"
 )

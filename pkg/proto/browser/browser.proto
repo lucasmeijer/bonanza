@@ -5,7 +5,7 @@ package bonanza.browser;
 import "google/protobuf/timestamp.proto";
 import "pkg/proto/model/encoding/encoding.proto";
 
-option go_package = "github.com/buildbarn/bonanza/pkg/proto/browser";
+option go_package = "bonanza.build/pkg/proto/browser";
 
 message RecentlyObservedEncoder {
   // Configuration of object encoders.

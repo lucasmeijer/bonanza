@@ -3,15 +3,16 @@ package starlark_test
 import (
 	"testing"
 
+	"bonanza.build/pkg/label"
+	model_core "bonanza.build/pkg/model/core"
+	"bonanza.build/pkg/model/core/inlinedtree"
+	model_starlark "bonanza.build/pkg/model/starlark"
+	model_starlark_pb "bonanza.build/pkg/proto/model/starlark"
+	object_pb "bonanza.build/pkg/proto/storage/object"
+	"bonanza.build/pkg/storage/object"
+
 	"github.com/buildbarn/bb-storage/pkg/testutil"
 	"github.com/buildbarn/bb-storage/pkg/util"
-	"github.com/buildbarn/bonanza/pkg/label"
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	"github.com/buildbarn/bonanza/pkg/model/core/inlinedtree"
-	model_starlark "github.com/buildbarn/bonanza/pkg/model/starlark"
-	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
-	object_pb "github.com/buildbarn/bonanza/pkg/proto/storage/object"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
 	"github.com/stretchr/testify/require"
 
 	"go.uber.org/mock/gomock"

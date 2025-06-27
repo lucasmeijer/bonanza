@@ -74,10 +74,10 @@ func main() {
 	}
 	fmt.Printf("import (\n")
 	fmt.Printf("\t\"context\"\n")
-	fmt.Printf("\t\"github.com/buildbarn/bonanza/pkg/evaluation\"\n")
-	fmt.Printf("\t\"github.com/buildbarn/bonanza/pkg/storage/dag\"\n")
-	fmt.Printf("\t\"github.com/buildbarn/bonanza/pkg/storage/object\"\n")
-	fmt.Printf("\tmodel_core \"github.com/buildbarn/bonanza/pkg/model/core\"\n")
+	fmt.Printf("\t\"bonanza.build/pkg/evaluation\"\n")
+	fmt.Printf("\t\"bonanza.build/pkg/storage/dag\"\n")
+	fmt.Printf("\t\"bonanza.build/pkg/storage/object\"\n")
+	fmt.Printf("\tmodel_core \"bonanza.build/pkg/model/core\"\n")
 	fmt.Printf("\t\"google.golang.org/protobuf/proto\"\n")
 	fmt.Printf("\tpb %#v\n", computerDefinition.ProtoPackage)
 	for _, shortName := range slices.Sorted(maps.Keys(imports)) {

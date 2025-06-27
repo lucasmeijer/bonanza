@@ -11,7 +11,7 @@ go_library(
     ],
     # keep
     embedsrcs = ["stylesheet_for_host"],
-    importpath = "github.com/buildbarn/bonanza/cmd/bonanza_browser",
+    importpath = "bonanza.build/cmd/bonanza_browser",
     visibility = ["//visibility:private"],
     deps = [
         "//pkg/encoding/varint",

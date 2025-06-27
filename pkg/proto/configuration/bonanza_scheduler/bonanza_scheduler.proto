@@ -7,7 +7,7 @@ import "pkg/proto/configuration/global/global.proto";
 import "pkg/proto/configuration/grpc/grpc.proto";
 import "pkg/proto/configuration/scheduler/scheduler.proto";
 
-option go_package = "github.com/buildbarn/bonanza/pkg/proto/configuration/bonanza_scheduler";
+option go_package = "bonanza.build/pkg/proto/configuration/bonanza_scheduler";
 
 message ApplicationConfiguration {
   // Common configuration options that apply to all Buildbarn binaries.

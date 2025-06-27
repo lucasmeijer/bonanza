@@ -3,13 +3,14 @@ package filesystem_test
 import (
 	"testing"
 
+	"bonanza.build/pkg/encoding/varint"
+	model_core "bonanza.build/pkg/model/core"
+	model_filesystem "bonanza.build/pkg/model/filesystem"
+	model_core_pb "bonanza.build/pkg/proto/model/core"
+	model_filesystem_pb "bonanza.build/pkg/proto/model/filesystem"
+	"bonanza.build/pkg/storage/object"
+
 	"github.com/buildbarn/bb-storage/pkg/testutil"
-	"github.com/buildbarn/bonanza/pkg/encoding/varint"
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
-	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
-	model_filesystem_pb "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
 	"github.com/stretchr/testify/require"
 
 	"google.golang.org/grpc/codes"

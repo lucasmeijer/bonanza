@@ -14,7 +14,7 @@ proto_library(
 
 go_proto_library(
     name = "browser_go_proto",
-    importpath = "github.com/buildbarn/bonanza/pkg/proto/browser",
+    importpath = "bonanza.build/pkg/proto/browser",
     proto = ":browser_proto",
     visibility = ["//visibility:public"],
     deps = ["//pkg/proto/model/encoding"],
@@ -23,6 +23,6 @@ go_proto_library(
 go_library(
     name = "browser",
     embed = [":browser_go_proto"],
-    importpath = "github.com/buildbarn/bonanza/pkg/proto/browser",
+    importpath = "bonanza.build/pkg/proto/browser",
     visibility = ["//visibility:public"],
 )

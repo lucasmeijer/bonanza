@@ -1,9 +1,9 @@
 package filesystem
 
 import (
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	model_filesystem_pb "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
+	model_core "bonanza.build/pkg/model/core"
+	model_filesystem_pb "bonanza.build/pkg/proto/model/filesystem"
+	"bonanza.build/pkg/storage/object"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

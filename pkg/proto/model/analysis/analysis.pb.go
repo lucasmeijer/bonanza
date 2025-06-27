@@ -7,12 +7,12 @@
 package analysis
 
 import (
-	build "github.com/buildbarn/bonanza/pkg/proto/model/build"
-	command "github.com/buildbarn/bonanza/pkg/proto/model/command"
-	core "github.com/buildbarn/bonanza/pkg/proto/model/core"
-	encoding "github.com/buildbarn/bonanza/pkg/proto/model/encoding"
-	filesystem "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
-	starlark "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
+	build "bonanza.build/pkg/proto/model/build"
+	command "bonanza.build/pkg/proto/model/command"
+	core "bonanza.build/pkg/proto/model/core"
+	encoding "bonanza.build/pkg/proto/model/encoding"
+	filesystem "bonanza.build/pkg/proto/model/filesystem"
+	starlark "bonanza.build/pkg/proto/model/starlark"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	durationpb "google.golang.org/protobuf/types/known/durationpb"
@@ -13031,7 +13031,7 @@ const file_pkg_proto_model_analysis_analysis_proto_rawDesc = "" +
 	"\aUNKNOWN\x10\x00\x12\x0e\n" +
 	"\n" +
 	"INPUT_ROOT\x10\x01\x12\f\n" +
-	"\bRUNFILES\x10\x02B7Z5github.com/buildbarn/bonanza/pkg/proto/model/analysisb\x06proto3"
+	"\bRUNFILES\x10\x02B(Z&bonanza.build/pkg/proto/model/analysisb\x06proto3"
 
 var (
 	file_pkg_proto_model_analysis_analysis_proto_rawDescOnce sync.Once

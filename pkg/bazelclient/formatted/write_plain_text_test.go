@@ -4,7 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/buildbarn/bonanza/pkg/bazelclient/formatted"
+	"bonanza.build/pkg/bazelclient/formatted"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

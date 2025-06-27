@@ -7,11 +7,11 @@ import (
 	"sort"
 	"strings"
 
-	pg_label "github.com/buildbarn/bonanza/pkg/label"
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	"github.com/buildbarn/bonanza/pkg/model/core/inlinedtree"
-	model_encoding "github.com/buildbarn/bonanza/pkg/model/encoding"
-	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
+	pg_label "bonanza.build/pkg/label"
+	model_core "bonanza.build/pkg/model/core"
+	"bonanza.build/pkg/model/core/inlinedtree"
+	model_encoding "bonanza.build/pkg/model/encoding"
+	model_starlark_pb "bonanza.build/pkg/proto/model/starlark"
 )
 
 // packageGroupNode is a simplified representation of the

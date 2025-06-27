@@ -6,7 +6,7 @@ import "google/protobuf/duration.proto";
 import "pkg/proto/configuration/global/global.proto";
 import "pkg/proto/configuration/grpc/grpc.proto";
 
-option go_package = "github.com/buildbarn/bonanza/pkg/proto/configuration/bonanza_storage_shard";
+option go_package = "bonanza.build/pkg/proto/configuration/bonanza_storage_shard";
 
 message ApplicationConfiguration {
   // Common configuration options that apply to all Buildbarn binaries.

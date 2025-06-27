@@ -4,7 +4,7 @@ package bonanza.model.evaluation;
 
 import "pkg/proto/model/core/core.proto";
 
-option go_package = "github.com/buildbarn/bonanza/pkg/proto/model/evaluation";
+option go_package = "bonanza.build/pkg/proto/model/evaluation";
 
 message Dependency {
   message Parent {

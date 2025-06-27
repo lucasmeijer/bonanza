@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	remoteexecution_pb "github.com/buildbarn/bonanza/pkg/proto/remoteexecution"
+	remoteexecution_pb "bonanza.build/pkg/proto/remoteexecution"
 )
 
 type fallbackAnalyzer struct {

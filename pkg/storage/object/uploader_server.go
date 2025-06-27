@@ -3,8 +3,9 @@ package object
 import (
 	"context"
 
+	"bonanza.build/pkg/proto/storage/object"
+
 	"github.com/buildbarn/bb-storage/pkg/util"
-	"github.com/buildbarn/bonanza/pkg/proto/storage/object"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

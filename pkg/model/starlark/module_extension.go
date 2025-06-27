@@ -6,10 +6,10 @@ import (
 	"slices"
 	"strings"
 
-	pg_label "github.com/buildbarn/bonanza/pkg/label"
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
+	pg_label "bonanza.build/pkg/label"
+	model_core "bonanza.build/pkg/model/core"
+	model_starlark_pb "bonanza.build/pkg/proto/model/starlark"
+	"bonanza.build/pkg/storage/object"
 
 	"go.starlark.net/starlark"
 )

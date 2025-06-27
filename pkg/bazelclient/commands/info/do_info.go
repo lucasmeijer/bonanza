@@ -5,11 +5,12 @@ import (
 	"sort"
 	"strings"
 
+	"bonanza.build/pkg/bazelclient/arguments"
+	"bonanza.build/pkg/bazelclient/commands"
+	"bonanza.build/pkg/bazelclient/formatted"
+	"bonanza.build/pkg/bazelclient/logging"
+
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
-	"github.com/buildbarn/bonanza/pkg/bazelclient/arguments"
-	"github.com/buildbarn/bonanza/pkg/bazelclient/commands"
-	"github.com/buildbarn/bonanza/pkg/bazelclient/formatted"
-	"github.com/buildbarn/bonanza/pkg/bazelclient/logging"
 )
 
 func DoInfo(args *arguments.InfoCommand, workspacePath path.Parser) {

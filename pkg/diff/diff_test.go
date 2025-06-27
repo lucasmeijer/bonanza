@@ -9,8 +9,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"bonanza.build/pkg/diff"
+
 	"github.com/bluekeyes/go-gitdiff/gitdiff"
-	"github.com/buildbarn/bonanza/pkg/diff"
 	"github.com/stretchr/testify/require"
 )
 

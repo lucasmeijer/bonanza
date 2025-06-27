@@ -11,7 +11,7 @@ go_library(
         "write_plain_text.go",
         "write_vt100.go",
     ],
-    importpath = "github.com/buildbarn/bonanza/pkg/bazelclient/formatted",
+    importpath = "bonanza.build/pkg/bazelclient/formatted",
     visibility = ["//visibility:public"],
 )
 

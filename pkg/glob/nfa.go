@@ -7,7 +7,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/buildbarn/bonanza/pkg/encoding/varint"
+	"bonanza.build/pkg/encoding/varint"
 )
 
 const (

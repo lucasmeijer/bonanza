@@ -3,7 +3,7 @@ load("@rules_go//go:def.bzl", "go_library")
 go_library(
     name = "leasemarshaling",
     srcs = ["uploader.go"],
-    importpath = "github.com/buildbarn/bonanza/pkg/storage/object/leasemarshaling",
+    importpath = "bonanza.build/pkg/storage/object/leasemarshaling",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/storage/object",

@@ -3,7 +3,7 @@ load("@rules_go//go:def.bzl", "go_binary", "go_library")
 go_library(
     name = "mount_directory_lib",
     srcs = ["main.go"],
-    importpath = "github.com/buildbarn/bonanza/cmd/mount_directory",
+    importpath = "bonanza.build/cmd/mount_directory",
     visibility = ["//visibility:private"],
     deps = [
         "//pkg/model/core",

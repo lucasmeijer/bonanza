@@ -3,8 +3,8 @@ package filesystem
 import (
 	"sort"
 
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
+	model_core "bonanza.build/pkg/model/core"
+	"bonanza.build/pkg/storage/object"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

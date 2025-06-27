@@ -4,8 +4,8 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 
-	"github.com/buildbarn/bonanza/pkg/encoding/float16"
-	"github.com/buildbarn/bonanza/pkg/proto/storage/object"
+	"bonanza.build/pkg/encoding/float16"
+	"bonanza.build/pkg/proto/storage/object"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

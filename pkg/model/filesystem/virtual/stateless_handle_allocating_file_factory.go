@@ -1,9 +1,10 @@
 package virtual
 
 import (
+	model_filesystem "bonanza.build/pkg/model/filesystem"
+	"bonanza.build/pkg/storage/object"
+
 	"github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual"
-	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
 )
 
 type statelessHandleAllocatingFileFactory struct {

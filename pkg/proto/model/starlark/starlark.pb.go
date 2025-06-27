@@ -7,7 +7,7 @@
 package starlark
 
 import (
-	core "github.com/buildbarn/bonanza/pkg/proto/model/core"
+	core "bonanza.build/pkg/proto/model/core"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
@@ -5769,7 +5769,7 @@ const file_pkg_proto_model_starlark_starlark_proto_rawDesc = "" +
 	"\x0eimplementation\x18\x01 \x01(\v2 .bonanza.model.starlark.FunctionR\x0eimplementation\x12\x16\n" +
 	"\x06inputs\x18\x02 \x03(\tR\x06inputs\x12\x18\n" +
 	"\aoutputs\x18\x03 \x03(\tR\aoutputsB\x06\n" +
-	"\x04kindB7Z5github.com/buildbarn/bonanza/pkg/proto/model/starlarkb\x06proto3"
+	"\x04kindB(Z&bonanza.build/pkg/proto/model/starlarkb\x06proto3"
 
 var (
 	file_pkg_proto_model_starlark_starlark_proto_rawDescOnce sync.Once

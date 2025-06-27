@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package bonanza.storage.object;
 
-option go_package = "github.com/buildbarn/bonanza/pkg/proto/storage/object";
+option go_package = "bonanza.build/pkg/proto/storage/object";
 
 // Object Store is a content addressed data store that is capable of
 // storing binary objects that are between 1 byte and 2 MiB in size. The

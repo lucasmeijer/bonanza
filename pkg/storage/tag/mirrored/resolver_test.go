@@ -4,11 +4,12 @@ import (
 	"context"
 	"testing"
 
+	object_pb "bonanza.build/pkg/proto/storage/object"
+	"bonanza.build/pkg/storage/object"
+	"bonanza.build/pkg/storage/tag/mirrored"
+
 	"github.com/buildbarn/bb-storage/pkg/testutil"
 	"github.com/buildbarn/bb-storage/pkg/util"
-	object_pb "github.com/buildbarn/bonanza/pkg/proto/storage/object"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
-	"github.com/buildbarn/bonanza/pkg/storage/tag/mirrored"
 	"github.com/stretchr/testify/require"
 
 	"google.golang.org/grpc/codes"

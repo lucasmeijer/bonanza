@@ -1,7 +1,7 @@
 package core
 
 import (
-	"github.com/buildbarn/bonanza/pkg/encoding/varint"
+	"bonanza.build/pkg/encoding/varint"
 
 	"google.golang.org/protobuf/proto"
 )

@@ -3,8 +3,9 @@ package mirrored
 import (
 	"context"
 
+	"bonanza.build/pkg/storage/object"
+
 	"github.com/buildbarn/bb-storage/pkg/util"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
 
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc/codes"

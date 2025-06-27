@@ -8,7 +8,7 @@ go_library(
         "environment.go",
         "fully_compute_value.go",
     ],
-    importpath = "github.com/buildbarn/bonanza/pkg/evaluation",
+    importpath = "bonanza.build/pkg/evaluation",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/model/core",

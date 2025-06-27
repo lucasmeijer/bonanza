@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 
-	"github.com/buildbarn/bonanza/pkg/evaluation"
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	"github.com/buildbarn/bonanza/pkg/model/core/btree"
-	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
-	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
-	"github.com/buildbarn/bonanza/pkg/storage/dag"
+	"bonanza.build/pkg/evaluation"
+	model_core "bonanza.build/pkg/model/core"
+	"bonanza.build/pkg/model/core/btree"
+	model_analysis_pb "bonanza.build/pkg/proto/model/analysis"
+	model_core_pb "bonanza.build/pkg/proto/model/core"
+	"bonanza.build/pkg/storage/dag"
 )
 
 func (c *baseComputer[TReference, TMetadata]) ComputeModuleExtensionRepoNamesValue(ctx context.Context, key *model_analysis_pb.ModuleExtensionRepoNames_Key, e ModuleExtensionRepoNamesEnvironment[TReference, TMetadata]) (PatchedModuleExtensionRepoNamesValue, error) {

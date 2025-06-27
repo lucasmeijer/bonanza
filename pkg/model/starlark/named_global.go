@@ -4,8 +4,9 @@ import (
 	"maps"
 	"slices"
 
+	pg_label "bonanza.build/pkg/label"
+
 	"github.com/buildbarn/bb-storage/pkg/util"
-	pg_label "github.com/buildbarn/bonanza/pkg/label"
 
 	"go.starlark.net/starlark"
 )

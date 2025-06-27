@@ -16,7 +16,7 @@ proto_library(
 
 go_proto_library(
     name = "bonanza_scheduler_go_proto",
-    importpath = "github.com/buildbarn/bonanza/pkg/proto/configuration/bonanza_scheduler",
+    importpath = "bonanza.build/pkg/proto/configuration/bonanza_scheduler",
     proto = ":bonanza_scheduler_proto",
     visibility = ["//visibility:public"],
     deps = [
@@ -29,6 +29,6 @@ go_proto_library(
 go_library(
     name = "bonanza_scheduler",
     embed = [":bonanza_scheduler_go_proto"],
-    importpath = "github.com/buildbarn/bonanza/pkg/proto/configuration/bonanza_scheduler",
+    importpath = "bonanza.build/pkg/proto/configuration/bonanza_scheduler",
     visibility = ["//visibility:public"],
 )

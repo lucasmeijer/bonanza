@@ -6,14 +6,15 @@ import (
 	"io"
 	"testing"
 
+	model_core "bonanza.build/pkg/model/core"
+	model_filesystem "bonanza.build/pkg/model/filesystem"
+	model_core_pb "bonanza.build/pkg/proto/model/core"
+	model_filesystem_pb "bonanza.build/pkg/proto/model/filesystem"
+	object_pb "bonanza.build/pkg/proto/storage/object"
+	"bonanza.build/pkg/storage/object"
+
 	"github.com/buildbarn/bb-storage/pkg/testutil"
 	"github.com/buildbarn/bb-storage/pkg/util"
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	model_filesystem "github.com/buildbarn/bonanza/pkg/model/filesystem"
-	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
-	model_filesystem_pb "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
-	object_pb "github.com/buildbarn/bonanza/pkg/proto/storage/object"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
 	"github.com/seehuhn/mt19937"
 	"github.com/stretchr/testify/require"
 

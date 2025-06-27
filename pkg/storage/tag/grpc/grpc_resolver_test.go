@@ -4,12 +4,13 @@ import (
 	"context"
 	"testing"
 
+	object_pb "bonanza.build/pkg/proto/storage/object"
+	tag_pb "bonanza.build/pkg/proto/storage/tag"
+	"bonanza.build/pkg/storage/object"
+	"bonanza.build/pkg/storage/tag/grpc"
+
 	"github.com/buildbarn/bb-storage/pkg/testutil"
 	"github.com/buildbarn/bb-storage/pkg/util"
-	object_pb "github.com/buildbarn/bonanza/pkg/proto/storage/object"
-	tag_pb "github.com/buildbarn/bonanza/pkg/proto/storage/tag"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
-	"github.com/buildbarn/bonanza/pkg/storage/tag/grpc"
 	"github.com/stretchr/testify/require"
 
 	"google.golang.org/grpc/codes"

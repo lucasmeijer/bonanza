@@ -1,7 +1,7 @@
 package filesystem
 
 import (
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
+	model_core "bonanza.build/pkg/model/core"
 )
 
 type DirectoryMerkleTreeCapturer[TDirectory, TFile any] interface {

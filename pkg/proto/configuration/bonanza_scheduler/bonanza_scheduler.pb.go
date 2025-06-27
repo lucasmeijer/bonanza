@@ -7,9 +7,9 @@
 package bonanza_scheduler
 
 import (
+	scheduler "bonanza.build/pkg/proto/configuration/scheduler"
 	global "github.com/buildbarn/bb-storage/pkg/proto/configuration/global"
 	grpc "github.com/buildbarn/bb-storage/pkg/proto/configuration/grpc"
-	scheduler "github.com/buildbarn/bonanza/pkg/proto/configuration/scheduler"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	durationpb "google.golang.org/protobuf/types/known/durationpb"
@@ -211,7 +211,7 @@ const file_pkg_proto_configuration_bonanza_scheduler_bonanza_scheduler_proto_raw
 	"\fsize_classes\x18\x02 \x03(\rR\vsizeClasses\x12h\n" +
 	"#worker_invocation_stickiness_limits\x18\x03 \x03(\v2\x19.google.protobuf.DurationR workerInvocationStickinessLimits\x12`\n" +
 	"-maximum_queued_background_learning_operations\x18\x04 \x01(\x05R)maximumQueuedBackgroundLearningOperations\x12S\n" +
-	"&background_learning_operation_priority\x18\x05 \x01(\x05R#backgroundLearningOperationPriorityBHZFgithub.com/buildbarn/bonanza/pkg/proto/configuration/bonanza_schedulerb\x06proto3"
+	"&background_learning_operation_priority\x18\x05 \x01(\x05R#backgroundLearningOperationPriorityB9Z7bonanza.build/pkg/proto/configuration/bonanza_schedulerb\x06proto3"
 
 var (
 	file_pkg_proto_configuration_bonanza_scheduler_bonanza_scheduler_proto_rawDescOnce sync.Once

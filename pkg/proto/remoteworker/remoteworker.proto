@@ -9,7 +9,7 @@ import "google/protobuf/timestamp.proto";
 import "google/rpc/status.proto";
 import "pkg/proto/remoteexecution/remoteexecution.proto";
 
-option go_package = "github.com/buildbarn/bonanza/pkg/proto/remoteworker";
+option go_package = "bonanza.build/pkg/proto/remoteworker";
 
 // Buildbarn's workers connect to the scheduler to receive instructions
 // on what they should be doing. They can either be instructed to be

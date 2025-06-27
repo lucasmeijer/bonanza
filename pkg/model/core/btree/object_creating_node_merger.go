@@ -1,11 +1,12 @@
 package btree
 
 import (
+	model_core "bonanza.build/pkg/model/core"
+	model_encoding "bonanza.build/pkg/model/encoding"
+	model_filesystem_pb "bonanza.build/pkg/proto/model/filesystem"
+	"bonanza.build/pkg/storage/object"
+
 	"github.com/buildbarn/bb-storage/pkg/util"
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	model_encoding "github.com/buildbarn/bonanza/pkg/model/encoding"
-	model_filesystem_pb "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
 
 	"google.golang.org/protobuf/proto"
 )

@@ -4,11 +4,12 @@ import (
 	"context"
 	"testing"
 
+	"bonanza.build/pkg/evaluation"
+	model_core "bonanza.build/pkg/model/core"
+	"bonanza.build/pkg/storage/dag"
+	"bonanza.build/pkg/storage/object"
+
 	"github.com/buildbarn/bb-storage/pkg/testutil"
-	"github.com/buildbarn/bonanza/pkg/evaluation"
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	"github.com/buildbarn/bonanza/pkg/storage/dag"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
 	"github.com/stretchr/testify/require"
 
 	"google.golang.org/protobuf/proto"

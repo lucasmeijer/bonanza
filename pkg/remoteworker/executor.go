@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	remoteworker_pb "github.com/buildbarn/bonanza/pkg/proto/remoteworker"
+	remoteworker_pb "bonanza.build/pkg/proto/remoteworker"
 
 	"google.golang.org/protobuf/proto"
 )

@@ -1,9 +1,10 @@
 package parser
 
 import (
+	"bonanza.build/pkg/encoding/varint"
+	model_core "bonanza.build/pkg/model/core"
+
 	"github.com/buildbarn/bb-storage/pkg/util"
-	"github.com/buildbarn/bonanza/pkg/encoding/varint"
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

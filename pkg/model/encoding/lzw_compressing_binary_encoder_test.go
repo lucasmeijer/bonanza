@@ -4,7 +4,8 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"github.com/buildbarn/bonanza/pkg/model/encoding"
+	"bonanza.build/pkg/model/encoding"
+
 	"github.com/stretchr/testify/require"
 )
 

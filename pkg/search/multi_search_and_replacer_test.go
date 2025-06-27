@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/buildbarn/bonanza/pkg/search"
+	"bonanza.build/pkg/search"
+
 	"github.com/stretchr/testify/require"
 )
 

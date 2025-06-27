@@ -3,9 +3,9 @@ package local
 import (
 	"context"
 
-	"github.com/buildbarn/bonanza/pkg/storage/object"
-	object_flatbacked "github.com/buildbarn/bonanza/pkg/storage/object/flatbacked"
-	"github.com/buildbarn/bonanza/pkg/storage/tag"
+	"bonanza.build/pkg/storage/object"
+	object_flatbacked "bonanza.build/pkg/storage/object/flatbacked"
+	"bonanza.build/pkg/storage/tag"
 
 	"google.golang.org/protobuf/types/known/anypb"
 )

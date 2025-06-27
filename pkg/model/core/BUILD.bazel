@@ -18,7 +18,7 @@ go_library(
         "top_level_message.go",
         "walkable_reference_metadata.go",
     ],
-    importpath = "github.com/buildbarn/bonanza/pkg/model/core",
+    importpath = "bonanza.build/pkg/model/core",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/ds",

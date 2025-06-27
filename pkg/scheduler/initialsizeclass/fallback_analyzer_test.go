@@ -5,8 +5,9 @@ import (
 	"testing"
 	"time"
 
-	remoteexecution_pb "github.com/buildbarn/bonanza/pkg/proto/remoteexecution"
-	"github.com/buildbarn/bonanza/pkg/scheduler/initialsizeclass"
+	remoteexecution_pb "bonanza.build/pkg/proto/remoteexecution"
+	"bonanza.build/pkg/scheduler/initialsizeclass"
+
 	"github.com/stretchr/testify/require"
 
 	"google.golang.org/protobuf/types/known/durationpb"

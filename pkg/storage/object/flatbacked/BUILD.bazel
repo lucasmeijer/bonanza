@@ -7,7 +7,7 @@ go_library(
         "lease.go",
         "store.go",
     ],
-    importpath = "github.com/buildbarn/bonanza/pkg/storage/object/flatbacked",
+    importpath = "bonanza.build/pkg/storage/object/flatbacked",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/ds/lossymap",

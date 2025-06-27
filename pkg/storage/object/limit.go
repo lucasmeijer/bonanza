@@ -3,7 +3,7 @@ package object
 import (
 	"math"
 
-	"github.com/buildbarn/bonanza/pkg/proto/storage/object"
+	"bonanza.build/pkg/proto/storage/object"
 )
 
 // Limit on the maximum number of objects to process in parallel.

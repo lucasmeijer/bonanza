@@ -1,4 +1,4 @@
-module(name = "com_github_buildbarn_bonanza")
+module(name = "build_bonanza")
 
 bazel_dep(name = "aspect_bazel_lib", version = "2.19.1")
 bazel_dep(name = "aspect_rules_js", version = "2.3.7")
@@ -151,8 +151,8 @@ use_repo(llvm, "llvm_toolchain_llvm")
 
 npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm")
 npm.npm_translate_lock(
-    name = "com_github_buildbarn_bonanza_npm",
-    link_workspace = "com_github_buildbarn_bonanza",
+    name = "build_bonanza_npm",
+    link_workspace = "build_bonanza",
     pnpm_lock = "//:pnpm-lock.yaml",
 )
-use_repo(npm, "com_github_buildbarn_bonanza_npm")
+use_repo(npm, "build_bonanza_npm")

@@ -1,9 +1,10 @@
 package commands
 
 import (
+	"bonanza.build/pkg/bazelclient/formatted"
+	"bonanza.build/pkg/bazelclient/logging"
+
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
-	"github.com/buildbarn/bonanza/pkg/bazelclient/formatted"
-	"github.com/buildbarn/bonanza/pkg/bazelclient/logging"
 )
 
 func ValidateInsideWorkspace(logger logging.Logger, commandName string, workspacePath path.Parser) {

@@ -3,8 +3,8 @@ package core
 import (
 	"context"
 
-	"github.com/buildbarn/bonanza/pkg/storage/dag"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
+	"bonanza.build/pkg/storage/dag"
+	"bonanza.build/pkg/storage/object"
 )
 
 // CreatedObject holds the contents of an object that was created using

@@ -3,7 +3,7 @@ load("@rules_go//go:def.bzl", "go_library")
 go_library(
     name = "leaserenewing",
     srcs = ["resolver.go"],
-    importpath = "github.com/buildbarn/bonanza/pkg/storage/tag/leaserenewing",
+    importpath = "bonanza.build/pkg/storage/tag/leaserenewing",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/storage/object",

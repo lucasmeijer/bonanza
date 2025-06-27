@@ -568,7 +568,7 @@ const file_pkg_proto_remoteexecution_remoteexecution_proto_rawDesc = "" +
 	"\x05stage2\xd7\x01\n" +
 	"\tExecution\x12^\n" +
 	"\aExecute\x12'.bonanza.remoteexecution.ExecuteRequest\x1a(.bonanza.remoteexecution.ExecuteResponse0\x01\x12j\n" +
-	"\rWaitExecution\x12-.bonanza.remoteexecution.WaitExecutionRequest\x1a(.bonanza.remoteexecution.ExecuteResponse0\x01B8Z6github.com/buildbarn/bonanza/pkg/proto/remoteexecutionb\x06proto3"
+	"\rWaitExecution\x12-.bonanza.remoteexecution.WaitExecutionRequest\x1a(.bonanza.remoteexecution.ExecuteResponse0\x01B)Z'bonanza.build/pkg/proto/remoteexecutionb\x06proto3"
 
 var (
 	file_pkg_proto_remoteexecution_remoteexecution_proto_rawDescOnce sync.Once

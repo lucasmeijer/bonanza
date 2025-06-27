@@ -6,11 +6,11 @@ import (
 	"maps"
 	"slices"
 
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	"github.com/buildbarn/bonanza/pkg/model/core/inlinedtree"
-	model_encoding "github.com/buildbarn/bonanza/pkg/model/encoding"
-	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
-	model_command_pb "github.com/buildbarn/bonanza/pkg/proto/model/command"
+	model_core "bonanza.build/pkg/model/core"
+	"bonanza.build/pkg/model/core/inlinedtree"
+	model_encoding "bonanza.build/pkg/model/encoding"
+	model_parser "bonanza.build/pkg/model/parser"
+	model_command_pb "bonanza.build/pkg/proto/model/command"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

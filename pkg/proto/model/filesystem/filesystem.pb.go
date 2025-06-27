@@ -7,8 +7,8 @@
 package filesystem
 
 import (
-	core "github.com/buildbarn/bonanza/pkg/proto/model/core"
-	encoding "github.com/buildbarn/bonanza/pkg/proto/model/encoding"
+	core "bonanza.build/pkg/proto/model/core"
+	encoding "bonanza.build/pkg/proto/model/encoding"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	wrapperspb "google.golang.org/protobuf/types/known/wrapperspb"
@@ -940,7 +940,7 @@ const file_pkg_proto_model_filesystem_filesystem_proto_rawDesc = "" +
 	"\x18chunk_minimum_size_bytes\x18\x02 \x01(\rR\x15chunkMinimumSizeBytes\x127\n" +
 	"\x18chunk_maximum_size_bytes\x18\x03 \x01(\rR\x15chunkMaximumSizeBytes\x12O\n" +
 	"%file_contents_list_minimum_size_bytes\x18\x04 \x01(\rR fileContentsListMinimumSizeBytes\x12O\n" +
-	"%file_contents_list_maximum_size_bytes\x18\x05 \x01(\rR fileContentsListMaximumSizeBytesB9Z7github.com/buildbarn/bonanza/pkg/proto/model/filesystemb\x06proto3"
+	"%file_contents_list_maximum_size_bytes\x18\x05 \x01(\rR fileContentsListMaximumSizeBytesB*Z(bonanza.build/pkg/proto/model/filesystemb\x06proto3"
 
 var (
 	file_pkg_proto_model_filesystem_filesystem_proto_rawDescOnce sync.Once

@@ -6,15 +6,16 @@ import (
 	"os"
 	"path/filepath"
 
+	"bonanza.build/pkg/bazelclient/arguments"
+	commands_build "bonanza.build/pkg/bazelclient/commands/build"
+	commands_info "bonanza.build/pkg/bazelclient/commands/info"
+	commands_license "bonanza.build/pkg/bazelclient/commands/license"
+	commands_version "bonanza.build/pkg/bazelclient/commands/version"
+	"bonanza.build/pkg/bazelclient/formatted"
+	"bonanza.build/pkg/bazelclient/logging"
+
 	"github.com/buildbarn/bb-storage/pkg/filesystem"
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
-	"github.com/buildbarn/bonanza/pkg/bazelclient/arguments"
-	commands_build "github.com/buildbarn/bonanza/pkg/bazelclient/commands/build"
-	commands_info "github.com/buildbarn/bonanza/pkg/bazelclient/commands/info"
-	commands_license "github.com/buildbarn/bonanza/pkg/bazelclient/commands/license"
-	commands_version "github.com/buildbarn/bonanza/pkg/bazelclient/commands/version"
-	"github.com/buildbarn/bonanza/pkg/bazelclient/formatted"
-	"github.com/buildbarn/bonanza/pkg/bazelclient/logging"
 )
 
 func main() {

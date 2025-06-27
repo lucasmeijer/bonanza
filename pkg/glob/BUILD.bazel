@@ -6,7 +6,7 @@ go_library(
         "matcher.go",
         "nfa.go",
     ],
-    importpath = "github.com/buildbarn/bonanza/pkg/glob",
+    importpath = "bonanza.build/pkg/glob",
     visibility = ["//visibility:public"],
     deps = ["//pkg/encoding/varint"],
 )

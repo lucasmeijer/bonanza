@@ -1,7 +1,7 @@
 package object
 
 import (
-	"github.com/buildbarn/bonanza/pkg/proto/storage/object"
+	"bonanza.build/pkg/proto/storage/object"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

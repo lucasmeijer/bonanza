@@ -4,10 +4,11 @@ import (
 	"testing"
 	"time"
 
+	object_pb "bonanza.build/pkg/proto/storage/object"
+	"bonanza.build/pkg/storage/object"
+	object_flatbacked "bonanza.build/pkg/storage/object/flatbacked"
+
 	"github.com/buildbarn/bb-storage/pkg/testutil"
-	object_pb "github.com/buildbarn/bonanza/pkg/proto/storage/object"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
-	object_flatbacked "github.com/buildbarn/bonanza/pkg/storage/object/flatbacked"
 	"github.com/stretchr/testify/require"
 
 	"google.golang.org/grpc/codes"

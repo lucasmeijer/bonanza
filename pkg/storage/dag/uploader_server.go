@@ -6,12 +6,13 @@ import (
 	"io"
 	"sync"
 
+	"bonanza.build/pkg/ds"
+	"bonanza.build/pkg/proto/storage/dag"
+	"bonanza.build/pkg/storage/object"
+	"bonanza.build/pkg/storage/tag"
+	pg_sync "bonanza.build/pkg/sync"
+
 	"github.com/buildbarn/bb-storage/pkg/util"
-	"github.com/buildbarn/bonanza/pkg/ds"
-	"github.com/buildbarn/bonanza/pkg/proto/storage/dag"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
-	"github.com/buildbarn/bonanza/pkg/storage/tag"
-	pg_sync "github.com/buildbarn/bonanza/pkg/sync"
 
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"

@@ -9,7 +9,7 @@ import "google/protobuf/timestamp.proto";
 import "google/rpc/status.proto";
 import "pkg/proto/remoteexecution/remoteexecution.proto";
 
-option go_package = "github.com/buildbarn/bonanza/pkg/proto/buildqueuestate";
+option go_package = "bonanza.build/pkg/proto/buildqueuestate";
 
 // BuildQueueState can be used to inspect the internal state of
 // InMemoryBuildQueue and perform administrative operations against it.

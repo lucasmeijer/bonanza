@@ -9,7 +9,7 @@ import "pkg/proto/model/encoding/encoding.proto";
 import "pkg/proto/model/filesystem/filesystem.proto";
 import "pkg/proto/storage/object/object.proto";
 
-option go_package = "github.com/buildbarn/bonanza/pkg/proto/model/command";
+option go_package = "bonanza.build/pkg/proto/model/command";
 
 message Command {
   // The arguments of the command.

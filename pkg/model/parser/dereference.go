@@ -3,8 +3,8 @@ package parser
 import (
 	"context"
 
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	model_core_pb "github.com/buildbarn/bonanza/pkg/proto/model/core"
+	model_core "bonanza.build/pkg/model/core"
+	model_core_pb "bonanza.build/pkg/proto/model/core"
 )
 
 // Dereference a reference message, returning the value that's

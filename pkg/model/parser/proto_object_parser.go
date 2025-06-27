@@ -1,8 +1,9 @@
 package parser
 
 import (
+	model_core "bonanza.build/pkg/model/core"
+
 	"github.com/buildbarn/bb-storage/pkg/util"
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

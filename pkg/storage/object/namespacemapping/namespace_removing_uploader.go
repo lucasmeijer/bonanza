@@ -3,7 +3,7 @@ package namespaced
 import (
 	"context"
 
-	"github.com/buildbarn/bonanza/pkg/storage/object"
+	"bonanza.build/pkg/storage/object"
 )
 
 type namespaceRemovingUploader[TReference object.BasicReference, TLease any] struct {

@@ -4,8 +4,9 @@ import (
 	"errors"
 	"testing"
 
+	"bonanza.build/pkg/label"
+
 	"github.com/buildbarn/bb-storage/pkg/util"
-	"github.com/buildbarn/bonanza/pkg/label"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

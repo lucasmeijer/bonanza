@@ -5,8 +5,9 @@ import (
 	"crypto/rand"
 	"testing"
 
+	"bonanza.build/pkg/model/encoding"
+
 	"github.com/buildbarn/bb-storage/pkg/testutil"
-	"github.com/buildbarn/bonanza/pkg/model/encoding"
 	"github.com/stretchr/testify/require"
 
 	"google.golang.org/grpc/codes"

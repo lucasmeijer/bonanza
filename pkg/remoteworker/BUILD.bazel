@@ -6,7 +6,7 @@ go_library(
         "client.go",
         "executor.go",
     ],
-    importpath = "github.com/buildbarn/bonanza/pkg/remoteworker",
+    importpath = "bonanza.build/pkg/remoteworker",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/ds",

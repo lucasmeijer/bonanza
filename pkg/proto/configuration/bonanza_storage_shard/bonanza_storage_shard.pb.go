@@ -119,7 +119,7 @@ const file_pkg_proto_configuration_bonanza_storage_shard_bonanza_storage_shard_p
 	"\x18leases_map_records_count\x18\x03 \x01(\x04R\x15leasesMapRecordsCount\x12m\n" +
 	"&leases_map_lease_completeness_duration\x18\x04 \x01(\v2\x19.google.protobuf.DurationR\"leasesMapLeaseCompletenessDuration\x12D\n" +
 	"\x1fleases_map_maximum_get_attempts\x18\x05 \x01(\rR\x1bleasesMapMaximumGetAttempts\x12D\n" +
-	"\x1fleases_map_maximum_put_attempts\x18\x06 \x01(\x03R\x1bleasesMapMaximumPutAttemptsBLZJgithub.com/buildbarn/bonanza/pkg/proto/configuration/bonanza_storage_shardb\x06proto3"
+	"\x1fleases_map_maximum_put_attempts\x18\x06 \x01(\x03R\x1bleasesMapMaximumPutAttemptsB=Z;bonanza.build/pkg/proto/configuration/bonanza_storage_shardb\x06proto3"
 
 var (
 	file_pkg_proto_configuration_bonanza_storage_shard_bonanza_storage_shard_proto_rawDescOnce sync.Once

@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"math/bits"
 
-	"github.com/buildbarn/bonanza/pkg/encoding/varint"
+	"bonanza.build/pkg/encoding/varint"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

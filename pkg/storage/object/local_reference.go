@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"math"
 
+	"bonanza.build/pkg/encoding/float16"
+	"bonanza.build/pkg/proto/storage/object"
+
 	"github.com/buildbarn/bb-storage/pkg/util"
-	"github.com/buildbarn/bonanza/pkg/encoding/float16"
-	"github.com/buildbarn/bonanza/pkg/proto/storage/object"
 )
 
 const (

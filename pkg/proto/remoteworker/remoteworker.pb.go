@@ -7,7 +7,7 @@
 package remoteworker
 
 import (
-	remoteexecution "github.com/buildbarn/bonanza/pkg/proto/remoteexecution"
+	remoteexecution "bonanza.build/pkg/proto/remoteexecution"
 	status "google.golang.org/genproto/googleapis/rpc/status"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -830,7 +830,7 @@ const file_pkg_proto_remoteworker_remoteworker_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x0e\n" +
 	"\fworker_state2t\n" +
 	"\x0eOperationQueue\x12b\n" +
-	"\vSynchronize\x12(.bonanza.remoteworker.SynchronizeRequest\x1a).bonanza.remoteworker.SynchronizeResponseB5Z3github.com/buildbarn/bonanza/pkg/proto/remoteworkerb\x06proto3"
+	"\vSynchronize\x12(.bonanza.remoteworker.SynchronizeRequest\x1a).bonanza.remoteworker.SynchronizeResponseB&Z$bonanza.build/pkg/proto/remoteworkerb\x06proto3"
 
 var (
 	file_pkg_proto_remoteworker_remoteworker_proto_rawDescOnce sync.Once

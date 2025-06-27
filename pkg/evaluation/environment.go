@@ -1,8 +1,8 @@
 package evaluation
 
 import (
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	"github.com/buildbarn/bonanza/pkg/storage/dag"
+	model_core "bonanza.build/pkg/model/core"
+	"bonanza.build/pkg/storage/dag"
 
 	"google.golang.org/protobuf/proto"
 )

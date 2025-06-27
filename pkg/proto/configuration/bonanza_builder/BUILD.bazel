@@ -17,7 +17,7 @@ proto_library(
 
 go_proto_library(
     name = "bonanza_builder_go_proto",
-    importpath = "github.com/buildbarn/bonanza/pkg/proto/configuration/bonanza_builder",
+    importpath = "bonanza.build/pkg/proto/configuration/bonanza_builder",
     proto = ":bonanza_builder_proto",
     visibility = ["//visibility:public"],
     deps = [
@@ -32,6 +32,6 @@ go_proto_library(
 go_library(
     name = "bonanza_builder",
     embed = [":bonanza_builder_go_proto"],
-    importpath = "github.com/buildbarn/bonanza/pkg/proto/configuration/bonanza_builder",
+    importpath = "bonanza.build/pkg/proto/configuration/bonanza_builder",
     visibility = ["//visibility:public"],
 )

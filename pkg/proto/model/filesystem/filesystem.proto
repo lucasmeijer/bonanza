@@ -6,7 +6,7 @@ import "google/protobuf/wrappers.proto";
 import "pkg/proto/model/core/core.proto";
 import "pkg/proto/model/encoding/encoding.proto";
 
-option go_package = "github.com/buildbarn/bonanza/pkg/proto/model/filesystem";
+option go_package = "bonanza.build/pkg/proto/model/filesystem";
 
 message Leaves {
   // The files in the directory. Files MUST be stored in alphabetical

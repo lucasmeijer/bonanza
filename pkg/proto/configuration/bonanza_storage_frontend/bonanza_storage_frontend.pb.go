@@ -7,9 +7,9 @@
 package bonanza_storage_frontend
 
 import (
+	object "bonanza.build/pkg/proto/storage/object"
 	global "github.com/buildbarn/bb-storage/pkg/proto/configuration/global"
 	grpc "github.com/buildbarn/bb-storage/pkg/proto/configuration/grpc"
-	object "github.com/buildbarn/bonanza/pkg/proto/storage/object"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -189,7 +189,7 @@ const file_pkg_proto_configuration_bonanza_storage_frontend_bonanza_storage_fron
 	"\x05value\x18\x02 \x01(\v2N.bonanza.configuration.bonanza_storage_frontend.ApplicationConfiguration.ShardR\x05value:\x028\x01\x1a\x91\x01\n" +
 	"\x13ShardsReplicaBEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12d\n" +
-	"\x05value\x18\x02 \x01(\v2N.bonanza.configuration.bonanza_storage_frontend.ApplicationConfiguration.ShardR\x05value:\x028\x01BOZMgithub.com/buildbarn/bonanza/pkg/proto/configuration/bonanza_storage_frontendb\x06proto3"
+	"\x05value\x18\x02 \x01(\v2N.bonanza.configuration.bonanza_storage_frontend.ApplicationConfiguration.ShardR\x05value:\x028\x01B@Z>bonanza.build/pkg/proto/configuration/bonanza_storage_frontendb\x06proto3"
 
 var (
 	file_pkg_proto_configuration_bonanza_storage_frontend_bonanza_storage_frontend_proto_rawDescOnce sync.Once

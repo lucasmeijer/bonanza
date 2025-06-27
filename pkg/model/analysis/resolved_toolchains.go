@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/buildbarn/bonanza/pkg/evaluation"
-	"github.com/buildbarn/bonanza/pkg/label"
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
-	"github.com/buildbarn/bonanza/pkg/storage/dag"
+	"bonanza.build/pkg/evaluation"
+	"bonanza.build/pkg/label"
+	model_core "bonanza.build/pkg/model/core"
+	model_analysis_pb "bonanza.build/pkg/proto/model/analysis"
+	"bonanza.build/pkg/storage/dag"
 )
 
 func constraintsAreCompatible(actual, expected []*model_analysis_pb.Constraint) bool {

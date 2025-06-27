@@ -4,8 +4,9 @@ import (
 	"context"
 	"sync/atomic"
 
+	"bonanza.build/pkg/storage/object"
+
 	"github.com/buildbarn/bb-storage/pkg/util"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
 )
 
 // LeaseMarshaler is used by the implementations of object.Downloader

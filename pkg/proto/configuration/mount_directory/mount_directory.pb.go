@@ -7,13 +7,13 @@
 package mount_directory
 
 import (
+	parser "bonanza.build/pkg/proto/configuration/model/parser"
+	core "bonanza.build/pkg/proto/model/core"
+	encoding "bonanza.build/pkg/proto/model/encoding"
+	object "bonanza.build/pkg/proto/storage/object"
 	virtual "github.com/buildbarn/bb-remote-execution/pkg/proto/configuration/filesystem/virtual"
 	global "github.com/buildbarn/bb-storage/pkg/proto/configuration/global"
 	grpc "github.com/buildbarn/bb-storage/pkg/proto/configuration/grpc"
-	parser "github.com/buildbarn/bonanza/pkg/proto/configuration/model/parser"
-	core "github.com/buildbarn/bonanza/pkg/proto/model/core"
-	encoding "github.com/buildbarn/bonanza/pkg/proto/model/encoding"
-	object "github.com/buildbarn/bonanza/pkg/proto/storage/object"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -151,7 +151,7 @@ const file_pkg_proto_configuration_mount_directory_mount_directory_proto_rawDesc
 	"\x18root_directory_reference\x18\x06 \x01(\v2*.bonanza.model.core.WeakDecodableReferenceB0\xea\xd7 ,\x12*bonanza.model.filesystem.DirectoryContentsR\x16rootDirectoryReference\x12T\n" +
 	"\x12directory_encoders\x18\a \x03(\v2%.bonanza.model.encoding.BinaryEncoderR\x11directoryEncoders\x12U\n" +
 	"\x13small_file_encoders\x18\b \x03(\v2%.bonanza.model.encoding.BinaryEncoderR\x11smallFileEncoders\x12c\n" +
-	"\x1aconcatenated_file_encoders\x18\t \x03(\v2%.bonanza.model.encoding.BinaryEncoderR\x18concatenatedFileEncodersBFZDgithub.com/buildbarn/bonanza/pkg/proto/configuration/mount_directoryb\x06proto3"
+	"\x1aconcatenated_file_encoders\x18\t \x03(\v2%.bonanza.model.encoding.BinaryEncoderR\x18concatenatedFileEncodersB7Z5bonanza.build/pkg/proto/configuration/mount_directoryb\x06proto3"
 
 var (
 	file_pkg_proto_configuration_mount_directory_mount_directory_proto_rawDescOnce sync.Once

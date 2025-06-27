@@ -4,7 +4,8 @@ import (
 	"math/rand/v2"
 	"testing"
 
-	"github.com/buildbarn/bonanza/pkg/encoding/float16"
+	"bonanza.build/pkg/encoding/float16"
+
 	"github.com/stretchr/testify/require"
 )
 

@@ -15,7 +15,7 @@ go_library(
         "proto_object_parser.go",
         "raw_object_parser.go",
     ],
-    importpath = "github.com/buildbarn/bonanza/pkg/model/parser",
+    importpath = "bonanza.build/pkg/model/parser",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/encoding/varint",

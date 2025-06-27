@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/buildbarn/bonanza/pkg/evaluation"
-	"github.com/buildbarn/bonanza/pkg/label"
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	model_analysis_pb "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
+	"bonanza.build/pkg/evaluation"
+	"bonanza.build/pkg/label"
+	model_core "bonanza.build/pkg/model/core"
+	model_analysis_pb "bonanza.build/pkg/proto/model/analysis"
 )
 
 func (c *baseComputer[TReference, TMetadata]) ComputeUsedModuleExtensionValue(ctx context.Context, key *model_analysis_pb.UsedModuleExtension_Key, e UsedModuleExtensionEnvironment[TReference, TMetadata]) (PatchedUsedModuleExtensionValue, error) {

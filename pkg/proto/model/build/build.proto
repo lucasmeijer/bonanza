@@ -9,7 +9,7 @@ import "pkg/proto/model/encoding/encoding.proto";
 import "pkg/proto/model/filesystem/filesystem.proto";
 import "pkg/proto/storage/object/object.proto";
 
-option go_package = "github.com/buildbarn/bonanza/pkg/proto/model/build";
+option go_package = "bonanza.build/pkg/proto/model/build";
 
 message Module {
   // The name of the module for which source code is provided, without

@@ -600,7 +600,7 @@ const file_pkg_proto_storage_object_object_proto_rawDesc = "" +
 	"Downloader\x12o\n" +
 	"\x0eDownloadObject\x12-.bonanza.storage.object.DownloadObjectRequest\x1a..bonanza.storage.object.DownloadObjectResponse2u\n" +
 	"\bUploader\x12i\n" +
-	"\fUploadObject\x12+.bonanza.storage.object.UploadObjectRequest\x1a,.bonanza.storage.object.UploadObjectResponseB7Z5github.com/buildbarn/bonanza/pkg/proto/storage/objectb\x06proto3"
+	"\fUploadObject\x12+.bonanza.storage.object.UploadObjectRequest\x1a,.bonanza.storage.object.UploadObjectResponseB(Z&bonanza.build/pkg/proto/storage/objectb\x06proto3"
 
 var (
 	file_pkg_proto_storage_object_object_proto_rawDescOnce sync.Once

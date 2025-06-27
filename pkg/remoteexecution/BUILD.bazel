@@ -3,7 +3,7 @@ load("@rules_go//go:def.bzl", "go_library")
 go_library(
     name = "remoteexecution",
     srcs = ["client.go"],
-    importpath = "github.com/buildbarn/bonanza/pkg/remoteexecution",
+    importpath = "bonanza.build/pkg/remoteexecution",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/proto/remoteexecution",

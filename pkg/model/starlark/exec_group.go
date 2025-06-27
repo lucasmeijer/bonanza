@@ -6,9 +6,9 @@ import (
 	"slices"
 	"sort"
 
-	pg_label "github.com/buildbarn/bonanza/pkg/label"
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	model_starlark_pb "github.com/buildbarn/bonanza/pkg/proto/model/starlark"
+	pg_label "bonanza.build/pkg/label"
+	model_core "bonanza.build/pkg/model/core"
+	model_starlark_pb "bonanza.build/pkg/proto/model/starlark"
 
 	"go.starlark.net/starlark"
 )

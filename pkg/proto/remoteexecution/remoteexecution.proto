@@ -4,7 +4,7 @@ package bonanza.remoteexecution;
 
 import "google/protobuf/duration.proto";
 
-option go_package = "github.com/buildbarn/bonanza/pkg/proto/remoteexecution";
+option go_package = "bonanza.build/pkg/proto/remoteexecution";
 
 service Execution {
   rpc Execute(ExecuteRequest) returns (stream ExecuteResponse);

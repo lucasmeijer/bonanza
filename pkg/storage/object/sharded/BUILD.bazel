@@ -9,7 +9,7 @@ go_library(
         "sharded_uploader.go",
         "weighted_rendezvous_picker.go",
     ],
-    importpath = "github.com/buildbarn/bonanza/pkg/storage/object/sharded",
+    importpath = "bonanza.build/pkg/storage/object/sharded",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/storage/object",

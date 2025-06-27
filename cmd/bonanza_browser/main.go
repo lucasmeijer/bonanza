@@ -5,21 +5,22 @@ import (
 	"net/http"
 	"os"
 
+	model_parser "bonanza.build/pkg/model/parser"
+	"bonanza.build/pkg/proto/configuration/bonanza_browser"
+	object_pb "bonanza.build/pkg/proto/storage/object"
+	object_grpc "bonanza.build/pkg/storage/object/grpc"
+
 	"github.com/buildbarn/bb-storage/pkg/global"
 	bb_http "github.com/buildbarn/bb-storage/pkg/http"
 	"github.com/buildbarn/bb-storage/pkg/program"
 	"github.com/buildbarn/bb-storage/pkg/util"
-	model_parser "github.com/buildbarn/bonanza/pkg/model/parser"
-	"github.com/buildbarn/bonanza/pkg/proto/configuration/bonanza_browser"
-	object_pb "github.com/buildbarn/bonanza/pkg/proto/storage/object"
-	object_grpc "github.com/buildbarn/bonanza/pkg/storage/object/grpc"
 
 	// Included to ensure message of these types are displayable.
-	_ "github.com/buildbarn/bonanza/pkg/proto/model/analysis"
-	_ "github.com/buildbarn/bonanza/pkg/proto/model/command"
-	_ "github.com/buildbarn/bonanza/pkg/proto/model/core"
-	_ "github.com/buildbarn/bonanza/pkg/proto/model/evaluation"
-	_ "github.com/buildbarn/bonanza/pkg/proto/model/filesystem"
+	_ "bonanza.build/pkg/proto/model/analysis"
+	_ "bonanza.build/pkg/proto/model/command"
+	_ "bonanza.build/pkg/proto/model/core"
+	_ "bonanza.build/pkg/proto/model/evaluation"
+	_ "bonanza.build/pkg/proto/model/filesystem"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

@@ -1,7 +1,7 @@
 package core
 
 import (
-	"github.com/buildbarn/bonanza/pkg/storage/object"
+	"bonanza.build/pkg/storage/object"
 )
 
 // CloneableReferenceMetadata is a type of ReferenceMetadata that is

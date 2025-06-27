@@ -3,9 +3,10 @@ package leasemarshaling
 import (
 	"context"
 
+	"bonanza.build/pkg/storage/object/leasemarshaling"
+	"bonanza.build/pkg/storage/tag"
+
 	"github.com/buildbarn/bb-storage/pkg/util"
-	"github.com/buildbarn/bonanza/pkg/storage/object/leasemarshaling"
-	"github.com/buildbarn/bonanza/pkg/storage/tag"
 
 	"google.golang.org/protobuf/types/known/anypb"
 )

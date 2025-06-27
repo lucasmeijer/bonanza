@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
-	model_core "github.com/buildbarn/bonanza/pkg/model/core"
-	"github.com/buildbarn/bonanza/pkg/storage/dag"
-	"github.com/buildbarn/bonanza/pkg/storage/object"
+	model_core "bonanza.build/pkg/model/core"
+	"bonanza.build/pkg/storage/dag"
+	"bonanza.build/pkg/storage/object"
 
 	"google.golang.org/protobuf/proto"
 )

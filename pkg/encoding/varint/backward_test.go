@@ -5,7 +5,8 @@ import (
 	"math/rand/v2"
 	"testing"
 
-	"github.com/buildbarn/bonanza/pkg/encoding/varint"
+	"bonanza.build/pkg/encoding/varint"
+
 	"github.com/stretchr/testify/require"
 )
 

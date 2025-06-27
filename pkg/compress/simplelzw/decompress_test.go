@@ -3,8 +3,9 @@ package simplelzw_test
 import (
 	"testing"
 
+	"bonanza.build/pkg/compress/simplelzw"
+
 	"github.com/buildbarn/bb-storage/pkg/testutil"
-	"github.com/buildbarn/bonanza/pkg/compress/simplelzw"
 	"github.com/stretchr/testify/require"
 
 	"google.golang.org/grpc/codes"

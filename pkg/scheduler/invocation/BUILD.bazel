@@ -8,7 +8,7 @@ go_library(
         "key.go",
         "key_extractor.go",
     ],
-    importpath = "github.com/buildbarn/bonanza/pkg/scheduler/invocation",
+    importpath = "bonanza.build/pkg/scheduler/invocation",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/proto/buildqueuestate",

@@ -15,7 +15,7 @@ proto_library(
 
 go_proto_library(
     name = "core_go_proto",
-    importpath = "github.com/buildbarn/bonanza/pkg/proto/model/core",
+    importpath = "bonanza.build/pkg/proto/model/core",
     proto = ":core_proto",
     visibility = ["//visibility:public"],
 )
@@ -23,6 +23,6 @@ go_proto_library(
 go_library(
     name = "core",
     embed = [":core_go_proto"],
-    importpath = "github.com/buildbarn/bonanza/pkg/proto/model/core",
+    importpath = "bonanza.build/pkg/proto/model/core",
     visibility = ["//visibility:public"],
 )
