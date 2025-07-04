@@ -1,4 +1,4 @@
-local replicasCount = 4;
+local shardsCount = 4;
 local statePath = std.extVar('STATE_PATH');
 
 {
@@ -23,17 +23,17 @@ local statePath = std.extVar('STATE_PATH');
   },
 
   shardsReplicaA: {
-    [std.toString(replica)]: {
-      client: { address: 'unix://%s/bonanza_storage_shard_a%s.sock' % [statePath, replica] },
+    [std.toString(shard)]: {
+      client: { address: 'unix://%s/bonanza_storage_shard_a%s.sock' % [statePath, shard] },
       weight: 1,
     }
-    for replica in std.range(0, replicasCount - 1)
+    for shard in std.range(0, shardsCount - 1)
   },
   shardsReplicaB: {
-    [std.toString(replica)]: {
-      client: { address: 'unix://%s/bonanza_storage_shard_b%s.sock' % [statePath, replica] },
+    [std.toString(shard)]: {
+      client: { address: 'unix://%s/bonanza_storage_shard_b%s.sock' % [statePath, shard] },
       weight: 1,
     }
-    for replica in std.range(0, replicasCount - 1)
+    for shard in std.range(0, shardsCount - 1)
   },
 }
