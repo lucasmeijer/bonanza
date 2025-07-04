@@ -75,7 +75,7 @@ func (p *weightedRendezvousPicker) PickShard(data []byte) int {
 	dataHash := dataHasher.Sum64()
 
 	bestIndex, bestScore := 0, uint64(0)
-	for index, shard := range p.shards {
+	for _, shard := range p.shards {
 		// Mix the hash of the object identifier and the server
 		// together. Simple multiplication should work well
 		// enough, considering that we ensure the server hash
@@ -85,7 +85,7 @@ func (p *weightedRendezvousPicker) PickShard(data []byte) int {
 		// Computed score = weight / -log(hash).
 		minusLogHash := 1<<32 - Log2Fixed64(combinedHash)>>32
 		if score := shard.weight / minusLogHash; bestScore < score {
-			bestIndex, bestScore = index, score
+			bestIndex, bestScore = shard.index, score
 		}
 	}
 	return bestIndex

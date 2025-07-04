@@ -3,6 +3,7 @@ package sharded_test
 import (
 	"encoding/binary"
 	"fmt"
+	"slices"
 	"testing"
 
 	"bonanza.build/pkg/storage/object/sharded"
@@ -88,6 +89,34 @@ func TestWeightedRendezvousPicker(t *testing.T) {
 		for i, shardHits := range hits {
 			assert.Less(t, 900*(i+1), shardHits)
 			assert.Greater(t, 1100*(i+1), shardHits)
+		}
+	})
+
+	t.Run("Order", func(t *testing.T) {
+		// The order in which shards are provided does not
+		// matter. The picker should always select the shard
+		// with the same key.
+		const shardCount = 10
+		var shards [shardCount]sharded.WeightedShard
+		for i := range shards {
+			shards[i] = sharded.WeightedShard{
+				Key:    []byte(fmt.Sprintf("Shard %d", i)),
+				Weight: 1,
+			}
+		}
+		picker1 := sharded.NewWeightedRendezvousPicker(shards[:])
+
+		slices.Reverse(shards[:])
+		picker2 := sharded.NewWeightedRendezvousPicker(shards[:])
+
+		for i := uint32(0); i < shardCount*1000; i++ {
+			var objectIdentifier [4]byte
+			binary.LittleEndian.PutUint32(objectIdentifier[:], uint32(i))
+			assert.Equal(
+				t,
+				picker1.PickShard(objectIdentifier[:]),
+				shardCount-1-picker2.PickShard(objectIdentifier[:]),
+			)
 		}
 	})
 }
