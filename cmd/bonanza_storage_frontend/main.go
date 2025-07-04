@@ -55,9 +55,9 @@ func main() {
 		if err != nil {
 			return util.StatusWrap(err, "Failed to create storage shards for replica A")
 		}
-		objectStoreB, tagStoreB, err := createShardsForReplica(grpcClientFactory, configuration.ShardsReplicaA)
+		objectStoreB, tagStoreB, err := createShardsForReplica(grpcClientFactory, configuration.ShardsReplicaB)
 		if err != nil {
-			return util.StatusWrap(err, "Failed to create storage shards for replica A")
+			return util.StatusWrap(err, "Failed to create storage shards for replica B")
 		}
 
 		// Combine mirrored replicas together.
