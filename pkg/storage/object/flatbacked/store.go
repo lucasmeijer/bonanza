@@ -92,9 +92,20 @@ func (s *store) UploadObject(ctx context.Context, reference object.LocalReferenc
 				}
 			}
 
+			// Lease renewing involves calling UploadObject()
+			// without children leases first, followed by
+			// another one where any expired leases are updated.
+			//
+			// Because there is some time between these calls
+			// and we don't want to tell the caller that one or
+			// more children leases have expired, be less strict
+			// during the second call.
 			leaseIncompleteCutoff := leaseNow - s.leaseCompletenessDuration
 			leaseExpirationCutoff := leaseIncompleteCutoff - s.leaseCompletenessDuration
-			incomplete := false
+			if len(childrenLeases) > 0 {
+				leaseIncompleteCutoff = leaseExpirationCutoff
+			}
+
 			wantOutgoingReferencesLeases := make([]int, 0, degree)
 			s.lock.Lock()
 			for i := 0; i < degree; i++ {
@@ -125,23 +136,13 @@ func (s *store) UploadObject(ctx context.Context, reference object.LocalReferenc
 						return nil, util.StatusWrapf(err, "Failed to obtain lease for reference %#v", childReference.String())
 					}
 				}
-
-				// Send an UploadObjectIncomplete if one
-				// or more leases have fully expired.
-				// Include all references that are more
-				// than half way expired, so that we
-				// ensure the caller doesn't need to
-				// repeat refreshing too frequently.
 				if childLease < leaseIncompleteCutoff {
-					if childLease < leaseExpirationCutoff {
-						incomplete = true
-					}
 					wantOutgoingReferencesLeases = append(wantOutgoingReferencesLeases, i)
 				}
 			}
 			s.lock.Unlock()
 
-			if incomplete {
+			if len(wantOutgoingReferencesLeases) > 0 {
 				result := object.UploadObjectIncomplete[Lease]{
 					WantOutgoingReferencesLeases: wantOutgoingReferencesLeases,
 				}
