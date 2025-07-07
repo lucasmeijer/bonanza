@@ -228,7 +228,7 @@ func (u *Uploader[TReference, TLease]) finalizeObjectLocked(o *objectState[TRefe
 								nil,
 								status.Errorf(
 									codes.Internal,
-									"%d leases of outgoing references of object with reference %s expired before renewing completed",
+									"%d lease(s) of outgoing references of object with reference %s expired before renewing completed",
 									len(resultType.WantOutgoingReferencesLeases),
 									oParent.reference,
 								),
