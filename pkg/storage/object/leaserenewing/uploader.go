@@ -230,7 +230,7 @@ func (u *Uploader[TReference, TLease]) finalizeObjectLocked(o *objectState[TRefe
 									codes.Internal,
 									"%d leases of outgoing references of object with reference %s expired before renewing completed",
 									len(resultType.WantOutgoingReferencesLeases),
-									o.reference,
+									oParent.reference,
 								),
 							)
 						case object.UploadObjectMissing[TLease]:
@@ -241,7 +241,7 @@ func (u *Uploader[TReference, TLease]) finalizeObjectLocked(o *objectState[TRefe
 								status.Errorf(
 									codes.Internal,
 									"Object with reference %s went missing before renewing of leases completed",
-									o.reference,
+									oParent.reference,
 								),
 							)
 						default:
