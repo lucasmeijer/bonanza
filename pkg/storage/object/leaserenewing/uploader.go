@@ -3,6 +3,7 @@ package leaserenewing
 import (
 	"container/heap"
 	"context"
+	"math/bits"
 	"sync"
 
 	"bonanza.build/pkg/ds"
@@ -163,8 +164,10 @@ func (u *Uploader[TReference, TLease]) finalizeObjectLocked(o *objectState[TRefe
 		// that they can provide it to UploadObject().
 		oParent := unfinalizedParent.object
 		hasUnfinalizedChildren := oParent.hasUnfinalizedChildren
-		if lease != nil {
-			*unfinalizedParent.lease = *lease
+		if leaseIndex := unfinalizedParent.leaseIndex; lease == nil {
+			hasUnfinalizedChildren.gotNoLease[leaseIndex/bits.UintSize] = 1 << (leaseIndex % bits.UintSize)
+		} else {
+			hasUnfinalizedChildren.leases[leaseIndex] = *lease
 			hasUnfinalizedChildren.originalIncompleteResult = nil
 		}
 
@@ -222,17 +225,7 @@ func (u *Uploader[TReference, TLease]) finalizeObjectLocked(o *objectState[TRefe
 						case object.UploadObjectComplete[TLease]:
 							u.finalizeObjectLocked(oParent, &resultType.Lease, result, nil)
 						case object.UploadObjectIncomplete[TLease]:
-							u.finalizeObjectLocked(
-								oParent,
-								nil,
-								nil,
-								status.Errorf(
-									codes.Internal,
-									"%d lease(s) of outgoing references of object with reference %s expired before renewing completed",
-									len(resultType.WantOutgoingReferencesLeases),
-									oParent.reference,
-								),
-							)
+							u.finalizeObjectIncompleteLocked(oParent, resultType.WantOutgoingReferencesLeases, hasUnfinalizedChildren)
 						case object.UploadObjectMissing[TLease]:
 							u.finalizeObjectLocked(
 								oParent,
@@ -260,6 +253,54 @@ func (u *Uploader[TReference, TLease]) finalizeObjectLocked(o *objectState[TRefe
 
 	u.remainingUnfinalizedParentsLimit.ReleaseObject(o.reference.GetLocalReference())
 	u.pendingObjectsWakeup.Broadcast()
+}
+
+// finalizeObjectIncompleteLocked is called when a second call to
+// UploadObject() against an object is made, and just like the first one
+// it reports that the object is incomplete. This can mean one of two
+// things:
+//
+//   - We didn't manage to obtain leases for all of its children, due to
+//     objects simply being missing. This is fine, and should cause us
+//     to report the object as being incomplete.
+//
+//   - The storage backend didn't accept our leases, or objects that
+//     were previously complete became incomplete. This shouldn't happen
+//     under normal conditions. Return a transient error, so that a
+//     client calling UploadDag() doesn't erroneously see this object as
+//     being missing.
+func (u *Uploader[TReference, TLease]) finalizeObjectIncompleteLocked(
+	o *objectState[TReference, TLease],
+	wantOutgoingReferencesLeases []int,
+	hasUnfinalizedChildren *hasUnfinalizedChildrenState[TReference, TLease],
+) {
+	contents := hasUnfinalizedChildren.contents
+	for _, i := range wantOutgoingReferencesLeases {
+		if hasUnfinalizedChildren.gotNoLease[i/bits.UintSize]&(1<<(i%bits.UintSize)) == 0 {
+			u.finalizeObjectLocked(
+				o,
+				nil,
+				nil,
+				status.Errorf(
+					codes.Internal,
+					"Lease of object with reference %s expired before renewing leases of object with reference %s completed",
+					contents.GetOutgoingReference(i),
+					o.reference,
+				),
+			)
+			return
+		}
+	}
+
+	u.finalizeObjectLocked(
+		o,
+		nil,
+		object.UploadObjectIncomplete[TLease]{
+			Contents:                     hasUnfinalizedChildren.contents,
+			WantOutgoingReferencesLeases: wantOutgoingReferencesLeases,
+		},
+		nil,
+	)
 }
 
 // ProcessSingleObject needs to be invoked repeatedly to ensure that
@@ -294,17 +335,20 @@ func (u *Uploader[TReference, TLease]) ProcessSingleObject(ctx context.Context) 
 				// references for which leases need to
 				// be renewed. Queue the children having
 				// the expired leases.
-				leases := make([]TLease, localReference.GetDegree())
+				contents := resultType.Contents
 				for _, i := range resultType.WantOutgoingReferencesLeases {
-					oChild := u.getOrCreateObjectState(o.reference.WithLocalReference(resultType.Contents.GetOutgoingReference(i)))
+					oChild := u.getOrCreateObjectState(o.reference.WithLocalReference(contents.GetOutgoingReference(i)))
 					oChild.unfinalizedParents = append(oChild.unfinalizedParents, unfinalizedParent[TReference, TLease]{
-						object: o,
-						lease:  &leases[i],
+						object:     o,
+						leaseIndex: i,
 					})
 				}
+				degree := localReference.GetDegree()
 				o.hasUnfinalizedChildren = &hasUnfinalizedChildrenState[TReference, TLease]{
+					contents:                 contents,
 					originalIncompleteResult: &resultType,
-					leases:                   leases,
+					leases:                   make([]TLease, degree),
+					gotNoLease:               make([]uint, (degree+bits.UintSize-1)/bits.UintSize),
 					unfinalizedChildrenCount: len(resultType.WantOutgoingReferencesLeases),
 				}
 			case object.UploadObjectMissing[TLease]:
@@ -351,16 +395,18 @@ type hasCallersState[TLease any] struct {
 }
 
 type unfinalizedParent[TReference Reference[TReference], TLease any] struct {
-	object *objectState[TReference, TLease]
-	lease  *TLease
+	object     *objectState[TReference, TLease]
+	leaseIndex int
 }
 
 // hasUnfinalizedChildrenState contains all state for a single object
 // that is incomplete, in the process of having its leases renewed, and
 // is waiting to obtain leases for all of its children.
 type hasUnfinalizedChildrenState[TReference Reference[TReference], TLease any] struct {
+	contents                 *object.Contents
 	originalIncompleteResult *object.UploadObjectIncomplete[TLease]
 	leases                   []TLease
+	gotNoLease               []uint
 	childErr                 error
 	unfinalizedChildrenCount int
 }

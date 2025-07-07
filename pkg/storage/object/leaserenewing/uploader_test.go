@@ -402,7 +402,7 @@ func TestUploader(t *testing.T) {
 				/* childrenLeases = */ nil,
 				/* wantContentsIfIncomplete = */ false,
 			)
-			testutil.RequireEqualStatus(t, status.Error(codes.Internal, "1 lease(s) of outgoing references of object with reference SHA256=0aec331c4c9622e592d6cbfc584f9f67f828e1c78d517247174c1f9b431021f2:S=45:H=2:D=1:M=459008 expired before renewing completed"), err)
+			testutil.RequireEqualStatus(t, status.Error(codes.Internal, "Lease of object with reference SHA256=076992b65db7a4731f3df48d83b9b4aa49023a4ce4671814da77478317a75824:S=458938:H=1:D=1:M=0 expired before renewing leases of object with reference SHA256=0aec331c4c9622e592d6cbfc584f9f67f828e1c78d517247174c1f9b431021f2:S=45:H=2:D=1:M=459008 completed"), err)
 		})
 
 		t.Run("UnexpectedIncomplete", func(t *testing.T) {
@@ -469,6 +469,94 @@ func TestUploader(t *testing.T) {
 				/* wantContentsIfIncomplete = */ false,
 			)
 			testutil.RequireEqualStatus(t, status.Error(codes.Internal, "Object with reference SHA256=aab3bff658ddaa11e30e3bb1ce737995466f91175e3f54c3fd1efe98eef62410:S=45:H=2:D=1:M=459008 went missing before renewing of leases completed"), err)
+		})
+
+		t.Run("IncompleteWithMissingChild", func(t *testing.T) {
+			// If an object with two children has one
+			// missing child, we should still issue a second
+			// UploadObject() call against the parent to
+			// store the lease of the child that is present,
+			// as that saves work later on.
+			//
+			// The client should receive
+			// WantOutgoingReferencesLeases from the second
+			// call to UploadObject(), with the contents
+			// that were obtained during the first call.
+			contents := object.MustNewContents(
+				object_pb.ReferenceFormat_SHA256_V1,
+				object.OutgoingReferencesList[object.LocalReference]{
+					object.MustNewSHA256V1LocalReference("7c3b027d32a1201a965e26f613856db29eddf9458e4f0f30cf855d34eb634d71", 458938, 0, 0, 0),
+					object.MustNewSHA256V1LocalReference("a9947f1669dab14d802d990f40578782b234821b23bc3da1f9aaf6c1db0b5ebf", 458938, 0, 0, 0),
+				},
+				[]byte("Hello"),
+			)
+			gomock.InOrder(
+				baseUploader.EXPECT().UploadObject(
+					gomock.Any(),
+					object.GlobalReference{
+						InstanceName:   object.NewInstanceName("hello/world"),
+						LocalReference: contents.GetLocalReference(),
+					},
+					/* contents = */ nil,
+					/* childrenLeases = */ nil,
+					/* wantContentsIfIncomplete = */ true,
+				).Return(object.UploadObjectIncomplete[any]{
+					Contents:                     contents,
+					WantOutgoingReferencesLeases: []int{0, 1},
+				}, nil),
+				baseUploader.EXPECT().UploadObject(
+					gomock.Any(),
+					object.MustNewSHA256V1GlobalReference("hello/world", "7c3b027d32a1201a965e26f613856db29eddf9458e4f0f30cf855d34eb634d71", 458938, 0, 0, 0),
+					/* contents = */ nil,
+					/* childrenLeases = */ nil,
+					/* wantContentsIfIncomplete = */ false,
+				).Return(object.UploadObjectComplete[any]{
+					Lease: "Lease",
+				}, nil),
+				baseUploader.EXPECT().UploadObject(
+					gomock.Any(),
+					object.MustNewSHA256V1GlobalReference("hello/world", "a9947f1669dab14d802d990f40578782b234821b23bc3da1f9aaf6c1db0b5ebf", 458938, 0, 0, 0),
+					/* contents = */ nil,
+					/* childrenLeases = */ nil,
+					/* wantContentsIfIncomplete = */ false,
+				).Return(object.UploadObjectMissing[any]{}, nil),
+				baseUploader.EXPECT().UploadObject(
+					gomock.Any(),
+					object.GlobalReference{
+						InstanceName:   object.NewInstanceName("hello/world"),
+						LocalReference: contents.GetLocalReference(),
+					},
+					/* contents = */ nil,
+					[]any{
+						"Lease",
+						nil,
+					},
+					/* wantContentsIfIncomplete = */ false,
+				).Return(object.UploadObjectIncomplete[any]{
+					WantOutgoingReferencesLeases: []int{1},
+				}, nil),
+			)
+
+			go func() {
+				for i := 0; i < 3; i++ {
+					require.True(t, uploader.ProcessSingleObject(ctx))
+				}
+			}()
+			result, err := uploader.UploadObject(
+				ctx,
+				object.GlobalReference{
+					InstanceName:   object.NewInstanceName("hello/world"),
+					LocalReference: contents.GetLocalReference(),
+				},
+				/* contents = */ nil,
+				/* childrenLeases = */ nil,
+				/* wantContentsIfIncomplete = */ true,
+			)
+			require.NoError(t, err)
+			require.Equal(t, object.UploadObjectIncomplete[any]{
+				Contents:                     contents,
+				WantOutgoingReferencesLeases: []int{1},
+			}, result)
 		})
 	}
 }
