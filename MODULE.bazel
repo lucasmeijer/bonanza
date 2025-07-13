@@ -1,38 +1,38 @@
 module(name = "build_bonanza")
 
-bazel_dep(name = "aspect_bazel_lib", version = "2.19.1")
-bazel_dep(name = "aspect_rules_js", version = "2.3.7")
+bazel_dep(name = "aspect_bazel_lib", version = "2.19.4")
+bazel_dep(name = "aspect_rules_js", version = "2.3.8")
 bazel_dep(name = "bazel_remote_apis", version = "0.0.0")
-bazel_dep(name = "bazel_skylib", version = "1.7.1")
+bazel_dep(name = "bazel_skylib", version = "1.8.1")
 bazel_dep(name = "com_github_buildbarn_bb_remote_execution")
 bazel_dep(name = "com_github_buildbarn_bb_storage")
 bazel_dep(name = "com_github_buildbarn_go_xdr")
-bazel_dep(name = "gazelle", version = "0.43.0")
-bazel_dep(name = "googleapis", version = "0.0.0-20241220-5e258e33.bcr.1")
+bazel_dep(name = "gazelle", version = "0.44.0")
+bazel_dep(name = "googleapis", version = "0.0.0-20250604-de157ca3")
 bazel_dep(name = "jsonnet_go", version = "0.21.0")
 bazel_dep(name = "platforms", version = "1.0.0")
-bazel_dep(name = "toolchains_protoc", version = "0.4.2")  # must come BEFORE protobuf so the toolchain registration wins
+bazel_dep(name = "toolchains_protoc", version = "0.4.3")  # must come BEFORE protobuf so the toolchain registration wins
 bazel_dep(name = "protobuf", version = "31.1")
 bazel_dep(name = "rules_go", version = "0.55.1")
-bazel_dep(name = "rules_jsonnet", version = "0.6.0")
+bazel_dep(name = "rules_jsonnet", version = "0.7.2")
 bazel_dep(name = "rules_proto", version = "7.1.0")
 bazel_dep(name = "toolchains_llvm", version = "1.4.0")
 
 git_override(
     module_name = "bazel_remote_apis",
-    commit = "536ec595e1df0064bb37aecc95332a661b8c79b2",
+    commit = "9ef19c6b5fbf77d6dd9d84d75fbb5a20a6b62ef1",
     remote = "https://github.com/bazelbuild/remote-apis.git",
 )
 
 git_override(
     module_name = "com_github_buildbarn_bb_remote_execution",
-    commit = "9026467fdbe62ad29b5a52edea07111fac084bab",
+    commit = "d879803aa1fa8d3bf566e5038155435a47522d6e",
     remote = "https://github.com/buildbarn/bb-remote-execution.git",
 )
 
 git_override(
     module_name = "com_github_buildbarn_bb_storage",
-    commit = "e5c5728f9dc5e0245931cc68ea4d46494766570c",
+    commit = "226829e872c3e8ec8e197b1f5ca8b0609dfa20fa",
     patches = ["//:patches/com_github_buildbarn_bb_storage/no-golint.diff"],
     remote = "https://github.com/buildbarn/bb-storage.git",
 )
@@ -41,11 +41,6 @@ git_override(
     module_name = "com_github_buildbarn_go_xdr",
     commit = "236788cf9e8948a1e8875c7dd243e2be180cdfd7",
     remote = "https://github.com/buildbarn/go-xdr.git",
-)
-
-single_version_override(
-    module_name = "jsonnet",
-    patches = ["//:patches/jsonnet/bazel-8.diff"],
 )
 
 git_override(
@@ -64,7 +59,7 @@ protoc.toolchain(version = "v31.1")
 go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
 go_sdk.download(
     patches = ["//:patches/go_sdk/x25519.diff"],
-    version = "1.24.3",
+    version = "1.24.5",
 )
 
 go_deps = use_extension("@gazelle//:extensions.bzl", "go_deps")
