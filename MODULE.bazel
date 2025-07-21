@@ -78,6 +78,7 @@ use_repo(
     "com_github_stretchr_testify",
     "com_github_ulikunitz_xz",
     "dev_maragu_gomponents",
+    "io_filippo_edwards25519",
     "net_starlark_go",
     "org_golang_google_genproto_googleapis_rpc",
     "org_golang_google_grpc",

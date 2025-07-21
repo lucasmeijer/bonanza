@@ -18,8 +18,13 @@ message Action {
 
   // ASN.1 DER data of the client certificate that the client needs to
   // present to the worker to authenticate, followed by any intermediate
-  // certificates. The public key embedded in the client certificate at
-  // index zero must be of type X25519.
+  // certificates.
+  //
+  // The public key embedded in the client certificate at index zero
+  // must be of type X25519 or Ed25519. When Ed25519, the public key
+  // will be converted to an X25519 public key by mapping its Edwards
+  // point to a Montgomery point using the birational map provided in
+  // RFC 7748.
   repeated bytes client_certificate_chain = 2;
 
   // The 12-byte nonce that was used to compute the ciphertext.

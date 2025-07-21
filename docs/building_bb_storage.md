@@ -60,17 +60,20 @@ common:bonanza --remote_encryption_key=U3YDUwfejfiRDeD4aqoR7A==
 common:bonanza --remote_executor_builder_pkix_public_key=MCowBQYDK2VuAyEAE+onXE9lGj+1ykKMdYJ7ORbbGvDg6mXwX9H90afmdDI=
 
 # bonanza_builder only accepts build requests that are accompanied with
-# a trusted X.509 certificate. We also need to provide the X25519
-# private key that corresponds to the public key in the certificate, as
-# that is used to encrypt the build request, so that only
-# bonanza_builder (and not bonanza_scheduler itself) can read it.
+# a trusted X.509 certificate. We also need to provide the X25519 or
+# Ed25519 private key that corresponds to the public key in the
+# certificate, as that is used to encrypt the build request, so that
+# only bonanza_builder (and not bonanza_scheduler itself) can read it.
 #
-# Generating such certificates yourself is still a bit hard, as OpenSSL
-# is currently only able to generate certificates for key types that
-# support signing. X25519 only supports elliptic-curve Diffie-Hellman
-# (ECDH), not signing. Take a look at Bonanza's
-# //cmd/create_x25519_client_certificate to see how you can use Go's
-# "crypto/x509" package to craft your own certificates.
+# In production you should obviously set up your own certificate
+# infrastructure. This demo deployment uses a self-signed certificate
+# that was generated as follows:
+#
+#     openssl req \
+#         -x509 -newkey ed25519 -sha256 \
+#         -keyout bonanza_bazel.key.pem \
+#         -out bonanza_bazel.cert.pem \
+#         -days 10000 -subj "/" -nodes
 common:bonanza --remote_executor_client_private_key=/Users/ed/projects/bonanza/deployments/demo/bonanza_bazel.key.pem
 common:bonanza --remote_executor_client_certificate_chain=/Users/ed/projects/bonanza/deployments/demo/bonanza_bazel.cert.pem
 

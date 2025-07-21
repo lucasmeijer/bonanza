@@ -3,7 +3,9 @@ package remoteexecution
 import (
 	"context"
 	"crypto/ecdh"
+	"crypto/ed25519"
 	"crypto/sha256"
+	"crypto/sha512"
 	"crypto/x509"
 	"encoding/pem"
 	"iter"
@@ -214,8 +216,8 @@ func (c *Client[TAction, TEvent, TEventPtr, TResult]) RunAction(ctx context.Cont
 	}
 }
 
-// ParseECDHPrivateKey parses a PCKS #8 encoded ECDH private key, so
-// that it can be provided to NewClient().
+// ParseECDHPrivateKey parses a PCKS #8 encoded ECDH or Ed25519 private
+// key, so that it can be provided to NewClient().
 func ParseECDHPrivateKey(data []byte) (*ecdh.PrivateKey, error) {
 	privateKeyBlock, _ := pem.Decode(data)
 	if privateKeyBlock == nil {
@@ -230,7 +232,15 @@ func ParseECDHPrivateKey(data []byte) (*ecdh.PrivateKey, error) {
 	}
 	ecdhPrivateKey, ok := privateKey.(*ecdh.PrivateKey)
 	if !ok {
-		return nil, status.Error(codes.InvalidArgument, "Private key is not an ECDH private key")
+		ed25519PrivateKey, ok := privateKey.(ed25519.PrivateKey)
+		if !ok {
+			return nil, status.Error(codes.InvalidArgument, "Private key is not an ECDH or Ed25519 private key")
+		}
+		seedHash := sha512.Sum512(ed25519PrivateKey.Seed())
+		ecdhPrivateKey, err = ecdh.X25519().NewPrivateKey(seedHash[:32])
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, "Failed to create X25519 private key from Ed25519 private key")
+		}
 	}
 	return ecdhPrivateKey, nil
 }

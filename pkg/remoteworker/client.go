@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/ecdh"
+	"crypto/ed25519"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
@@ -18,6 +19,8 @@ import (
 	"bonanza.build/pkg/ds"
 	remoteexecution_pb "bonanza.build/pkg/proto/remoteexecution"
 	remoteworker_pb "bonanza.build/pkg/proto/remoteworker"
+
+	"filippo.io/edwards25519"
 
 	"github.com/buildbarn/bb-storage/pkg/clock"
 	"github.com/buildbarn/bb-storage/pkg/otel"
@@ -194,13 +197,32 @@ func (c *Client[TAction, TActionPtr]) startExecution(desiredState *remoteworker_
 		return util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to validate client certificate")
 	}
 
+	// Extract the X25519 public key from the client certificate. As
+	// X25519 cannot be used for signing, it's not possible to
+	// create Certificate Signing Requests (CSRs) for them. We
+	// therefore also permit public keys of type Ed25519, which we
+	// convert to a X25519 public key using the birational map
+	// provided in RFC 7748.
+	clientX25519PublicKey, ok := clientCertificate.PublicKey.(*ecdh.PublicKey)
+	if !ok {
+		clientEd25519PublicKey, ok := clientCertificate.PublicKey.(ed25519.PublicKey)
+		if !ok {
+			return status.Error(codes.InvalidArgument, "Client certificate does not contain an X25519 or Ed25519 public key")
+		}
+		var clientPublicKeyPoint edwards25519.Point
+		if _, err := clientPublicKeyPoint.SetBytes(clientEd25519PublicKey); err != nil {
+			return util.StatusWrapWithCode(err, codes.InvalidArgument, "Invalid Ed25519 public key")
+		}
+		var err error
+		clientX25519PublicKey, err = ecdh.X25519().NewPublicKey(clientPublicKeyPoint.BytesMontgomery())
+		if err != nil {
+			return util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to create X25519 public key from Ed25519 public key")
+		}
+	}
+
 	// Obtain the shared secret used to decrypt actions and encrypt
 	// execution events.
-	clientPublicKey, ok := clientCertificate.PublicKey.(*ecdh.PublicKey)
-	if !ok {
-		return status.Error(codes.InvalidArgument, "Client certificate does not contain an ECDH public key")
-	}
-	sharedSecret, err := c.privateKeys[workerKeyIndex].ECDH(clientPublicKey)
+	sharedSecret, err := c.privateKeys[workerKeyIndex].ECDH(clientX25519PublicKey)
 	if err != nil {
 		return util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to compute shared secret")
 	}

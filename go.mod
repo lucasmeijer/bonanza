@@ -15,6 +15,7 @@ replace go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelg
 replace go.starlark.net => go.starlark.net v0.0.0-20250225190231-0d3f41d403af
 
 require (
+	filippo.io/edwards25519 v1.1.0
 	github.com/bazelbuild/buildtools v0.0.0-20250703141324-fdc626802fbc
 	github.com/bluekeyes/go-gitdiff v0.8.1
 	github.com/buildbarn/bb-remote-execution v0.0.0-20250626085515-d879803aa1fa
