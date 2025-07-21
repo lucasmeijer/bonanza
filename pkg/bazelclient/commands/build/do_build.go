@@ -47,6 +47,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/security/advancedtls"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -74,7 +75,10 @@ func newGRPCClient(endpoint string, commonFlags *arguments.CommonFlags) (*grpc.C
 		clientCredentials = insecure.NewCredentials()
 	case "grpcs":
 		target = endpointURL.Host
-		panic("TODO: TLS")
+		clientCredentials, err = advancedtls.NewClientCreds(&advancedtls.Options{})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create TLS client credentials: %w", err)
+		}
 	case "unix":
 		target = endpoint
 		clientCredentials = insecure.NewCredentials()

@@ -35,6 +35,7 @@ require (
 	golang.org/x/term v0.33.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250707201910-8d1bb00bc6a7
 	google.golang.org/grpc v1.73.0
+	google.golang.org/grpc/security/advancedtls v1.0.0
 	google.golang.org/protobuf v1.36.6
 	maragu.dev/gomponents v1.1.0
 	mvdan.cc/gofumpt v0.8.0
@@ -135,7 +136,6 @@ require (
 	google.golang.org/api v0.241.0 // indirect
 	google.golang.org/genproto v0.0.0-20250707201910-8d1bb00bc6a7 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250707201910-8d1bb00bc6a7 // indirect
-	google.golang.org/grpc/security/advancedtls v1.0.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	sigs.k8s.io/yaml v1.5.0 // indirect
 )
