@@ -32,7 +32,8 @@ service BuildQueueState {
   //
   // Platform queues are responsible for tracking all workers and
   // operations for a single execution platform. Platform queues are
-  // identified by a set of X25519 public keys owned by the workers.
+  // identified by a set of elliptic-curve public keys owned by the
+  // workers.
   //
   // TODO: Should this call support pagination, or is the number of
   // platform queues low enough that it's not needed?
@@ -96,8 +97,9 @@ message PaginationInfo {
 }
 
 message SizeClassQueueName {
-  // X25519 public key in PKIX, ASN.1 DER form that clients can use to
-  // obtain a shared secret for encrypting actions for this platform.
+  // Elliptic-curve public key in PKIX, ASN.1 DER form that clients can
+  // use to obtain a shared secret for encrypting actions for this
+  // platform.
   //
   // If workers announce multiple public keys, the scheduler returns the
   // public key corresponding to PlatformQueueState.pkix_public_keys[0].
@@ -197,9 +199,9 @@ message SizeClassQueueState {
 }
 
 message PlatformQueueState {
-  // Non-empty sorted list of X25519 public keys in PKIX, ASN.1 DER form
-  // that clients can use to obtain a shared secret for encrypting
-  // actions.
+  // Non-empty sorted list of elliptic-curve public keys in PKIX, ASN.1
+  // DER form that clients can use to obtain a shared secret for
+  // encrypting actions.
   repeated bytes pkix_public_keys = 1;
 
   // The state of the platform queue per worker size class.

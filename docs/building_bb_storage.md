@@ -48,7 +48,7 @@ common:bonanza --remote_encryption_key=U3YDUwfejfiRDeD4aqoR7A==
 #
 # Whereas REv2 identifies different types of workers by key-value pairs
 # called platform properties, Bonanza requires that each type of worker
-# has an X25519 private key. Clients can use the corresponding X25519
+# has an elliptic-curve private key. Clients can use the corresponding
 # public key to route requests. The key below is the public key
 # corresponding to the private key used by the demo deployment.
 #
@@ -60,10 +60,10 @@ common:bonanza --remote_encryption_key=U3YDUwfejfiRDeD4aqoR7A==
 common:bonanza --remote_executor_builder_pkix_public_key=MCowBQYDK2VuAyEAE+onXE9lGj+1ykKMdYJ7ORbbGvDg6mXwX9H90afmdDI=
 
 # bonanza_builder only accepts build requests that are accompanied with
-# a trusted X.509 certificate. We also need to provide the X25519 or
-# Ed25519 private key that corresponds to the public key in the
-# certificate, as that is used to encrypt the build request, so that
-# only bonanza_builder (and not bonanza_scheduler itself) can read it.
+# a trusted X.509 certificate. We also need to provide the private key
+# that corresponds to the elliptic-curve public key in the certificate,
+# as that is used to encrypt the build request, so that only
+# bonanza_builder (and not bonanza_scheduler itself) can read it.
 #
 # In production you should obviously set up your own certificate
 # infrastructure. This demo deployment uses a self-signed certificate
@@ -130,7 +130,8 @@ Bonanza.
 
 - The `exec_pkix_public_key` attribute is a replacement for Bazel's
   `exec_properties` and `remote_execution_properties` attributes. It
-  contains the X25519 public key that identifies the type of worker.
+  contains the elliptic-curve public key that identifies the type of
+  worker.
 
 - The `repository_os_*` attributes contain some additional information
   about the platform that's needed to make it usable for running

@@ -641,10 +641,10 @@ func (x *CurrentState_Completed) GetResult() CurrentState_Completed_Result {
 }
 
 type DesiredState_VerifyingPublicKeys struct {
-	state                     protoimpl.MessageState `protogen:"open.v1"`
-	VerificationPkixPublicKey []byte                 `protobuf:"bytes,1,opt,name=verification_pkix_public_key,json=verificationPkixPublicKey,proto3" json:"verification_pkix_public_key,omitempty"`
-	unknownFields             protoimpl.UnknownFields
-	sizeCache                 protoimpl.SizeCache
+	state                      protoimpl.MessageState `protogen:"open.v1"`
+	VerificationPkixPublicKeys [][]byte               `protobuf:"bytes,1,rep,name=verification_pkix_public_keys,json=verificationPkixPublicKeys,proto3" json:"verification_pkix_public_keys,omitempty"`
+	unknownFields              protoimpl.UnknownFields
+	sizeCache                  protoimpl.SizeCache
 }
 
 func (x *DesiredState_VerifyingPublicKeys) Reset() {
@@ -677,9 +677,9 @@ func (*DesiredState_VerifyingPublicKeys) Descriptor() ([]byte, []int) {
 	return file_pkg_proto_remoteworker_remoteworker_proto_rawDescGZIP(), []int{3, 0}
 }
 
-func (x *DesiredState_VerifyingPublicKeys) GetVerificationPkixPublicKey() []byte {
+func (x *DesiredState_VerifyingPublicKeys) GetVerificationPkixPublicKeys() [][]byte {
 	if x != nil {
-		return x.VerificationPkixPublicKey
+		return x.VerificationPkixPublicKeys
 	}
 	return nil
 }
@@ -811,13 +811,13 @@ const file_pkg_proto_remoteworker_remoteworker_proto_rawDesc = "" +
 	"\fworker_state\"\xb2\x01\n" +
 	"\x13SynchronizeResponse\x12R\n" +
 	"\x17next_synchronization_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\x15nextSynchronizationAt\x12G\n" +
-	"\rdesired_state\x18\x02 \x01(\v2\".bonanza.remoteworker.DesiredStateR\fdesiredState\"\xde\x06\n" +
+	"\rdesired_state\x18\x02 \x01(\v2\".bonanza.remoteworker.DesiredStateR\fdesiredState\"\xe0\x06\n" +
 	"\fDesiredState\x12l\n" +
 	"\x15verifying_public_keys\x18\x01 \x01(\v26.bonanza.remoteworker.DesiredState.VerifyingPublicKeysH\x00R\x13verifyingPublicKeys\x12,\n" +
 	"\x04idle\x18\x02 \x01(\v2\x16.google.protobuf.EmptyH\x00R\x04idle\x12L\n" +
-	"\texecuting\x18\x03 \x01(\v2,.bonanza.remoteworker.DesiredState.ExecutingH\x00R\texecuting\x1aV\n" +
-	"\x13VerifyingPublicKeys\x12?\n" +
-	"\x1cverification_pkix_public_key\x18\x01 \x01(\fR\x19verificationPkixPublicKey\x1a\xfb\x03\n" +
+	"\texecuting\x18\x03 \x01(\v2,.bonanza.remoteworker.DesiredState.ExecutingH\x00R\texecuting\x1aX\n" +
+	"\x13VerifyingPublicKeys\x12A\n" +
+	"\x1dverification_pkix_public_keys\x18\x01 \x03(\fR\x1averificationPkixPublicKeys\x1a\xfb\x03\n" +
 	"\tExecuting\x12\x1b\n" +
 	"\ttask_uuid\x18\x01 \x01(\tR\btaskUuid\x127\n" +
 	"\x06action\x18\x02 \x01(\v2\x1f.bonanza.remoteexecution.ActionR\x06action\x12Y\n" +

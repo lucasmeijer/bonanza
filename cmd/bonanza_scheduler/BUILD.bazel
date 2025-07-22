@@ -7,6 +7,7 @@ go_library(
     importpath = "bonanza.build/cmd/bonanza_scheduler",
     visibility = ["//visibility:private"],
     deps = [
+        "//pkg/crypto",
         "//pkg/proto/buildqueuestate",
         "//pkg/proto/configuration/bonanza_scheduler",
         "//pkg/proto/remoteexecution",

@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"time"
 
+	"bonanza.build/pkg/crypto"
 	"bonanza.build/pkg/evaluation"
 	model_analysis "bonanza.build/pkg/model/analysis"
 	model_core "bonanza.build/pkg/model/core"
@@ -99,7 +100,7 @@ func main() {
 			return util.StatusWrap(err, "Failed to create execution gRPC client")
 		}
 
-		executionClientPrivateKey, err := remoteexecution.ParseECDHPrivateKey([]byte(configuration.ExecutionClientPrivateKey))
+		executionClientPrivateKey, err := crypto.ParsePEMWithPKCS8ECDHPrivateKey([]byte(configuration.ExecutionClientPrivateKey))
 		if err != nil {
 			return util.StatusWrap(err, "Failed to parse execution client private key")
 		}

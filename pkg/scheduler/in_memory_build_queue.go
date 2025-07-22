@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"bonanza.build/pkg/crypto"
 	buildqueuestate_pb "bonanza.build/pkg/proto/buildqueuestate"
 	remoteexecution_pb "bonanza.build/pkg/proto/remoteexecution"
 	remoteworker_pb "bonanza.build/pkg/proto/remoteworker"
@@ -241,8 +242,8 @@ type InMemoryBuildQueue struct {
 	// Private key that is used to verify that workers provide
 	// public keys for which they actually own the private key.
 	verificationPrivateKeyExpiration time.Time
-	verificationPrivateKey           *ecdh.PrivateKey
-	verifyingPublicKeysDesiredState  *remoteworker_pb.DesiredState
+	verificationCurveIndices         map[ecdh.Curve]int
+	verificationPrivateKeys          []verificationPrivateKey
 
 	// Bookkeeping for WaitExecution(). This call permits us to
 	// re-attach to operations by name. It also allows us to obtain
@@ -298,6 +299,7 @@ func NewInMemoryBuildQueue(clock clock.Clock, uuidGenerator util.UUIDGenerator, 
 		platformQueueAbsenceHardFailureTime: clock.Now().Add(configuration.PlatformQueueWithNoWorkersTimeout),
 		actionRouter:                        actionRouter,
 		platformQueues:                      map[string]*platformQueue{},
+		verificationCurveIndices:            map[ecdh.Curve]int{},
 		operationsNameMap:                   map[string]*operation{},
 		inFlightDeduplicationMap:            map[[sha256.Size]byte]*task{},
 	}
@@ -475,28 +477,75 @@ func (bq *InMemoryBuildQueue) WaitExecution(in *remoteexecution_pb.WaitExecution
 	}
 }
 
+type verificationPrivateKey struct {
+	privateKey    *ecdh.PrivateKey
+	pkixPublicKey []byte
+}
+
+// generateVerificationPrivateKey generates a new elliptic-curve private
+// key for the purpose of validating that a worker is in the possession
+// of a private key for which it announces a public key.
+//
+// This method is either called when a worker announces a public key
+// having a curve is used that hasn't been observed before, or when the
+// keys are periodically rotated.
+func (bq *InMemoryBuildQueue) generateVerificationPrivateKey(curve ecdh.Curve) (verificationPrivateKey, error) {
+	privateKey, err := curve.GenerateKey(bq.randomNumberGenerator)
+	if err != nil {
+		return verificationPrivateKey{}, util.StatusWrapWithCode(err, codes.Internal, "Failed to generate new verification private key")
+	}
+	pkixPublicKey, err := x509.MarshalPKIXPublicKey(privateKey.PublicKey())
+	if err != nil {
+		return verificationPrivateKey{}, util.StatusWrapWithCode(err, codes.Internal, "Failed to marshal new verification public key")
+	}
+	return verificationPrivateKey{
+		privateKey:    privateKey,
+		pkixPublicKey: pkixPublicKey,
+	}, nil
+}
+
+// parsePKIXPublicKeyAndGetCurveIndex parses a PKIX public key that a
+// worker has provided. If the public key uses a curve that hasn't been
+// observed before, it ensures that a new verification key for this
+// curve is available.
+func (bq *InMemoryBuildQueue) parsePKIXPublicKeyAndGetCurveIndex(pkixPublicKey []byte) (*ecdh.PublicKey, int, error) {
+	ecdhPublicKey, err := crypto.ParsePKIXECDHPublicKey(pkixPublicKey)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	curve := ecdhPublicKey.Curve()
+	curveIndex, ok := bq.verificationCurveIndices[curve]
+	if !ok {
+		verificationPrivateKey, err := bq.generateVerificationPrivateKey(curve)
+		if err != nil {
+			return nil, 0, err
+		}
+		curveIndex = len(bq.verificationPrivateKeys)
+		bq.verificationCurveIndices[curve] = curveIndex
+		bq.verificationPrivateKeys = append(bq.verificationPrivateKeys, verificationPrivateKey)
+	}
+	return ecdhPublicKey, curveIndex, nil
+}
+
 // computeVerificationZeros computes the value of verification_zeros a
 // worker needs to provide to the scheduler for a given PKIX public key.
-func (bq *InMemoryBuildQueue) computeVerificationZeros(pkixPublicKey []byte) ([aes.BlockSize]byte, error) {
-	parsedPublicKey, err := x509.ParsePKIXPublicKey(pkixPublicKey)
+func (bq *InMemoryBuildQueue) computeVerificationZeros(pkixPublicKey []byte) ([aes.BlockSize]byte, int, error) {
+	ecdhPublicKey, curveIndex, err := bq.parsePKIXPublicKeyAndGetCurveIndex(pkixPublicKey)
 	if err != nil {
-		return [aes.BlockSize]byte{}, util.StatusWrapWithCode(err, codes.InvalidArgument, "Invalid PKIX public key")
+		return [aes.BlockSize]byte{}, 0, err
 	}
-	ecdhPublicKey, ok := parsedPublicKey.(*ecdh.PublicKey)
-	if !ok {
-		return [aes.BlockSize]byte{}, status.Error(codes.InvalidArgument, "PKIX public key is not an ECDH public key")
-	}
-	sharedSecret, err := bq.verificationPrivateKey.ECDH(ecdhPublicKey)
+	sharedSecret, err := bq.verificationPrivateKeys[curveIndex].privateKey.ECDH(ecdhPublicKey)
 	if err != nil {
-		return [aes.BlockSize]byte{}, util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to compute shared secret")
+		return [aes.BlockSize]byte{}, 0, util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to compute shared secret")
 	}
 	blockCipher, err := aes.NewCipher(sharedSecret)
 	if err != nil {
-		return [aes.BlockSize]byte{}, util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to create AES cipher")
+		return [aes.BlockSize]byte{}, 0, util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to create AES cipher")
 	}
 	var verificationZeros [aes.BlockSize]byte
 	blockCipher.Encrypt(verificationZeros[:], verificationZeros[:])
-	return verificationZeros, nil
+	return verificationZeros, curveIndex, nil
 }
 
 // Synchronize the state of a worker with the scheduler. This call is
@@ -509,10 +558,10 @@ func (bq *InMemoryBuildQueue) Synchronize(ctx context.Context, request *remotewo
 	if len(publicKeys) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Worker provided no public keys")
 	}
-	for i := 1; i < len(publicKeys); i++ {
-		if bytes.Compare(publicKeys[i-1].PkixPublicKey, publicKeys[i].PkixPublicKey) >= 0 {
-			return nil, status.Error(codes.InvalidArgument, "Public keys provided by worker are not sorted")
-		}
+	if !slices.IsSortedFunc(publicKeys, func(a, b *remoteworker_pb.SynchronizeRequest_PublicKey) int {
+		return bytes.Compare(a.PkixPublicKey, b.PkixPublicKey)
+	}) {
+		return nil, status.Error(codes.InvalidArgument, "Public keys provided by worker are not sorted")
 	}
 
 	workerKey := newWorkerKey(request.WorkerId)
@@ -520,35 +569,28 @@ func (bq *InMemoryBuildQueue) Synchronize(ctx context.Context, request *remotewo
 	bq.enter(bq.clock.Now())
 	defer bq.leave()
 
-	// Rotate the key used for computing verification zeros if
-	// needed. This key is done periodically, so that accidental
+	// Rotate the keys used for computing verification zeros if
+	// needed. This is done periodically, so that accidental
 	// disclosure of verification_zeros does not have a lasting
 	// impact.
 	if !bq.verificationPrivateKeyExpiration.After(bq.now) {
-		privateKey, err := ecdh.X25519().GenerateKey(bq.randomNumberGenerator)
-		if err != nil {
-			return nil, util.StatusWrapWithCode(err, codes.Internal, "Failed to generate new verification private key")
+		newVerificationPrivateKeys := make([]verificationPrivateKey, len(bq.verificationPrivateKeys))
+		for curve, index := range bq.verificationCurveIndices {
+			verificationPrivateKey, err := bq.generateVerificationPrivateKey(curve)
+			if err != nil {
+				return nil, err
+			}
+			newVerificationPrivateKeys[index] = verificationPrivateKey
 		}
-		marshaledPublicKey, err := x509.MarshalPKIXPublicKey(privateKey.PublicKey())
-		if err != nil {
-			return nil, util.StatusWrapWithCode(err, codes.Internal, "Failed to marshal new verification public key")
-		}
-
-		bq.verificationPrivateKey = privateKey
-		bq.verifyingPublicKeysDesiredState = &remoteworker_pb.DesiredState{
-			WorkerState: &remoteworker_pb.DesiredState_VerifyingPublicKeys_{
-				VerifyingPublicKeys: &remoteworker_pb.DesiredState_VerifyingPublicKeys{
-					VerificationPkixPublicKey: marshaledPublicKey,
-				},
-			},
-		}
+		bq.verificationPrivateKeys = newVerificationPrivateKeys
 
 		// Update cached verification zeros, so that existing
 		// workers are forced to recompute as well.
 		for _, pq := range bq.platformQueues {
 			for i := 0; i < len(pq.publicKeys); i++ {
 				publicKey := &pq.publicKeys[i]
-				publicKey.verificationZeros, err = bq.computeVerificationZeros(publicKey.pkixPublicKey)
+				var err error
+				publicKey.verificationZeros, _, err = bq.computeVerificationZeros(publicKey.pkixPublicKey)
 				if err != nil {
 					return nil, util.StatusWrapWithCode(err, codes.Internal, "Failed to update cached verification zeros")
 				}
@@ -563,7 +605,7 @@ func (bq *InMemoryBuildQueue) Synchronize(ctx context.Context, request *remotewo
 	// that they all belong to the same platform queue.
 	var pq *platformQueue
 	var firstPublicKey []byte
-	for _, publicKey := range request.PublicKeys {
+	for _, publicKey := range publicKeys {
 		if foundPQ, ok := bq.platformQueues[string(publicKey.PkixPublicKey)]; ok {
 			if pq == nil {
 				pq = foundPQ
@@ -583,59 +625,105 @@ func (bq *InMemoryBuildQueue) Synchronize(ctx context.Context, request *remotewo
 		existingPublicKeys = pq.publicKeys
 	}
 
-	// Validate that all verification zeros values are correct.
-	// These need to be provided, so that the scheduler can validate
-	// that the worker is actually in possession of the private keys
+	// Check whether at least all verification zeros are set. These
+	// need to be provided, so that the scheduler can validate that
+	// the worker is actually in possession of the private keys
 	// belonging to the public keys that it announces.
+	needsVerification := slices.ContainsFunc(
+		publicKeys,
+		func(publicKey *remoteworker_pb.SynchronizeRequest_PublicKey) bool {
+			return len(publicKey.VerificationZeros) != aes.BlockSize
+		},
+	)
+
+	// Check whether all verification zeros are correct.
 	type newPublicKey struct {
-		pkixPublicKey     []byte
-		verificationZeros [aes.BlockSize]byte
-		insertionIndex    int
+		publicKey      platformQueuePublicKey
+		insertionIndex int
 	}
 	var newPublicKeys []newPublicKey
 	insertionIndex := 0
-	for index, publicKey := range request.PublicKeys {
-		verificationZerosMatches := false
-		if len(publicKey.VerificationZeros) == aes.BlockSize {
-			// Determine if the public key is already
-			// associated with the current platform queue.
-			// If so, we can use a cached copy of the
-			// verification zeros.
-			cmp := 1
-			for insertionIndex < len(existingPublicKeys) {
-				cmp = bytes.Compare(publicKey.PkixPublicKey, existingPublicKeys[insertionIndex].verificationZeros[:])
-				if cmp >= 0 {
-					break
-				}
-				insertionIndex++
+	curvesSeen := make(map[int]struct{}, len(publicKeys))
+	verificationPKIXPublicKeys := make([][]byte, 0, len(publicKeys))
+	for index, requestPublicKey := range publicKeys {
+		// Determine if this public key is already associated
+		// with this platform queue. If not, determine the index
+		// at which it needs to be inserted to keep the list of
+		// public keys sorted.
+		cmp := 1
+		for insertionIndex < len(existingPublicKeys) {
+			cmp = bytes.Compare(requestPublicKey.PkixPublicKey, existingPublicKeys[insertionIndex].pkixPublicKey[:])
+			if cmp >= 0 {
+				break
 			}
+			insertionIndex++
+		}
+
+		var curveIndex int
+		if cmp == 0 {
+			// Platform queue already uses this public key.
+			// Require that the client provided verification
+			// zeros equal the precomputed value.
+			publicKey := &existingPublicKeys[insertionIndex]
+			curveIndex = publicKey.curveIndex
+			if !needsVerification && subtle.ConstantTimeCompare(requestPublicKey.VerificationZeros, publicKey.verificationZeros[:]) != 1 {
+				needsVerification = true
+			}
+		} else if needsVerification {
+			// Platform queue does not use this public key
+			// yet, but we already know that this call won't
+			// be adding them. At least ensure that a
+			// verification key exists.
+			var err error
+			_, curveIndex, err = bq.parsePKIXPublicKeyAndGetCurveIndex(requestPublicKey.PkixPublicKey)
+			if err != nil {
+				return nil, util.StatusWrapfWithCode(err, codes.InvalidArgument, "Invalid PKIX public key at index %d", index)
+			}
+		} else {
+			// Platform queue does not use this public key
+			// yet. Compute the verification zeros on the
+			// fly and allow the public key to be added if
+			// the client provided value matches.
 			var expectedVerificationZeros [aes.BlockSize]byte
-			if cmp == 0 {
-				expectedVerificationZeros = existingPublicKeys[insertionIndex].verificationZeros
-				insertionIndex++
-			} else {
-				var err error
-				expectedVerificationZeros, err = bq.computeVerificationZeros(publicKey.PkixPublicKey)
-				if err != nil {
-					return nil, util.StatusWrapfWithCode(err, codes.InvalidArgument, "Failed to compute verification zeros for PKIX public key at index %d", index)
-				}
-				newPublicKeys = append(newPublicKeys, newPublicKey{
-					pkixPublicKey:     publicKey.PkixPublicKey,
-					verificationZeros: expectedVerificationZeros,
-					insertionIndex:    insertionIndex,
-				})
+			var err error
+			expectedVerificationZeros, curveIndex, err = bq.computeVerificationZeros(requestPublicKey.PkixPublicKey)
+			if err != nil {
+				return nil, util.StatusWrapfWithCode(err, codes.InvalidArgument, "Failed to compute verification zeros for PKIX public key at index %d", index)
 			}
-			verificationZerosMatches = subtle.ConstantTimeCompare(publicKey.VerificationZeros, expectedVerificationZeros[:]) == 1
+			if subtle.ConstantTimeCompare(requestPublicKey.VerificationZeros, expectedVerificationZeros[:]) == 1 {
+				newPublicKeys = append(newPublicKeys, newPublicKey{
+					publicKey: platformQueuePublicKey{
+						pkixPublicKey:     requestPublicKey.PkixPublicKey,
+						verificationZeros: expectedVerificationZeros,
+						curveIndex:        curveIndex,
+					},
+					insertionIndex: insertionIndex,
+				})
+			} else {
+				needsVerification = true
+			}
 		}
-		if !verificationZerosMatches {
-			// Worker provided verification zeros don't
-			// match. Return our public key to the worker,
-			// so that it can recompute and retry.
-			return &remoteworker_pb.SynchronizeResponse{
-				NextSynchronizationAt: bq.getCurrentTime(),
-				DesiredState:          bq.verifyingPublicKeysDesiredState,
-			}, nil
+
+		if _, ok := curvesSeen[curveIndex]; !ok {
+			curvesSeen[curveIndex] = struct{}{}
+			verificationPKIXPublicKeys = append(verificationPKIXPublicKeys, bq.verificationPrivateKeys[curveIndex].pkixPublicKey)
 		}
+	}
+	if needsVerification {
+		// One or more worker provided verification zeros don't
+		// match. Return the verification public keys for all
+		// curves used by the worker, so that it can recompute
+		// and retry.
+		return &remoteworker_pb.SynchronizeResponse{
+			NextSynchronizationAt: bq.getCurrentTime(),
+			DesiredState: &remoteworker_pb.DesiredState{
+				WorkerState: &remoteworker_pb.DesiredState_VerifyingPublicKeys_{
+					VerifyingPublicKeys: &remoteworker_pb.DesiredState_VerifyingPublicKeys{
+						VerificationPkixPublicKeys: verificationPKIXPublicKeys,
+					},
+				},
+			},
+		}, nil
 	}
 
 	var scq *sizeClassQueue
@@ -680,11 +768,8 @@ func (bq *InMemoryBuildQueue) Synchronize(ctx context.Context, request *remotewo
 		for _, newPublicKey := range newPublicKeys {
 			mergedPublicKeys = append(mergedPublicKeys, existingPublicKeys[previousInsertionIndex:newPublicKey.insertionIndex]...)
 			previousInsertionIndex = newPublicKey.insertionIndex
-			mergedPublicKeys = append(mergedPublicKeys, platformQueuePublicKey{
-				pkixPublicKey:     newPublicKey.pkixPublicKey,
-				verificationZeros: newPublicKey.verificationZeros,
-			})
-			bq.platformQueues[string(newPublicKey.pkixPublicKey)] = pq
+			mergedPublicKeys = append(mergedPublicKeys, newPublicKey.publicKey)
+			bq.platformQueues[string(newPublicKey.publicKey.pkixPublicKey)] = pq
 		}
 		mergedPublicKeys = append(mergedPublicKeys, existingPublicKeys[previousInsertionIndex:]...)
 		pq.publicKeys = mergedPublicKeys
@@ -1372,6 +1457,7 @@ func (h platformQueueList) Swap(i, j int) {
 type platformQueuePublicKey struct {
 	pkixPublicKey     []byte
 	verificationZeros [aes.BlockSize]byte
+	curveIndex        int
 }
 
 // platformQueue is an actual build operations queue that contains a

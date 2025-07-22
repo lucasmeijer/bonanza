@@ -151,12 +151,12 @@ var commonFlags = []flag{
 	},
 	{
 		longName:    "remote_executor_client_private_key",
-		description: "Path of a file containing an X25519 or Ed25519 private key that is used to encrypt build requests that are submitted to bonanza_scheduler.",
+		description: "Path of a file containing an elliptic-curve private key that is used to encrypt build requests that are submitted to bonanza_scheduler.",
 		flagType:    stringFlagType{},
 	},
 	{
 		longName:    "remote_executor_client_certificate_chain",
-		description: "Path of a file containing a certificate chain that corresponds to the X25519 or Ed25519 private key that is used to encrypt build requests that are submitted to bonanza_scheduler.",
+		description: "Path of a file containing a certificate chain that corresponds to the elliptic-curve private key that is used to encrypt build requests that are submitted to bonanza_scheduler.",
 		flagType:    stringFlagType{},
 	},
 	{

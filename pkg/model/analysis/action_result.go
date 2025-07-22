@@ -2,14 +2,13 @@ package analysis
 
 import (
 	"context"
-	"crypto/ecdh"
 	"crypto/sha256"
-	"crypto/x509"
 	"errors"
 	"fmt"
 	"maps"
 	"slices"
 
+	"bonanza.build/pkg/crypto"
 	"bonanza.build/pkg/evaluation"
 	model_core "bonanza.build/pkg/model/core"
 	"bonanza.build/pkg/model/core/btree"
@@ -35,13 +34,9 @@ func (c *baseComputer[TReference, TMetadata]) ComputeActionResultValue(ctx conte
 	if action.Message == nil {
 		return PatchedActionResultValue{}, errors.New("no action specified")
 	}
-	platformPublicKey, err := x509.ParsePKIXPublicKey(action.Message.PlatformPkixPublicKey)
+	platformECDHPublicKey, err := crypto.ParsePKIXECDHPublicKey(action.Message.PlatformPkixPublicKey)
 	if err != nil {
 		return PatchedActionResultValue{}, fmt.Errorf("invalid platform PKIX public key: %w", err)
-	}
-	platformECDHPublicKey, ok := platformPublicKey.(*ecdh.PublicKey)
-	if !ok {
-		return PatchedActionResultValue{}, errors.New("platform PKIX public key is not an ECDH public key")
 	}
 
 	// Use the reference of the Command message as the stable

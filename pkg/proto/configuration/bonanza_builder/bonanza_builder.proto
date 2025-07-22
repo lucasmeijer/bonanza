@@ -33,9 +33,10 @@ message ApplicationConfiguration {
   // the scheduler to request the execution of build actions.
   buildbarn.configuration.grpc.ClientConfiguration execution_grpc_client = 7;
 
-  // X25519 private key used to compute a shared secret for encrypting
-  // actions to submit to the scheduler. The key must be in PKCS #8,
-  // ASN.1 DER form, stored in a PEM block of type "PRIVATE KEY".
+  // Elliptic-curve private key used to compute a shared secret for
+  // encrypting actions to submit to the scheduler. The key must be in
+  // PKCS #8, ASN.1 DER form, stored in a PEM block of type "PRIVATE
+  // KEY".
   //
   // It is also permitted to provide an Ed25519 private key. Such a
   // private key will be converted to an X25519 private key by mapping
@@ -53,10 +54,10 @@ message ApplicationConfiguration {
   buildbarn.configuration.grpc.ClientConfiguration remote_worker_grpc_client =
       10;
 
-  // X25519 privates key used to compute a shared secret for decrypting
-  // build requests obtained from the scheduler. The public keys
-  // associated with these private keys are used by the scheduler to
-  // identify the platform and route actions.
+  // Elliptic-curve private keys used to compute a shared secret for
+  // decrypting build requests obtained from the scheduler. The public
+  // keys associated with these private keys are used by the scheduler
+  // to identify the platform and route actions.
   //
   // Keys must be in PKCS #8, ASN.1 DER form, stored in a PEM block of
   // type "PRIVATE KEY".

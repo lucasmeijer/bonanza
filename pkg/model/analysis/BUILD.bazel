@@ -78,6 +78,7 @@ go_library(
     importpath = "bonanza.build/pkg/model/analysis",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/crypto",
         "//pkg/diff",
         "//pkg/ds",
         "//pkg/evaluation",

@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 	"crypto/ecdh"
-	"crypto/x509"
 	"os"
 	"time"
 
+	"bonanza.build/pkg/crypto"
 	buildqueuestate_pb "bonanza.build/pkg/proto/buildqueuestate"
 	"bonanza.build/pkg/proto/configuration/bonanza_scheduler"
 	remoteexecution_pb "bonanza.build/pkg/proto/remoteexecution"
@@ -82,13 +82,9 @@ func main() {
 		for platformQueueIndex, platformQueue := range configuration.PredeclaredPlatformQueues {
 			publicKeys := make([]*ecdh.PublicKey, 0, len(platformQueue.PkixPublicKeys))
 			for publicKeyIndex, pkixPublicKey := range platformQueue.PkixPublicKeys {
-				publicKey, err := x509.ParsePKIXPublicKey(pkixPublicKey)
+				ecdhPublicKey, err := crypto.ParsePKIXECDHPublicKey(pkixPublicKey)
 				if err != nil {
 					return util.StatusWrapfWithCode(err, codes.InvalidArgument, "Invalid PKIX public key at index %d of platform at index %d: %s", publicKeyIndex, platformQueueIndex)
-				}
-				ecdhPublicKey, ok := publicKey.(*ecdh.PublicKey)
-				if !ok {
-					return status.Errorf(codes.InvalidArgument, "PKIX public key at index %d of platform at index %d is not an ECDH public key", publicKeyIndex, platformQueueIndex)
 				}
 				publicKeys = append(publicKeys, ecdhPublicKey)
 			}

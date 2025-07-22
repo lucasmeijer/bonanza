@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/ecdh"
-	"crypto/ed25519"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
@@ -16,11 +15,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"bonanza.build/pkg/crypto"
 	"bonanza.build/pkg/ds"
 	remoteexecution_pb "bonanza.build/pkg/proto/remoteexecution"
 	remoteworker_pb "bonanza.build/pkg/proto/remoteworker"
-
-	"filippo.io/edwards25519"
 
 	"github.com/buildbarn/bb-storage/pkg/clock"
 	"github.com/buildbarn/bb-storage/pkg/otel"
@@ -197,32 +195,13 @@ func (c *Client[TAction, TActionPtr]) startExecution(desiredState *remoteworker_
 		return util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to validate client certificate")
 	}
 
-	// Extract the X25519 public key from the client certificate. As
-	// X25519 cannot be used for signing, it's not possible to
-	// create Certificate Signing Requests (CSRs) for them. We
-	// therefore also permit public keys of type Ed25519, which we
-	// convert to a X25519 public key using the birational map
-	// provided in RFC 7748.
-	clientX25519PublicKey, ok := clientCertificate.PublicKey.(*ecdh.PublicKey)
-	if !ok {
-		clientEd25519PublicKey, ok := clientCertificate.PublicKey.(ed25519.PublicKey)
-		if !ok {
-			return status.Error(codes.InvalidArgument, "Client certificate does not contain an X25519 or Ed25519 public key")
-		}
-		var clientPublicKeyPoint edwards25519.Point
-		if _, err := clientPublicKeyPoint.SetBytes(clientEd25519PublicKey); err != nil {
-			return util.StatusWrapWithCode(err, codes.InvalidArgument, "Invalid Ed25519 public key")
-		}
-		var err error
-		clientX25519PublicKey, err = ecdh.X25519().NewPublicKey(clientPublicKeyPoint.BytesMontgomery())
-		if err != nil {
-			return util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to create X25519 public key from Ed25519 public key")
-		}
-	}
-
 	// Obtain the shared secret used to decrypt actions and encrypt
 	// execution events.
-	sharedSecret, err := c.privateKeys[workerKeyIndex].ECDH(clientX25519PublicKey)
+	clientECDHPublicKey, err := crypto.PublicKeyToECDHPublicKey(clientCertificate.PublicKey)
+	if err != nil {
+		return err
+	}
+	sharedSecret, err := c.privateKeys[workerKeyIndex].ECDH(clientECDHPublicKey)
 	if err != nil {
 		return util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to compute shared secret")
 	}
@@ -525,16 +504,20 @@ func (c *Client[TAction, TActionPtr]) Run(ctx context.Context) (bool, error) {
 		case *remoteworker_pb.DesiredState_VerifyingPublicKeys_:
 			// Scheduler wants us to recompute our
 			// verification zeros.
-			verificationPublicKey, err := x509.ParsePKIXPublicKey(workerState.VerifyingPublicKeys.VerificationPkixPublicKey)
-			if err != nil {
-				return false, util.StatusWrapWithCode(err, codes.Internal, "Scheduler provided an invalid verification PKIX public key")
-			}
-			verificationECDHPublicKey, ok := verificationPublicKey.(*ecdh.PublicKey)
-			if !ok {
-				return false, status.Error(codes.Internal, "Scheduler provided an verification PKIX public key that is not an ECDH public key")
+			verificationECDHPublicKeys := map[ecdh.Curve]*ecdh.PublicKey{}
+			for i, k := range workerState.VerifyingPublicKeys.VerificationPkixPublicKeys {
+				verificationECDHPublicKey, err := crypto.ParsePKIXECDHPublicKey(k)
+				if err != nil {
+					return false, util.StatusWrapfWithCode(err, codes.Internal, "Scheduler provided an invalid verification PKIX public key at index %d", i)
+				}
+				verificationECDHPublicKeys[verificationECDHPublicKey.Curve()] = verificationECDHPublicKey
 			}
 
 			for i, privateKey := range c.privateKeys {
+				verificationECDHPublicKey, ok := verificationECDHPublicKeys[privateKey.Curve()]
+				if !ok {
+					return false, status.Errorf(codes.Internal, "Scheduler did not provide a verification PKIX public key that has the same curve as PKIX public key %s", base64.StdEncoding.EncodeToString(c.request.PublicKeys[i].PkixPublicKey))
+				}
 				sharedSecret, err := privateKey.ECDH(verificationECDHPublicKey)
 				if err != nil {
 					return false, util.StatusWrapfWithCode(err, codes.Internal, "Failed to compute shared secret for PKIX public key %s", base64.StdEncoding.EncodeToString(c.request.PublicKeys[i].PkixPublicKey))
@@ -619,22 +602,11 @@ func LaunchWorkerThread(group program.Group, run func(ctx context.Context) (bool
 func ParsePlatformPrivateKeys(privateKeys []string) ([]*ecdh.PrivateKey, error) {
 	platformPrivateKeys := make([]*ecdh.PrivateKey, 0, len(privateKeys))
 	for i, privateKey := range privateKeys {
-		privateKeyBlock, _ := pem.Decode([]byte(privateKey))
-		if privateKeyBlock == nil {
-			return nil, status.Errorf(codes.InvalidArgument, "Platform private key at index %d does not contain a PEM block", i)
-		}
-		if privateKeyBlock.Type != "PRIVATE KEY" {
-			return nil, status.Errorf(codes.InvalidArgument, "PEM block of platform private key at index %d is not of type PRIVATE KEY", i)
-		}
-		parsedPrivateKey, err := x509.ParsePKCS8PrivateKey(privateKeyBlock.Bytes)
+		platformPrivateKey, err := crypto.ParsePEMWithPKCS8ECDHPrivateKey([]byte(privateKey))
 		if err != nil {
-			return nil, util.StatusWrapf(err, "Failed to parse platform private key at index %d", i)
+			return nil, util.StatusWrapf(err, "Platform private key at index %d", i)
 		}
-		ecdhPrivateKey, ok := parsedPrivateKey.(*ecdh.PrivateKey)
-		if !ok {
-			return nil, status.Errorf(codes.InvalidArgument, "Platform private key at index %d is not an ECDH private key", i)
-		}
-		platformPrivateKeys = append(platformPrivateKeys, ecdhPrivateKey)
+		platformPrivateKeys = append(platformPrivateKeys, platformPrivateKey)
 	}
 	return platformPrivateKeys, nil
 }

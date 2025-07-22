@@ -2,8 +2,6 @@ package build
 
 import (
 	"context"
-	"crypto/ecdh"
-	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -21,6 +19,7 @@ import (
 	"bonanza.build/pkg/bazelclient/commands"
 	"bonanza.build/pkg/bazelclient/formatted"
 	"bonanza.build/pkg/bazelclient/logging"
+	"bonanza.build/pkg/crypto"
 	"bonanza.build/pkg/label"
 	model_core "bonanza.build/pkg/model/core"
 	model_encoding "bonanza.build/pkg/model/encoding"
@@ -433,7 +432,7 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 	if err != nil {
 		logger.Fatal(formatted.Textf("Failed to read --remote_executor_client_private_key=%#v: %s", args.CommonFlags.RemoteExecutorClientPrivateKey, err))
 	}
-	clientPrivateKey, err := remoteexecution.ParseECDHPrivateKey(clientPrivateKeyData)
+	clientPrivateKey, err := crypto.ParsePEMWithPKCS8ECDHPrivateKey(clientPrivateKeyData)
 	if err != nil {
 		logger.Fatal(formatted.Textf("Failed to parse --remote_executor_client_private_key=%#v: %s", args.CommonFlags.RemoteExecutorClientPrivateKey, err))
 	}
@@ -461,13 +460,9 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 	if err != nil {
 		logger.Fatal(formatted.Textf("Failed to base64 decode --remote_executor_builder_pkix_public_key: %s", err))
 	}
-	builderPublicKey, err := x509.ParsePKIXPublicKey(builderPKIXPublicKey)
+	builderECDHPublicKey, err := crypto.ParsePKIXECDHPublicKey(builderPKIXPublicKey)
 	if err != nil {
 		logger.Fatal(formatted.Textf("Failed to parse --remote_executor_builder_pkix_public_key: %s", err))
-	}
-	builderECDHPublicKey, ok := builderPublicKey.(*ecdh.PublicKey)
-	if !ok {
-		logger.Fatal(formatted.Textf("--remote_executor_builder_pkix_public_key is not an ECDH public key"))
 	}
 
 	var invocationID uuid.UUID

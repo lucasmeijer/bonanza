@@ -50,7 +50,7 @@ message SynchronizeRequest {
   map<string, string> worker_id = 1;
 
   message PublicKey {
-    // X25519 public key in PKIX, ASN.1 DER form.
+    // Elliptic-curve public key in PKIX, ASN.1 DER form.
     bytes pkix_public_key = 1;
 
     // AES-256 encrypted block of data, where the input consists of all
@@ -209,10 +209,13 @@ message SynchronizeResponse {
 
 message DesiredState {
   message VerifyingPublicKeys {
-    // X25519 public key in PKIX, ASN.1 DER form, used by the scheduler
-    // to verify that the worker is in possession of the private keys
-    // belonging to the public keys that it announces.
-    bytes verification_pkix_public_key = 1;
+    // Elliptic-curve public keys in PKIX, ASN.1 DER form, used by the
+    // scheduler to verify that the worker is in possession of the
+    // private keys belonging to the public keys that it announces.
+    //
+    // This list MUST contain exactly one public key for each curve type
+    // used by the public keys listed in the SynchronizeRequest.
+    repeated bytes verification_pkix_public_keys = 1;
   }
 
   message Executing {

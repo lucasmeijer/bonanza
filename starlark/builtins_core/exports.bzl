@@ -535,10 +535,10 @@ platform = rule(
         ),
         "exec_pkix_public_key": attr.string(
             doc = """
-            When the platform is used for execution, the X25519 public
-            key in PKIX form that identifies the execution platform. The
-            key needs to be provided in base64 encoded form, without the
-            PEM header/footer.
+            When the platform is used for execution, the elliptic-curve
+            public key in PKIX form that identifies the execution
+            platform. The key needs to be provided in base64 encoded
+            form, without the PEM header/footer.
             """,
         ),
         "parents": attr.label_list(
