@@ -199,7 +199,7 @@ func main() {
 
 					client, err := remoteworker.NewClient(
 						schedulerClient,
-						executor,
+						remoteworker.NewProtoExecutor(executor),
 						clock.SystemClock,
 						random.CryptoThreadSafeGenerator,
 						platformPrivateKeys,

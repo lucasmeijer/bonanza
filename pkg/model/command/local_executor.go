@@ -128,7 +128,7 @@ func NewLocalExecutor(
 	environmentVariables map[string]string,
 	buildDirectoryOwnerUserID uint32,
 	buildDirectoryOwnerGroupID uint32,
-) remoteworker.Executor[*model_command_pb.Action] {
+) remoteworker.Executor[*model_command_pb.Action, proto.Message, *model_command_pb.Result] {
 	return &localExecutor{
 		objectDownloader:               objectDownloader,
 		parsedObjectPool:               parsedObjectPool,
@@ -196,12 +196,12 @@ func captureLog(ctx context.Context, buildDirectory virtual.PrepopulatedDirector
 	return model_core.PatchedMessage[*model_filesystem_pb.FileContents, dag.ObjectContentsWalker]{}, status.Error(codes.InvalidArgument, "File is of an incorrect type")
 }
 
-func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Action, executionTimeout time.Duration, executionEvents chan<- proto.Message) (proto.Message, time.Duration, remoteworker_pb.CurrentState_Completed_Result) {
+func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Action, executionTimeout time.Duration, executionEvents chan<- proto.Message) (*model_command_pb.Result, time.Duration, remoteworker_pb.CurrentState_Completed_Result, error) {
 	namespace, err := object.NewNamespace(action.Namespace)
 	if err != nil {
 		return &model_command_pb.Result{
 			Status: status.Convert(util.StatusWrap(err, "Invalid namespace")).Proto(),
-		}, 0, remoteworker_pb.CurrentState_Completed_FAILED
+		}, 0, remoteworker_pb.CurrentState_Completed_FAILED, nil
 	}
 	parsedObjectPoolIngester := model_parser.NewParsedObjectPoolIngester(
 		e.parsedObjectPool,
@@ -219,7 +219,7 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 	if err != nil {
 		return &model_command_pb.Result{
 			Status: status.Convert(util.StatusWrap(err, "Invalid command encoders")).Proto(),
-		}, 0, remoteworker_pb.CurrentState_Completed_FAILED
+		}, 0, remoteworker_pb.CurrentState_Completed_FAILED, nil
 	}
 	commandReader := model_parser.LookupParsedObjectReader[object.LocalReference](
 		parsedObjectPoolIngester,
@@ -233,13 +233,13 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 	if err != nil {
 		return &model_command_pb.Result{
 			Status: status.Convert(util.StatusWrap(err, "Invalid command reference")).Proto(),
-		}, 0, remoteworker_pb.CurrentState_Completed_FAILED
+		}, 0, remoteworker_pb.CurrentState_Completed_FAILED, nil
 	}
 	command, err := commandReader.ReadParsedObject(ctx, commandReference)
 	if err != nil {
 		return &model_command_pb.Result{
 			Status: status.Convert(util.StatusWrap(err, "Failed to read command")).Proto(),
-		}, 0, remoteworker_pb.CurrentState_Completed_FAILED
+		}, 0, remoteworker_pb.CurrentState_Completed_FAILED, nil
 	}
 
 	// Convert arguments and environment variables stored in B-trees
@@ -266,14 +266,14 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 		if !ok {
 			return &model_command_pb.Result{
 				Status: status.New(codes.InvalidArgument, "Invalid leaf element in arguments").Proto(),
-			}, 0, remoteworker_pb.CurrentState_Completed_FAILED
+			}, 0, remoteworker_pb.CurrentState_Completed_FAILED, nil
 		}
 		arguments = append(arguments, level.Leaf)
 	}
 	if errIter != nil {
 		return &model_command_pb.Result{
 			Status: status.Convert(util.StatusWrap(err, "Failed to iterate arguments")).Proto(),
-		}, 0, remoteworker_pb.CurrentState_Completed_FAILED
+		}, 0, remoteworker_pb.CurrentState_Completed_FAILED, nil
 	}
 
 	environmentVariables := map[string]string{}
@@ -296,14 +296,14 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 		if !ok {
 			return &model_command_pb.Result{
 				Status: status.New(codes.InvalidArgument, "Invalid leaf entry in environment variables").Proto(),
-			}, 0, remoteworker_pb.CurrentState_Completed_FAILED
+			}, 0, remoteworker_pb.CurrentState_Completed_FAILED, nil
 		}
 		environmentVariables[level.Leaf.Name] = level.Leaf.Value
 	}
 	if errIter != nil {
 		return &model_command_pb.Result{
 			Status: status.Convert(util.StatusWrap(err, "Failed to iterate environment variables")).Proto(),
-		}, 0, remoteworker_pb.CurrentState_Completed_FAILED
+		}, 0, remoteworker_pb.CurrentState_Completed_FAILED, nil
 	}
 
 	// Error logger to terminate execution and capture I/O error events.
@@ -318,7 +318,7 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 	if err != nil {
 		return &model_command_pb.Result{
 			Status: status.Convert(util.StatusWrap(err, "Invalid file creation parameters")).Proto(),
-		}, 0, remoteworker_pb.CurrentState_Completed_FAILED
+		}, 0, remoteworker_pb.CurrentState_Completed_FAILED, nil
 	}
 	directoryCreationParameters, err := model_filesystem.NewDirectoryCreationParametersFromProto(
 		command.Message.DirectoryCreationParameters,
@@ -327,7 +327,7 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 	if err != nil {
 		return &model_command_pb.Result{
 			Status: status.Convert(util.StatusWrap(err, "Invalid file creation parameters")).Proto(),
-		}, 0, remoteworker_pb.CurrentState_Completed_FAILED
+		}, 0, remoteworker_pb.CurrentState_Completed_FAILED, nil
 	}
 	directoryEncoder := directoryCreationParameters.GetEncoder()
 
@@ -356,7 +356,7 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 	if err != nil {
 		return &model_command_pb.Result{
 			Status: status.Convert(util.StatusWrap(err, "Invalid input root reference")).Proto(),
-		}, 0, remoteworker_pb.CurrentState_Completed_FAILED
+		}, 0, remoteworker_pb.CurrentState_Completed_FAILED, nil
 	}
 	if err := buildDirectory.CreateChildren(map[path.Component]virtual.InitialChild{
 		inputRootDirectoryComponent: virtual.InitialChild{}.FromDirectory(
@@ -408,7 +408,7 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 	}, false); err != nil {
 		return &model_command_pb.Result{
 			Status: status.Convert(util.StatusWrap(err, "Failed to create initial children of build directory")).Proto(),
-		}, 0, remoteworker_pb.CurrentState_Completed_FAILED
+		}, 0, remoteworker_pb.CurrentState_Completed_FAILED, nil
 	}
 
 	// If the command requires a stable input root path, we should
@@ -425,7 +425,7 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 	if err := e.topLevelDirectory.AddChild(ctx, buildDirectoryName, virtual.DirectoryChild{}.FromDirectory(buildDirectory)); err != nil {
 		return &model_command_pb.Result{
 			Status: status.Convert(util.StatusWrap(err, "Failed to attach build directory")).Proto(),
-		}, 0, remoteworker_pb.CurrentState_Completed_FAILED
+		}, 0, remoteworker_pb.CurrentState_Completed_FAILED, nil
 	}
 	defer e.topLevelDirectory.RemoveChild(buildDirectoryName)
 
@@ -595,7 +595,7 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 			setError(util.StatusWrap(err, "Failed to marshal outputs"))
 		}
 	}
-	return resultMessage, virtualExecutionDuration, resultCode
+	return resultMessage, virtualExecutionDuration, resultCode, nil
 }
 
 type prepopulatedCapturableDirectoryOptions struct {
