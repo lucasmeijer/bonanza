@@ -32,6 +32,8 @@ import (
 	"go.starlark.net/starlark"
 )
 
+type ExecutionClient remoteexecution.Client[*model_command_pb.Action, *emptypb.Empty, *model_command_pb.Result]
+
 type BaseComputerReferenceMetadata interface {
 	model_core.CloneableReferenceMetadata
 	model_core.WalkableReferenceMetadata
@@ -43,7 +45,7 @@ type baseComputer[TReference object.BasicReference, TMetadata BaseComputerRefere
 	httpClient                  *http.Client
 	filePool                    pool.FilePool
 	cacheDirectory              filesystem.Directory
-	executionClient             *remoteexecution.Client[*model_command_pb.Action, emptypb.Empty, *emptypb.Empty, *model_command_pb.Result]
+	executionClient             ExecutionClient
 	executionNamespace          *object_pb.Namespace
 	bzlFileBuiltins             starlark.StringDict
 	buildFileBuiltins           starlark.StringDict
@@ -73,7 +75,7 @@ func NewBaseComputer[TReference object.BasicReference, TMetadata BaseComputerRef
 	httpClient *http.Client,
 	filePool pool.FilePool,
 	cacheDirectory filesystem.Directory,
-	executionClient *remoteexecution.Client[*model_command_pb.Action, emptypb.Empty, *emptypb.Empty, *model_command_pb.Result],
+	executionClient remoteexecution.Client[*model_command_pb.Action, *emptypb.Empty, *model_command_pb.Result],
 	executionInstanceName object.InstanceName,
 	bzlFileBuiltins starlark.StringDict,
 	buildFileBuiltins starlark.StringDict,

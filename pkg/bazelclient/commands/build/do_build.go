@@ -450,10 +450,12 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 	if err != nil {
 		logger.Fatal(formatted.Textf("Failed to create gRPC client for --remote_executor=%#v: %s", args.CommonFlags.RemoteExecutor, err))
 	}
-	builderClient := remoteexecution.NewClient[*model_build_pb.Action, emptypb.Empty, *model_build_pb.Result](
-		remoteexecution_pb.NewExecutionClient(remoteExecutorClient),
-		clientPrivateKey,
-		clientCertificateChain,
+	builderClient := remoteexecution.NewProtoClient[*model_build_pb.Action, emptypb.Empty, model_build_pb.Result](
+		remoteexecution.NewRemoteClient(
+			remoteexecution_pb.NewExecutionClient(remoteExecutorClient),
+			clientPrivateKey,
+			clientCertificateChain,
+		),
 	)
 
 	builderPKIXPublicKey, err := base64.StdEncoding.DecodeString(args.CommonFlags.RemoteExecutorBuilderPkixPublicKey)
@@ -503,7 +505,7 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 	}
 	logger.Info(formatted.Join(formatted.Text("Performing build of specification "), buildSpecificationLink))
 
-	var result model_build_pb.Result
+	var result *model_build_pb.Result
 	var errBuild error
 	namespace := object.Namespace{
 		InstanceName:    instanceName,

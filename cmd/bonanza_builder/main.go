@@ -139,10 +139,12 @@ func main() {
 			},
 			filePool:       filePool,
 			cacheDirectory: cacheDirectory,
-			executionClient: remoteexecution.NewClient[*model_command_pb.Action, emptypb.Empty, *model_command_pb.Result](
-				remoteexecution_pb.NewExecutionClient(executionGRPCClient),
-				executionClientPrivateKey,
-				executionClientCertificateChain,
+			executionClient: remoteexecution.NewProtoClient[*model_command_pb.Action, emptypb.Empty, model_command_pb.Result](
+				remoteexecution.NewRemoteClient(
+					remoteexecution_pb.NewExecutionClient(executionGRPCClient),
+					executionClientPrivateKey,
+					executionClientCertificateChain,
+				),
 			),
 			bzlFileBuiltins:   bzlFileBuiltins,
 			buildFileBuiltins: buildFileBuiltins,
@@ -271,7 +273,7 @@ type builderExecutor struct {
 	httpClient                    *http.Client
 	filePool                      pool.FilePool
 	cacheDirectory                filesystem.Directory
-	executionClient               *remoteexecution.Client[*model_command_pb.Action, emptypb.Empty, *emptypb.Empty, *model_command_pb.Result]
+	executionClient               remoteexecution.Client[*model_command_pb.Action, *emptypb.Empty, *model_command_pb.Result]
 	bzlFileBuiltins               starlark.StringDict
 	buildFileBuiltins             starlark.StringDict
 }

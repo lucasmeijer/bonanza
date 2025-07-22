@@ -54,7 +54,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeActionResultValue(ctx conte
 		return PatchedActionResultValue{}, fmt.Errorf("invalid input root reference: %w", err)
 	}
 
-	var completionEvent model_command_pb.Result
+	var completionEvent *model_command_pb.Result
 	var errExecution error
 	for range c.executionClient.RunAction(
 		ctx,

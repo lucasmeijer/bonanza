@@ -167,6 +167,7 @@ gomock(
     name = "mocks_analysis",
     out = "mocks_analysis_test.go",
     interfaces = [
+        "ExecutionClient",
         "FileRootEnvironmentForTesting",
         "RoundTripperForTesting",
     ],
