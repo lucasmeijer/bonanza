@@ -133,7 +133,7 @@ func (c *remoteClient) RunAction(ctx context.Context, platformECDHPublicKey *ecd
 					}
 
 					if !yield(lastEvent) {
-						*errOut = nil
+						*errOut = status.Error(codes.Canceled, "Caller canceled iteration of execution events")
 						return
 					}
 				}
