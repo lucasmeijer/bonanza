@@ -170,10 +170,7 @@ func TestUploader(t *testing.T) {
 			gomock.InOrder(
 				baseUploader.EXPECT().UploadObject(
 					gomock.Any(),
-					object.GlobalReference{
-						InstanceName:   object.NewInstanceName("hello/world"),
-						LocalReference: contents.GetLocalReference(),
-					},
+					object.NewInstanceName("hello/world").WithLocalReference(contents.GetLocalReference()),
 					/* contents = */ nil,
 					/* childrenLeases = */ nil,
 					/* wantContentsIfIncomplete = */ true,
@@ -208,10 +205,7 @@ func TestUploader(t *testing.T) {
 				}, nil),
 				baseUploader.EXPECT().UploadObject(
 					gomock.Any(),
-					object.GlobalReference{
-						InstanceName:   object.NewInstanceName("hello/world"),
-						LocalReference: contents.GetLocalReference(),
-					},
+					object.NewInstanceName("hello/world").WithLocalReference(contents.GetLocalReference()),
 					/* contents = */ nil,
 					[]any{
 						nil,
@@ -232,10 +226,7 @@ func TestUploader(t *testing.T) {
 			}()
 			result, err := uploader.UploadObject(
 				ctx,
-				object.GlobalReference{
-					InstanceName:   object.NewInstanceName("hello/world"),
-					LocalReference: contents.GetLocalReference(),
-				},
+				object.NewInstanceName("hello/world").WithLocalReference(contents.GetLocalReference()),
 				/* contents = */ nil,
 				/* childrenLeases = */ nil,
 				/* wantContentsIfIncomplete = */ false,
@@ -281,10 +272,7 @@ func TestUploader(t *testing.T) {
 			gomock.InOrder(
 				baseUploader.EXPECT().UploadObject(
 					gomock.Any(),
-					object.GlobalReference{
-						InstanceName:   object.NewInstanceName("hello/world"),
-						LocalReference: contents.GetLocalReference(),
-					},
+					object.NewInstanceName("hello/world").WithLocalReference(contents.GetLocalReference()),
 					/* contents = */ nil,
 					/* childrenLeases = */ nil,
 					/* wantContentsIfIncomplete = */ true,
@@ -303,10 +291,7 @@ func TestUploader(t *testing.T) {
 				}, nil),
 				baseUploader.EXPECT().UploadObject(
 					gomock.Any(),
-					object.GlobalReference{
-						InstanceName:   object.NewInstanceName("hello/world"),
-						LocalReference: contents.GetLocalReference(),
-					},
+					object.NewInstanceName("hello/world").WithLocalReference(contents.GetLocalReference()),
 					/* contents = */ nil,
 					[]any{"Lease"},
 					/* wantContentsIfIncomplete = */ false,
@@ -320,10 +305,7 @@ func TestUploader(t *testing.T) {
 			}()
 			_, err := uploader.UploadObject(
 				ctx,
-				object.GlobalReference{
-					InstanceName:   object.NewInstanceName("hello/world"),
-					LocalReference: contents.GetLocalReference(),
-				},
+				object.NewInstanceName("hello/world").WithLocalReference(contents.GetLocalReference()),
 				/* contents = */ nil,
 				/* childrenLeases = */ nil,
 				/* wantContentsIfIncomplete = */ false,
@@ -352,10 +334,7 @@ func TestUploader(t *testing.T) {
 			gomock.InOrder(
 				baseUploader.EXPECT().UploadObject(
 					gomock.Any(),
-					object.GlobalReference{
-						InstanceName:   object.NewInstanceName("hello/world"),
-						LocalReference: contents.GetLocalReference(),
-					},
+					object.NewInstanceName("hello/world").WithLocalReference(contents.GetLocalReference()),
 					/* contents = */ nil,
 					/* childrenLeases = */ nil,
 					/* wantContentsIfIncomplete = */ true,
@@ -374,10 +353,7 @@ func TestUploader(t *testing.T) {
 				}, nil),
 				baseUploader.EXPECT().UploadObject(
 					gomock.Any(),
-					object.GlobalReference{
-						InstanceName:   object.NewInstanceName("hello/world"),
-						LocalReference: contents.GetLocalReference(),
-					},
+					object.NewInstanceName("hello/world").WithLocalReference(contents.GetLocalReference()),
 					/* contents = */ nil,
 					[]any{"Lease"},
 					/* wantContentsIfIncomplete = */ false,
@@ -394,10 +370,7 @@ func TestUploader(t *testing.T) {
 			}()
 			_, err := uploader.UploadObject(
 				ctx,
-				object.GlobalReference{
-					InstanceName:   object.NewInstanceName("hello/world"),
-					LocalReference: contents.GetLocalReference(),
-				},
+				object.NewInstanceName("hello/world").WithLocalReference(contents.GetLocalReference()),
 				/* contents = */ nil,
 				/* childrenLeases = */ nil,
 				/* wantContentsIfIncomplete = */ false,
@@ -421,10 +394,7 @@ func TestUploader(t *testing.T) {
 			gomock.InOrder(
 				baseUploader.EXPECT().UploadObject(
 					gomock.Any(),
-					object.GlobalReference{
-						InstanceName:   object.NewInstanceName("hello/world"),
-						LocalReference: contents.GetLocalReference(),
-					},
+					object.NewInstanceName("hello/world").WithLocalReference(contents.GetLocalReference()),
 					/* contents = */ nil,
 					/* childrenLeases = */ nil,
 					/* wantContentsIfIncomplete = */ true,
@@ -443,10 +413,7 @@ func TestUploader(t *testing.T) {
 				}, nil),
 				baseUploader.EXPECT().UploadObject(
 					gomock.Any(),
-					object.GlobalReference{
-						InstanceName:   object.NewInstanceName("hello/world"),
-						LocalReference: contents.GetLocalReference(),
-					},
+					object.NewInstanceName("hello/world").WithLocalReference(contents.GetLocalReference()),
 					/* contents = */ nil,
 					[]any{"Lease"},
 					/* wantContentsIfIncomplete = */ false,
@@ -460,10 +427,7 @@ func TestUploader(t *testing.T) {
 			}()
 			_, err := uploader.UploadObject(
 				ctx,
-				object.GlobalReference{
-					InstanceName:   object.NewInstanceName("hello/world"),
-					LocalReference: contents.GetLocalReference(),
-				},
+				object.NewInstanceName("hello/world").WithLocalReference(contents.GetLocalReference()),
 				/* contents = */ nil,
 				/* childrenLeases = */ nil,
 				/* wantContentsIfIncomplete = */ false,
@@ -493,10 +457,7 @@ func TestUploader(t *testing.T) {
 			gomock.InOrder(
 				baseUploader.EXPECT().UploadObject(
 					gomock.Any(),
-					object.GlobalReference{
-						InstanceName:   object.NewInstanceName("hello/world"),
-						LocalReference: contents.GetLocalReference(),
-					},
+					object.NewInstanceName("hello/world").WithLocalReference(contents.GetLocalReference()),
 					/* contents = */ nil,
 					/* childrenLeases = */ nil,
 					/* wantContentsIfIncomplete = */ true,
@@ -522,10 +483,7 @@ func TestUploader(t *testing.T) {
 				).Return(object.UploadObjectMissing[any]{}, nil),
 				baseUploader.EXPECT().UploadObject(
 					gomock.Any(),
-					object.GlobalReference{
-						InstanceName:   object.NewInstanceName("hello/world"),
-						LocalReference: contents.GetLocalReference(),
-					},
+					object.NewInstanceName("hello/world").WithLocalReference(contents.GetLocalReference()),
 					/* contents = */ nil,
 					[]any{
 						"Lease",
@@ -544,10 +502,7 @@ func TestUploader(t *testing.T) {
 			}()
 			result, err := uploader.UploadObject(
 				ctx,
-				object.GlobalReference{
-					InstanceName:   object.NewInstanceName("hello/world"),
-					LocalReference: contents.GetLocalReference(),
-				},
+				object.NewInstanceName("hello/world").WithLocalReference(contents.GetLocalReference()),
 				/* contents = */ nil,
 				/* childrenLeases = */ nil,
 				/* wantContentsIfIncomplete = */ true,

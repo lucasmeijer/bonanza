@@ -573,10 +573,7 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Ac
 			if err := dag.UploadDAG(
 				ctx,
 				e.dagUploaderClient,
-				object.GlobalReference{
-					LocalReference: outputsReference,
-					InstanceName:   namespace.InstanceName,
-				},
+				namespace.WithLocalReference(outputsReference),
 				dag.NewSimpleObjectContentsWalker(
 					createdObject.Value.Contents,
 					createdObject.Value.Metadata,

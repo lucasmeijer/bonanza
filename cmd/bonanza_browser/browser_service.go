@@ -168,10 +168,7 @@ func getReferenceFromRequest(r *http.Request) (model_core.Decodable[object.Globa
 
 	return model_core.CopyDecodable(
 		localReference,
-		object.GlobalReference{
-			InstanceName:   object.NewInstanceName(r.PathValue("instance_name")),
-			LocalReference: localReference.Value,
-		},
+		object.NewInstanceName(r.PathValue("instance_name")).WithLocalReference(localReference.Value),
 	), nil
 }
 

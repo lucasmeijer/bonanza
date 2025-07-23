@@ -78,10 +78,7 @@ func TestGRPCUploader(t *testing.T) {
 		)
 		_, err := uploader.UploadObject(
 			ctx,
-			object.GlobalReference{
-				InstanceName:   object.NewInstanceName("hello/world"),
-				LocalReference: contents.GetLocalReference(),
-			},
+			object.NewInstanceName("hello/world").WithLocalReference(contents.GetLocalReference()),
 			contents,
 			[][]byte{
 				{1, 2, 3},
@@ -163,10 +160,7 @@ func TestGRPCUploader(t *testing.T) {
 		)
 		_, err := uploader.UploadObject(
 			ctx,
-			object.GlobalReference{
-				InstanceName:   object.NewInstanceName("hello/world"),
-				LocalReference: contents.GetLocalReference(),
-			},
+			object.NewInstanceName("hello/world").WithLocalReference(contents.GetLocalReference()),
 			contents,
 			/* outgoingReferencesLeases = */ nil,
 			/* wantContentsIfIncomplete = */ false,

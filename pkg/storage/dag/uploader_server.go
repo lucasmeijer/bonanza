@@ -535,10 +535,7 @@ func (r *dagReceiver[TLease]) processPendingObjects() error {
 		r.group.Go(func() error {
 			result, err := r.server.objectUploader.UploadObject(
 				r.context,
-				object.GlobalReference{
-					InstanceName:   r.namespace.InstanceName,
-					LocalReference: o.reference,
-				},
+				r.namespace.WithLocalReference(o.reference),
 				/* contents = */ nil,
 				/* leases = */ nil,
 				/* wantContentsIfIncomplete = */ false,
@@ -661,10 +658,7 @@ func (r *dagReceiver[TLease]) finalizeDAGLocked(rootReference object.LocalRefere
 			err := r.server.tagUpdater.UpdateTag(
 				r.context,
 				rootTag,
-				object.GlobalReference{
-					InstanceName:   r.namespace.InstanceName,
-					LocalReference: rootReference,
-				},
+				r.namespace.WithLocalReference(rootReference),
 				rootLease,
 				/* overwrite = */ true,
 			)
@@ -686,10 +680,7 @@ func (r *dagReceiver[TLease]) putObject(o *objectState[TLease], contents *object
 	r.group.Go(func() error {
 		result, err := r.server.objectUploader.UploadObject(
 			r.context,
-			object.GlobalReference{
-				InstanceName:   r.namespace.InstanceName,
-				LocalReference: o.reference,
-			},
+			r.namespace.WithLocalReference(o.reference),
 			contents,
 			childrenLeases,
 			/* wantContentsIfIncomplete = */ false,
