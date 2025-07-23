@@ -67,8 +67,11 @@ func (c *protoClient[TAction, TEvent, TResult, TEventPtr, TResultPtr]) RunAction
 
 	var resultData []byte
 	var baseErr error
-	baseEvents := c.Client.RunAction(ctx, platformECDHPublicKey, actionData, actionAdditionalData, &resultData, &baseErr)
+	ctxWithCancel, cancel := context.WithCancel(ctx)
+	baseEvents := c.Client.RunAction(ctxWithCancel, platformECDHPublicKey, actionData, actionAdditionalData, &resultData, &baseErr)
 	return func(yield func(TEventPtr) bool) {
+		defer cancel()
+
 		// Unmarshal execution events.
 		for eventData := range baseEvents {
 			var event TEvent
