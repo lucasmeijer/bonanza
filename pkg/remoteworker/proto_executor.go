@@ -53,11 +53,11 @@ func (e *protoExecutor[TAction, TEvent, TResult, TActionPtr]) Execute(ctx contex
 	// deny incorrectly routed requests.
 	var actionAny anypb.Any
 	if err := proto.Unmarshal(action, &actionAny); err != nil {
-		return nil, 0, remoteworker_pb.CurrentState_Completed_FAILED, util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to unmarshal action")
+		return nil, 0, 0, util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to unmarshal action")
 	}
 	var actionMessage TAction
 	if err := actionAny.UnmarshalTo(TActionPtr(&actionMessage)); err != nil {
-		return nil, 0, remoteworker_pb.CurrentState_Completed_FAILED, util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to unmarshal action")
+		return nil, 0, 0, util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to unmarshal action")
 	}
 
 	// Invoke the base executor. Marshal any execution events that
@@ -92,13 +92,13 @@ func (e *protoExecutor[TAction, TEvent, TResult, TActionPtr]) Execute(ctx contex
 		return
 	})
 	if err := group.Wait(); err != nil {
-		return nil, 0, remoteworker_pb.CurrentState_Completed_FAILED, err
+		return nil, 0, 0, err
 	}
 
 	// Marshal the completion event.
 	marshaledCompletedEvent, err := proto.Marshal(completedEvent)
 	if err != nil {
-		return nil, 0, remoteworker_pb.CurrentState_Completed_FAILED, util.StatusWrapWithCode(err, codes.Internal, "Failed to marshal result")
+		return nil, 0, 0, util.StatusWrapWithCode(err, codes.Internal, "Failed to marshal result")
 	}
 	return marshaledCompletedEvent, virtualExecutionDuration, result, nil
 }
