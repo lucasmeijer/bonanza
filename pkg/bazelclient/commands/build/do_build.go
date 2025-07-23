@@ -23,10 +23,13 @@ import (
 	"bonanza.build/pkg/label"
 	model_core "bonanza.build/pkg/model/core"
 	model_encoding "bonanza.build/pkg/model/encoding"
+	model_executewithstorage "bonanza.build/pkg/model/executewithstorage"
 	model_filesystem "bonanza.build/pkg/model/filesystem"
+	model_parser "bonanza.build/pkg/model/parser"
 	model_build_pb "bonanza.build/pkg/proto/model/build"
 	model_core_pb "bonanza.build/pkg/proto/model/core"
 	model_encoding_pb "bonanza.build/pkg/proto/model/encoding"
+	model_executewithstorage_pb "bonanza.build/pkg/proto/model/executewithstorage"
 	model_filesystem_pb "bonanza.build/pkg/proto/model/filesystem"
 	remoteexecution_pb "bonanza.build/pkg/proto/remoteexecution"
 	dag_pb "bonanza.build/pkg/proto/storage/dag"
@@ -35,7 +38,10 @@ import (
 	pg_starlark "bonanza.build/pkg/starlark"
 	"bonanza.build/pkg/storage/dag"
 	"bonanza.build/pkg/storage/object"
+	object_grpc "bonanza.build/pkg/storage/object/grpc"
+	object_namespacemapping "bonanza.build/pkg/storage/object/namespacemapping"
 
+	"github.com/buildbarn/bb-storage/pkg/eviction"
 	"github.com/buildbarn/bb-storage/pkg/filesystem"
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
 	"github.com/buildbarn/bb-storage/pkg/util"
@@ -388,36 +394,72 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 		)
 	}
 
-	buildSpecificationEncoder, err := model_encoding.NewBinaryEncoderFromProto(
+	actionEncoder, err := model_encoding.NewBinaryEncoderFromProto(
 		defaultEncoders,
 		uint32(referenceFormat.GetMaximumObjectSizeBytes()),
 	)
 	if err != nil {
-		logger.Fatal(formatted.Textf("Failed to create build specification encoder: %s", err))
+		logger.Fatal(formatted.Textf("Failed to create action encoder: %s", err))
 	}
 
 	createdBuildSpecification, err := model_core.MarshalAndEncode(
 		model_core.NewPatchedMessage(model_core.NewProtoMarshalable(&buildSpecification), buildSpecificationPatcher),
 		referenceFormat,
-		buildSpecificationEncoder,
+		actionEncoder,
 	)
 	if err != nil {
 		logger.Fatal(formatted.Textf("Failed to create build specification object: %s", err))
 	}
 
+	// Construct an Action message.
+	var invocationID uuid.UUID
+	if v := args.CommonFlags.InvocationId; v == "" {
+		invocationID = uuid.Must(uuid.NewRandom())
+	} else {
+		invocationID, err = uuid.Parse(v)
+		if err != nil {
+			logger.Fatal(formatted.Textf("Invalid --invocation_id=%#v: %s", v, err))
+		}
+	}
+	var buildRequestID uuid.UUID
+	if v := args.CommonFlags.BuildRequestId; v == "" {
+		buildRequestID = uuid.Must(uuid.NewRandom())
+	} else {
+		buildRequestID, err = uuid.Parse(v)
+		if err != nil {
+			logger.Fatal(formatted.Textf("Invalid --build_request_id=%#v: %s", v, err))
+		}
+	}
+
+	createdAction, err := model_core.MarshalAndEncode(
+		model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[dag.ObjectContentsWalker]) model_core.Marshalable {
+			return model_core.NewProtoMarshalable(&model_build_pb.Action{
+				InvocationId:   invocationID.String(),
+				BuildRequestId: buildRequestID.String(),
+				BuildSpecificationReference: patcher.CaptureAndAddDecodableReference(
+					createdBuildSpecification,
+					model_core.WalkableCreatedObjectCapturer,
+				),
+			})
+		}),
+		referenceFormat,
+		actionEncoder,
+	)
+	if err != nil {
+		logger.Fatal(formatted.Textf("Failed to create action object: %s", err))
+	}
+
 	logger.Info(formatted.Text("Uploading module sources"))
 	instanceName := object.NewInstanceName(args.CommonFlags.RemoteInstanceName)
-	buildSpecificationReference := createdBuildSpecification.Value.GetLocalReference()
+	actionReference := createdAction.Value.GetLocalReference()
+	actionGlobalReference := instanceName.WithLocalReference(actionReference)
 	if err := dag.UploadDAG(
 		context.Background(),
 		dag_pb.NewUploaderClient(remoteCacheClient),
-		object.GlobalReference{
-			InstanceName:   instanceName,
-			LocalReference: buildSpecificationReference,
-		},
+		actionGlobalReference,
 		dag.NewSimpleObjectContentsWalker(
-			createdBuildSpecification.Value.Contents,
-			createdBuildSpecification.Value.Metadata,
+			createdAction.Value.Contents,
+			createdAction.Value.Metadata,
 		),
 		semaphore.NewWeighted(10),
 		object.NewLimit(&object_pb.Limit{
@@ -450,11 +492,13 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 	if err != nil {
 		logger.Fatal(formatted.Textf("Failed to create gRPC client for --remote_executor=%#v: %s", args.CommonFlags.RemoteExecutor, err))
 	}
-	builderClient := remoteexecution.NewProtoClient[*model_build_pb.Action, emptypb.Empty, model_build_pb.Result](
-		remoteexecution.NewRemoteClient(
-			remoteexecution_pb.NewExecutionClient(remoteExecutorClient),
-			clientPrivateKey,
-			clientCertificateChain,
+	builderClient := model_executewithstorage.NewClient(
+		remoteexecution.NewProtoClient[*model_executewithstorage_pb.Action, model_core_pb.WeakDecodableReference, model_core_pb.WeakDecodableReference](
+			remoteexecution.NewRemoteClient(
+				remoteexecution_pb.NewExecutionClient(remoteExecutorClient),
+				clientPrivateKey,
+				clientCertificateChain,
+			),
 		),
 	)
 
@@ -467,45 +511,27 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 		logger.Fatal(formatted.Textf("Failed to parse --remote_executor_builder_pkix_public_key: %s", err))
 	}
 
-	var invocationID uuid.UUID
-	if v := args.CommonFlags.InvocationId; v == "" {
-		invocationID = uuid.Must(uuid.NewRandom())
-	} else {
-		invocationID, err = uuid.Parse(v)
-		if err != nil {
-			logger.Fatal(formatted.Textf("Invalid --invocation_id=%#v: %s", v, err))
-		}
-	}
-	var buildRequestID uuid.UUID
-	if v := args.CommonFlags.BuildRequestId; v == "" {
-		buildRequestID = uuid.Must(uuid.NewRandom())
-	} else {
-		buildRequestID, err = uuid.Parse(v)
-		if err != nil {
-			logger.Fatal(formatted.Textf("Invalid --build_request_id=%#v: %s", v, err))
-		}
-	}
-
-	decodableBuildSpecificationReference := model_core.CopyDecodable(createdBuildSpecification, buildSpecificationReference)
-	buildSpecificationReferenceStr := model_core.DecodableLocalReferenceToString(decodableBuildSpecificationReference)
-	buildSpecificationLink := formatted.Text(buildSpecificationReferenceStr)
+	decodableActionReference := model_core.CopyDecodable(createdAction, actionReference)
+	actionReferenceStr := model_core.DecodableLocalReferenceToString(decodableActionReference)
+	actionLink := formatted.Text(actionReferenceStr)
 	browserURL := args.CommonFlags.BrowserUrl
+	actionMessageType := "bonanza.model.build.Action"
 	if browserURL != "" {
-		if buildSpecificationURL, err := url.JoinPath(
+		if actionURL, err := url.JoinPath(
 			browserURL,
 			"object",
 			url.PathEscape(instanceName.String()),
 			referenceFormat.ToProto().String(),
-			buildSpecificationReferenceStr,
+			actionReferenceStr,
 			"proto",
-			"bonanza.model.build.BuildSpecification",
+			actionMessageType,
 		); err == nil {
-			buildSpecificationLink = formatted.Link(buildSpecificationURL, buildSpecificationLink)
+			actionLink = formatted.Link(actionURL, actionLink)
 		}
 	}
-	logger.Info(formatted.Join(formatted.Text("Performing build of specification "), buildSpecificationLink))
+	logger.Info(formatted.Join(formatted.Text("Performing build "), actionLink))
 
-	var result *model_build_pb.Result
+	var resultReference model_core.Decodable[object.LocalReference]
 	var errBuild error
 	namespace := object.Namespace{
 		InstanceName:    instanceName,
@@ -514,17 +540,22 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 	for range builderClient.RunAction(
 		context.Background(),
 		builderECDHPublicKey,
-		&model_build_pb.Action{
-			InvocationId:                invocationID.String(),
-			BuildRequestId:              buildRequestID.String(),
-			Namespace:                   namespace.ToProto(),
-			BuildSpecificationReference: model_core.DecodableLocalReferenceToWeakProto(decodableBuildSpecificationReference),
-			BuildSpecificationEncoders:  defaultEncoders,
+		&model_executewithstorage.Action{
+			Reference: model_core.CopyDecodable(
+				createdAction,
+				actionGlobalReference,
+			),
+			Encoders: defaultEncoders,
+			Format: &model_core_pb.ObjectFormat{
+				Format: &model_core_pb.ObjectFormat_ProtoTypeName{
+					ProtoTypeName: actionMessageType,
+				},
+			},
 		},
 		&remoteexecution_pb.Action_AdditionalData{
 			ExecutionTimeout: &durationpb.Duration{Seconds: 24 * 60 * 60},
 		},
-		&result,
+		&resultReference,
 		&errBuild,
 	) {
 		// TODO: Display events as they come in.
@@ -533,16 +564,46 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 		logger.Fatal(formatted.Textf("Failed to perform build: %s", errBuild))
 	}
 
+	parsedObjectPool := model_parser.NewParsedObjectPool(
+		eviction.NewLRUSet[model_parser.ParsedObjectEvictionKey](),
+		/* maximumCount = */ 1e3,
+		/* maximumSizeBytes = */ 1e5,
+	)
+	parsedObjectPoolIngester := model_parser.NewParsedObjectPoolIngester[object.LocalReference](
+		parsedObjectPool,
+		model_parser.NewDownloadingParsedObjectReader(
+			object_namespacemapping.NewNamespaceAddingDownloader(
+				object_grpc.NewGRPCDownloader(object_pb.NewDownloaderClient(remoteCacheClient)),
+				instanceName,
+			),
+		),
+	)
+	resultReader := model_parser.LookupParsedObjectReader(
+		parsedObjectPoolIngester,
+		model_parser.NewChainedObjectParser(
+			model_parser.NewEncodedObjectParser[object.LocalReference](actionEncoder),
+			model_parser.NewProtoObjectParser[object.LocalReference, model_build_pb.Result](),
+		),
+	)
+
+	result, err := resultReader.ReadParsedObject(
+		context.Background(),
+		resultReference,
+	)
+	if err != nil {
+		logger.Fatal(formatted.Textf("Failed to read result message: %s", err))
+	}
+
 	var evaluationsReference *model_core.Decodable[object.LocalReference]
-	if result.EvaluationsReference != nil {
-		r, err := model_core.NewDecodableLocalReferenceFromWeakProto(referenceFormat, result.EvaluationsReference)
+	if rm := result.Message.EvaluationsReference; rm != nil {
+		r, err := model_core.FlattenDecodableReference(model_core.Nested(result, rm))
 		if err != nil {
 			logger.Fatal(formatted.Textf("Invalid evaluations reference: %s", err))
 		}
 		evaluationsReference = &r
 	}
 
-	if f := result.Failure; f != nil {
+	if f := result.Message.Failure; f != nil {
 		printStackTrace(namespace, f.StackTraceKeys, logger, browserURL, evaluationsReference)
 		logger.Fatal(formatted.Textf("Failed to perform build: %s", status.FromProto(f.Status)))
 	}

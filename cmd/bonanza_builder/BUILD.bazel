@@ -13,6 +13,7 @@ go_library(
         "//pkg/model/core",
         "//pkg/model/core/btree",
         "//pkg/model/encoding",
+        "//pkg/model/executewithstorage",
         "//pkg/model/parser",
         "//pkg/model/starlark",
         "//pkg/proto/configuration/bonanza_builder",

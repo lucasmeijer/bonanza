@@ -10,7 +10,6 @@ import (
 	core "bonanza.build/pkg/proto/model/core"
 	encoding "bonanza.build/pkg/proto/model/encoding"
 	filesystem "bonanza.build/pkg/proto/model/filesystem"
-	object "bonanza.build/pkg/proto/storage/object"
 	status "google.golang.org/genproto/googleapis/rpc/status"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -280,12 +279,10 @@ func (x *BuildSpecification) GetSubruleImplementationWrapperIdentifier() string 
 }
 
 type Action struct {
-	state                       protoimpl.MessageState       `protogen:"open.v1"`
-	InvocationId                string                       `protobuf:"bytes,1,opt,name=invocation_id,json=invocationId,proto3" json:"invocation_id,omitempty"`
-	BuildRequestId              string                       `protobuf:"bytes,2,opt,name=build_request_id,json=buildRequestId,proto3" json:"build_request_id,omitempty"`
-	Namespace                   *object.Namespace            `protobuf:"bytes,3,opt,name=namespace,proto3" json:"namespace,omitempty"`
-	BuildSpecificationReference *core.WeakDecodableReference `protobuf:"bytes,4,opt,name=build_specification_reference,json=buildSpecificationReference,proto3" json:"build_specification_reference,omitempty"`
-	BuildSpecificationEncoders  []*encoding.BinaryEncoder    `protobuf:"bytes,5,rep,name=build_specification_encoders,json=buildSpecificationEncoders,proto3" json:"build_specification_encoders,omitempty"`
+	state                       protoimpl.MessageState   `protogen:"open.v1"`
+	InvocationId                string                   `protobuf:"bytes,1,opt,name=invocation_id,json=invocationId,proto3" json:"invocation_id,omitempty"`
+	BuildRequestId              string                   `protobuf:"bytes,2,opt,name=build_request_id,json=buildRequestId,proto3" json:"build_request_id,omitempty"`
+	BuildSpecificationReference *core.DecodableReference `protobuf:"bytes,3,opt,name=build_specification_reference,json=buildSpecificationReference,proto3" json:"build_specification_reference,omitempty"`
 	unknownFields               protoimpl.UnknownFields
 	sizeCache                   protoimpl.SizeCache
 }
@@ -334,31 +331,17 @@ func (x *Action) GetBuildRequestId() string {
 	return ""
 }
 
-func (x *Action) GetNamespace() *object.Namespace {
-	if x != nil {
-		return x.Namespace
-	}
-	return nil
-}
-
-func (x *Action) GetBuildSpecificationReference() *core.WeakDecodableReference {
+func (x *Action) GetBuildSpecificationReference() *core.DecodableReference {
 	if x != nil {
 		return x.BuildSpecificationReference
 	}
 	return nil
 }
 
-func (x *Action) GetBuildSpecificationEncoders() []*encoding.BinaryEncoder {
-	if x != nil {
-		return x.BuildSpecificationEncoders
-	}
-	return nil
-}
-
 type Result struct {
-	state                protoimpl.MessageState       `protogen:"open.v1"`
-	Failure              *Result_Failure              `protobuf:"bytes,1,opt,name=failure,proto3" json:"failure,omitempty"`
-	EvaluationsReference *core.WeakDecodableReference `protobuf:"bytes,2,opt,name=evaluations_reference,json=evaluationsReference,proto3" json:"evaluations_reference,omitempty"`
+	state                protoimpl.MessageState   `protogen:"open.v1"`
+	Failure              *Result_Failure          `protobuf:"bytes,1,opt,name=failure,proto3" json:"failure,omitempty"`
+	EvaluationsReference *core.DecodableReference `protobuf:"bytes,2,opt,name=evaluations_reference,json=evaluationsReference,proto3" json:"evaluations_reference,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -400,7 +383,7 @@ func (x *Result) GetFailure() *Result_Failure {
 	return nil
 }
 
-func (x *Result) GetEvaluationsReference() *core.WeakDecodableReference {
+func (x *Result) GetEvaluationsReference() *core.DecodableReference {
 	if x != nil {
 		return x.EvaluationsReference
 	}
@@ -463,7 +446,7 @@ var File_pkg_proto_model_build_build_proto protoreflect.FileDescriptor
 
 const file_pkg_proto_model_build_build_proto_rawDesc = "" +
 	"\n" +
-	"!pkg/proto/model/build/build.proto\x12\x13bonanza.model.build\x1a\x1egoogle/protobuf/duration.proto\x1a\x17google/rpc/status.proto\x1a\x1fpkg/proto/model/core/core.proto\x1a'pkg/proto/model/encoding/encoding.proto\x1a+pkg/proto/model/filesystem/filesystem.proto\x1a%pkg/proto/storage/object/object.proto\"\x84\x01\n" +
+	"!pkg/proto/model/build/build.proto\x12\x13bonanza.model.build\x1a\x1egoogle/protobuf/duration.proto\x1a\x17google/rpc/status.proto\x1a\x1fpkg/proto/model/core/core.proto\x1a'pkg/proto/model/encoding/encoding.proto\x1a+pkg/proto/model/filesystem/filesystem.proto\"\x84\x01\n" +
 	"\x06Module\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12f\n" +
 	"\x18root_directory_reference\x18\x02 \x01(\v2,.bonanza.model.filesystem.DirectoryReferenceR\x16rootDirectoryReference\"t\n" +
@@ -485,16 +468,14 @@ const file_pkg_proto_model_build_build_proto_rawDesc = "" +
 	"\x10command_encoders\x18\v \x03(\v2%.bonanza.model.encoding.BinaryEncoderR\x0fcommandEncoders\x12)\n" +
 	"\x10target_platforms\x18\f \x03(\tR\x0ftargetPlatforms\x12S\n" +
 	"&rule_implementation_wrapper_identifier\x18\r \x01(\tR#ruleImplementationWrapperIdentifier\x12Y\n" +
-	")subrule_implementation_wrapper_identifier\x18\x0e \x01(\tR&subruleImplementationWrapperIdentifier\"\xa0\x03\n" +
+	")subrule_implementation_wrapper_identifier\x18\x0e \x01(\tR&subruleImplementationWrapperIdentifier\"\xf2\x01\n" +
 	"\x06Action\x12#\n" +
 	"\rinvocation_id\x18\x01 \x01(\tR\finvocationId\x12(\n" +
-	"\x10build_request_id\x18\x02 \x01(\tR\x0ebuildRequestId\x12?\n" +
-	"\tnamespace\x18\x03 \x01(\v2!.bonanza.storage.object.NamespaceR\tnamespace\x12\x9c\x01\n" +
-	"\x1dbuild_specification_reference\x18\x04 \x01(\v2*.bonanza.model.core.WeakDecodableReferenceB,\xea\xd7 (\x12&bonanza.model.build.BuildSpecificationR\x1bbuildSpecificationReference\x12g\n" +
-	"\x1cbuild_specification_encoders\x18\x05 \x03(\v2%.bonanza.model.encoding.BinaryEncoderR\x1abuildSpecificationEncoders\"\xb5\x02\n" +
+	"\x10build_request_id\x18\x02 \x01(\tR\x0ebuildRequestId\x12\x98\x01\n" +
+	"\x1dbuild_specification_reference\x18\x03 \x01(\v2&.bonanza.model.core.DecodableReferenceB,\xea\xd7 (\x12&bonanza.model.build.BuildSpecificationR\x1bbuildSpecificationReference\"\xb1\x02\n" +
 	"\x06Result\x12=\n" +
-	"\afailure\x18\x01 \x01(\v2#.bonanza.model.build.Result.FailureR\afailure\x12\x8a\x01\n" +
-	"\x15evaluations_reference\x18\x02 \x01(\v2*.bonanza.model.core.WeakDecodableReferenceB)\xea\xd7 %\x1a#bonanza.model.evaluation.EvaluationR\x14evaluationsReference\x1a_\n" +
+	"\afailure\x18\x01 \x01(\v2#.bonanza.model.build.Result.FailureR\afailure\x12\x86\x01\n" +
+	"\x15evaluations_reference\x18\x02 \x01(\v2&.bonanza.model.core.DecodableReferenceB)\xea\xd7 %\x1a#bonanza.model.evaluation.EvaluationR\x14evaluationsReference\x1a_\n" +
 	"\aFailure\x12(\n" +
 	"\x10stack_trace_keys\x18\x01 \x03(\fR\x0estackTraceKeys\x12*\n" +
 	"\x06status\x18\x02 \x01(\v2\x12.google.rpc.StatusR\x06statusB%Z#bonanza.build/pkg/proto/model/buildb\x06proto3"
@@ -524,9 +505,8 @@ var file_pkg_proto_model_build_build_proto_goTypes = []any{
 	(*filesystem.DirectoryCreationParameters)(nil), // 8: bonanza.model.filesystem.DirectoryCreationParameters
 	(*filesystem.FileCreationParameters)(nil),      // 9: bonanza.model.filesystem.FileCreationParameters
 	(*encoding.BinaryEncoder)(nil),                 // 10: bonanza.model.encoding.BinaryEncoder
-	(*object.Namespace)(nil),                       // 11: bonanza.storage.object.Namespace
-	(*core.WeakDecodableReference)(nil),            // 12: bonanza.model.core.WeakDecodableReference
-	(*status.Status)(nil),                          // 13: google.rpc.Status
+	(*core.DecodableReference)(nil),                // 11: bonanza.model.core.DecodableReference
+	(*status.Status)(nil),                          // 12: google.rpc.Status
 }
 var file_pkg_proto_model_build_build_proto_depIdxs = []int32{
 	6,  // 0: bonanza.model.build.Module.root_directory_reference:type_name -> bonanza.model.filesystem.DirectoryReference
@@ -536,17 +516,15 @@ var file_pkg_proto_model_build_build_proto_depIdxs = []int32{
 	9,  // 4: bonanza.model.build.BuildSpecification.file_creation_parameters:type_name -> bonanza.model.filesystem.FileCreationParameters
 	1,  // 5: bonanza.model.build.BuildSpecification.use_lockfile:type_name -> bonanza.model.build.UseLockfile
 	10, // 6: bonanza.model.build.BuildSpecification.command_encoders:type_name -> bonanza.model.encoding.BinaryEncoder
-	11, // 7: bonanza.model.build.Action.namespace:type_name -> bonanza.storage.object.Namespace
-	12, // 8: bonanza.model.build.Action.build_specification_reference:type_name -> bonanza.model.core.WeakDecodableReference
-	10, // 9: bonanza.model.build.Action.build_specification_encoders:type_name -> bonanza.model.encoding.BinaryEncoder
-	5,  // 10: bonanza.model.build.Result.failure:type_name -> bonanza.model.build.Result.Failure
-	12, // 11: bonanza.model.build.Result.evaluations_reference:type_name -> bonanza.model.core.WeakDecodableReference
-	13, // 12: bonanza.model.build.Result.Failure.status:type_name -> google.rpc.Status
-	13, // [13:13] is the sub-list for method output_type
-	13, // [13:13] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	11, // 7: bonanza.model.build.Action.build_specification_reference:type_name -> bonanza.model.core.DecodableReference
+	5,  // 8: bonanza.model.build.Result.failure:type_name -> bonanza.model.build.Result.Failure
+	11, // 9: bonanza.model.build.Result.evaluations_reference:type_name -> bonanza.model.core.DecodableReference
+	12, // 10: bonanza.model.build.Result.Failure.status:type_name -> google.rpc.Status
+	11, // [11:11] is the sub-list for method output_type
+	11, // [11:11] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_pkg_proto_model_build_build_proto_init() }

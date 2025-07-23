@@ -7,7 +7,6 @@ import "google/rpc/status.proto";
 import "pkg/proto/model/core/core.proto";
 import "pkg/proto/model/encoding/encoding.proto";
 import "pkg/proto/model/filesystem/filesystem.proto";
-import "pkg/proto/storage/object/object.proto";
 
 option go_package = "bonanza.build/pkg/proto/model/build";
 
@@ -126,21 +125,12 @@ message Action {
   // Unique identifier, in UUID format, for the build being run.
   string build_request_id = 2;
 
-  // The namespace in storage where the build specification DAG is
-  // stored.
-  bonanza.storage.object.Namespace namespace = 3;
-
   // Reference of the build specification DAG.
-  bonanza.model.core.WeakDecodableReference build_specification_reference = 4
+  bonanza.model.core.DecodableReference build_specification_reference = 3
       [(bonanza.model.core.object_format) = {
         proto_type_name:
           "bonanza.model.build.BuildSpecification";
       }];
-
-  // Encoders that were used to compress and/or encrypt the root of the
-  // build specification DAG.
-  repeated bonanza.model.encoding.BinaryEncoder build_specification_encoders =
-      5;
 }
 
 message Result {
@@ -160,7 +150,7 @@ message Result {
 
   // If set, list of outcomes of the keys that were evaluated during
   // this build.
-  bonanza.model.core.WeakDecodableReference evaluations_reference = 2
+  bonanza.model.core.DecodableReference evaluations_reference = 2
       [(bonanza.model.core.object_format) = {
         proto_list_type_name:
           "bonanza.model.evaluation.Evaluation";

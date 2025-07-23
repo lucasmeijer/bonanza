@@ -3,34 +3,31 @@ load("@rules_go//proto:def.bzl", "go_proto_library")
 load("@rules_proto//proto:defs.bzl", "proto_library")
 
 proto_library(
-    name = "build_proto",
-    srcs = ["build.proto"],
+    name = "executewithstorage_proto",
+    srcs = ["executewithstorage.proto"],
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/proto/model/core:core_proto",
         "//pkg/proto/model/encoding:encoding_proto",
-        "//pkg/proto/model/filesystem:filesystem_proto",
-        "@googleapis//google/rpc:status_proto",
-        "@protobuf//:duration_proto",
+        "//pkg/proto/storage/object:object_proto",
     ],
 )
 
 go_proto_library(
-    name = "build_go_proto",
-    importpath = "bonanza.build/pkg/proto/model/build",
-    proto = ":build_proto",
+    name = "executewithstorage_go_proto",
+    importpath = "bonanza.build/pkg/proto/model/executewithstorage",
+    proto = ":executewithstorage_proto",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/proto/model/core",
         "//pkg/proto/model/encoding",
-        "//pkg/proto/model/filesystem",
-        "@org_golang_google_genproto_googleapis_rpc//status",
+        "//pkg/proto/storage/object",
     ],
 )
 
 go_library(
-    name = "build",
-    embed = [":build_go_proto"],
-    importpath = "bonanza.build/pkg/proto/model/build",
+    name = "executewithstorage",
+    embed = [":executewithstorage_go_proto"],
+    importpath = "bonanza.build/pkg/proto/model/executewithstorage",
     visibility = ["//visibility:public"],
 )
