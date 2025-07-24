@@ -15,7 +15,7 @@ import (
 )
 
 type executor struct {
-	remoteworker.Executor[*Action, model_core.Decodable[object.LocalReference], model_core.Decodable[object.LocalReference]]
+	remoteworker.Executor[*Action[object.GlobalReference], model_core.Decodable[object.LocalReference], model_core.Decodable[object.LocalReference]]
 }
 
 // NewExecutor creates a decorator for the remote worker executor that
@@ -27,7 +27,7 @@ type executor struct {
 // native types for decodable references, as opposed to sending and
 // receiving their Protobuf message equivalents.
 func NewExecutor(
-	base remoteworker.Executor[*Action, model_core.Decodable[object.LocalReference], model_core.Decodable[object.LocalReference]],
+	base remoteworker.Executor[*Action[object.GlobalReference], model_core.Decodable[object.LocalReference], model_core.Decodable[object.LocalReference]],
 ) remoteworker.Executor[*model_executewithstorage_pb.Action, *model_core_pb.WeakDecodableReference, *model_core_pb.WeakDecodableReference] {
 	return &executor{
 		Executor: base,
@@ -59,7 +59,7 @@ func (e *executor) Execute(ctx context.Context, action *model_executewithstorage
 
 	resultReference, virtualExecutionDuration, resultCode, err := e.Executor.Execute(
 		ctx,
-		&Action{
+		&Action[object.GlobalReference]{
 			Reference: model_core.CopyDecodable(
 				actionReference,
 				namespace.WithLocalReference(actionReference.Value),

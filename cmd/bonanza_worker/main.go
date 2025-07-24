@@ -12,6 +12,7 @@ import (
 	"time"
 
 	model_command "bonanza.build/pkg/model/command"
+	model_executewithstorage "bonanza.build/pkg/model/executewithstorage"
 	model_filesystem_virtual "bonanza.build/pkg/model/filesystem/virtual"
 	model_parser "bonanza.build/pkg/model/parser"
 	"bonanza.build/pkg/proto/configuration/bonanza_worker"
@@ -199,7 +200,9 @@ func main() {
 
 					client, err := remoteworker.NewClient(
 						schedulerClient,
-						remoteworker.NewProtoExecutor(executor),
+						remoteworker.NewProtoExecutor(
+							model_executewithstorage.NewExecutor(executor),
+						),
 						clock.SystemClock,
 						random.CryptoThreadSafeGenerator,
 						platformPrivateKeys,

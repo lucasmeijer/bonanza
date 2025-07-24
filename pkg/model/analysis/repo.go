@@ -47,6 +47,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"go.starlark.net/starlark"
 	"go.starlark.net/syntax"
@@ -1941,23 +1942,38 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 		return nil, fmt.Errorf("failed to create Merkle tree of root directory: %w", err)
 	}
 
+	createdAction, err := model_core.MarshalAndEncode(
+		model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[dag.ObjectContentsWalker]) model_core.Marshalable {
+			patcher.Merge(inputRootReference.Patcher)
+			return model_core.NewProtoMarshalable(&model_command_pb.Action{
+				CommandReference: patcher.CaptureAndAddDecodableReference(
+					createdCommand,
+					model_core.WalkableCreatedObjectCapturer,
+				),
+				InputRootReference: inputRootReference.Message,
+			})
+		}),
+		referenceFormat,
+		mrc.commandEncoder,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create action: %w", err)
+	}
+
 	// Execute the command.
-	keyPatcher := inputRootReference.Patcher
 	actionResult := mrc.environment.GetActionResultValue(
-		model_core.NewPatchedMessage(
-			&model_analysis_pb.ActionResult_Key{
-				Action: &model_analysis_pb.Action{
+		model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[dag.ObjectContentsWalker]) *model_analysis_pb.ActionResult_Key {
+			return &model_analysis_pb.ActionResult_Key{
+				ExecuteRequest: &model_analysis_pb.ExecuteRequest{
 					PlatformPkixPublicKey: mrc.repoPlatform.Message.ExecPkixPublicKey,
-					CommandReference: keyPatcher.CaptureAndAddDecodableReference(
-						createdCommand,
+					ActionReference: patcher.CaptureAndAddDecodableReference(
+						createdAction,
 						model_core.WalkableCreatedObjectCapturer,
 					),
-					InputRootReference: inputRootReference.Message.Reference,
-					ExecutionTimeout:   &durationpb.Duration{Seconds: timeout},
+					ExecutionTimeout: &durationpb.Duration{Seconds: timeout},
 				},
-			},
-			keyPatcher,
-		),
+			}
+		}),
 	)
 	if !actionResult.IsSet() {
 		return nil, evaluation.ErrMissingDependency
@@ -2258,23 +2274,38 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doRead(thread *star
 		return nil, fmt.Errorf("failed to create Merkle tree of root directory: %w", err)
 	}
 
+	createdAction, err := model_core.MarshalAndEncode(
+		model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[dag.ObjectContentsWalker]) model_core.Marshalable {
+			patcher.Merge(inputRootReference.Patcher)
+			return model_core.NewProtoMarshalable(&model_command_pb.Action{
+				CommandReference: patcher.CaptureAndAddDecodableReference(
+					createdCommand,
+					model_core.WalkableCreatedObjectCapturer,
+				),
+				InputRootReference: inputRootReference.Message,
+			})
+		}),
+		referenceFormat,
+		mrc.commandEncoder,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create action: %w", err)
+	}
+
 	// Execute the command.
-	keyPatcher := inputRootReference.Patcher
 	actionResult := mrc.environment.GetSuccessfulActionResultValue(
-		model_core.NewPatchedMessage(
-			&model_analysis_pb.SuccessfulActionResult_Key{
-				Action: &model_analysis_pb.Action{
+		model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[dag.ObjectContentsWalker]) *model_analysis_pb.SuccessfulActionResult_Key {
+			return &model_analysis_pb.SuccessfulActionResult_Key{
+				ExecuteRequest: &model_analysis_pb.ExecuteRequest{
 					PlatformPkixPublicKey: mrc.repoPlatform.Message.ExecPkixPublicKey,
-					CommandReference: keyPatcher.CaptureAndAddDecodableReference(
-						createdCommand,
+					ActionReference: patcher.CaptureAndAddDecodableReference(
+						createdAction,
 						model_core.WalkableCreatedObjectCapturer,
 					),
-					InputRootReference: inputRootReference.Message.Reference,
-					ExecutionTimeout:   &durationpb.Duration{Seconds: 300},
+					ExecutionTimeout: &durationpb.Duration{Seconds: 300},
 				},
-			},
-			keyPatcher,
-		),
+			}
+		}),
 	)
 	if !actionResult.IsSet() {
 		return nil, evaluation.ErrMissingDependency
@@ -2416,18 +2447,39 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doWhich(thread *sta
 		return nil, fmt.Errorf("failed to create input root: %w", err)
 	}
 
+	createdAction, err := model_core.MarshalAndEncode(
+		model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[dag.ObjectContentsWalker]) model_core.Marshalable {
+			return model_core.NewProtoMarshalable(&model_command_pb.Action{
+				CommandReference: patcher.CaptureAndAddDecodableReference(
+					createdCommand,
+					model_core.WalkableCreatedObjectCapturer,
+				),
+				// TODO: We shouldn't be handcrafting a
+				// DirectoryReference here.
+				InputRootReference: &model_filesystem_pb.DirectoryReference{
+					Reference: patcher.CaptureAndAddDecodableReference(
+						createdInputRoot,
+						model_core.WalkableCreatedObjectCapturer,
+					),
+					MaximumSymlinkEscapementLevels: &wrapperspb.UInt32Value{},
+				},
+			})
+		}),
+		referenceFormat,
+		mrc.commandEncoder,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create action: %w", err)
+	}
+
 	// Invoke command.
 	actionResult := mrc.environment.GetActionResultValue(
 		model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[dag.ObjectContentsWalker]) *model_analysis_pb.ActionResult_Key {
 			return &model_analysis_pb.ActionResult_Key{
-				Action: &model_analysis_pb.Action{
+				ExecuteRequest: &model_analysis_pb.ExecuteRequest{
 					PlatformPkixPublicKey: mrc.repoPlatform.Message.ExecPkixPublicKey,
-					CommandReference: patcher.CaptureAndAddDecodableReference(
-						createdCommand,
-						model_core.WalkableCreatedObjectCapturer,
-					),
-					InputRootReference: patcher.CaptureAndAddDecodableReference(
-						createdInputRoot,
+					ActionReference: patcher.CaptureAndAddDecodableReference(
+						createdAction,
 						model_core.WalkableCreatedObjectCapturer,
 					),
 					ExecutionTimeout: &durationpb.Duration{Seconds: 60},
@@ -2589,23 +2641,38 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) Exists(p *model_sta
 		return false, fmt.Errorf("failed to create Merkle tree of root directory: %w", err)
 	}
 
+	createdAction, err := model_core.MarshalAndEncode(
+		model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[dag.ObjectContentsWalker]) model_core.Marshalable {
+			patcher.Merge(inputRootReference.Patcher)
+			return model_core.NewProtoMarshalable(&model_command_pb.Action{
+				CommandReference: patcher.CaptureAndAddDecodableReference(
+					createdCommand,
+					model_core.WalkableCreatedObjectCapturer,
+				),
+				InputRootReference: inputRootReference.Message,
+			})
+		}),
+		referenceFormat,
+		mrc.commandEncoder,
+	)
+	if err != nil {
+		return false, fmt.Errorf("failed to create action: %w", err)
+	}
+
 	// Execute the command.
-	keyPatcher := inputRootReference.Patcher
 	actionResult := mrc.environment.GetActionResultValue(
-		model_core.NewPatchedMessage(
-			&model_analysis_pb.ActionResult_Key{
-				Action: &model_analysis_pb.Action{
+		model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[dag.ObjectContentsWalker]) *model_analysis_pb.ActionResult_Key {
+			return &model_analysis_pb.ActionResult_Key{
+				ExecuteRequest: &model_analysis_pb.ExecuteRequest{
 					PlatformPkixPublicKey: mrc.repoPlatform.Message.ExecPkixPublicKey,
-					CommandReference: keyPatcher.CaptureAndAddDecodableReference(
-						createdCommand,
+					ActionReference: patcher.CaptureAndAddDecodableReference(
+						createdAction,
 						model_core.WalkableCreatedObjectCapturer,
 					),
-					InputRootReference: inputRootReference.Message.Reference,
-					ExecutionTimeout:   &durationpb.Duration{Seconds: 300},
+					ExecutionTimeout: &durationpb.Duration{Seconds: 300},
 				},
-			},
-			keyPatcher,
-		),
+			}
+		}),
 	)
 	if !actionResult.IsSet() {
 		return false, evaluation.ErrMissingDependency
@@ -2718,22 +2785,37 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) Readdir(p *model_st
 		return nil, fmt.Errorf("failed to create Merkle tree of root directory: %w", err)
 	}
 
-	keyPatcher := inputRootReference.Patcher
+	createdAction, err := model_core.MarshalAndEncode(
+		model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[dag.ObjectContentsWalker]) model_core.Marshalable {
+			patcher.Merge(inputRootReference.Patcher)
+			return model_core.NewProtoMarshalable(&model_command_pb.Action{
+				CommandReference: patcher.CaptureAndAddDecodableReference(
+					createdCommand,
+					model_core.WalkableCreatedObjectCapturer,
+				),
+				InputRootReference: inputRootReference.Message,
+			})
+		}),
+		referenceFormat,
+		mrc.commandEncoder,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create action: %w", err)
+	}
+
 	actionResult := mrc.environment.GetSuccessfulActionResultValue(
-		model_core.NewPatchedMessage(
-			&model_analysis_pb.SuccessfulActionResult_Key{
-				Action: &model_analysis_pb.Action{
+		model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[dag.ObjectContentsWalker]) *model_analysis_pb.SuccessfulActionResult_Key {
+			return &model_analysis_pb.SuccessfulActionResult_Key{
+				ExecuteRequest: &model_analysis_pb.ExecuteRequest{
 					PlatformPkixPublicKey: mrc.repoPlatform.Message.ExecPkixPublicKey,
-					CommandReference: keyPatcher.CaptureAndAddDecodableReference(
-						createdCommand,
+					ActionReference: patcher.CaptureAndAddDecodableReference(
+						createdAction,
 						model_core.WalkableCreatedObjectCapturer,
 					),
-					InputRootReference: inputRootReference.Message.Reference,
-					ExecutionTimeout:   &durationpb.Duration{Seconds: 300},
+					ExecutionTimeout: &durationpb.Duration{Seconds: 300},
 				},
-			},
-			keyPatcher,
-		),
+			}
+		}),
 	)
 	if !actionResult.IsSet() {
 		return nil, evaluation.ErrMissingDependency

@@ -11,6 +11,7 @@ import (
 	model_core "bonanza.build/pkg/model/core"
 	"bonanza.build/pkg/model/core/inlinedtree"
 	model_encoding "bonanza.build/pkg/model/encoding"
+	model_executewithstorage "bonanza.build/pkg/model/executewithstorage"
 	model_filesystem "bonanza.build/pkg/model/filesystem"
 	model_parser "bonanza.build/pkg/model/parser"
 	model_starlark "bonanza.build/pkg/model/starlark"
@@ -18,8 +19,7 @@ import (
 	model_build_pb "bonanza.build/pkg/proto/model/build"
 	model_command_pb "bonanza.build/pkg/proto/model/command"
 	model_starlark_pb "bonanza.build/pkg/proto/model/starlark"
-	object_pb "bonanza.build/pkg/proto/storage/object"
-	remoteexecution "bonanza.build/pkg/remoteexecution"
+	"bonanza.build/pkg/remoteexecution"
 	"bonanza.build/pkg/storage/dag"
 	"bonanza.build/pkg/storage/object"
 
@@ -27,12 +27,8 @@ import (
 	"github.com/buildbarn/bb-storage/pkg/filesystem"
 	"github.com/buildbarn/bb-storage/pkg/util"
 
-	"google.golang.org/protobuf/types/known/emptypb"
-
 	"go.starlark.net/starlark"
 )
-
-type ExecutionClient remoteexecution.Client[*model_command_pb.Action, *emptypb.Empty, *model_command_pb.Result]
 
 type BaseComputerReferenceMetadata interface {
 	model_core.CloneableReferenceMetadata
@@ -45,8 +41,7 @@ type baseComputer[TReference object.BasicReference, TMetadata BaseComputerRefere
 	httpClient                  *http.Client
 	filePool                    pool.FilePool
 	cacheDirectory              filesystem.Directory
-	executionClient             ExecutionClient
-	executionNamespace          *object_pb.Namespace
+	executionClient             remoteexecution.Client[*model_executewithstorage.Action[TReference], model_core.Decodable[TReference], model_core.Decodable[TReference]]
 	bzlFileBuiltins             starlark.StringDict
 	buildFileBuiltins           starlark.StringDict
 	discardingObjectCapturer    model_core.ObjectCapturer[TReference, model_core.NoopReferenceMetadata]
@@ -75,8 +70,7 @@ func NewBaseComputer[TReference object.BasicReference, TMetadata BaseComputerRef
 	httpClient *http.Client,
 	filePool pool.FilePool,
 	cacheDirectory filesystem.Directory,
-	executionClient remoteexecution.Client[*model_command_pb.Action, *emptypb.Empty, *model_command_pb.Result],
-	executionInstanceName object.InstanceName,
+	executionClient remoteexecution.Client[*model_executewithstorage.Action[TReference], model_core.Decodable[TReference], model_core.Decodable[TReference]],
 	bzlFileBuiltins starlark.StringDict,
 	buildFileBuiltins starlark.StringDict,
 ) Computer[TReference, TMetadata] {
@@ -87,13 +81,9 @@ func NewBaseComputer[TReference object.BasicReference, TMetadata BaseComputerRef
 		filePool:                    filePool,
 		cacheDirectory:              cacheDirectory,
 		executionClient:             executionClient,
-		executionNamespace: object.Namespace{
-			InstanceName:    executionInstanceName,
-			ReferenceFormat: buildSpecificationReference.Value.GetReferenceFormat(),
-		}.ToProto(),
-		bzlFileBuiltins:          bzlFileBuiltins,
-		buildFileBuiltins:        buildFileBuiltins,
-		discardingObjectCapturer: model_core.NewDiscardingObjectCapturer[TReference](),
+		bzlFileBuiltins:             bzlFileBuiltins,
+		buildFileBuiltins:           buildFileBuiltins,
+		discardingObjectCapturer:    model_core.NewDiscardingObjectCapturer[TReference](),
 
 		// TODO: Set up encoding!
 		valueReaders: model_starlark.ValueReaders[TReference]{

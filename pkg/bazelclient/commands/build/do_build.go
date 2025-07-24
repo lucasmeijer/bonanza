@@ -540,7 +540,7 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 	for range builderClient.RunAction(
 		context.Background(),
 		builderECDHPublicKey,
-		&model_executewithstorage.Action{
+		&model_executewithstorage.Action[object.GlobalReference]{
 			Reference: model_core.CopyDecodable(
 				createdAction,
 				actionGlobalReference,

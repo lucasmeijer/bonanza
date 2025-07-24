@@ -14,6 +14,7 @@ import (
 	model_core "bonanza.build/pkg/model/core"
 	"bonanza.build/pkg/model/core/btree"
 	model_encoding "bonanza.build/pkg/model/encoding"
+	model_executewithstorage "bonanza.build/pkg/model/executewithstorage"
 	model_filesystem "bonanza.build/pkg/model/filesystem"
 	model_filesystem_virtual "bonanza.build/pkg/model/filesystem/virtual"
 	pg_vfs "bonanza.build/pkg/model/filesystem/virtual"
@@ -128,7 +129,7 @@ func NewLocalExecutor(
 	environmentVariables map[string]string,
 	buildDirectoryOwnerUserID uint32,
 	buildDirectoryOwnerGroupID uint32,
-) remoteworker.Executor[*model_command_pb.Action, proto.Message, *model_command_pb.Result] {
+) remoteworker.Executor[*model_executewithstorage.Action[object.GlobalReference], model_core.Decodable[object.LocalReference], model_core.Decodable[object.LocalReference]] {
 	return &localExecutor{
 		objectDownloader:               objectDownloader,
 		parsedObjectPool:               parsedObjectPool,
@@ -196,403 +197,416 @@ func captureLog(ctx context.Context, buildDirectory virtual.PrepopulatedDirector
 	return model_core.PatchedMessage[*model_filesystem_pb.FileContents, dag.ObjectContentsWalker]{}, status.Error(codes.InvalidArgument, "File is of an incorrect type")
 }
 
-func (e *localExecutor) Execute(ctx context.Context, action *model_command_pb.Action, executionTimeout time.Duration, executionEvents chan<- proto.Message) (*model_command_pb.Result, time.Duration, remoteworker_pb.CurrentState_Completed_Result, error) {
-	namespace, err := object.NewNamespace(action.Namespace)
-	if err != nil {
-		return &model_command_pb.Result{
-			Status: status.Convert(util.StatusWrap(err, "Invalid namespace")).Proto(),
-		}, 0, remoteworker_pb.CurrentState_Completed_FAILED, nil
+func (e *localExecutor) Execute(ctx context.Context, action *model_executewithstorage.Action[object.GlobalReference], executionTimeout time.Duration, executionEvents chan<- model_core.Decodable[object.LocalReference]) (model_core.Decodable[object.LocalReference], time.Duration, remoteworker_pb.CurrentState_Completed_Result, error) {
+	if !proto.Equal(action.Format, &model_core_pb.ObjectFormat{
+		Format: &model_core_pb.ObjectFormat_ProtoTypeName{
+			ProtoTypeName: "bonanza.model.command.Action",
+		},
+	}) {
+		var badReference model_core.Decodable[object.LocalReference]
+		return badReference, 0, 0, status.Error(codes.InvalidArgument, "This worker cannot execute actions of this type")
 	}
+	// Fetch the Command message, so that we know the arguments and
+	// environment variables of the process to spawn.
+	referenceFormat := action.Reference.Value.GetReferenceFormat()
+	actionEncoder, err := model_encoding.NewBinaryEncoderFromProto(
+		action.Encoders,
+		uint32(referenceFormat.GetMaximumObjectSizeBytes()),
+	)
+	if err != nil {
+		var badReference model_core.Decodable[object.LocalReference]
+		return badReference, 0, 0, status.Error(codes.InvalidArgument, "Invalid action encoders")
+	}
+
 	parsedObjectPoolIngester := model_parser.NewParsedObjectPoolIngester(
 		e.parsedObjectPool,
 		model_parser.NewDownloadingParsedObjectReader(
-			object_namespacemapping.NewNamespaceAddingDownloader(e.objectDownloader, namespace),
+			object_namespacemapping.NewNamespaceAddingDownloader(e.objectDownloader, action.Reference.Value.InstanceName),
 		),
 	)
 
-	// Fetch the Command message, so that we know the arguments and
-	// environment variables of the process to spawn.
-	commandEncoder, err := model_encoding.NewBinaryEncoderFromProto(
-		action.CommandEncoders,
-		uint32(namespace.ReferenceFormat.GetMaximumObjectSizeBytes()),
-	)
-	if err != nil {
-		return &model_command_pb.Result{
-			Status: status.Convert(util.StatusWrap(err, "Invalid command encoders")).Proto(),
-		}, 0, remoteworker_pb.CurrentState_Completed_FAILED, nil
-	}
-	commandReader := model_parser.LookupParsedObjectReader[object.LocalReference](
-		parsedObjectPoolIngester,
-		model_parser.NewChainedObjectParser(
-			model_parser.NewEncodedObjectParser[object.LocalReference](commandEncoder),
-			model_parser.NewProtoObjectParser[object.LocalReference, model_command_pb.Command](),
-		),
-	)
-
-	commandReference, err := model_core.NewDecodableLocalReferenceFromWeakProto(namespace.ReferenceFormat, action.CommandReference)
-	if err != nil {
-		return &model_command_pb.Result{
-			Status: status.Convert(util.StatusWrap(err, "Invalid command reference")).Proto(),
-		}, 0, remoteworker_pb.CurrentState_Completed_FAILED, nil
-	}
-	command, err := commandReader.ReadParsedObject(ctx, commandReference)
-	if err != nil {
-		return &model_command_pb.Result{
-			Status: status.Convert(util.StatusWrap(err, "Failed to read command")).Proto(),
-		}, 0, remoteworker_pb.CurrentState_Completed_FAILED, nil
-	}
-
-	// Convert arguments and environment variables stored in B-trees
-	// backed by storage to plain lists, so that they can be sent to
-	// the runner.
-	var arguments []string
-	var errIter error
-	for element := range btree.AllLeaves(
-		ctx,
-		model_parser.LookupParsedObjectReader(
+	var virtualExecutionDuration time.Duration
+	result := model_core.BuildPatchedMessage(func(resultPatcher *model_core.ReferenceMessagePatcher[dag.ObjectContentsWalker]) *model_command_pb.Result {
+		var result model_command_pb.Result
+		actionReader := model_parser.LookupParsedObjectReader[object.LocalReference](
 			parsedObjectPoolIngester,
 			model_parser.NewChainedObjectParser(
-				model_parser.NewEncodedObjectParser[object.LocalReference](commandEncoder),
-				model_parser.NewProtoListObjectParser[object.LocalReference, model_command_pb.ArgumentList_Element](),
+				model_parser.NewEncodedObjectParser[object.LocalReference](actionEncoder),
+				model_parser.NewProtoObjectParser[object.LocalReference, model_command_pb.Action](),
 			),
-		),
-		model_core.Nested(command, command.Message.Arguments),
-		func(element model_core.Message[*model_command_pb.ArgumentList_Element, object.LocalReference]) (*model_core_pb.DecodableReference, error) {
-			return element.Message.GetParent(), nil
-		},
-		&errIter,
-	) {
-		level, ok := element.Message.Level.(*model_command_pb.ArgumentList_Element_Leaf)
-		if !ok {
-			return &model_command_pb.Result{
-				Status: status.New(codes.InvalidArgument, "Invalid leaf element in arguments").Proto(),
-			}, 0, remoteworker_pb.CurrentState_Completed_FAILED, nil
+		)
+		actionMessage, err := actionReader.ReadParsedObject(ctx, model_core.CopyDecodable(action.Reference, action.Reference.Value.GetLocalReference()))
+		if err != nil {
+			result.Status = status.Convert(util.StatusWrap(err, "Failed to read action")).Proto()
+			return &result
 		}
-		arguments = append(arguments, level.Leaf)
-	}
-	if errIter != nil {
-		return &model_command_pb.Result{
-			Status: status.Convert(util.StatusWrap(err, "Failed to iterate arguments")).Proto(),
-		}, 0, remoteworker_pb.CurrentState_Completed_FAILED, nil
-	}
 
-	environmentVariables := map[string]string{}
-	for entry := range btree.AllLeaves(
-		ctx,
-		model_parser.LookupParsedObjectReader(
+		commandReader := model_parser.LookupParsedObjectReader[object.LocalReference](
 			parsedObjectPoolIngester,
 			model_parser.NewChainedObjectParser(
-				model_parser.NewEncodedObjectParser[object.LocalReference](commandEncoder),
-				model_parser.NewProtoListObjectParser[object.LocalReference, model_command_pb.EnvironmentVariableList_Element](),
+				model_parser.NewEncodedObjectParser[object.LocalReference](actionEncoder),
+				model_parser.NewProtoObjectParser[object.LocalReference, model_command_pb.Command](),
 			),
-		),
-		model_core.Nested(command, command.Message.EnvironmentVariables),
-		func(entry model_core.Message[*model_command_pb.EnvironmentVariableList_Element, object.LocalReference]) (*model_core_pb.DecodableReference, error) {
-			return entry.Message.GetParent(), nil
-		},
-		&errIter,
-	) {
-		level, ok := entry.Message.Level.(*model_command_pb.EnvironmentVariableList_Element_Leaf_)
-		if !ok {
-			return &model_command_pb.Result{
-				Status: status.New(codes.InvalidArgument, "Invalid leaf entry in environment variables").Proto(),
-			}, 0, remoteworker_pb.CurrentState_Completed_FAILED, nil
+		)
+		command, err := model_parser.Dereference(ctx, commandReader, model_core.Nested(actionMessage, actionMessage.Message.CommandReference))
+		if err != nil {
+			result.Status = status.Convert(util.StatusWrap(err, "Failed to read command")).Proto()
+			return &result
 		}
-		environmentVariables[level.Leaf.Name] = level.Leaf.Value
-	}
-	if errIter != nil {
-		return &model_command_pb.Result{
-			Status: status.Convert(util.StatusWrap(err, "Failed to iterate environment variables")).Proto(),
-		}, 0, remoteworker_pb.CurrentState_Completed_FAILED, nil
-	}
 
-	// Error logger to terminate execution and capture I/O error events.
-	ctxWithIOError, cancelIOError := context.WithCancel(ctx)
-	defer cancelIOError()
-	ioErrorCapturer := &capturingErrorLogger{cancel: cancelIOError}
+		// Convert arguments and environment variables stored in B-trees
+		// backed by storage to plain lists, so that they can be sent to
+		// the runner.
+		var arguments []string
+		var errIter error
+		for element := range btree.AllLeaves(
+			ctx,
+			model_parser.LookupParsedObjectReader(
+				parsedObjectPoolIngester,
+				model_parser.NewChainedObjectParser(
+					model_parser.NewEncodedObjectParser[object.LocalReference](actionEncoder),
+					model_parser.NewProtoListObjectParser[object.LocalReference, model_command_pb.ArgumentList_Element](),
+				),
+			),
+			model_core.Nested(command, command.Message.Arguments),
+			func(element model_core.Message[*model_command_pb.ArgumentList_Element, object.LocalReference]) (*model_core_pb.DecodableReference, error) {
+				return element.Message.GetParent(), nil
+			},
+			&errIter,
+		) {
+			level, ok := element.Message.Level.(*model_command_pb.ArgumentList_Element_Leaf)
+			if !ok {
+				result.Status = status.New(codes.InvalidArgument, "Invalid leaf element in arguments").Proto()
+				return &result
+			}
+			arguments = append(arguments, level.Leaf)
+		}
+		if errIter != nil {
+			result.Status = status.Convert(util.StatusWrap(err, "Failed to iterate arguments")).Proto()
+			return &result
+		}
 
-	fileCreationParameters, err := model_filesystem.NewFileCreationParametersFromProto(
-		command.Message.FileCreationParameters,
-		namespace.ReferenceFormat,
-	)
-	if err != nil {
-		return &model_command_pb.Result{
-			Status: status.Convert(util.StatusWrap(err, "Invalid file creation parameters")).Proto(),
-		}, 0, remoteworker_pb.CurrentState_Completed_FAILED, nil
-	}
-	directoryCreationParameters, err := model_filesystem.NewDirectoryCreationParametersFromProto(
-		command.Message.DirectoryCreationParameters,
-		namespace.ReferenceFormat,
-	)
-	if err != nil {
-		return &model_command_pb.Result{
-			Status: status.Convert(util.StatusWrap(err, "Invalid file creation parameters")).Proto(),
-		}, 0, remoteworker_pb.CurrentState_Completed_FAILED, nil
-	}
-	directoryEncoder := directoryCreationParameters.GetEncoder()
+		environmentVariables := map[string]string{}
+		for entry := range btree.AllLeaves(
+			ctx,
+			model_parser.LookupParsedObjectReader(
+				parsedObjectPoolIngester,
+				model_parser.NewChainedObjectParser(
+					model_parser.NewEncodedObjectParser[object.LocalReference](actionEncoder),
+					model_parser.NewProtoListObjectParser[object.LocalReference, model_command_pb.EnvironmentVariableList_Element](),
+				),
+			),
+			model_core.Nested(command, command.Message.EnvironmentVariables),
+			func(entry model_core.Message[*model_command_pb.EnvironmentVariableList_Element, object.LocalReference]) (*model_core_pb.DecodableReference, error) {
+				return entry.Message.GetParent(), nil
+			},
+			&errIter,
+		) {
+			level, ok := entry.Message.Level.(*model_command_pb.EnvironmentVariableList_Element_Leaf_)
+			if !ok {
+				result.Status = status.New(codes.InvalidArgument, "Invalid leaf entry in environment variables").Proto()
+				return &result
+			}
+			environmentVariables[level.Leaf.Name] = level.Leaf.Value
+		}
+		if errIter != nil {
+			result.Status = status.Convert(util.StatusWrap(err, "Failed to iterate environment variables")).Proto()
+			return &result
+		}
 
-	// Create build directory and expose it via the virtual file system.
-	buildDirectory := virtual.NewInMemoryPrepopulatedDirectory(
-		virtual.NewHandleAllocatingFileAllocator(
-			virtual.NewPoolBackedFileAllocator(e.filePool, ioErrorCapturer),
+		// Error logger to terminate execution and capture I/O error events.
+		ctxWithIOError, cancelIOError := context.WithCancel(ctx)
+		defer cancelIOError()
+		ioErrorCapturer := &capturingErrorLogger{cancel: cancelIOError}
+
+		fileCreationParameters, err := model_filesystem.NewFileCreationParametersFromProto(
+			command.Message.FileCreationParameters,
+			referenceFormat,
+		)
+		if err != nil {
+			result.Status = status.Convert(util.StatusWrap(err, "Invalid file creation parameters")).Proto()
+			return &result
+		}
+		directoryCreationParameters, err := model_filesystem.NewDirectoryCreationParametersFromProto(
+			command.Message.DirectoryCreationParameters,
+			referenceFormat,
+		)
+		if err != nil {
+			result.Status = status.Convert(util.StatusWrap(err, "Invalid directory creation parameters")).Proto()
+			return &result
+		}
+		directoryEncoder := directoryCreationParameters.GetEncoder()
+
+		// Create build directory and expose it via the virtual file system.
+		buildDirectory := virtual.NewInMemoryPrepopulatedDirectory(
+			virtual.NewHandleAllocatingFileAllocator(
+				virtual.NewPoolBackedFileAllocator(e.filePool, ioErrorCapturer),
+				e.handleAllocator,
+			),
+			e.symlinkFactory,
+			ioErrorCapturer,
 			e.handleAllocator,
-		),
-		e.symlinkFactory,
-		ioErrorCapturer,
-		e.handleAllocator,
-		e.initialContentsSorter,
-		e.hiddenFilesMatcher,
-		e.clock,
-		/* defaultAttributesSetter = */ func(requested virtual.AttributesMask, attributes *virtual.Attributes) {
-			attributes.SetOwnerUserID(e.buildDirectoryOwnerUserID)
-			attributes.SetOwnerGroupID(e.buildDirectoryOwnerGroupID)
-		},
-	)
-	defer buildDirectory.RemoveAllChildren(true)
+			e.initialContentsSorter,
+			e.hiddenFilesMatcher,
+			e.clock,
+			/* defaultAttributesSetter = */ func(requested virtual.AttributesMask, attributes *virtual.Attributes) {
+				attributes.SetOwnerUserID(e.buildDirectoryOwnerUserID)
+				attributes.SetOwnerGroupID(e.buildDirectoryOwnerGroupID)
+			},
+		)
+		defer buildDirectory.RemoveAllChildren(true)
 
-	// Create subdirectories that should be present when the command
-	// is executed, such as the input root directory.
-	inputRootReference, err := model_core.NewDecodableLocalReferenceFromWeakProto(namespace.ReferenceFormat, action.InputRootReference)
-	if err != nil {
-		return &model_command_pb.Result{
-			Status: status.Convert(util.StatusWrap(err, "Invalid input root reference")).Proto(),
-		}, 0, remoteworker_pb.CurrentState_Completed_FAILED, nil
-	}
-	if err := buildDirectory.CreateChildren(map[path.Component]virtual.InitialChild{
-		inputRootDirectoryComponent: virtual.InitialChild{}.FromDirectory(
-			pg_vfs.NewObjectBackedInitialContentsFetcher(
-				ctxWithIOError,
-				model_parser.LookupParsedObjectReader(
-					parsedObjectPoolIngester,
-					model_parser.NewChainedObjectParser(
-						model_parser.NewEncodedObjectParser[object.LocalReference](directoryEncoder),
-						model_filesystem.NewDirectoryClusterObjectParser[object.LocalReference](),
-					),
-				),
-				model_parser.LookupParsedObjectReader(
-					parsedObjectPoolIngester,
-					model_parser.NewChainedObjectParser(
-						model_parser.NewEncodedObjectParser[object.LocalReference](directoryEncoder),
-						model_parser.NewProtoObjectParser[object.LocalReference, model_filesystem_pb.Leaves](),
-					),
-				),
-				pg_vfs.NewStatelessHandleAllocatingFileFactory(
-					pg_vfs.NewObjectBackedFileFactory(
-						ctxWithIOError,
-						model_filesystem.NewFileReader(
-							model_parser.LookupParsedObjectReader(
-								parsedObjectPoolIngester,
-								model_parser.NewChainedObjectParser(
-									model_parser.NewEncodedObjectParser[object.LocalReference](fileCreationParameters.GetFileContentsListEncoder()),
-									model_filesystem.NewFileContentsListObjectParser[object.LocalReference](),
-								),
-							),
-							model_parser.LookupParsedObjectReader(
-								parsedObjectPoolIngester,
-								model_parser.NewChainedObjectParser(
-									model_parser.NewEncodedObjectParser[object.LocalReference](fileCreationParameters.GetChunkEncoder()),
-									model_parser.NewRawObjectParser[object.LocalReference](),
-								),
-							),
+		// Create subdirectories that should be present when the command
+		// is executed, such as the input root directory.
+		inputRootReference, err := model_core.FlattenDecodableReference(model_core.Nested(actionMessage, actionMessage.Message.InputRootReference.GetReference()))
+		if err != nil {
+			result.Status = status.Convert(util.StatusWrap(err, "Invalid input root reference")).Proto()
+			return &result
+		}
+		if err := buildDirectory.CreateChildren(map[path.Component]virtual.InitialChild{
+			inputRootDirectoryComponent: virtual.InitialChild{}.FromDirectory(
+				pg_vfs.NewObjectBackedInitialContentsFetcher(
+					ctxWithIOError,
+					model_parser.LookupParsedObjectReader(
+						parsedObjectPoolIngester,
+						model_parser.NewChainedObjectParser(
+							model_parser.NewEncodedObjectParser[object.LocalReference](directoryEncoder),
+							model_filesystem.NewDirectoryClusterObjectParser[object.LocalReference](),
 						),
-						ioErrorCapturer,
 					),
-					e.handleAllocator.New(),
+					model_parser.LookupParsedObjectReader(
+						parsedObjectPoolIngester,
+						model_parser.NewChainedObjectParser(
+							model_parser.NewEncodedObjectParser[object.LocalReference](directoryEncoder),
+							model_parser.NewProtoObjectParser[object.LocalReference, model_filesystem_pb.Leaves](),
+						),
+					),
+					pg_vfs.NewStatelessHandleAllocatingFileFactory(
+						pg_vfs.NewObjectBackedFileFactory(
+							ctxWithIOError,
+							model_filesystem.NewFileReader(
+								model_parser.LookupParsedObjectReader(
+									parsedObjectPoolIngester,
+									model_parser.NewChainedObjectParser(
+										model_parser.NewEncodedObjectParser[object.LocalReference](fileCreationParameters.GetFileContentsListEncoder()),
+										model_filesystem.NewFileContentsListObjectParser[object.LocalReference](),
+									),
+								),
+								model_parser.LookupParsedObjectReader(
+									parsedObjectPoolIngester,
+									model_parser.NewChainedObjectParser(
+										model_parser.NewEncodedObjectParser[object.LocalReference](fileCreationParameters.GetChunkEncoder()),
+										model_parser.NewRawObjectParser[object.LocalReference](),
+									),
+								),
+							),
+							ioErrorCapturer,
+						),
+						e.handleAllocator.New(),
+					),
+					e.symlinkFactory,
+					inputRootReference,
 				),
-				e.symlinkFactory,
-				inputRootReference,
 			),
-		),
-		serverLogsDirectoryComponent: virtual.InitialChild{}.FromDirectory(virtual.EmptyInitialContentsFetcher),
-		temporaryDirectoryComponent:  virtual.InitialChild{}.FromDirectory(virtual.EmptyInitialContentsFetcher),
-	}, false); err != nil {
-		return &model_command_pb.Result{
-			Status: status.Convert(util.StatusWrap(err, "Failed to create initial children of build directory")).Proto(),
-		}, 0, remoteworker_pb.CurrentState_Completed_FAILED, nil
-	}
+			serverLogsDirectoryComponent: virtual.InitialChild{}.FromDirectory(virtual.EmptyInitialContentsFetcher),
+			temporaryDirectoryComponent:  virtual.InitialChild{}.FromDirectory(virtual.EmptyInitialContentsFetcher),
+		}, false); err != nil {
+			result.Status = status.Convert(util.StatusWrap(err, "Failed to create initial children of build directory")).Proto()
+			return &result
+		}
 
-	// If the command requires a stable input root path, we should
-	// attach the build directory name under a fixed name. We
-	// ideally don't want to do this, because it limits prevents any
-	// form of parallelism.
-	var buildDirectoryName path.Component
-	if command.Message.NeedsStableInputRootPath {
-		buildDirectoryName = stableInputRootComponent
-	} else {
-		buildDirectoryName = path.MustNewComponent(uuid.Must(e.uuidGenerator()).String())
-	}
+		// If the command requires a stable input root path, we should
+		// attach the build directory name under a fixed name. We
+		// ideally don't want to do this, because it limits prevents any
+		// form of parallelism.
+		var buildDirectoryName path.Component
+		if command.Message.NeedsStableInputRootPath {
+			buildDirectoryName = stableInputRootComponent
+		} else {
+			buildDirectoryName = path.MustNewComponent(uuid.Must(e.uuidGenerator()).String())
+		}
 
-	if err := e.topLevelDirectory.AddChild(ctx, buildDirectoryName, virtual.DirectoryChild{}.FromDirectory(buildDirectory)); err != nil {
-		return &model_command_pb.Result{
-			Status: status.Convert(util.StatusWrap(err, "Failed to attach build directory")).Proto(),
-		}, 0, remoteworker_pb.CurrentState_Completed_FAILED, nil
-	}
-	defer e.topLevelDirectory.RemoveChild(buildDirectoryName)
+		if err := e.topLevelDirectory.AddChild(ctx, buildDirectoryName, virtual.DirectoryChild{}.FromDirectory(buildDirectory)); err != nil {
+			result.Status = status.Convert(util.StatusWrap(err, "Failed to attach build directory")).Proto()
+			return &result
+		}
+		defer e.topLevelDirectory.RemoveChild(buildDirectoryName)
 
-	// TODO: This is currently needed, because NFSv4 caches
-	// directory entries even if we fully disable any form of
-	// caching. Figure out what's going on here, so we can get rid
-	// of this unnecessary delay.
-	if command.Message.NeedsStableInputRootPath {
-		time.Sleep(1)
-	}
+		// TODO: This is currently needed, because NFSv4 caches
+		// directory entries even if we fully disable any form of
+		// caching. Figure out what's going on here, so we can get rid
+		// of this unnecessary delay.
+		if command.Message.NeedsStableInputRootPath {
+			time.Sleep(1)
+		}
 
-	// Invoke the command.
-	buildDirectoryPath := (*path.Trace)(nil).Append(buildDirectoryName)
-	ctxWithTimeout, cancelTimeout := e.clock.NewContextWithTimeout(ctxWithIOError, executionTimeout)
-	runResponse, runErr := e.runner.Run(ctxWithTimeout, &runner_pb.RunRequest{
-		Arguments:            arguments,
-		EnvironmentVariables: environmentVariables,
-		WorkingDirectory:     command.Message.WorkingDirectory,
-		StdoutPath:           buildDirectoryPath.Append(stdoutComponent).GetUNIXString(),
-		StderrPath:           buildDirectoryPath.Append(stderrComponent).GetUNIXString(),
-		InputRootDirectory:   buildDirectoryPath.Append(inputRootDirectoryComponent).GetUNIXString(),
-		TemporaryDirectory:   buildDirectoryPath.Append(temporaryDirectoryComponent).GetUNIXString(),
-		ServerLogsDirectory:  buildDirectoryPath.Append(serverLogsDirectoryComponent).GetUNIXString(),
+		// Invoke the command.
+		buildDirectoryPath := (*path.Trace)(nil).Append(buildDirectoryName)
+		ctxWithTimeout, cancelTimeout := e.clock.NewContextWithTimeout(ctxWithIOError, executionTimeout)
+		runResponse, runErr := e.runner.Run(ctxWithTimeout, &runner_pb.RunRequest{
+			Arguments:            arguments,
+			EnvironmentVariables: environmentVariables,
+			WorkingDirectory:     command.Message.WorkingDirectory,
+			StdoutPath:           buildDirectoryPath.Append(stdoutComponent).GetUNIXString(),
+			StderrPath:           buildDirectoryPath.Append(stderrComponent).GetUNIXString(),
+			InputRootDirectory:   buildDirectoryPath.Append(inputRootDirectoryComponent).GetUNIXString(),
+			TemporaryDirectory:   buildDirectoryPath.Append(temporaryDirectoryComponent).GetUNIXString(),
+			ServerLogsDirectory:  buildDirectoryPath.Append(serverLogsDirectoryComponent).GetUNIXString(),
+		})
+
+		// Determine the amount of time the action ran, minus the time
+		// it was delayed reading data from storage.
+		cancelTimeout()
+		<-ctxWithTimeout.Done()
+		if d, ok := ctxWithTimeout.Value(re_clock.UnsuspendedDurationKey{}).(time.Duration); ok {
+			virtualExecutionDuration = d
+		}
+
+		setError := func(err error) {
+			if result.Status == nil {
+				result.Status = status.Convert(err).Proto()
+			}
+		}
+
+		// If an I/O error occurred during execution, attach any errors
+		// related to it to the response first. These errors should be
+		// preferred over the cancelation errors that are a result of it.
+		if err := ioErrorCapturer.GetError(); err != nil {
+			setError(err)
+		}
+
+		// Attach the exit code or execution error.
+		if runErr == nil {
+			result.ExitCode = runResponse.ExitCode
+			result.AuxiliaryMetadata = append(result.AuxiliaryMetadata, runResponse.ResourceUsage...)
+		} else {
+			setError(util.StatusWrap(runErr, "Failed to run command"))
+		}
+
+		writableFileUploadDelayCtx, writableFileUploadDelayCancel := e.clock.NewContextWithTimeout(ctx, e.maximumWritableFileUploadDelay)
+		defer writableFileUploadDelayCancel()
+		writableFileUploadDelayChan := writableFileUploadDelayCtx.Done()
+
+		// Capture output files.
+		var outputs model_command_pb.Outputs
+		outputsPatcher := model_core.NewReferenceMessagePatcher[dag.ObjectContentsWalker]()
+
+		if stdoutContents, err := captureLog(ctx, buildDirectory, stdoutComponent, writableFileUploadDelayChan, fileCreationParameters); err == nil {
+			if stdoutContents.IsSet() {
+				outputs.Stdout = stdoutContents.Message
+				outputsPatcher.Merge(stdoutContents.Patcher)
+			}
+		} else {
+			setError(util.StatusWrap(err, "Failed to capture standard output"))
+		}
+
+		if stderrContents, err := captureLog(ctx, buildDirectory, stderrComponent, writableFileUploadDelayChan, fileCreationParameters); err == nil {
+			if stderrContents.IsSet() {
+				outputs.Stderr = stderrContents.Message
+				outputsPatcher.Merge(stderrContents.Patcher)
+			}
+		} else {
+			setError(util.StatusWrap(err, "Failed to capture standard error"))
+		}
+
+		if pattern := command.Message.OutputPathPattern; pattern != nil {
+			if inputRoot, err := buildDirectory.LookupChild(inputRootDirectoryComponent); err != nil {
+				setError(util.StatusWrap(err, "Failed to look up input root directory"))
+			} else if inputRootDirectory, _ := inputRoot.GetPair(); inputRootDirectory == nil {
+				setError(util.StatusWrap(err, "Input root is not a directory"))
+			} else {
+				group, groupCtx := errgroup.WithContext(ctx)
+				var outputRoot model_filesystem.CreatedDirectory[dag.ObjectContentsWalker]
+				group.Go(func() error {
+					return model_filesystem.CreateDirectoryMerkleTree(
+						groupCtx,
+						// TODO: Should this be a separate semaphore?
+						e.objectContentsWalkerSemaphore,
+						group,
+						directoryCreationParameters,
+						&prepopulatedCapturableDirectory{
+							options: &prepopulatedCapturableDirectoryOptions{
+								context: groupCtx,
+								pathPatternChildrenReader: model_parser.LookupParsedObjectReader[object.LocalReference](
+									parsedObjectPoolIngester,
+									model_parser.NewChainedObjectParser(
+										model_parser.NewEncodedObjectParser[object.LocalReference](actionEncoder),
+										model_parser.NewProtoObjectParser[object.LocalReference, model_command_pb.PathPattern_Children](),
+									),
+								),
+								writableFileUploadDelay: writableFileUploadDelayChan,
+								fileCreationParameters:  fileCreationParameters,
+							},
+							directory: inputRootDirectory,
+							pattern:   model_core.Nested(command, pattern),
+						},
+						model_filesystem.NewSimpleDirectoryMerkleTreeCapturer(model_core.WalkableCreatedObjectCapturer),
+						&outputRoot,
+					)
+				})
+				if err := group.Wait(); err == nil {
+					outputs.OutputRoot = outputRoot.Message.Message
+					outputsPatcher.Merge(outputRoot.Message.Patcher)
+				} else {
+					setError(util.StatusWrap(err, "Failed to capture output root"))
+				}
+			}
+		}
+
+		if proto.Size(&outputs) > 0 {
+			// Action has one or more outputs. Upload them and
+			// attach a reference to the result message.
+			if createdObject, err := model_core.MarshalAndEncode(
+				model_core.NewPatchedMessage(model_core.NewProtoMarshalable(&outputs), outputsPatcher),
+				referenceFormat,
+				directoryEncoder,
+			); err == nil {
+				result.OutputsReference = resultPatcher.CaptureAndAddDecodableReference(
+					createdObject,
+					model_core.WalkableCreatedObjectCapturer,
+				)
+			} else {
+				// TODO: Does this properly release all resources?
+				setError(util.StatusWrap(err, "Failed to marshal outputs"))
+			}
+		}
+		return &result
 	})
 
-	// Determine the amount of time the action ran, minus the time
-	// it was delayed reading data from storage.
-	cancelTimeout()
-	<-ctxWithTimeout.Done()
-	var virtualExecutionDuration time.Duration
-	if d, ok := ctxWithTimeout.Value(re_clock.UnsuspendedDurationKey{}).(time.Duration); ok {
-		virtualExecutionDuration = d
+	createdResult, err := model_core.MarshalAndEncode(
+		model_core.ProtoToMarshalable(result),
+		referenceFormat,
+		actionEncoder,
+	)
+	if err != nil {
+		var badReference model_core.Decodable[object.LocalReference]
+		return badReference, 0, 0, util.StatusWrap(err, "Failed to create marshal and encode result")
+	}
+	resultReference := createdResult.Value.GetLocalReference()
+	if err := dag.UploadDAG(
+		ctx,
+		e.dagUploaderClient,
+		action.Reference.Value.WithLocalReference(resultReference),
+		model_core.WalkableCreatedObjectCapturer.CaptureCreatedObject(createdResult.Value),
+		e.objectContentsWalkerSemaphore,
+		// Assume everything we attempt to upload is memory backed.
+		object.Unlimited,
+	); err != nil {
+		var badReference model_core.Decodable[object.LocalReference]
+		return badReference, 0, 0, util.StatusWrap(err, "Failed to upload result")
 	}
 
-	resultMessage := &model_command_pb.Result{}
 	resultCode := remoteworker_pb.CurrentState_Completed_SUCCEEDED
-	setError := func(err error) {
-		if resultMessage.Status == nil {
-			resultMessage.Status = status.Convert(err).Proto()
-			if status.Code(runErr) == codes.DeadlineExceeded {
-				resultCode = remoteworker_pb.CurrentState_Completed_TIMED_OUT
-			} else {
-				resultCode = remoteworker_pb.CurrentState_Completed_FAILED
-			}
-		}
-	}
-
-	// If an I/O error occurred during execution, attach any errors
-	// related to it to the response first. These errors should be
-	// preferred over the cancelation errors that are a result of it.
-	if err := ioErrorCapturer.GetError(); err != nil {
-		setError(err)
-	}
-
-	// Attach the exit code or execution error.
-	if runErr == nil {
-		resultMessage.ExitCode = runResponse.ExitCode
-		resultMessage.AuxiliaryMetadata = append(resultMessage.AuxiliaryMetadata, runResponse.ResourceUsage...)
-		if runResponse.ExitCode != 0 {
+	if grpcCode := codes.Code(result.Message.Status.GetCode()); grpcCode != codes.OK {
+		if grpcCode == codes.DeadlineExceeded {
+			resultCode = remoteworker_pb.CurrentState_Completed_TIMED_OUT
+		} else {
 			resultCode = remoteworker_pb.CurrentState_Completed_FAILED
 		}
-	} else {
-		setError(util.StatusWrap(runErr, "Failed to run command"))
+	} else if result.Message.ExitCode != 0 {
+		resultCode = remoteworker_pb.CurrentState_Completed_FAILED
 	}
-
-	writableFileUploadDelayCtx, writableFileUploadDelayCancel := e.clock.NewContextWithTimeout(ctx, e.maximumWritableFileUploadDelay)
-	defer writableFileUploadDelayCancel()
-	writableFileUploadDelayChan := writableFileUploadDelayCtx.Done()
-
-	// Capture output files.
-	var outputs model_command_pb.Outputs
-	outputsPatcher := model_core.NewReferenceMessagePatcher[dag.ObjectContentsWalker]()
-
-	if stdoutContents, err := captureLog(ctx, buildDirectory, stdoutComponent, writableFileUploadDelayChan, fileCreationParameters); err == nil {
-		if stdoutContents.IsSet() {
-			outputs.Stdout = stdoutContents.Message
-			outputsPatcher.Merge(stdoutContents.Patcher)
-		}
-	} else {
-		setError(util.StatusWrap(err, "Failed to capture standard output"))
-	}
-
-	if stderrContents, err := captureLog(ctx, buildDirectory, stderrComponent, writableFileUploadDelayChan, fileCreationParameters); err == nil {
-		if stderrContents.IsSet() {
-			outputs.Stderr = stderrContents.Message
-			outputsPatcher.Merge(stderrContents.Patcher)
-		}
-	} else {
-		setError(util.StatusWrap(err, "Failed to capture standard error"))
-	}
-
-	if pattern := command.Message.OutputPathPattern; pattern != nil {
-		if inputRoot, err := buildDirectory.LookupChild(inputRootDirectoryComponent); err != nil {
-			setError(util.StatusWrap(err, "Failed to look up input root directory"))
-		} else if inputRootDirectory, _ := inputRoot.GetPair(); inputRootDirectory == nil {
-			setError(util.StatusWrap(err, "Input root is not a directory"))
-		} else {
-			group, groupCtx := errgroup.WithContext(ctx)
-			var outputRoot model_filesystem.CreatedDirectory[dag.ObjectContentsWalker]
-			group.Go(func() error {
-				return model_filesystem.CreateDirectoryMerkleTree(
-					groupCtx,
-					// TODO: Should this be a separate semaphore?
-					e.objectContentsWalkerSemaphore,
-					group,
-					directoryCreationParameters,
-					&prepopulatedCapturableDirectory{
-						options: &prepopulatedCapturableDirectoryOptions{
-							context: groupCtx,
-							pathPatternChildrenReader: model_parser.LookupParsedObjectReader[object.LocalReference](
-								parsedObjectPoolIngester,
-								model_parser.NewChainedObjectParser(
-									model_parser.NewEncodedObjectParser[object.LocalReference](commandEncoder),
-									model_parser.NewProtoObjectParser[object.LocalReference, model_command_pb.PathPattern_Children](),
-								),
-							),
-							writableFileUploadDelay: writableFileUploadDelayChan,
-							fileCreationParameters:  fileCreationParameters,
-						},
-						directory: inputRootDirectory,
-						pattern:   model_core.Nested(command, pattern),
-					},
-					model_filesystem.NewSimpleDirectoryMerkleTreeCapturer(model_core.WalkableCreatedObjectCapturer),
-					&outputRoot,
-				)
-			})
-			if err := group.Wait(); err == nil {
-				outputs.OutputRoot = outputRoot.Message.Message
-				outputsPatcher.Merge(outputRoot.Message.Patcher)
-			} else {
-				setError(util.StatusWrap(err, "Failed to capture output root"))
-			}
-		}
-	}
-
-	if proto.Size(&outputs) > 0 {
-		// Action has one or more outputs. Upload them and
-		// attach a reference to the result message.
-		if createdObject, err := model_core.MarshalAndEncode(
-			model_core.NewPatchedMessage(model_core.NewProtoMarshalable(&outputs), outputsPatcher),
-			namespace.ReferenceFormat,
-			directoryEncoder,
-		); err == nil {
-			outputsReference := createdObject.Value.GetLocalReference()
-			if err := dag.UploadDAG(
-				ctx,
-				e.dagUploaderClient,
-				namespace.WithLocalReference(outputsReference),
-				dag.NewSimpleObjectContentsWalker(
-					createdObject.Value.Contents,
-					createdObject.Value.Metadata,
-				),
-				e.objectContentsWalkerSemaphore,
-				object.Unlimited,
-			); err == nil {
-				resultMessage.OutputsReference = model_core.DecodableLocalReferenceToWeakProto(
-					model_core.CopyDecodable(createdObject, outputsReference),
-				)
-			} else {
-				setError(util.StatusWrap(err, "Failed to upload outputs"))
-			}
-		} else {
-			// TODO: Does this properly release all resources?
-			setError(util.StatusWrap(err, "Failed to marshal outputs"))
-		}
-	}
-	return resultMessage, virtualExecutionDuration, resultCode, nil
+	return model_core.CopyDecodable(createdResult, resultReference), virtualExecutionDuration, resultCode, nil
 }
 
 type prepopulatedCapturableDirectoryOptions struct {

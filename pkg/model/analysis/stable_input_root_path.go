@@ -18,6 +18,7 @@ import (
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
 
 	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 func (c *baseComputer[TReference, TMetadata]) ComputeStableInputRootPathValue(ctx context.Context, key *model_analysis_pb.StableInputRootPath_Key, e StableInputRootPathEnvironment[TReference, TMetadata]) (PatchedStableInputRootPathValue, error) {
@@ -94,18 +95,39 @@ func (c *baseComputer[TReference, TMetadata]) ComputeStableInputRootPathValue(ct
 		return PatchedStableInputRootPathValue{}, fmt.Errorf("failed to create input root: %w", err)
 	}
 
+	createdAction, err := model_core.MarshalAndEncode(
+		model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[dag.ObjectContentsWalker]) model_core.Marshalable {
+			return model_core.NewProtoMarshalable(&model_command_pb.Action{
+				CommandReference: patcher.CaptureAndAddDecodableReference(
+					createdCommand,
+					model_core.WalkableCreatedObjectCapturer,
+				),
+				// TODO: We shouldn't be handcrafting a
+				// DirectoryReference here.
+				InputRootReference: &model_filesystem_pb.DirectoryReference{
+					Reference: patcher.CaptureAndAddDecodableReference(
+						createdInputRoot,
+						model_core.WalkableCreatedObjectCapturer,
+					),
+					MaximumSymlinkEscapementLevels: &wrapperspb.UInt32Value{},
+				},
+			})
+		}),
+		referenceFormat,
+		commandEncoder,
+	)
+	if err != nil {
+		return PatchedStableInputRootPathValue{}, fmt.Errorf("failed to create action: %w", err)
+	}
+
 	// Invoke "pwd".
 	actionResult := e.GetSuccessfulActionResultValue(
 		model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[dag.ObjectContentsWalker]) *model_analysis_pb.SuccessfulActionResult_Key {
 			return &model_analysis_pb.SuccessfulActionResult_Key{
-				Action: &model_analysis_pb.Action{
+				ExecuteRequest: &model_analysis_pb.ExecuteRequest{
 					PlatformPkixPublicKey: repoPlatform.Message.ExecPkixPublicKey,
-					CommandReference: patcher.CaptureAndAddDecodableReference(
-						createdCommand,
-						model_core.WalkableCreatedObjectCapturer,
-					),
-					InputRootReference: patcher.CaptureAndAddDecodableReference(
-						createdInputRoot,
+					ActionReference: patcher.CaptureAndAddDecodableReference(
+						createdAction,
 						model_core.WalkableCreatedObjectCapturer,
 					),
 					ExecutionTimeout: &durationpb.Duration{Seconds: 60},

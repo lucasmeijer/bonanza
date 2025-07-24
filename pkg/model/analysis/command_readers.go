@@ -14,7 +14,9 @@ import (
 // follow references to objects that are encoded using the command
 // encoders that are part of the BuildSpecification.
 type CommandReaders[TReference any] struct {
+	Action              model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_command_pb.Action, TReference]]
 	PathPatternChildren model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_command_pb.PathPattern_Children, TReference]]
+	Result              model_parser.ParsedObjectReader[model_core.Decodable[TReference], model_core.Message[*model_command_pb.Result, TReference]]
 }
 
 func (c *baseComputer[TReference, TMetadata]) ComputeCommandReadersValue(ctx context.Context, key *model_analysis_pb.CommandReaders_Key, e CommandReadersEnvironment[TReference, TMetadata]) (*CommandReaders[TReference], error) {
@@ -24,11 +26,25 @@ func (c *baseComputer[TReference, TMetadata]) ComputeCommandReadersValue(ctx con
 	}
 	encodedObjectParser := model_parser.NewEncodedObjectParser[TReference](commandEncoder)
 	return &CommandReaders[TReference]{
+		Action: model_parser.LookupParsedObjectReader(
+			c.parsedObjectPoolIngester,
+			model_parser.NewChainedObjectParser(
+				encodedObjectParser,
+				model_parser.NewProtoObjectParser[TReference, model_command_pb.Action](),
+			),
+		),
 		PathPatternChildren: model_parser.LookupParsedObjectReader(
 			c.parsedObjectPoolIngester,
 			model_parser.NewChainedObjectParser(
 				encodedObjectParser,
 				model_parser.NewProtoObjectParser[TReference, model_command_pb.PathPattern_Children](),
+			),
+		),
+		Result: model_parser.LookupParsedObjectReader(
+			c.parsedObjectPoolIngester,
+			model_parser.NewChainedObjectParser(
+				encodedObjectParser,
+				model_parser.NewProtoObjectParser[TReference, model_command_pb.Result](),
 			),
 		),
 	}, nil

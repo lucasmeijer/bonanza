@@ -14,35 +14,27 @@ import "pkg/proto/model/starlark/starlark.proto";
 
 option go_package = "bonanza.build/pkg/proto/model/analysis";
 
-message Action {
+message ExecuteRequest {
   // The elliptic-curve public key that identifies the platform that
   // should be used to execute the action in PKIX, ASN.1 DER form.
   bytes platform_pkix_public_key = 1;
 
-  // Reference to a Command message, containing the command line
+  // Reference to a command Action message, containing the command line
   // arguments, environment variables, and set of paths to capture.
-  bonanza.model.core.DecodableReference command_reference = 2
+  bonanza.model.core.DecodableReference action_reference = 2
       [(bonanza.model.core.object_format) = {
         proto_type_name:
-          "bonanza.model.command.Command";
-      }];
-
-  // Reference to a Directory message, containing the files that need to
-  // be present on the worker when executing.
-  bonanza.model.core.DecodableReference input_root_reference = 3
-      [(bonanza.model.core.object_format) = {
-        proto_type_name:
-          "bonanza.model.filesystem.DirectoryContents";
+          "bonanza.model.command.Action";
       }];
 
   // The timeout that the worker needs to enforce when executing the
   // action.
-  google.protobuf.Duration execution_timeout = 4;
+  google.protobuf.Duration execution_timeout = 3;
 }
 
 message ActionResult {
   message Key {
-    Action action = 1;
+    ExecuteRequest execute_request = 1;
   }
 
   message Value {
@@ -1594,7 +1586,7 @@ message StableInputRootPathObject {
 
 message SuccessfulActionResult {
   message Key {
-    Action action = 1;
+    ExecuteRequest execute_request = 1;
   }
 
   message Value {

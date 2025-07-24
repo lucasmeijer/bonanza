@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/ecdh"
 	"encoding/json"
 	"fmt"
+	"iter"
 	"net/http"
 	"os"
 	"runtime"
@@ -22,9 +24,9 @@ import (
 	"bonanza.build/pkg/proto/configuration/bonanza_builder"
 	model_analysis_pb "bonanza.build/pkg/proto/model/analysis"
 	model_build_pb "bonanza.build/pkg/proto/model/build"
-	model_command_pb "bonanza.build/pkg/proto/model/command"
 	model_core_pb "bonanza.build/pkg/proto/model/core"
 	model_evaluation_pb "bonanza.build/pkg/proto/model/evaluation"
+	model_executewithstorage_pb "bonanza.build/pkg/proto/model/executewithstorage"
 	remoteexecution_pb "bonanza.build/pkg/proto/remoteexecution"
 	remoteworker_pb "bonanza.build/pkg/proto/remoteworker"
 	dag_pb "bonanza.build/pkg/proto/storage/dag"
@@ -50,7 +52,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/emptypb"
 
 	"go.starlark.net/starlark"
 )
@@ -140,11 +141,13 @@ func main() {
 			},
 			filePool:       filePool,
 			cacheDirectory: cacheDirectory,
-			executionClient: remoteexecution.NewProtoClient[*model_command_pb.Action, emptypb.Empty, model_command_pb.Result](
-				remoteexecution.NewRemoteClient(
-					remoteexecution_pb.NewExecutionClient(executionGRPCClient),
-					executionClientPrivateKey,
-					executionClientCertificateChain,
+			executionClient: model_executewithstorage.NewClient(
+				remoteexecution.NewProtoClient[*model_executewithstorage_pb.Action, model_core_pb.WeakDecodableReference, model_core_pb.WeakDecodableReference](
+					remoteexecution.NewRemoteClient(
+						remoteexecution_pb.NewExecutionClient(executionGRPCClient),
+						executionClientPrivateKey,
+						executionClientCertificateChain,
+					),
 				),
 			),
 			bzlFileBuiltins:   bzlFileBuiltins,
@@ -276,7 +279,7 @@ type builderExecutor struct {
 	httpClient                    *http.Client
 	filePool                      pool.FilePool
 	cacheDirectory                filesystem.Directory
-	executionClient               remoteexecution.Client[*model_command_pb.Action, *emptypb.Empty, *model_command_pb.Result]
+	executionClient               remoteexecution.Client[*model_executewithstorage.Action[object.GlobalReference], model_core.Decodable[object.LocalReference], model_core.Decodable[object.LocalReference]]
 	bzlFileBuiltins               starlark.StringDict
 	buildFileBuiltins             starlark.StringDict
 }
@@ -285,7 +288,7 @@ func (e *builderExecutor) CheckReadiness(ctx context.Context) error {
 	return nil
 }
 
-func (e *builderExecutor) Execute(ctx context.Context, action *model_executewithstorage.Action, executionTimeout time.Duration, executionEvents chan<- model_core.Decodable[object.LocalReference]) (model_core.Decodable[object.LocalReference], time.Duration, remoteworker_pb.CurrentState_Completed_Result, error) {
+func (e *builderExecutor) Execute(ctx context.Context, action *model_executewithstorage.Action[object.GlobalReference], executionTimeout time.Duration, executionEvents chan<- model_core.Decodable[object.LocalReference]) (model_core.Decodable[object.LocalReference], time.Duration, remoteworker_pb.CurrentState_Completed_Result, error) {
 	if !proto.Equal(action.Format, &model_core_pb.ObjectFormat{
 		Format: &model_core_pb.ObjectFormat_ProtoTypeName{
 			ProtoTypeName: "bonanza.model.build.Action",
@@ -357,8 +360,10 @@ func (e *builderExecutor) Execute(ctx context.Context, action *model_executewith
 				e.httpClient,
 				e.filePool,
 				e.cacheDirectory,
-				e.executionClient,
-				instanceName,
+				&builderExecutionClient{
+					base:         e.executionClient,
+					instanceName: instanceName,
+				},
 				e.bzlFileBuiltins,
 				e.buildFileBuiltins,
 			)),
@@ -620,4 +625,57 @@ func (e *builderExecutor) Execute(ctx context.Context, action *model_executewith
 		resultCode = remoteworker_pb.CurrentState_Completed_FAILED
 	}
 	return model_core.CopyDecodable(createdResult, resultReference), 0, resultCode, nil
+}
+
+type builderExecutionClient struct {
+	base         remoteexecution.Client[*model_executewithstorage.Action[object.GlobalReference], model_core.Decodable[object.LocalReference], model_core.Decodable[object.LocalReference]]
+	instanceName object.InstanceName
+}
+
+func (e *builderExecutionClient) RunAction(ctx context.Context, platformECDHPublicKey *ecdh.PublicKey, action *model_executewithstorage.Action[builderReference], actionAdditionalData *remoteexecution_pb.Action_AdditionalData, resultReference *model_core.Decodable[builderReference], errOut *error) iter.Seq[model_core.Decodable[builderReference]] {
+	// Re-add instance name to the action reference.
+	ctxWithCancel, cancel := context.WithCancel(ctx)
+	var baseResultReference model_core.Decodable[object.LocalReference]
+	var baseErr error
+	eventReferences := e.base.RunAction(
+		ctxWithCancel,
+		platformECDHPublicKey,
+		&model_executewithstorage.Action[object.GlobalReference]{
+			Reference: model_core.CopyDecodable(
+				action.Reference,
+				e.instanceName.WithLocalReference(action.Reference.Value.GetLocalReference()),
+			),
+			Encoders: action.Encoders,
+			Format:   action.Format,
+		},
+		actionAdditionalData,
+		&baseResultReference,
+		&baseErr,
+	)
+	return func(yield func(model_core.Decodable[builderReference]) bool) {
+		defer cancel()
+
+		// Convert event references to native types.
+		for eventReference := range eventReferences {
+			if !yield(
+				model_core.CopyDecodable(
+					eventReference,
+					builderReference{LocalReference: eventReference.Value.GetLocalReference()},
+				),
+			) {
+				break
+			}
+		}
+
+		// Convert result reference to native type.
+		if baseErr != nil {
+			*errOut = baseErr
+			return
+		}
+		*resultReference = model_core.CopyDecodable(
+			baseResultReference,
+			builderReference{LocalReference: baseResultReference.Value.GetLocalReference()},
+		)
+		*errOut = nil
+	}
 }

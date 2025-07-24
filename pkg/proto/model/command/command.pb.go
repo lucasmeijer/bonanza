@@ -8,9 +8,7 @@ package command
 
 import (
 	core "bonanza.build/pkg/proto/model/core"
-	encoding "bonanza.build/pkg/proto/model/encoding"
 	filesystem "bonanza.build/pkg/proto/model/filesystem"
-	object "bonanza.build/pkg/proto/storage/object"
 	status "google.golang.org/genproto/googleapis/rpc/status"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -350,11 +348,9 @@ func (x *Outputs) GetOutputRoot() *filesystem.DirectoryContents {
 }
 
 type Action struct {
-	state              protoimpl.MessageState       `protogen:"open.v1"`
-	Namespace          *object.Namespace            `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
-	CommandEncoders    []*encoding.BinaryEncoder    `protobuf:"bytes,2,rep,name=command_encoders,json=commandEncoders,proto3" json:"command_encoders,omitempty"`
-	CommandReference   *core.WeakDecodableReference `protobuf:"bytes,3,opt,name=command_reference,json=commandReference,proto3" json:"command_reference,omitempty"`
-	InputRootReference *core.WeakDecodableReference `protobuf:"bytes,4,opt,name=input_root_reference,json=inputRootReference,proto3" json:"input_root_reference,omitempty"`
+	state              protoimpl.MessageState         `protogen:"open.v1"`
+	CommandReference   *core.DecodableReference       `protobuf:"bytes,1,opt,name=command_reference,json=commandReference,proto3" json:"command_reference,omitempty"`
+	InputRootReference *filesystem.DirectoryReference `protobuf:"bytes,2,opt,name=input_root_reference,json=inputRootReference,proto3" json:"input_root_reference,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -389,28 +385,14 @@ func (*Action) Descriptor() ([]byte, []int) {
 	return file_pkg_proto_model_command_command_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *Action) GetNamespace() *object.Namespace {
-	if x != nil {
-		return x.Namespace
-	}
-	return nil
-}
-
-func (x *Action) GetCommandEncoders() []*encoding.BinaryEncoder {
-	if x != nil {
-		return x.CommandEncoders
-	}
-	return nil
-}
-
-func (x *Action) GetCommandReference() *core.WeakDecodableReference {
+func (x *Action) GetCommandReference() *core.DecodableReference {
 	if x != nil {
 		return x.CommandReference
 	}
 	return nil
 }
 
-func (x *Action) GetInputRootReference() *core.WeakDecodableReference {
+func (x *Action) GetInputRootReference() *filesystem.DirectoryReference {
 	if x != nil {
 		return x.InputRootReference
 	}
@@ -418,11 +400,11 @@ func (x *Action) GetInputRootReference() *core.WeakDecodableReference {
 }
 
 type Result struct {
-	state             protoimpl.MessageState       `protogen:"open.v1"`
-	Status            *status.Status               `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
-	ExitCode          int64                        `protobuf:"varint,2,opt,name=exit_code,json=exitCode,proto3" json:"exit_code,omitempty"`
-	OutputsReference  *core.WeakDecodableReference `protobuf:"bytes,3,opt,name=outputs_reference,json=outputsReference,proto3" json:"outputs_reference,omitempty"`
-	AuxiliaryMetadata []*anypb.Any                 `protobuf:"bytes,4,rep,name=auxiliary_metadata,json=auxiliaryMetadata,proto3" json:"auxiliary_metadata,omitempty"`
+	state             protoimpl.MessageState   `protogen:"open.v1"`
+	Status            *status.Status           `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	ExitCode          int64                    `protobuf:"varint,2,opt,name=exit_code,json=exitCode,proto3" json:"exit_code,omitempty"`
+	OutputsReference  *core.DecodableReference `protobuf:"bytes,3,opt,name=outputs_reference,json=outputsReference,proto3" json:"outputs_reference,omitempty"`
+	AuxiliaryMetadata []*anypb.Any             `protobuf:"bytes,4,rep,name=auxiliary_metadata,json=auxiliaryMetadata,proto3" json:"auxiliary_metadata,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -471,7 +453,7 @@ func (x *Result) GetExitCode() int64 {
 	return 0
 }
 
-func (x *Result) GetOutputsReference() *core.WeakDecodableReference {
+func (x *Result) GetOutputsReference() *core.DecodableReference {
 	if x != nil {
 		return x.OutputsReference
 	}
@@ -801,7 +783,7 @@ var File_pkg_proto_model_command_command_proto protoreflect.FileDescriptor
 
 const file_pkg_proto_model_command_command_proto_rawDesc = "" +
 	"\n" +
-	"%pkg/proto/model/command/command.proto\x12\x15bonanza.model.command\x1a\x19google/protobuf/any.proto\x1a\x17google/rpc/status.proto\x1a\x1fpkg/proto/model/core/core.proto\x1a'pkg/proto/model/encoding/encoding.proto\x1a+pkg/proto/model/filesystem/filesystem.proto\x1a%pkg/proto/storage/object/object.proto\"\xe9\x04\n" +
+	"%pkg/proto/model/command/command.proto\x12\x15bonanza.model.command\x1a\x19google/protobuf/any.proto\x1a\x17google/rpc/status.proto\x1a\x1fpkg/proto/model/core/core.proto\x1a+pkg/proto/model/filesystem/filesystem.proto\"\xe9\x04\n" +
 	"\aCommand\x12I\n" +
 	"\targuments\x18\x01 \x03(\v2+.bonanza.model.command.ArgumentList.ElementR\targuments\x12k\n" +
 	"\x15environment_variables\x18\x02 \x03(\v26.bonanza.model.command.EnvironmentVariableList.ElementR\x14environmentVariables\x12y\n" +
@@ -839,16 +821,14 @@ const file_pkg_proto_model_command_command_proto_rawDesc = "" +
 	"\x06stdout\x18\x01 \x01(\v2&.bonanza.model.filesystem.FileContentsR\x06stdout\x12>\n" +
 	"\x06stderr\x18\x02 \x01(\v2&.bonanza.model.filesystem.FileContentsR\x06stderr\x12L\n" +
 	"\voutput_root\x18\x03 \x01(\v2+.bonanza.model.filesystem.DirectoryContentsR\n" +
-	"outputRoot\"\xaa\x03\n" +
-	"\x06Action\x12?\n" +
-	"\tnamespace\x18\x01 \x01(\v2!.bonanza.storage.object.NamespaceR\tnamespace\x12P\n" +
-	"\x10command_encoders\x18\x02 \x03(\v2%.bonanza.model.encoding.BinaryEncoderR\x0fcommandEncoders\x12|\n" +
-	"\x11command_reference\x18\x03 \x01(\v2*.bonanza.model.core.WeakDecodableReferenceB#\xea\xd7 \x1f\x12\x1dbonanza.model.command.CommandR\x10commandReference\x12\x8e\x01\n" +
-	"\x14input_root_reference\x18\x04 \x01(\v2*.bonanza.model.core.WeakDecodableReferenceB0\xea\xd7 ,\x12*bonanza.model.filesystem.DirectoryContentsR\x12inputRootReference\"\x94\x02\n" +
+	"outputRoot\"\xe2\x01\n" +
+	"\x06Action\x12x\n" +
+	"\x11command_reference\x18\x01 \x01(\v2&.bonanza.model.core.DecodableReferenceB#\xea\xd7 \x1f\x12\x1dbonanza.model.command.CommandR\x10commandReference\x12^\n" +
+	"\x14input_root_reference\x18\x02 \x01(\v2,.bonanza.model.filesystem.DirectoryReferenceR\x12inputRootReference\"\x90\x02\n" +
 	"\x06Result\x12*\n" +
 	"\x06status\x18\x01 \x01(\v2\x12.google.rpc.StatusR\x06status\x12\x1b\n" +
-	"\texit_code\x18\x02 \x01(\x03R\bexitCode\x12|\n" +
-	"\x11outputs_reference\x18\x03 \x01(\v2*.bonanza.model.core.WeakDecodableReferenceB#\xea\xd7 \x1f\x12\x1dbonanza.model.command.OutputsR\x10outputsReference\x12C\n" +
+	"\texit_code\x18\x02 \x01(\x03R\bexitCode\x12x\n" +
+	"\x11outputs_reference\x18\x03 \x01(\v2&.bonanza.model.core.DecodableReferenceB#\xea\xd7 \x1f\x12\x1dbonanza.model.command.OutputsR\x10outputsReference\x12C\n" +
 	"\x12auxiliary_metadata\x18\x04 \x03(\v2\x14.google.protobuf.AnyR\x11auxiliaryMetadataB'Z%bonanza.build/pkg/proto/model/commandb\x06proto3"
 
 var (
@@ -882,11 +862,9 @@ var file_pkg_proto_model_command_command_proto_goTypes = []any{
 	(*core.DecodableReference)(nil),                // 14: bonanza.model.core.DecodableReference
 	(*filesystem.FileContents)(nil),                // 15: bonanza.model.filesystem.FileContents
 	(*filesystem.DirectoryContents)(nil),           // 16: bonanza.model.filesystem.DirectoryContents
-	(*object.Namespace)(nil),                       // 17: bonanza.storage.object.Namespace
-	(*encoding.BinaryEncoder)(nil),                 // 18: bonanza.model.encoding.BinaryEncoder
-	(*core.WeakDecodableReference)(nil),            // 19: bonanza.model.core.WeakDecodableReference
-	(*status.Status)(nil),                          // 20: google.rpc.Status
-	(*anypb.Any)(nil),                              // 21: google.protobuf.Any
+	(*filesystem.DirectoryReference)(nil),          // 17: bonanza.model.filesystem.DirectoryReference
+	(*status.Status)(nil),                          // 18: google.rpc.Status
+	(*anypb.Any)(nil),                              // 19: google.protobuf.Any
 }
 var file_pkg_proto_model_command_command_proto_depIdxs = []int32{
 	9,  // 0: bonanza.model.command.Command.arguments:type_name -> bonanza.model.command.ArgumentList.Element
@@ -901,23 +879,21 @@ var file_pkg_proto_model_command_command_proto_depIdxs = []int32{
 	15, // 9: bonanza.model.command.Outputs.stdout:type_name -> bonanza.model.filesystem.FileContents
 	15, // 10: bonanza.model.command.Outputs.stderr:type_name -> bonanza.model.filesystem.FileContents
 	16, // 11: bonanza.model.command.Outputs.output_root:type_name -> bonanza.model.filesystem.DirectoryContents
-	17, // 12: bonanza.model.command.Action.namespace:type_name -> bonanza.storage.object.Namespace
-	18, // 13: bonanza.model.command.Action.command_encoders:type_name -> bonanza.model.encoding.BinaryEncoder
-	19, // 14: bonanza.model.command.Action.command_reference:type_name -> bonanza.model.core.WeakDecodableReference
-	19, // 15: bonanza.model.command.Action.input_root_reference:type_name -> bonanza.model.core.WeakDecodableReference
-	20, // 16: bonanza.model.command.Result.status:type_name -> google.rpc.Status
-	19, // 17: bonanza.model.command.Result.outputs_reference:type_name -> bonanza.model.core.WeakDecodableReference
-	21, // 18: bonanza.model.command.Result.auxiliary_metadata:type_name -> google.protobuf.Any
-	1,  // 19: bonanza.model.command.PathPattern.Child.pattern:type_name -> bonanza.model.command.PathPattern
-	7,  // 20: bonanza.model.command.PathPattern.Children.children:type_name -> bonanza.model.command.PathPattern.Child
-	14, // 21: bonanza.model.command.ArgumentList.Element.parent:type_name -> bonanza.model.core.DecodableReference
-	11, // 22: bonanza.model.command.EnvironmentVariableList.Element.leaf:type_name -> bonanza.model.command.EnvironmentVariableList.Element.Leaf
-	14, // 23: bonanza.model.command.EnvironmentVariableList.Element.parent:type_name -> bonanza.model.core.DecodableReference
-	24, // [24:24] is the sub-list for method output_type
-	24, // [24:24] is the sub-list for method input_type
-	24, // [24:24] is the sub-list for extension type_name
-	24, // [24:24] is the sub-list for extension extendee
-	0,  // [0:24] is the sub-list for field type_name
+	14, // 12: bonanza.model.command.Action.command_reference:type_name -> bonanza.model.core.DecodableReference
+	17, // 13: bonanza.model.command.Action.input_root_reference:type_name -> bonanza.model.filesystem.DirectoryReference
+	18, // 14: bonanza.model.command.Result.status:type_name -> google.rpc.Status
+	14, // 15: bonanza.model.command.Result.outputs_reference:type_name -> bonanza.model.core.DecodableReference
+	19, // 16: bonanza.model.command.Result.auxiliary_metadata:type_name -> google.protobuf.Any
+	1,  // 17: bonanza.model.command.PathPattern.Child.pattern:type_name -> bonanza.model.command.PathPattern
+	7,  // 18: bonanza.model.command.PathPattern.Children.children:type_name -> bonanza.model.command.PathPattern.Child
+	14, // 19: bonanza.model.command.ArgumentList.Element.parent:type_name -> bonanza.model.core.DecodableReference
+	11, // 20: bonanza.model.command.EnvironmentVariableList.Element.leaf:type_name -> bonanza.model.command.EnvironmentVariableList.Element.Leaf
+	14, // 21: bonanza.model.command.EnvironmentVariableList.Element.parent:type_name -> bonanza.model.core.DecodableReference
+	22, // [22:22] is the sub-list for method output_type
+	22, // [22:22] is the sub-list for method input_type
+	22, // [22:22] is the sub-list for extension type_name
+	22, // [22:22] is the sub-list for extension extendee
+	0,  // [0:22] is the sub-list for field type_name
 }
 
 func init() { file_pkg_proto_model_command_command_proto_init() }

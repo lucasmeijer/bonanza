@@ -14,6 +14,7 @@ import (
 	model_analysis_pb "bonanza.build/pkg/proto/model/analysis"
 	model_command_pb "bonanza.build/pkg/proto/model/command"
 	model_filesystem_pb "bonanza.build/pkg/proto/model/filesystem"
+	"bonanza.build/pkg/storage/dag"
 	"bonanza.build/pkg/storage/object"
 
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
@@ -127,22 +128,37 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRepoPlatformHostPathValue(c
 		return PatchedRepoPlatformHostPathValue{}, fmt.Errorf("failed to create Merkle tree of root directory: %w", err)
 	}
 
-	keyPatcher := inputRootReference.Patcher
+	createdAction, err := model_core.MarshalAndEncode(
+		model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[dag.ObjectContentsWalker]) model_core.Marshalable {
+			patcher.Merge(inputRootReference.Patcher)
+			return model_core.NewProtoMarshalable(&model_command_pb.Action{
+				CommandReference: patcher.CaptureAndAddDecodableReference(
+					createdCommand,
+					model_core.WalkableCreatedObjectCapturer,
+				),
+				InputRootReference: inputRootReference.Message,
+			})
+		}),
+		referenceFormat,
+		commandEncoder,
+	)
+	if err != nil {
+		return PatchedRepoPlatformHostPathValue{}, fmt.Errorf("failed to create action: %w", err)
+	}
+
 	actionResult := e.GetSuccessfulActionResultValue(
-		model_core.NewPatchedMessage(
-			&model_analysis_pb.SuccessfulActionResult_Key{
-				Action: &model_analysis_pb.Action{
+		model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[dag.ObjectContentsWalker]) *model_analysis_pb.SuccessfulActionResult_Key {
+			return &model_analysis_pb.SuccessfulActionResult_Key{
+				ExecuteRequest: &model_analysis_pb.ExecuteRequest{
 					PlatformPkixPublicKey: repoPlatform.Message.ExecPkixPublicKey,
-					CommandReference: keyPatcher.CaptureAndAddDecodableReference(
-						createdCommand,
+					ActionReference: patcher.CaptureAndAddDecodableReference(
+						createdAction,
 						model_core.WalkableCreatedObjectCapturer,
 					),
-					InputRootReference: inputRootReference.Message.Reference,
-					ExecutionTimeout:   &durationpb.Duration{Seconds: 600},
+					ExecutionTimeout: &durationpb.Duration{Seconds: 600},
 				},
-			},
-			keyPatcher,
-		),
+			}
+		}),
 	)
 	if !actionResult.IsSet() {
 		return PatchedRepoPlatformHostPathValue{}, evaluation.ErrMissingDependency

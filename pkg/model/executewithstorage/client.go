@@ -25,8 +25,8 @@ import (
 // the client used to create the object, allowing the worker to decode
 // it. The format needs to be provided so that the worker can reject
 // misrouted requests.
-type Action struct {
-	Reference model_core.Decodable[object.GlobalReference]
+type Action[TReference any] struct {
+	Reference model_core.Decodable[TReference]
 	Encoders  []*model_encoding_pb.BinaryEncoder
 	Format    *model_core_pb.ObjectFormat
 }
@@ -45,7 +45,7 @@ type client struct {
 // receiving their Protobuf message equivalents.
 func NewClient(
 	base remoteexecution.Client[*model_executewithstorage_pb.Action, *model_core_pb.WeakDecodableReference, *model_core_pb.WeakDecodableReference],
-) remoteexecution.Client[*Action, model_core.Decodable[object.LocalReference], model_core.Decodable[object.LocalReference]] {
+) remoteexecution.Client[*Action[object.GlobalReference], model_core.Decodable[object.LocalReference], model_core.Decodable[object.LocalReference]] {
 	return &client{
 		base: base,
 	}
@@ -54,7 +54,7 @@ func NewClient(
 func (c *client) RunAction(
 	ctx context.Context,
 	platformECDHPublicKey *ecdh.PublicKey,
-	action *Action,
+	action *Action[object.GlobalReference],
 	actionAdditionalData *remoteexecution_pb.Action_AdditionalData,
 	resultReferenceOut *model_core.Decodable[object.LocalReference],
 	errOut *error,

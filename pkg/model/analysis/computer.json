@@ -2,7 +2,8 @@
    "functions": {
       "ActionResult": {
          "dependsOn": [
-            "CommandEncoders"
+            "CommandEncoders",
+            "CommandReaders"
          ],
          "keyContainsReferences": true
       },
@@ -603,6 +604,7 @@
       },
       "TargetActionResult": {
          "dependsOn": [
+            "CommandEncoderObject",
             "DirectoryReaders",
             "SuccessfulActionResult",
             "TargetAction",

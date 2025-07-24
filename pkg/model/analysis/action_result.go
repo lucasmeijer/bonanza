@@ -13,11 +13,11 @@ import (
 	model_core "bonanza.build/pkg/model/core"
 	"bonanza.build/pkg/model/core/btree"
 	model_encoding "bonanza.build/pkg/model/encoding"
+	model_executewithstorage "bonanza.build/pkg/model/executewithstorage"
 	model_analysis_pb "bonanza.build/pkg/proto/model/analysis"
 	model_command_pb "bonanza.build/pkg/proto/model/command"
 	model_core_pb "bonanza.build/pkg/proto/model/core"
 	remoteexecution_pb "bonanza.build/pkg/proto/remoteexecution"
-	"bonanza.build/pkg/storage/dag"
 	"bonanza.build/pkg/storage/object"
 
 	"google.golang.org/grpc/status"
@@ -25,16 +25,19 @@ import (
 
 func (c *baseComputer[TReference, TMetadata]) ComputeActionResultValue(ctx context.Context, key model_core.Message[*model_analysis_pb.ActionResult_Key, TReference], e ActionResultEnvironment[TReference, TMetadata]) (PatchedActionResultValue, error) {
 	commandEncodersValue := e.GetCommandEncodersValue(&model_analysis_pb.CommandEncoders_Key{})
-	if !commandEncodersValue.IsSet() {
+	commandReaders, gotCommandReaders := e.GetCommandReadersValue(&model_analysis_pb.CommandReaders_Key{})
+	if !commandEncodersValue.IsSet() || !gotCommandReaders {
 		return PatchedActionResultValue{}, evaluation.ErrMissingDependency
 	}
 
-	// Compute shared secret for encrypting the action.
-	action := model_core.Nested(key, key.Message.Action)
-	if action.Message == nil {
-		return PatchedActionResultValue{}, errors.New("no action specified")
+	// Obtain the public key of the target platform, which is used
+	// to route the request to the right worker and to encrypt the
+	// action.
+	executeRequest := model_core.Nested(key, key.Message.ExecuteRequest)
+	if executeRequest.Message == nil {
+		return PatchedActionResultValue{}, errors.New("no execute request specified")
 	}
-	platformECDHPublicKey, err := crypto.ParsePKIXECDHPublicKey(action.Message.PlatformPkixPublicKey)
+	platformECDHPublicKey, err := crypto.ParsePKIXECDHPublicKey(executeRequest.Message.PlatformPkixPublicKey)
 	if err != nil {
 		return PatchedActionResultValue{}, fmt.Errorf("invalid platform PKIX public key: %w", err)
 	}
@@ -43,33 +46,39 @@ func (c *baseComputer[TReference, TMetadata]) ComputeActionResultValue(ctx conte
 	// fingerprint of the action, which the scheduler can use to
 	// keep track of performance characteristics. Compute a hash to
 	// masquerade the actual Command reference.
+	actionReference, err := model_core.FlattenDecodableReference(model_core.Nested(executeRequest, executeRequest.Message.ActionReference))
+	if err != nil {
+		return PatchedActionResultValue{}, fmt.Errorf("invalid action reference: %w", err)
+	}
+	action, err := commandReaders.Action.ReadParsedObject(ctx, actionReference)
+	if err != nil {
+		return PatchedActionResultValue{}, fmt.Errorf("failed to read action: %w", err)
+	}
 	commandReference, err := model_core.FlattenDecodableReference(model_core.Nested(action, action.Message.CommandReference))
 	if err != nil {
 		return PatchedActionResultValue{}, fmt.Errorf("invalid command reference: %w", err)
 	}
 	commandReferenceSHA256 := sha256.Sum256(commandReference.Value.GetRawReference())
 
-	inputRootReference, err := model_core.FlattenDecodableReference(model_core.Nested(action, action.Message.InputRootReference))
-	if err != nil {
-		return PatchedActionResultValue{}, fmt.Errorf("invalid input root reference: %w", err)
-	}
-
-	var completionEvent *model_command_pb.Result
+	var resultReference model_core.Decodable[TReference]
 	var errExecution error
 	for range c.executionClient.RunAction(
 		ctx,
 		platformECDHPublicKey,
-		&model_command_pb.Action{
-			Namespace:          c.executionNamespace,
-			CommandEncoders:    commandEncodersValue.Message.CommandEncoders,
-			CommandReference:   model_core.DecodableLocalReferenceToWeakProto(commandReference),
-			InputRootReference: model_core.DecodableLocalReferenceToWeakProto(inputRootReference),
+		&model_executewithstorage.Action[TReference]{
+			Reference: actionReference,
+			Encoders:  commandEncodersValue.Message.CommandEncoders,
+			Format: &model_core_pb.ObjectFormat{
+				Format: &model_core_pb.ObjectFormat_ProtoTypeName{
+					ProtoTypeName: "bonanza.model.command.Action",
+				},
+			},
 		},
 		&remoteexecution_pb.Action_AdditionalData{
 			StableFingerprint: commandReferenceSHA256[:],
-			ExecutionTimeout:  action.Message.ExecutionTimeout,
+			ExecutionTimeout:  executeRequest.Message.ExecutionTimeout,
 		},
-		&completionEvent,
+		&resultReference,
 		&errExecution,
 	) {
 		// TODO: Capture and propagate execution events?
@@ -78,25 +87,21 @@ func (c *baseComputer[TReference, TMetadata]) ComputeActionResultValue(ctx conte
 		return PatchedActionResultValue{}, errExecution
 	}
 
-	if err := status.ErrorProto(completionEvent.Status); err != nil {
+	result, err := commandReaders.Result.ReadParsedObject(ctx, resultReference)
+	if err != nil {
+		return PatchedActionResultValue{}, fmt.Errorf("failed to read completion event: %w", err)
+	}
+	if err := status.ErrorProto(result.Message.Status); err != nil {
 		return PatchedActionResultValue{}, err
 	}
-
-	result := &model_analysis_pb.ActionResult_Value{
-		ExitCode: completionEvent.ExitCode,
-	}
-	patcher := model_core.NewReferenceMessagePatcher[dag.ObjectContentsWalker]()
-	if completionEvent.OutputsReference != nil {
-		outputsReference, err := model_core.NewDecodableLocalReferenceFromWeakProto(c.getReferenceFormat(), completionEvent.OutputsReference)
-		if err != nil {
-			return PatchedActionResultValue{}, fmt.Errorf("invalid outputs reference: %w", err)
-		}
-		result.OutputsReference = &model_core_pb.DecodableReference{
-			Reference:          patcher.AddReference(outputsReference.Value, dag.ExistingObjectContentsWalker),
-			DecodingParameters: outputsReference.GetDecodingParameters(),
-		}
-	}
-	return model_core.NewPatchedMessage(result, patcher), nil
+	outputsReference := model_core.Patch(e, model_core.Nested(result, result.Message.OutputsReference))
+	return model_core.NewPatchedMessage(
+		&model_analysis_pb.ActionResult_Value{
+			ExitCode:         result.Message.ExitCode,
+			OutputsReference: outputsReference.Message,
+		},
+		model_core.MapReferenceMetadataToWalkers(outputsReference.Patcher),
+	), nil
 }
 
 func convertDictToEnvironmentVariableList[TMetadata model_core.ReferenceMetadata](
