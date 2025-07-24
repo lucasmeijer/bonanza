@@ -46,7 +46,7 @@ func newBaseComputerTester(ctrl *gomock.Controller) *baseComputerTester {
 	buildSpecificationEncoder := NewMockBinaryEncoder(ctrl)
 	buildSpecificationEncoder.EXPECT().GetDecodingParametersSizeBytes().Return(16).AnyTimes()
 	cacheDirectory := NewMockDirectory(ctrl)
-	executionClient := NewMockExecutionClient(ctrl)
+	executionClient := NewMockExecutionClientForTesting(ctrl)
 	filePool := NewMockFilePool(ctrl)
 	httpRoundTripper := NewMockRoundTripperForTesting(ctrl)
 	parsedObjectPoolIngester := model_parser.NewParsedObjectPoolIngester(
@@ -73,7 +73,6 @@ func newBaseComputerTester(ctrl *gomock.Controller) *baseComputerTester {
 			filePool,
 			cacheDirectory,
 			executionClient,
-			object.NewInstanceName("default"),
 			bzlFileBuiltins,
 			buildFileBuiltins,
 		),

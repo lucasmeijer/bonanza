@@ -473,4 +473,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRepoDefaultAttrsValue(ctx c
 	), nil
 }
 
-type RoundTripperForTesting http.RoundTripper
+type (
+	ExecutionClientForTesting remoteexecution.Client[*model_executewithstorage.Action[model_core.CreatedObjectTree], model_core.Decodable[model_core.CreatedObjectTree], model_core.Decodable[model_core.CreatedObjectTree]]
+	RoundTripperForTesting    http.RoundTripper
+)
