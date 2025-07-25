@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"regexp"
 	"runtime"
@@ -166,9 +167,7 @@ func main() {
 					if runnerConfiguration.Concurrency > 1 {
 						workerID["thread"] = fmt.Sprintf("%0*d", concurrencyLength, threadID)
 					}
-					for k, v := range runnerConfiguration.WorkerId {
-						workerID[k] = v
-					}
+					maps.Copy(workerID, runnerConfiguration.WorkerId)
 					workerName, err := json.Marshal(workerID)
 					if err != nil {
 						return util.StatusWrap(err, "Failed to marshal worker ID")
