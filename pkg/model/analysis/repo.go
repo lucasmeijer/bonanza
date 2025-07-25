@@ -31,6 +31,7 @@ import (
 	model_analysis_pb "bonanza.build/pkg/proto/model/analysis"
 	model_command_pb "bonanza.build/pkg/proto/model/command"
 	model_core_pb "bonanza.build/pkg/proto/model/core"
+	model_fetch_pb "bonanza.build/pkg/proto/model/fetch"
 	model_filesystem_pb "bonanza.build/pkg/proto/model/filesystem"
 	model_starlark_pb "bonanza.build/pkg/proto/model/starlark"
 	"bonanza.build/pkg/search"
@@ -811,14 +812,14 @@ func inferArchiveFormatFromURL(url string) (model_analysis_pb.HttpArchiveContent
 	return 0, false
 }
 
-func parseSubresourceIntegrity(integrity string) (*model_analysis_pb.SubresourceIntegrity, error) {
+func parseSubresourceIntegrity(integrity string) (*model_fetch_pb.SubresourceIntegrity, error) {
 	dash := strings.IndexByte(integrity, '-')
 	if dash < 0 {
 		return nil, errors.New("subresource integrity does not contain a dash")
 	}
 
 	hashAlgorithmStr := integrity[:dash]
-	hashAlgorithm, ok := model_analysis_pb.SubresourceIntegrity_HashAlgorithm_value[strings.ToUpper(hashAlgorithmStr)]
+	hashAlgorithm, ok := model_fetch_pb.SubresourceIntegrity_HashAlgorithm_value[strings.ToUpper(hashAlgorithmStr)]
 	if !ok {
 		return nil, fmt.Errorf("unknown hash algorithm %#v", hashAlgorithmStr)
 	}
@@ -829,13 +830,13 @@ func parseSubresourceIntegrity(integrity string) (*model_analysis_pb.Subresource
 		return nil, fmt.Errorf("invalid hash %#v: %w", hashStr, err)
 	}
 
-	return &model_analysis_pb.SubresourceIntegrity{
-		HashAlgorithm: model_analysis_pb.SubresourceIntegrity_HashAlgorithm(hashAlgorithm),
+	return &model_fetch_pb.SubresourceIntegrity{
+		HashAlgorithm: model_fetch_pb.SubresourceIntegrity_HashAlgorithm(hashAlgorithm),
 		Hash:          hash,
 	}, nil
 }
 
-func parseSubresourceIntegrityOrSHA256(integrity, sha256 string) (*model_analysis_pb.SubresourceIntegrity, error) {
+func parseSubresourceIntegrityOrSHA256(integrity, sha256 string) (*model_fetch_pb.SubresourceIntegrity, error) {
 	if integrity != "" {
 		return parseSubresourceIntegrity(integrity)
 	}
@@ -844,8 +845,8 @@ func parseSubresourceIntegrityOrSHA256(integrity, sha256 string) (*model_analysi
 		if err != nil {
 			return nil, fmt.Errorf("invalid sha256: %w", err)
 		}
-		return &model_analysis_pb.SubresourceIntegrity{
-			HashAlgorithm: model_analysis_pb.SubresourceIntegrity_SHA256,
+		return &model_fetch_pb.SubresourceIntegrity{
+			HashAlgorithm: model_fetch_pb.SubresourceIntegrity_SHA256,
 			Hash:          sha256Bytes,
 		}, nil
 	}
@@ -878,7 +879,7 @@ func (c *baseComputer[TReference, TMetadata]) fetchModuleFromRegistry(
 
 	sourceJSONContentsValue := e.GetHttpFileContentsValue(
 		&model_analysis_pb.HttpFileContents_Key{
-			FetchOptions: &model_analysis_pb.HttpFetchOptions{
+			FetchOptions: &model_fetch_pb.Options{
 				Urls: []string{sourceJSONURL},
 			},
 		},
@@ -920,7 +921,7 @@ func (c *baseComputer[TReference, TMetadata]) fetchModuleFromRegistry(
 	// that needs downloading is done.
 	missingDependencies := false
 	archiveContentsValue := e.GetHttpArchiveContentsValue(&model_analysis_pb.HttpArchiveContents_Key{
-		FetchOptions: &model_analysis_pb.HttpFetchOptions{
+		FetchOptions: &model_fetch_pb.Options{
 			Urls:      []string{sourceJSON.URL},
 			Integrity: integrity,
 		},
@@ -951,7 +952,7 @@ func (c *baseComputer[TReference, TMetadata]) fetchModuleFromRegistry(
 		}
 
 		patchContentsValue := e.GetHttpFileContentsValue(&model_analysis_pb.HttpFileContents_Key{
-			FetchOptions: &model_analysis_pb.HttpFetchOptions{
+			FetchOptions: &model_fetch_pb.Options{
 				Urls:      []string{patchURL},
 				Integrity: integrity,
 			},
@@ -1440,19 +1441,19 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) maybeGetStableInput
 	return nil
 }
 
-func createDownloadSuccessResult[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](integrity *model_analysis_pb.SubresourceIntegrity, sha256 []byte) starlark.Value {
+func createDownloadSuccessResult[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](integrity *model_fetch_pb.SubresourceIntegrity, sha256 []byte) starlark.Value {
 	fields := map[string]any{
 		"success": starlark.Bool(true),
 	}
 
 	if integrity == nil {
-		integrity = &model_analysis_pb.SubresourceIntegrity{
-			HashAlgorithm: model_analysis_pb.SubresourceIntegrity_SHA256,
+		integrity = &model_fetch_pb.SubresourceIntegrity{
+			HashAlgorithm: model_fetch_pb.SubresourceIntegrity_SHA256,
 			Hash:          sha256,
 		}
 	}
-	fields["integrity"] = starlark.String(strings.ToLower(model_analysis_pb.SubresourceIntegrity_HashAlgorithm_name[int32(integrity.HashAlgorithm)]) + "-" + base64.StdEncoding.EncodeToString(integrity.Hash))
-	if integrity.HashAlgorithm == model_analysis_pb.SubresourceIntegrity_SHA256 {
+	fields["integrity"] = starlark.String(strings.ToLower(model_fetch_pb.SubresourceIntegrity_HashAlgorithm_name[int32(integrity.HashAlgorithm)]) + "-" + base64.StdEncoding.EncodeToString(integrity.Hash))
+	if integrity.HashAlgorithm == model_fetch_pb.SubresourceIntegrity_SHA256 {
 		fields["sha256"] = starlark.String(hex.EncodeToString(integrity.Hash))
 	}
 
@@ -1505,16 +1506,16 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doDownload(thread *
 		return nil, err
 	}
 
-	headersEntries := make([]*model_analysis_pb.HttpFetchOptions_Header, 0, len(headers))
+	headersEntries := make([]*model_fetch_pb.Options_Header, 0, len(headers))
 	for _, name := range slices.Sorted(maps.Keys(headers)) {
-		headersEntries = append(headersEntries, &model_analysis_pb.HttpFetchOptions_Header{
+		headersEntries = append(headersEntries, &model_fetch_pb.Options_Header{
 			Name:  name,
 			Value: headers[name],
 		})
 	}
 
 	fileContentsValue := mrc.environment.GetHttpFileContentsValue(&model_analysis_pb.HttpFileContents_Key{
-		FetchOptions: &model_analysis_pb.HttpFetchOptions{
+		FetchOptions: &model_fetch_pb.Options{
 			Urls:      urls,
 			Integrity: integrityMessage,
 			AllowFail: allowFail,
@@ -1536,7 +1537,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doDownload(thread *
 	}), nil
 }
 
-func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) completeDownload(output *model_starlark.BarePath, executable bool, integrity *model_analysis_pb.SubresourceIntegrity, fileContentsValue model_core.Message[*model_analysis_pb.HttpFileContents_Value, TReference]) (starlark.Value, error) {
+func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) completeDownload(output *model_starlark.BarePath, executable bool, integrity *model_fetch_pb.SubresourceIntegrity, fileContentsValue model_core.Message[*model_analysis_pb.HttpFileContents_Value, TReference]) (starlark.Value, error) {
 	if !fileContentsValue.IsSet() {
 		return nil, evaluation.ErrMissingDependency
 	}
@@ -1641,7 +1642,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doDownloadAndExtrac
 	}
 
 	archiveContentsValue := mrc.environment.GetHttpArchiveContentsValue(&model_analysis_pb.HttpArchiveContents_Key{
-		FetchOptions: &model_analysis_pb.HttpFetchOptions{
+		FetchOptions: &model_fetch_pb.Options{
 			AllowFail: allowFail,
 			Integrity: integrityMessage,
 			Urls:      urls,

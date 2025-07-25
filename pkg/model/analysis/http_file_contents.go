@@ -18,6 +18,7 @@ import (
 	model_core "bonanza.build/pkg/model/core"
 	model_filesystem "bonanza.build/pkg/model/filesystem"
 	model_analysis_pb "bonanza.build/pkg/proto/model/analysis"
+	model_fetch_pb "bonanza.build/pkg/proto/model/fetch"
 	"bonanza.build/pkg/storage/dag"
 
 	"github.com/buildbarn/bb-storage/pkg/filesystem"
@@ -89,11 +90,11 @@ ProcessURLs:
 			hasher = sha256.New()
 		} else {
 			switch integrity.HashAlgorithm {
-			case model_analysis_pb.SubresourceIntegrity_SHA256:
+			case model_fetch_pb.SubresourceIntegrity_SHA256:
 				hasher = sha256.New()
-			case model_analysis_pb.SubresourceIntegrity_SHA384:
+			case model_fetch_pb.SubresourceIntegrity_SHA384:
 				hasher = sha512.New384()
-			case model_analysis_pb.SubresourceIntegrity_SHA512:
+			case model_fetch_pb.SubresourceIntegrity_SHA512:
 				hasher = sha512.New()
 			default:
 				downloadedFile.Close()

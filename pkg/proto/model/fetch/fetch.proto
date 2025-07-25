@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package bonanza.model.fetch;
+
+option go_package = "bonanza.build/pkg/proto/model/fetch";
+
+message SubresourceIntegrity {
+  enum HashAlgorithm {
+    SHA256 = 0;
+    SHA384 = 1;
+    SHA512 = 2;
+  }
+
+  // Hash algorithm that was used to compute the Subresource Integrity.
+  HashAlgorithm hash_algorithm = 1;
+
+  // Hash value associated with the Subresource Integrity.
+  bytes hash = 2;
+}
+
+message Options {
+  // List of mirror URLs referencing the same file.
+  repeated string urls = 1;
+
+  // Optional checksum of the file to download, provided in the
+  // Subresource Integrity (SRI) format.
+  SubresourceIntegrity integrity = 2;
+
+  // If not set, let the function fail if the server returns a HTTP
+  // status code other than 200 and 404.
+  bool allow_fail = 3;
+
+  message Header {
+    // Name of the HTTP header to set.
+    string name = 1;
+
+    // Value to assign to the HTTP header.
+    string value = 2;
+  }
+
+  // HTTP headers to send to servers as part of outgoing requests.
+  repeated Header headers = 4;
+}

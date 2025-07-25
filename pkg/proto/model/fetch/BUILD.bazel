@@ -1,0 +1,23 @@
+load("@rules_go//go:def.bzl", "go_library")
+load("@rules_go//proto:def.bzl", "go_proto_library")
+load("@rules_proto//proto:defs.bzl", "proto_library")
+
+proto_library(
+    name = "fetch_proto",
+    srcs = ["fetch.proto"],
+    visibility = ["//visibility:public"],
+)
+
+go_proto_library(
+    name = "fetch_go_proto",
+    importpath = "bonanza.build/pkg/proto/model/fetch",
+    proto = ":fetch_proto",
+    visibility = ["//visibility:public"],
+)
+
+go_library(
+    name = "fetch",
+    embed = [":fetch_go_proto"],
+    importpath = "bonanza.build/pkg/proto/model/fetch",
+    visibility = ["//visibility:public"],
+)

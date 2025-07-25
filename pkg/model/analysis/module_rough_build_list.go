@@ -13,6 +13,7 @@ import (
 	model_core "bonanza.build/pkg/model/core"
 	model_filesystem "bonanza.build/pkg/model/filesystem"
 	model_analysis_pb "bonanza.build/pkg/proto/model/analysis"
+	model_fetch_pb "bonanza.build/pkg/proto/model/fetch"
 	model_filesystem_pb "bonanza.build/pkg/proto/model/filesystem"
 	pg_starlark "bonanza.build/pkg/starlark"
 	"bonanza.build/pkg/storage/dag"
@@ -206,7 +207,7 @@ ProcessModule:
 				}
 				httpFileContents := e.GetHttpFileContentsValue(
 					&model_analysis_pb.HttpFileContents_Key{
-						FetchOptions: &model_analysis_pb.HttpFetchOptions{
+						FetchOptions: &model_fetch_pb.Options{
 							Urls: []string{moduleFileURL},
 						},
 					},
