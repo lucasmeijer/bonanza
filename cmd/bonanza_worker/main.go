@@ -66,6 +66,8 @@ func main() {
 		if err != nil {
 			return util.StatusWrap(err, "Failed to create parsed object pool")
 		}
+		dagUploaderClient := dag_pb.NewUploaderClient(storageGRPCClient)
+		objectContentsWalkerSemaphore := semaphore.NewWeighted(int64(runtime.NumCPU()))
 
 		// Create connection with scheduler.
 		schedulerConnection, err := grpcClientFactory.NewClientFromConfiguration(configuration.SchedulerGrpcClient)
@@ -176,8 +178,8 @@ func main() {
 					executor := model_command.NewLocalExecutor(
 						objectDownloader,
 						parsedObjectPool,
-						dag_pb.NewUploaderClient(storageGRPCClient),
-						semaphore.NewWeighted(int64(runtime.NumCPU())),
+						dagUploaderClient,
+						objectContentsWalkerSemaphore,
 						rootDirectory,
 						handleAllocator,
 						pool.NewQuotaEnforcingFilePool(
