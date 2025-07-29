@@ -2,6 +2,7 @@ package parser
 
 import (
 	"context"
+	"reflect"
 	"sync"
 
 	model_core "bonanza.build/pkg/model/core"
@@ -11,10 +12,8 @@ import (
 )
 
 type ParsedObjectEvictionKey struct {
-	// TODO: Have a stable key for identifying readers. That will
-	// allow us to get cache hits between builds.
-	reader    any
-	reference model_core.Decodable[object.LocalReference]
+	parserType reflect.Type
+	reference  model_core.Decodable[object.LocalReference]
 }
 
 type cachedParsedObject struct {
@@ -74,6 +73,7 @@ func LookupParsedObjectReader[TReference object.BasicReference, TParsedObject an
 func (r *poolBackedParsedObjectReader[TReference, TParsedObject]) ReadParsedObject(ctx context.Context, reference model_core.Decodable[TReference]) (TParsedObject, error) {
 	insertionKey := ParsedObjectEvictionKey{
 		reference: model_core.CopyDecodable(reference, reference.Value.GetLocalReference()),
+		parserType: reflect.TypeOf(r.parser),
 	}
 
 	i := r.ingester
