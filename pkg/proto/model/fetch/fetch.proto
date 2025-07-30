@@ -2,7 +2,22 @@ syntax = "proto3";
 
 package bonanza.model.fetch;
 
+import "google/rpc/status.proto";
+import "pkg/proto/model/filesystem/filesystem.proto";
+
 option go_package = "bonanza.build/pkg/proto/model/fetch";
+
+// Action and result messages for "fetch" workers.
+//
+// bonanza_builder is designed to be usable in isolated environments
+// that don't have direct internet access (e.g., Kubernetes clusters
+// with a restricted VPC network). However, most builds rely on fetching
+// one or more files from Bazel Central Registry or source hosting
+// services like GitHub.
+//
+// This file declares a protocol that bonanza_builder can use to call
+// into a helper process for doing the actual downloading, similar to
+// Bazel's Remote Asset API.
 
 message SubresourceIntegrity {
   enum HashAlgorithm {
@@ -36,4 +51,36 @@ message Target {
 
   // HTTP headers to send to servers as part of outgoing requests.
   repeated Header headers = 3;
+}
+
+message Action {
+  // Parameters that the worker should use to create chunks of the file
+  // that was downloaded.
+  bonanza.model.filesystem.FileCreationParameters file_creation_parameters = 1;
+
+  // Target describing where the file to fetch may be located, and how
+  // to configure the HTTP client that is used to fetch the file.
+  Target target = 2;
+}
+
+message Result {
+  message Success {
+    // The contents of the file, if the file was non-empty.
+    bonanza.model.filesystem.FileContents contents = 1;
+
+    // A SHA-256 hash of the file that was downloaded. This field is
+    // only set if no integrity was provided as part of fetch_options.
+    bytes sha256 = 2;
+  }
+
+  oneof outcome {
+    // If set, fetching the file failed. The status code will be
+    // consistent with error codes of the protocol that was used to
+    // download the file (e.g., a HTTP 404 will get translated to gRPC
+    // status code NOT_FOUND).
+    google.rpc.Status failure = 1;
+
+    // If set, fetching the file succeeded.
+    Success success = 2;
+  }
 }

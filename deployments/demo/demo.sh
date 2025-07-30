@@ -15,7 +15,7 @@ source "${RUNFILES_DIR:-/dev/null}/$f" 2>/dev/null || \
 set -eu
 
 export STATE_PATH="${HOME}/bonanza_demo"
-mkdir -p "${STATE_PATH}/bonanza_builder_cache"
+mkdir -p "${STATE_PATH}/bonanza_fetcher_cache"
 rm -rf "${STATE_PATH}/bonanza_builder_filepool" "${STATE_PATH}/bonanza_worker_filepool"
 umount "${STATE_PATH}/bonanza_worker_mount" || true
 mkdir -p "${STATE_PATH}/bonanza_worker_mount" || true
@@ -53,12 +53,15 @@ set +m
 "$(rlocation build_bonanza/cmd/bonanza_builder/bonanza_builder_/bonanza_builder)" \
     "$(rlocation build_bonanza/deployments/demo/bonanza_builder.jsonnet)" &
 builder_pid=$!
+"$(rlocation build_bonanza/cmd/bonanza_fetcher/bonanza_fetcher_/bonanza_fetcher)" \
+    "$(rlocation build_bonanza/deployments/demo/bonanza_fetcher.jsonnet)" &
+fetcher_pid=$!
 "$(rlocation build_bonanza/cmd/bonanza_worker/bonanza_worker_/bonanza_worker)" \
     "$(rlocation build_bonanza/deployments/demo/bonanza_worker.jsonnet)" &
 worker_pid=$!
 
-# Install trap handler that first kills the builder and worker, and only
-# kills the rest afterwards.
-trap 'trap - EXIT INT TERM; wait ${builder_pid} ${worker_pid} || true; kill $(jobs -p); wait' EXIT INT TERM
+# Install trap handler that first kills the builder, fetcher and worker,
+# and only kills the rest afterwards.
+trap 'trap - EXIT INT TERM; wait ${builder_pid} ${fetcher_pid} ${worker_pid} || true; kill $(jobs -p); wait' EXIT INT TERM
 
 wait

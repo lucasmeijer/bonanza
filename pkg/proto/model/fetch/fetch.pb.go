@@ -7,6 +7,8 @@
 package fetch
 
 import (
+	filesystem "bonanza.build/pkg/proto/model/filesystem"
+	status "google.golang.org/genproto/googleapis/rpc/status"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -182,6 +184,140 @@ func (x *Target) GetHeaders() []*Target_Header {
 	return nil
 }
 
+type Action struct {
+	state                  protoimpl.MessageState             `protogen:"open.v1"`
+	FileCreationParameters *filesystem.FileCreationParameters `protobuf:"bytes,1,opt,name=file_creation_parameters,json=fileCreationParameters,proto3" json:"file_creation_parameters,omitempty"`
+	Target                 *Target                            `protobuf:"bytes,2,opt,name=target,proto3" json:"target,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *Action) Reset() {
+	*x = Action{}
+	mi := &file_pkg_proto_model_fetch_fetch_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Action) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Action) ProtoMessage() {}
+
+func (x *Action) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_proto_model_fetch_fetch_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Action.ProtoReflect.Descriptor instead.
+func (*Action) Descriptor() ([]byte, []int) {
+	return file_pkg_proto_model_fetch_fetch_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *Action) GetFileCreationParameters() *filesystem.FileCreationParameters {
+	if x != nil {
+		return x.FileCreationParameters
+	}
+	return nil
+}
+
+func (x *Action) GetTarget() *Target {
+	if x != nil {
+		return x.Target
+	}
+	return nil
+}
+
+type Result struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Outcome:
+	//
+	//	*Result_Failure
+	//	*Result_Success_
+	Outcome       isResult_Outcome `protobuf_oneof:"outcome"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Result) Reset() {
+	*x = Result{}
+	mi := &file_pkg_proto_model_fetch_fetch_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Result) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Result) ProtoMessage() {}
+
+func (x *Result) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_proto_model_fetch_fetch_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Result.ProtoReflect.Descriptor instead.
+func (*Result) Descriptor() ([]byte, []int) {
+	return file_pkg_proto_model_fetch_fetch_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *Result) GetOutcome() isResult_Outcome {
+	if x != nil {
+		return x.Outcome
+	}
+	return nil
+}
+
+func (x *Result) GetFailure() *status.Status {
+	if x != nil {
+		if x, ok := x.Outcome.(*Result_Failure); ok {
+			return x.Failure
+		}
+	}
+	return nil
+}
+
+func (x *Result) GetSuccess() *Result_Success {
+	if x != nil {
+		if x, ok := x.Outcome.(*Result_Success_); ok {
+			return x.Success
+		}
+	}
+	return nil
+}
+
+type isResult_Outcome interface {
+	isResult_Outcome()
+}
+
+type Result_Failure struct {
+	Failure *status.Status `protobuf:"bytes,1,opt,name=failure,proto3,oneof"`
+}
+
+type Result_Success_ struct {
+	Success *Result_Success `protobuf:"bytes,2,opt,name=success,proto3,oneof"`
+}
+
+func (*Result_Failure) isResult_Outcome() {}
+
+func (*Result_Success_) isResult_Outcome() {}
+
 type Target_Header struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -192,7 +328,7 @@ type Target_Header struct {
 
 func (x *Target_Header) Reset() {
 	*x = Target_Header{}
-	mi := &file_pkg_proto_model_fetch_fetch_proto_msgTypes[2]
+	mi := &file_pkg_proto_model_fetch_fetch_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -204,7 +340,7 @@ func (x *Target_Header) String() string {
 func (*Target_Header) ProtoMessage() {}
 
 func (x *Target_Header) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_fetch_fetch_proto_msgTypes[2]
+	mi := &file_pkg_proto_model_fetch_fetch_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -234,11 +370,63 @@ func (x *Target_Header) GetValue() string {
 	return ""
 }
 
+type Result_Success struct {
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	Contents      *filesystem.FileContents `protobuf:"bytes,1,opt,name=contents,proto3" json:"contents,omitempty"`
+	Sha256        []byte                   `protobuf:"bytes,2,opt,name=sha256,proto3" json:"sha256,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Result_Success) Reset() {
+	*x = Result_Success{}
+	mi := &file_pkg_proto_model_fetch_fetch_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Result_Success) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Result_Success) ProtoMessage() {}
+
+func (x *Result_Success) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_proto_model_fetch_fetch_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Result_Success.ProtoReflect.Descriptor instead.
+func (*Result_Success) Descriptor() ([]byte, []int) {
+	return file_pkg_proto_model_fetch_fetch_proto_rawDescGZIP(), []int{3, 0}
+}
+
+func (x *Result_Success) GetContents() *filesystem.FileContents {
+	if x != nil {
+		return x.Contents
+	}
+	return nil
+}
+
+func (x *Result_Success) GetSha256() []byte {
+	if x != nil {
+		return x.Sha256
+	}
+	return nil
+}
+
 var File_pkg_proto_model_fetch_fetch_proto protoreflect.FileDescriptor
 
 const file_pkg_proto_model_fetch_fetch_proto_rawDesc = "" +
 	"\n" +
-	"!pkg/proto/model/fetch/fetch.proto\x12\x13bonanza.model.fetch\"\xbf\x01\n" +
+	"!pkg/proto/model/fetch/fetch.proto\x12\x13bonanza.model.fetch\x1a\x17google/rpc/status.proto\x1a+pkg/proto/model/filesystem/filesystem.proto\"\xbf\x01\n" +
 	"\x14SubresourceIntegrity\x12^\n" +
 	"\x0ehash_algorithm\x18\x01 \x01(\x0e27.bonanza.model.fetch.SubresourceIntegrity.HashAlgorithmR\rhashAlgorithm\x12\x12\n" +
 	"\x04hash\x18\x02 \x01(\fR\x04hash\"3\n" +
@@ -255,7 +443,17 @@ const file_pkg_proto_model_fetch_fetch_proto_rawDesc = "" +
 	"\aheaders\x18\x03 \x03(\v2\".bonanza.model.fetch.Target.HeaderR\aheaders\x1a2\n" +
 	"\x06Header\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05valueB%Z#bonanza.build/pkg/proto/model/fetchb\x06proto3"
+	"\x05value\x18\x02 \x01(\tR\x05value\"\xa9\x01\n" +
+	"\x06Action\x12j\n" +
+	"\x18file_creation_parameters\x18\x01 \x01(\v20.bonanza.model.filesystem.FileCreationParametersR\x16fileCreationParameters\x123\n" +
+	"\x06target\x18\x02 \x01(\v2\x1b.bonanza.model.fetch.TargetR\x06target\"\xeb\x01\n" +
+	"\x06Result\x12.\n" +
+	"\afailure\x18\x01 \x01(\v2\x12.google.rpc.StatusH\x00R\afailure\x12?\n" +
+	"\asuccess\x18\x02 \x01(\v2#.bonanza.model.fetch.Result.SuccessH\x00R\asuccess\x1ae\n" +
+	"\aSuccess\x12B\n" +
+	"\bcontents\x18\x01 \x01(\v2&.bonanza.model.filesystem.FileContentsR\bcontents\x12\x16\n" +
+	"\x06sha256\x18\x02 \x01(\fR\x06sha256B\t\n" +
+	"\aoutcomeB%Z#bonanza.build/pkg/proto/model/fetchb\x06proto3"
 
 var (
 	file_pkg_proto_model_fetch_fetch_proto_rawDescOnce sync.Once
@@ -270,22 +468,33 @@ func file_pkg_proto_model_fetch_fetch_proto_rawDescGZIP() []byte {
 }
 
 var file_pkg_proto_model_fetch_fetch_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_pkg_proto_model_fetch_fetch_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_pkg_proto_model_fetch_fetch_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_pkg_proto_model_fetch_fetch_proto_goTypes = []any{
-	(SubresourceIntegrity_HashAlgorithm)(0), // 0: bonanza.model.fetch.SubresourceIntegrity.HashAlgorithm
-	(*SubresourceIntegrity)(nil),            // 1: bonanza.model.fetch.SubresourceIntegrity
-	(*Target)(nil),                          // 2: bonanza.model.fetch.Target
-	(*Target_Header)(nil),                   // 3: bonanza.model.fetch.Target.Header
+	(SubresourceIntegrity_HashAlgorithm)(0),   // 0: bonanza.model.fetch.SubresourceIntegrity.HashAlgorithm
+	(*SubresourceIntegrity)(nil),              // 1: bonanza.model.fetch.SubresourceIntegrity
+	(*Target)(nil),                            // 2: bonanza.model.fetch.Target
+	(*Action)(nil),                            // 3: bonanza.model.fetch.Action
+	(*Result)(nil),                            // 4: bonanza.model.fetch.Result
+	(*Target_Header)(nil),                     // 5: bonanza.model.fetch.Target.Header
+	(*Result_Success)(nil),                    // 6: bonanza.model.fetch.Result.Success
+	(*filesystem.FileCreationParameters)(nil), // 7: bonanza.model.filesystem.FileCreationParameters
+	(*status.Status)(nil),                     // 8: google.rpc.Status
+	(*filesystem.FileContents)(nil),           // 9: bonanza.model.filesystem.FileContents
 }
 var file_pkg_proto_model_fetch_fetch_proto_depIdxs = []int32{
 	0, // 0: bonanza.model.fetch.SubresourceIntegrity.hash_algorithm:type_name -> bonanza.model.fetch.SubresourceIntegrity.HashAlgorithm
 	1, // 1: bonanza.model.fetch.Target.integrity:type_name -> bonanza.model.fetch.SubresourceIntegrity
-	3, // 2: bonanza.model.fetch.Target.headers:type_name -> bonanza.model.fetch.Target.Header
-	3, // [3:3] is the sub-list for method output_type
-	3, // [3:3] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	5, // 2: bonanza.model.fetch.Target.headers:type_name -> bonanza.model.fetch.Target.Header
+	7, // 3: bonanza.model.fetch.Action.file_creation_parameters:type_name -> bonanza.model.filesystem.FileCreationParameters
+	2, // 4: bonanza.model.fetch.Action.target:type_name -> bonanza.model.fetch.Target
+	8, // 5: bonanza.model.fetch.Result.failure:type_name -> google.rpc.Status
+	6, // 6: bonanza.model.fetch.Result.success:type_name -> bonanza.model.fetch.Result.Success
+	9, // 7: bonanza.model.fetch.Result.Success.contents:type_name -> bonanza.model.filesystem.FileContents
+	8, // [8:8] is the sub-list for method output_type
+	8, // [8:8] is the sub-list for method input_type
+	8, // [8:8] is the sub-list for extension type_name
+	8, // [8:8] is the sub-list for extension extendee
+	0, // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_pkg_proto_model_fetch_fetch_proto_init() }
@@ -293,13 +502,17 @@ func file_pkg_proto_model_fetch_fetch_proto_init() {
 	if File_pkg_proto_model_fetch_fetch_proto != nil {
 		return
 	}
+	file_pkg_proto_model_fetch_fetch_proto_msgTypes[3].OneofWrappers = []any{
+		(*Result_Failure)(nil),
+		(*Result_Success_)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pkg_proto_model_fetch_fetch_proto_rawDesc), len(file_pkg_proto_model_fetch_fetch_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   3,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

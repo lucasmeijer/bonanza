@@ -88,6 +88,18 @@
                }
             },
             {
+               "name": "linux_amd64: copy bonanza_fetcher",
+               "run": "rm -f bonanza_fetcher && bazel run --run_under cp --platforms=@rules_go//go/toolchain:linux_amd64 //cmd/bonanza_fetcher $(pwd)/bonanza_fetcher"
+            },
+            {
+               "name": "linux_amd64: upload bonanza_fetcher",
+               "uses": "actions/upload-artifact@v4",
+               "with": {
+                  "name": "bonanza_fetcher.linux_amd64",
+                  "path": "bonanza_fetcher"
+               }
+            },
+            {
                "name": "linux_amd64: copy bonanza_scheduler",
                "run": "rm -f bonanza_scheduler && bazel run --run_under cp --platforms=@rules_go//go/toolchain:linux_amd64 //cmd/bonanza_scheduler $(pwd)/bonanza_scheduler"
             },
@@ -173,6 +185,18 @@
                "with": {
                   "name": "bonanza_builder.linux_386",
                   "path": "bonanza_builder"
+               }
+            },
+            {
+               "name": "linux_386: copy bonanza_fetcher",
+               "run": "rm -f bonanza_fetcher && bazel run --run_under cp --platforms=@rules_go//go/toolchain:linux_386 //cmd/bonanza_fetcher $(pwd)/bonanza_fetcher"
+            },
+            {
+               "name": "linux_386: upload bonanza_fetcher",
+               "uses": "actions/upload-artifact@v4",
+               "with": {
+                  "name": "bonanza_fetcher.linux_386",
+                  "path": "bonanza_fetcher"
                }
             },
             {
@@ -264,6 +288,18 @@
                }
             },
             {
+               "name": "linux_arm: copy bonanza_fetcher",
+               "run": "rm -f bonanza_fetcher && bazel run --run_under cp --platforms=@rules_go//go/toolchain:linux_arm //cmd/bonanza_fetcher $(pwd)/bonanza_fetcher"
+            },
+            {
+               "name": "linux_arm: upload bonanza_fetcher",
+               "uses": "actions/upload-artifact@v4",
+               "with": {
+                  "name": "bonanza_fetcher.linux_arm",
+                  "path": "bonanza_fetcher"
+               }
+            },
+            {
                "name": "linux_arm: copy bonanza_scheduler",
                "run": "rm -f bonanza_scheduler && bazel run --run_under cp --platforms=@rules_go//go/toolchain:linux_arm //cmd/bonanza_scheduler $(pwd)/bonanza_scheduler"
             },
@@ -349,6 +385,18 @@
                "with": {
                   "name": "bonanza_builder.linux_arm64",
                   "path": "bonanza_builder"
+               }
+            },
+            {
+               "name": "linux_arm64: copy bonanza_fetcher",
+               "run": "rm -f bonanza_fetcher && bazel run --run_under cp --platforms=@rules_go//go/toolchain:linux_arm64 //cmd/bonanza_fetcher $(pwd)/bonanza_fetcher"
+            },
+            {
+               "name": "linux_arm64: upload bonanza_fetcher",
+               "uses": "actions/upload-artifact@v4",
+               "with": {
+                  "name": "bonanza_fetcher.linux_arm64",
+                  "path": "bonanza_fetcher"
                }
             },
             {
@@ -440,6 +488,18 @@
                }
             },
             {
+               "name": "darwin_amd64: copy bonanza_fetcher",
+               "run": "rm -f bonanza_fetcher && bazel run --run_under cp --platforms=@rules_go//go/toolchain:darwin_amd64 //cmd/bonanza_fetcher $(pwd)/bonanza_fetcher"
+            },
+            {
+               "name": "darwin_amd64: upload bonanza_fetcher",
+               "uses": "actions/upload-artifact@v4",
+               "with": {
+                  "name": "bonanza_fetcher.darwin_amd64",
+                  "path": "bonanza_fetcher"
+               }
+            },
+            {
                "name": "darwin_amd64: copy bonanza_scheduler",
                "run": "rm -f bonanza_scheduler && bazel run --run_under cp --platforms=@rules_go//go/toolchain:darwin_amd64 //cmd/bonanza_scheduler $(pwd)/bonanza_scheduler"
             },
@@ -528,6 +588,18 @@
                }
             },
             {
+               "name": "darwin_arm64: copy bonanza_fetcher",
+               "run": "rm -f bonanza_fetcher && bazel run --run_under cp --platforms=@rules_go//go/toolchain:darwin_arm64 //cmd/bonanza_fetcher $(pwd)/bonanza_fetcher"
+            },
+            {
+               "name": "darwin_arm64: upload bonanza_fetcher",
+               "uses": "actions/upload-artifact@v4",
+               "with": {
+                  "name": "bonanza_fetcher.darwin_arm64",
+                  "path": "bonanza_fetcher"
+               }
+            },
+            {
                "name": "darwin_arm64: copy bonanza_scheduler",
                "run": "rm -f bonanza_scheduler && bazel run --run_under cp --platforms=@rules_go//go/toolchain:darwin_arm64 //cmd/bonanza_scheduler $(pwd)/bonanza_scheduler"
             },
@@ -577,7 +649,7 @@
             },
             {
                "name": "freebsd_amd64: build and test",
-               "run": "bazel build --platforms=@rules_go//go/toolchain:freebsd_amd64 //cmd/bonanza_bazel //cmd/bonanza_browser //cmd/bonanza_builder //cmd/bonanza_scheduler //cmd/bonanza_storage_frontend //cmd/bonanza_storage_shard //cmd/bonanza_worker"
+               "run": "bazel build --platforms=@rules_go//go/toolchain:freebsd_amd64 //cmd/bonanza_bazel //cmd/bonanza_browser //cmd/bonanza_builder //cmd/bonanza_fetcher //cmd/bonanza_scheduler //cmd/bonanza_storage_frontend //cmd/bonanza_storage_shard //cmd/bonanza_worker"
             },
             {
                "name": "freebsd_amd64: copy bonanza_bazel",
@@ -613,6 +685,18 @@
                "with": {
                   "name": "bonanza_builder.freebsd_amd64",
                   "path": "bonanza_builder"
+               }
+            },
+            {
+               "name": "freebsd_amd64: copy bonanza_fetcher",
+               "run": "rm -f bonanza_fetcher && bazel run --run_under cp --platforms=@rules_go//go/toolchain:freebsd_amd64 //cmd/bonanza_fetcher $(pwd)/bonanza_fetcher"
+            },
+            {
+               "name": "freebsd_amd64: upload bonanza_fetcher",
+               "uses": "actions/upload-artifact@v4",
+               "with": {
+                  "name": "bonanza_fetcher.freebsd_amd64",
+                  "path": "bonanza_fetcher"
                }
             },
             {
@@ -665,7 +749,7 @@
             },
             {
                "name": "windows_amd64: build and test",
-               "run": "bazel build --platforms=@rules_go//go/toolchain:windows_amd64 //cmd/bonanza_bazel //cmd/bonanza_browser //cmd/bonanza_builder //cmd/bonanza_scheduler //cmd/bonanza_storage_frontend //cmd/bonanza_storage_shard //cmd/bonanza_worker"
+               "run": "bazel build --platforms=@rules_go//go/toolchain:windows_amd64 //cmd/bonanza_bazel //cmd/bonanza_browser //cmd/bonanza_builder //cmd/bonanza_fetcher //cmd/bonanza_scheduler //cmd/bonanza_storage_frontend //cmd/bonanza_storage_shard //cmd/bonanza_worker"
             },
             {
                "name": "windows_amd64: copy bonanza_bazel",
@@ -701,6 +785,18 @@
                "with": {
                   "name": "bonanza_builder.windows_amd64",
                   "path": "bonanza_builder.exe"
+               }
+            },
+            {
+               "name": "windows_amd64: copy bonanza_fetcher",
+               "run": "rm -f bonanza_fetcher.exe && bazel run --run_under cp --platforms=@rules_go//go/toolchain:windows_amd64 //cmd/bonanza_fetcher $(pwd)/bonanza_fetcher.exe"
+            },
+            {
+               "name": "windows_amd64: upload bonanza_fetcher",
+               "uses": "actions/upload-artifact@v4",
+               "with": {
+                  "name": "bonanza_fetcher.windows_amd64",
+                  "path": "bonanza_fetcher.exe"
                }
             },
             {
@@ -765,6 +861,10 @@
             {
                "name": "Push container bonanza_builder:bonanza_builder",
                "run": "bazel run --stamp //cmd/bonanza_builder:bonanza_builder_container_push"
+            },
+            {
+               "name": "Push container bonanza_fetcher:bonanza_fetcher",
+               "run": "bazel run --stamp //cmd/bonanza_fetcher:bonanza_fetcher_container_push"
             },
             {
                "name": "Push container bonanza_scheduler:bonanza_scheduler",

@@ -116,6 +116,12 @@ message BuildSpecification {
   // decorate subrule_ctx to contain fields that are either deprecated,
   // or trivially implementable in pure Starlark.
   string subrule_implementation_wrapper_identifier = 14;
+
+  // The elliptic-curve public key that identifies the platform that
+  // should be used to fetch files from module registries, module
+  // sources, and through repository_ctx.download() in PKIX, ASN.1 DER
+  // form.
+  bytes fetch_platform_pkix_public_key = 15;
 }
 
 message Action {

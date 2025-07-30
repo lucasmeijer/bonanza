@@ -142,10 +142,11 @@ type BuildSpecification struct {
 	IgnoreRootModuleDevDependencies        bool                                    `protobuf:"varint,8,opt,name=ignore_root_module_dev_dependencies,json=ignoreRootModuleDevDependencies,proto3" json:"ignore_root_module_dev_dependencies,omitempty"`
 	BuiltinsModuleNames                    []string                                `protobuf:"bytes,9,rep,name=builtins_module_names,json=builtinsModuleNames,proto3" json:"builtins_module_names,omitempty"`
 	RepoPlatform                           string                                  `protobuf:"bytes,10,opt,name=repo_platform,json=repoPlatform,proto3" json:"repo_platform,omitempty"`
-	CommandEncoders                        []*encoding.BinaryEncoder               `protobuf:"bytes,11,rep,name=command_encoders,json=commandEncoders,proto3" json:"command_encoders,omitempty"`
+	ActionEncoders                         []*encoding.BinaryEncoder               `protobuf:"bytes,11,rep,name=action_encoders,json=actionEncoders,proto3" json:"action_encoders,omitempty"`
 	TargetPlatforms                        []string                                `protobuf:"bytes,12,rep,name=target_platforms,json=targetPlatforms,proto3" json:"target_platforms,omitempty"`
 	RuleImplementationWrapperIdentifier    string                                  `protobuf:"bytes,13,opt,name=rule_implementation_wrapper_identifier,json=ruleImplementationWrapperIdentifier,proto3" json:"rule_implementation_wrapper_identifier,omitempty"`
 	SubruleImplementationWrapperIdentifier string                                  `protobuf:"bytes,14,opt,name=subrule_implementation_wrapper_identifier,json=subruleImplementationWrapperIdentifier,proto3" json:"subrule_implementation_wrapper_identifier,omitempty"`
+	FetchPlatformPkixPublicKey             []byte                                  `protobuf:"bytes,15,opt,name=fetch_platform_pkix_public_key,json=fetchPlatformPkixPublicKey,proto3" json:"fetch_platform_pkix_public_key,omitempty"`
 	unknownFields                          protoimpl.UnknownFields
 	sizeCache                              protoimpl.SizeCache
 }
@@ -250,9 +251,9 @@ func (x *BuildSpecification) GetRepoPlatform() string {
 	return ""
 }
 
-func (x *BuildSpecification) GetCommandEncoders() []*encoding.BinaryEncoder {
+func (x *BuildSpecification) GetActionEncoders() []*encoding.BinaryEncoder {
 	if x != nil {
-		return x.CommandEncoders
+		return x.ActionEncoders
 	}
 	return nil
 }
@@ -276,6 +277,13 @@ func (x *BuildSpecification) GetSubruleImplementationWrapperIdentifier() string 
 		return x.SubruleImplementationWrapperIdentifier
 	}
 	return ""
+}
+
+func (x *BuildSpecification) GetFetchPlatformPkixPublicKey() []byte {
+	if x != nil {
+		return x.FetchPlatformPkixPublicKey
+	}
+	return nil
 }
 
 type Action struct {
@@ -452,7 +460,7 @@ const file_pkg_proto_model_build_build_proto_rawDesc = "" +
 	"\x18root_directory_reference\x18\x02 \x01(\v2,.bonanza.model.filesystem.DirectoryReferenceR\x16rootDirectoryReference\"t\n" +
 	"\vUseLockfile\x12\x14\n" +
 	"\x05error\x18\x01 \x01(\bR\x05error\x12O\n" +
-	"\x16maximum_cache_duration\x18\x02 \x01(\v2\x19.google.protobuf.DurationR\x14maximumCacheDuration\"\xd0\a\n" +
+	"\x16maximum_cache_duration\x18\x02 \x01(\v2\x19.google.protobuf.DurationR\x14maximumCacheDuration\"\x92\b\n" +
 	"\x12BuildSpecification\x125\n" +
 	"\amodules\x18\x01 \x03(\v2\x1b.bonanza.model.build.ModuleR\amodules\x12(\n" +
 	"\x10root_module_name\x18\x02 \x01(\tR\x0erootModuleName\x12'\n" +
@@ -464,11 +472,12 @@ const file_pkg_proto_model_build_build_proto_rawDesc = "" +
 	"#ignore_root_module_dev_dependencies\x18\b \x01(\bR\x1fignoreRootModuleDevDependencies\x122\n" +
 	"\x15builtins_module_names\x18\t \x03(\tR\x13builtinsModuleNames\x12#\n" +
 	"\rrepo_platform\x18\n" +
-	" \x01(\tR\frepoPlatform\x12P\n" +
-	"\x10command_encoders\x18\v \x03(\v2%.bonanza.model.encoding.BinaryEncoderR\x0fcommandEncoders\x12)\n" +
+	" \x01(\tR\frepoPlatform\x12N\n" +
+	"\x0faction_encoders\x18\v \x03(\v2%.bonanza.model.encoding.BinaryEncoderR\x0eactionEncoders\x12)\n" +
 	"\x10target_platforms\x18\f \x03(\tR\x0ftargetPlatforms\x12S\n" +
 	"&rule_implementation_wrapper_identifier\x18\r \x01(\tR#ruleImplementationWrapperIdentifier\x12Y\n" +
-	")subrule_implementation_wrapper_identifier\x18\x0e \x01(\tR&subruleImplementationWrapperIdentifier\"\xf2\x01\n" +
+	")subrule_implementation_wrapper_identifier\x18\x0e \x01(\tR&subruleImplementationWrapperIdentifier\x12B\n" +
+	"\x1efetch_platform_pkix_public_key\x18\x0f \x01(\fR\x1afetchPlatformPkixPublicKey\"\xf2\x01\n" +
 	"\x06Action\x12#\n" +
 	"\rinvocation_id\x18\x01 \x01(\tR\finvocationId\x12(\n" +
 	"\x10build_request_id\x18\x02 \x01(\tR\x0ebuildRequestId\x12\x98\x01\n" +
@@ -515,7 +524,7 @@ var file_pkg_proto_model_build_build_proto_depIdxs = []int32{
 	8,  // 3: bonanza.model.build.BuildSpecification.directory_creation_parameters:type_name -> bonanza.model.filesystem.DirectoryCreationParameters
 	9,  // 4: bonanza.model.build.BuildSpecification.file_creation_parameters:type_name -> bonanza.model.filesystem.FileCreationParameters
 	1,  // 5: bonanza.model.build.BuildSpecification.use_lockfile:type_name -> bonanza.model.build.UseLockfile
-	10, // 6: bonanza.model.build.BuildSpecification.command_encoders:type_name -> bonanza.model.encoding.BinaryEncoder
+	10, // 6: bonanza.model.build.BuildSpecification.action_encoders:type_name -> bonanza.model.encoding.BinaryEncoder
 	11, // 7: bonanza.model.build.Action.build_specification_reference:type_name -> bonanza.model.core.DecodableReference
 	5,  // 8: bonanza.model.build.Result.failure:type_name -> bonanza.model.build.Result.Failure
 	11, // 9: bonanza.model.build.Result.evaluations_reference:type_name -> bonanza.model.core.DecodableReference

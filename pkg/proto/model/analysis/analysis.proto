@@ -949,18 +949,9 @@ message HttpFileContents {
   }
 
   message Value {
-    message Exists {
-      // The contents of the file, if the file was non-empty.
-      bonanza.model.filesystem.FileContents contents = 1;
-
-      // A SHA-256 hash of the file that was downloaded. This field is
-      // only set if no integrity was provided as part of fetch_options.
-      bytes sha256 = 2;
-    }
-
     // If set, the file was fetched successfully. If not set, fetching
     // the file failed with a non-200 HTTP status code.
-    Exists exists = 1;
+    bonanza.model.fetch.Result.Success exists = 1;
   }
 }
 
@@ -1289,6 +1280,18 @@ message RegisteredExecutionPlatforms {
     // List of platforms that are available for executing commands,
     // ordered by decreasing preference.
     repeated ExecutionPlatform execution_platforms = 1;
+  }
+}
+
+message RegisteredFetchPlatform {
+  message Key {}
+
+  message Value {
+    // The elliptic-curve public key that identifies the platform that
+    // should be used to fetch files from module registries, module
+    // sources, and through repository_ctx.download() in PKIX, ASN.1 DER
+    // form.
+    bytes fetch_platform_pkix_public_key = 1;
   }
 }
 

@@ -6,6 +6,10 @@ proto_library(
     name = "fetch_proto",
     srcs = ["fetch.proto"],
     visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/proto/model/filesystem:filesystem_proto",
+        "@googleapis//google/rpc:status_proto",
+    ],
 )
 
 go_proto_library(
@@ -13,6 +17,10 @@ go_proto_library(
     importpath = "bonanza.build/pkg/proto/model/fetch",
     proto = ":fetch_proto",
     visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/proto/model/filesystem",
+        "@org_golang_google_genproto_googleapis_rpc//status",
+    ],
 )
 
 go_library(

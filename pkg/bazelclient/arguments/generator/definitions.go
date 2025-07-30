@@ -160,6 +160,11 @@ var commonFlags = []flag{
 		flagType:    stringFlagType{},
 	},
 	{
+		longName:    "remote_executor_fetcher_pkix_public_key",
+		description: "The PKIX public key of the bonanza_fetcher processes to which to send requests to fetch Bazel module dependencies and files needed by repository rules.",
+		flagType:    stringFlagType{},
+	},
+	{
 		longName:    "remote_instance_name",
 		description: "Value to pass as instance_name in the remote execution API.",
 		flagType:    stringFlagType{},

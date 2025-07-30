@@ -5,7 +5,6 @@ package bonanza.configuration.bonanza_builder;
 import "pkg/proto/configuration/filesystem/filesystem.proto";
 import "pkg/proto/configuration/global/global.proto";
 import "pkg/proto/configuration/grpc/grpc.proto";
-import "pkg/proto/configuration/http/http.proto";
 import "pkg/proto/configuration/model/parser/parser.proto";
 
 option go_package = "bonanza.build/pkg/proto/configuration/bonanza_builder";
@@ -17,17 +16,8 @@ message ApplicationConfiguration {
   // gRPC client that communicates with the storage frontend.
   buildbarn.configuration.grpc.ClientConfiguration storage_grpc_client = 3;
 
-  // HTTP client that is used to download files from Bazel Central
-  // Registry and other locations.
-  buildbarn.configuration.http.ClientConfiguration http_client = 4;
-
-  // Storage space for temporary files (e.g., files downloaded via HTTP).
+  // Storage space for temporary files.
   buildbarn.configuration.filesystem.FilePoolConfiguration file_pool = 5;
-
-  // Directory where files may be stored for caching purposes.
-  // TODO: This option should be removed once we can properly store tags
-  // in the build cache.
-  string cache_directory_path = 6;
 
   // gRPC client that communicates with the remoteexecution service of
   // the scheduler to request the execution of build actions.

@@ -11,7 +11,6 @@ import (
 	filesystem "github.com/buildbarn/bb-remote-execution/pkg/proto/configuration/filesystem"
 	global "github.com/buildbarn/bb-storage/pkg/proto/configuration/global"
 	grpc "github.com/buildbarn/bb-storage/pkg/proto/configuration/grpc"
-	http "github.com/buildbarn/bb-storage/pkg/proto/configuration/http"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -30,9 +29,7 @@ type ApplicationConfiguration struct {
 	state                           protoimpl.MessageState            `protogen:"open.v1"`
 	Global                          *global.Configuration             `protobuf:"bytes,1,opt,name=global,proto3" json:"global,omitempty"`
 	StorageGrpcClient               *grpc.ClientConfiguration         `protobuf:"bytes,3,opt,name=storage_grpc_client,json=storageGrpcClient,proto3" json:"storage_grpc_client,omitempty"`
-	HttpClient                      *http.ClientConfiguration         `protobuf:"bytes,4,opt,name=http_client,json=httpClient,proto3" json:"http_client,omitempty"`
 	FilePool                        *filesystem.FilePoolConfiguration `protobuf:"bytes,5,opt,name=file_pool,json=filePool,proto3" json:"file_pool,omitempty"`
-	CacheDirectoryPath              string                            `protobuf:"bytes,6,opt,name=cache_directory_path,json=cacheDirectoryPath,proto3" json:"cache_directory_path,omitempty"`
 	ExecutionGrpcClient             *grpc.ClientConfiguration         `protobuf:"bytes,7,opt,name=execution_grpc_client,json=executionGrpcClient,proto3" json:"execution_grpc_client,omitempty"`
 	ExecutionClientPrivateKey       string                            `protobuf:"bytes,8,opt,name=execution_client_private_key,json=executionClientPrivateKey,proto3" json:"execution_client_private_key,omitempty"`
 	ExecutionClientCertificateChain string                            `protobuf:"bytes,9,opt,name=execution_client_certificate_chain,json=executionClientCertificateChain,proto3" json:"execution_client_certificate_chain,omitempty"`
@@ -89,25 +86,11 @@ func (x *ApplicationConfiguration) GetStorageGrpcClient() *grpc.ClientConfigurat
 	return nil
 }
 
-func (x *ApplicationConfiguration) GetHttpClient() *http.ClientConfiguration {
-	if x != nil {
-		return x.HttpClient
-	}
-	return nil
-}
-
 func (x *ApplicationConfiguration) GetFilePool() *filesystem.FilePoolConfiguration {
 	if x != nil {
 		return x.FilePool
 	}
 	return nil
-}
-
-func (x *ApplicationConfiguration) GetCacheDirectoryPath() string {
-	if x != nil {
-		return x.CacheDirectoryPath
-	}
-	return ""
 }
 
 func (x *ApplicationConfiguration) GetExecutionGrpcClient() *grpc.ClientConfiguration {
@@ -170,14 +153,11 @@ var File_pkg_proto_configuration_bonanza_builder_bonanza_builder_proto protorefl
 
 const file_pkg_proto_configuration_bonanza_builder_bonanza_builder_proto_rawDesc = "" +
 	"\n" +
-	"=pkg/proto/configuration/bonanza_builder/bonanza_builder.proto\x12%bonanza.configuration.bonanza_builder\x1a3pkg/proto/configuration/filesystem/filesystem.proto\x1a+pkg/proto/configuration/global/global.proto\x1a'pkg/proto/configuration/grpc/grpc.proto\x1a'pkg/proto/configuration/http/http.proto\x1a1pkg/proto/configuration/model/parser/parser.proto\"\x8c\t\n" +
+	"=pkg/proto/configuration/bonanza_builder/bonanza_builder.proto\x12%bonanza.configuration.bonanza_builder\x1a3pkg/proto/configuration/filesystem/filesystem.proto\x1a+pkg/proto/configuration/global/global.proto\x1a'pkg/proto/configuration/grpc/grpc.proto\x1a1pkg/proto/configuration/model/parser/parser.proto\"\x86\b\n" +
 	"\x18ApplicationConfiguration\x12E\n" +
 	"\x06global\x18\x01 \x01(\v2-.buildbarn.configuration.global.ConfigurationR\x06global\x12a\n" +
-	"\x13storage_grpc_client\x18\x03 \x01(\v21.buildbarn.configuration.grpc.ClientConfigurationR\x11storageGrpcClient\x12R\n" +
-	"\vhttp_client\x18\x04 \x01(\v21.buildbarn.configuration.http.ClientConfigurationR\n" +
-	"httpClient\x12V\n" +
-	"\tfile_pool\x18\x05 \x01(\v29.buildbarn.configuration.filesystem.FilePoolConfigurationR\bfilePool\x120\n" +
-	"\x14cache_directory_path\x18\x06 \x01(\tR\x12cacheDirectoryPath\x12e\n" +
+	"\x13storage_grpc_client\x18\x03 \x01(\v21.buildbarn.configuration.grpc.ClientConfigurationR\x11storageGrpcClient\x12V\n" +
+	"\tfile_pool\x18\x05 \x01(\v29.buildbarn.configuration.filesystem.FilePoolConfigurationR\bfilePool\x12e\n" +
 	"\x15execution_grpc_client\x18\a \x01(\v21.buildbarn.configuration.grpc.ClientConfigurationR\x13executionGrpcClient\x12?\n" +
 	"\x1cexecution_client_private_key\x18\b \x01(\tR\x19executionClientPrivateKey\x12K\n" +
 	"\"execution_client_certificate_chain\x18\t \x01(\tR\x1fexecutionClientCertificateChain\x12l\n" +
@@ -209,24 +189,22 @@ var file_pkg_proto_configuration_bonanza_builder_bonanza_builder_proto_goTypes =
 	nil,                                      // 1: bonanza.configuration.bonanza_builder.ApplicationConfiguration.WorkerIdEntry
 	(*global.Configuration)(nil),             // 2: buildbarn.configuration.global.Configuration
 	(*grpc.ClientConfiguration)(nil),         // 3: buildbarn.configuration.grpc.ClientConfiguration
-	(*http.ClientConfiguration)(nil),         // 4: buildbarn.configuration.http.ClientConfiguration
-	(*filesystem.FilePoolConfiguration)(nil), // 5: buildbarn.configuration.filesystem.FilePoolConfiguration
-	(*parser.ParsedObjectPool)(nil),          // 6: bonanza.configuration.model.parser.ParsedObjectPool
+	(*filesystem.FilePoolConfiguration)(nil), // 4: buildbarn.configuration.filesystem.FilePoolConfiguration
+	(*parser.ParsedObjectPool)(nil),          // 5: bonanza.configuration.model.parser.ParsedObjectPool
 }
 var file_pkg_proto_configuration_bonanza_builder_bonanza_builder_proto_depIdxs = []int32{
 	2, // 0: bonanza.configuration.bonanza_builder.ApplicationConfiguration.global:type_name -> buildbarn.configuration.global.Configuration
 	3, // 1: bonanza.configuration.bonanza_builder.ApplicationConfiguration.storage_grpc_client:type_name -> buildbarn.configuration.grpc.ClientConfiguration
-	4, // 2: bonanza.configuration.bonanza_builder.ApplicationConfiguration.http_client:type_name -> buildbarn.configuration.http.ClientConfiguration
-	5, // 3: bonanza.configuration.bonanza_builder.ApplicationConfiguration.file_pool:type_name -> buildbarn.configuration.filesystem.FilePoolConfiguration
-	3, // 4: bonanza.configuration.bonanza_builder.ApplicationConfiguration.execution_grpc_client:type_name -> buildbarn.configuration.grpc.ClientConfiguration
-	3, // 5: bonanza.configuration.bonanza_builder.ApplicationConfiguration.remote_worker_grpc_client:type_name -> buildbarn.configuration.grpc.ClientConfiguration
-	1, // 6: bonanza.configuration.bonanza_builder.ApplicationConfiguration.worker_id:type_name -> bonanza.configuration.bonanza_builder.ApplicationConfiguration.WorkerIdEntry
-	6, // 7: bonanza.configuration.bonanza_builder.ApplicationConfiguration.parsed_object_pool:type_name -> bonanza.configuration.model.parser.ParsedObjectPool
-	8, // [8:8] is the sub-list for method output_type
-	8, // [8:8] is the sub-list for method input_type
-	8, // [8:8] is the sub-list for extension type_name
-	8, // [8:8] is the sub-list for extension extendee
-	0, // [0:8] is the sub-list for field type_name
+	4, // 2: bonanza.configuration.bonanza_builder.ApplicationConfiguration.file_pool:type_name -> buildbarn.configuration.filesystem.FilePoolConfiguration
+	3, // 3: bonanza.configuration.bonanza_builder.ApplicationConfiguration.execution_grpc_client:type_name -> buildbarn.configuration.grpc.ClientConfiguration
+	3, // 4: bonanza.configuration.bonanza_builder.ApplicationConfiguration.remote_worker_grpc_client:type_name -> buildbarn.configuration.grpc.ClientConfiguration
+	1, // 5: bonanza.configuration.bonanza_builder.ApplicationConfiguration.worker_id:type_name -> bonanza.configuration.bonanza_builder.ApplicationConfiguration.WorkerIdEntry
+	5, // 6: bonanza.configuration.bonanza_builder.ApplicationConfiguration.parsed_object_pool:type_name -> bonanza.configuration.model.parser.ParsedObjectPool
+	7, // [7:7] is the sub-list for method output_type
+	7, // [7:7] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_pkg_proto_configuration_bonanza_builder_bonanza_builder_proto_init() }

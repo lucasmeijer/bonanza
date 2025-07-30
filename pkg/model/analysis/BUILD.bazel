@@ -50,6 +50,7 @@ go_library(
         "package.go",
         "packages_at_and_below.go",
         "registered_execution_platforms.go",
+        "registered_fetch_platform.go",
         "registered_repo_platform.go",
         "registered_toolchains.go",
         "registered_toolchains_for_type.go",
@@ -170,7 +171,6 @@ gomock(
     interfaces = [
         "ExecutionClientForTesting",
         "FileRootEnvironmentForTesting",
-        "RoundTripperForTesting",
     ],
     library = "//pkg/model/analysis",
     mockgen_model_library = "@org_uber_go_mock//mockgen/model",

@@ -2,7 +2,6 @@ package analysis_test
 
 import (
 	"context"
-	"net/http"
 	"testing"
 
 	model_analysis "bonanza.build/pkg/model/analysis"
@@ -45,10 +44,8 @@ type baseComputerTester struct {
 func newBaseComputerTester(ctrl *gomock.Controller) *baseComputerTester {
 	buildSpecificationEncoder := NewMockBinaryEncoder(ctrl)
 	buildSpecificationEncoder.EXPECT().GetDecodingParametersSizeBytes().Return(16).AnyTimes()
-	cacheDirectory := NewMockDirectory(ctrl)
 	executionClient := NewMockExecutionClientForTesting(ctrl)
 	filePool := NewMockFilePool(ctrl)
-	httpRoundTripper := NewMockRoundTripperForTesting(ctrl)
 	parsedObjectPoolIngester := model_parser.NewParsedObjectPoolIngester(
 		model_parser.NewParsedObjectPool(
 			eviction.NewFIFOSet[model_parser.ParsedObjectEvictionKey](),
@@ -69,9 +66,7 @@ func newBaseComputerTester(ctrl *gomock.Controller) *baseComputerTester {
 				[]byte("Build specification"),
 			),
 			buildSpecificationEncoder,
-			&http.Client{Transport: httpRoundTripper},
 			filePool,
-			cacheDirectory,
 			executionClient,
 			bzlFileBuiltins,
 			buildFileBuiltins,

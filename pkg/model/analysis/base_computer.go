@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 
 	"bonanza.build/pkg/evaluation"
 	"bonanza.build/pkg/label"
@@ -24,7 +23,6 @@ import (
 	"bonanza.build/pkg/storage/object"
 
 	"github.com/buildbarn/bb-remote-execution/pkg/filesystem/pool"
-	"github.com/buildbarn/bb-storage/pkg/filesystem"
 	"github.com/buildbarn/bb-storage/pkg/util"
 
 	"go.starlark.net/starlark"
@@ -38,9 +36,7 @@ type BaseComputerReferenceMetadata interface {
 type baseComputer[TReference object.BasicReference, TMetadata BaseComputerReferenceMetadata] struct {
 	parsedObjectPoolIngester    *model_parser.ParsedObjectPoolIngester[TReference]
 	buildSpecificationReference model_core.Decodable[TReference]
-	httpClient                  *http.Client
 	filePool                    pool.FilePool
-	cacheDirectory              filesystem.Directory
 	executionClient             remoteexecution.Client[*model_executewithstorage.Action[TReference], model_core.Decodable[TReference], model_core.Decodable[TReference]]
 	bzlFileBuiltins             starlark.StringDict
 	buildFileBuiltins           starlark.StringDict
@@ -67,9 +63,7 @@ func NewBaseComputer[TReference object.BasicReference, TMetadata BaseComputerRef
 	parsedObjectPoolIngester *model_parser.ParsedObjectPoolIngester[TReference],
 	buildSpecificationReference model_core.Decodable[TReference],
 	buildSpecificationEncoder model_encoding.BinaryEncoder,
-	httpClient *http.Client,
 	filePool pool.FilePool,
-	cacheDirectory filesystem.Directory,
 	executionClient remoteexecution.Client[*model_executewithstorage.Action[TReference], model_core.Decodable[TReference], model_core.Decodable[TReference]],
 	bzlFileBuiltins starlark.StringDict,
 	buildFileBuiltins starlark.StringDict,
@@ -77,9 +71,7 @@ func NewBaseComputer[TReference object.BasicReference, TMetadata BaseComputerRef
 	return &baseComputer[TReference, TMetadata]{
 		parsedObjectPoolIngester:    parsedObjectPoolIngester,
 		buildSpecificationReference: buildSpecificationReference,
-		httpClient:                  httpClient,
 		filePool:                    filePool,
-		cacheDirectory:              cacheDirectory,
 		executionClient:             executionClient,
 		bzlFileBuiltins:             bzlFileBuiltins,
 		buildFileBuiltins:           buildFileBuiltins,
@@ -473,7 +465,4 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRepoDefaultAttrsValue(ctx c
 	), nil
 }
 
-type (
-	ExecutionClientForTesting remoteexecution.Client[*model_executewithstorage.Action[model_core.CreatedObjectTree], model_core.Decodable[model_core.CreatedObjectTree], model_core.Decodable[model_core.CreatedObjectTree]]
-	RoundTripperForTesting    http.RoundTripper
-)
+type ExecutionClientForTesting remoteexecution.Client[*model_executewithstorage.Action[model_core.CreatedObjectTree], model_core.Decodable[model_core.CreatedObjectTree], model_core.Decodable[model_core.CreatedObjectTree]]

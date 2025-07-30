@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package bonanza.configuration.bonanza_fetcher;
+
+import "pkg/proto/configuration/filesystem/filesystem.proto";
+import "pkg/proto/configuration/global/global.proto";
+import "pkg/proto/configuration/grpc/grpc.proto";
+import "pkg/proto/configuration/http/http.proto";
+import "pkg/proto/configuration/model/parser/parser.proto";
+
+option go_package = "bonanza.build/pkg/proto/configuration/bonanza_fetcher";
+
+message ApplicationConfiguration {
+  // Common configuration options that apply to all Buildbarn binaries.
+  buildbarn.configuration.global.Configuration global = 1;
+
+  // gRPC client that communicates with the storage frontend.
+  buildbarn.configuration.grpc.ClientConfiguration storage_grpc_client = 2;
+
+  // HTTP client that is used when fetching files.
+  buildbarn.configuration.http.ClientConfiguration http_client = 3;
+
+  // Storage space for temporary files (e.g., files downloaded via HTTP).
+  buildbarn.configuration.filesystem.FilePoolConfiguration file_pool = 4;
+
+  // Directory where files may be stored for caching purposes.
+  // TODO: This option should be removed once we can properly store tags
+  // in the build cache.
+  string cache_directory_path = 5;
+
+  // gRPC client that communicates with the remoteworker service of the
+  // scheduler to accept incoming fetch requests.
+  buildbarn.configuration.grpc.ClientConfiguration remote_worker_grpc_client =
+      6;
+
+  // Elliptic-curve private keys used to compute a shared secret for
+  // decrypting build requests obtained from the scheduler. The public
+  // keys associated with these private keys are used by the scheduler
+  // to identify the platform and route actions.
+  //
+  // Keys must be in PKCS #8, ASN.1 DER form, stored in a PEM block of
+  // type "PRIVATE KEY".
+  repeated string platform_private_keys = 7;
+
+  // Client certificate authorities to consider when authenticating the
+  // client certificate that is provided as part of the build request
+  // submitted by clients. This effectively controls which clients are
+  // permitted to use this worker.
+  string client_certificate_authorities = 8;
+
+  // Fields that need to be attached to the ID of the worker, as
+  // announced to the scheduler.
+  map<string, string> worker_id = 9;
+
+  // The maximum number of fetch requests to process in parallel.
+  uint64 concurrency = 10;
+
+  // Cache that resides in memory of objects read from storage that have
+  // been decoded and parsed.
+  bonanza.configuration.model.parser.ParsedObjectPool parsed_object_pool = 11;
+}

@@ -278,7 +278,11 @@
       },
       "HttpFileContents": {
          "dependsOn": [
-            "FileCreationParametersObject"
+            "ActionEncoderObject",
+            "ActionEncoders",
+            "ActionReaders",
+            "FileCreationParameters",
+            "RegisteredFetchPlatform"
          ]
       },
       "ModuleDotBazelContents": {
@@ -413,6 +417,11 @@
             "ModulesWithMultipleVersionsObject",
             "RootModule",
             "TargetPatternExpansion"
+         ]
+      },
+      "RegisteredFetchPlatform": {
+         "dependsOn": [
+            "BuildSpecification"
          ]
       },
       "RegisteredRepoPlatform": {

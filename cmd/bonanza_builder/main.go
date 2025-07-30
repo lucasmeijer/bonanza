@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"iter"
-	"net/http"
 	"os"
 	"runtime"
 	"time"
@@ -41,10 +40,7 @@ import (
 
 	"github.com/buildbarn/bb-remote-execution/pkg/filesystem/pool"
 	"github.com/buildbarn/bb-storage/pkg/clock"
-	"github.com/buildbarn/bb-storage/pkg/filesystem"
-	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
 	"github.com/buildbarn/bb-storage/pkg/global"
-	bb_http "github.com/buildbarn/bb-storage/pkg/http"
 	"github.com/buildbarn/bb-storage/pkg/program"
 	"github.com/buildbarn/bb-storage/pkg/random"
 	"github.com/buildbarn/bb-storage/pkg/util"
@@ -85,19 +81,9 @@ func main() {
 			return util.StatusWrap(err, "Failed to create parsed object pool")
 		}
 
-		roundTripper, err := bb_http.NewRoundTripperFromConfiguration(configuration.HttpClient)
-		if err != nil {
-			return util.StatusWrap(err, "Failed to create HTTP client")
-		}
-
 		filePool, err := pool.NewFilePoolFromConfiguration(configuration.FilePool)
 		if err != nil {
 			return util.StatusWrap(err, "Failed to create file pool")
-		}
-
-		cacheDirectory, err := filesystem.NewLocalDirectory(path.LocalFormat.NewParser(configuration.CacheDirectoryPath))
-		if err != nil {
-			return util.StatusWrap(err, "Failed to create cache directory")
 		}
 
 		executionGRPCClient, err := grpcClientFactory.NewClientFromConfiguration(configuration.ExecutionGrpcClient)
@@ -139,11 +125,7 @@ func main() {
 			parsedObjectPool:              parsedObjectPool,
 			dagUploaderClient:             dag_pb.NewUploaderClient(storageGRPCClient),
 			objectContentsWalkerSemaphore: semaphore.NewWeighted(int64(runtime.NumCPU())),
-			httpClient: &http.Client{
-				Transport: bb_http.NewMetricsRoundTripper(roundTripper, "Builder"),
-			},
-			filePool:       filePool,
-			cacheDirectory: cacheDirectory,
+			filePool:                      filePool,
 			executionClient: model_executewithstorage.NewClient(
 				remoteexecution.NewProtoClient[*model_executewithstorage_pb.Action, model_core_pb.WeakDecodableReference, model_core_pb.WeakDecodableReference](
 					remoteexecution.NewRemoteClient(
@@ -279,9 +261,7 @@ type builderExecutor struct {
 	parsedObjectPool              *model_parser.ParsedObjectPool
 	dagUploaderClient             dag_pb.UploaderClient
 	objectContentsWalkerSemaphore *semaphore.Weighted
-	httpClient                    *http.Client
 	filePool                      pool.FilePool
-	cacheDirectory                filesystem.Directory
 	executionClient               remoteexecution.Client[*model_executewithstorage.Action[object.GlobalReference], model_core.Decodable[object.LocalReference], model_core.Decodable[object.LocalReference]]
 	bzlFileBuiltins               starlark.StringDict
 	buildFileBuiltins             starlark.StringDict
@@ -360,9 +340,7 @@ func (e *builderExecutor) Execute(ctx context.Context, action *model_executewith
 				parsedObjectPoolIngester,
 				buildSpecificationReference,
 				actionEncoder,
-				e.httpClient,
 				e.filePool,
-				e.cacheDirectory,
 				&builderExecutionClient{
 					base:                          e.executionClient,
 					dagUploaderClient:             e.dagUploaderClient,

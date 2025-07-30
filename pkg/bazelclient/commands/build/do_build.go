@@ -317,6 +317,11 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 		targetPlatforms = []string{"@platforms//host"}
 	}
 
+	fetcherPKIXPublicKey, err := base64.StdEncoding.DecodeString(args.CommonFlags.RemoteExecutorFetcherPkixPublicKey)
+	if err != nil {
+		logger.Fatal(formatted.Textf("Failed to base64 decode --remote_executor_fetcher_pkix_public_key: %s", err))
+	}
+
 	// Construct a BuildSpecification message that lists all the
 	// modules and contains all of the flags to instruct what needs
 	// to be built.
@@ -328,6 +333,7 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 		IgnoreRootModuleDevDependencies:        args.CommonFlags.IgnoreDevDependency,
 		BuiltinsModuleNames:                    args.CommonFlags.BuiltinsModule,
 		RepoPlatform:                           args.CommonFlags.RepoPlatform,
+		FetchPlatformPkixPublicKey:             fetcherPKIXPublicKey,
 		ActionEncoders:                         defaultEncoders,
 		TargetPlatforms:                        targetPlatforms,
 		RuleImplementationWrapperIdentifier:    args.CommonFlags.RuleImplementationWrapperIdentifier,

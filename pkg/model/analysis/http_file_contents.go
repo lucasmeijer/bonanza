@@ -1,147 +1,118 @@
 package analysis
 
 import (
-	"bytes"
 	"context"
-	"crypto/sha256"
-	"crypto/sha512"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"hash"
-	"io"
-	"io/fs"
-	"math"
-	"net/http"
 
+	"bonanza.build/pkg/crypto"
 	"bonanza.build/pkg/evaluation"
 	model_core "bonanza.build/pkg/model/core"
-	model_filesystem "bonanza.build/pkg/model/filesystem"
+	model_executewithstorage "bonanza.build/pkg/model/executewithstorage"
 	model_analysis_pb "bonanza.build/pkg/proto/model/analysis"
+	model_core_pb "bonanza.build/pkg/proto/model/core"
 	model_fetch_pb "bonanza.build/pkg/proto/model/fetch"
+	remoteexecution_pb "bonanza.build/pkg/proto/remoteexecution"
 	"bonanza.build/pkg/storage/dag"
 
-	"github.com/buildbarn/bb-storage/pkg/filesystem"
-	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 func (c *baseComputer[TReference, TMetadata]) ComputeHttpFileContentsValue(ctx context.Context, key *model_analysis_pb.HttpFileContents_Key, e HttpFileContentsEnvironment[TReference, TMetadata]) (PatchedHttpFileContentsValue, error) {
-	fileCreationParameters, gotFileCreationParameters := e.GetFileCreationParametersObjectValue(&model_analysis_pb.FileCreationParametersObject_Key{})
-	if !gotFileCreationParameters {
+	actionEncodersValue := e.GetActionEncodersValue(&model_analysis_pb.ActionEncoders_Key{})
+	actionEncoder, gotActionEncoder := e.GetActionEncoderObjectValue(&model_analysis_pb.ActionEncoderObject_Key{})
+	actionReaders, gotActionReaders := e.GetActionReadersValue(&model_analysis_pb.ActionReaders_Key{})
+	fetchPlatform := e.GetRegisteredFetchPlatformValue(&model_analysis_pb.RegisteredFetchPlatform_Key{})
+	fileCreationParametersValue := e.GetFileCreationParametersValue(&model_analysis_pb.FileCreationParameters_Key{})
+	registeredFetchPlatformValue := e.GetRegisteredFetchPlatformValue(&model_analysis_pb.RegisteredFetchPlatform_Key{})
+	if !actionEncodersValue.IsSet() ||
+		!gotActionEncoder ||
+		!gotActionReaders ||
+		!fetchPlatform.IsSet() ||
+		!fileCreationParametersValue.IsSet() ||
+		!registeredFetchPlatformValue.IsSet() {
 		return PatchedHttpFileContentsValue{}, evaluation.ErrMissingDependency
 	}
 
-ProcessURLs:
-	for _, url := range key.FetchOptions.GetTarget().GetUrls() {
-		// Store copies of the file in a local cache directory.
-		// TODO: Remove this feature once our storage is robust enough.
-		urlHash := sha256.Sum256([]byte(url))
-		filename := path.MustNewComponent(hex.EncodeToString(urlHash[:]))
-		downloadedFile, err := c.cacheDirectory.OpenReadWrite(filename, filesystem.DontCreate)
-		if err != nil {
-			if !errors.Is(err, fs.ErrNotExist) {
-				return PatchedHttpFileContentsValue{}, err
-			}
-			downloadedFile, err = c.cacheDirectory.OpenReadWrite(filename, filesystem.CreateExcl(0o666))
-			if err != nil {
-				return PatchedHttpFileContentsValue{}, err
-			}
-
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-			if err != nil {
-				downloadedFile.Close()
-				return PatchedHttpFileContentsValue{}, err
-			}
-			for _, entry := range key.FetchOptions.GetTarget().GetHeaders() {
-				req.Header.Set(entry.Name, entry.Value)
-			}
-
-			resp, err := c.httpClient.Do(req)
-			if err != nil {
-				downloadedFile.Close()
-				return PatchedHttpFileContentsValue{}, err
-			}
-			defer resp.Body.Close()
-
-			switch resp.StatusCode {
-			case http.StatusOK:
-				// Download the file to the local system.
-				if _, err := io.Copy(model_filesystem.NewSectionWriter(downloadedFile), resp.Body); err != nil {
-					downloadedFile.Close()
-					c.cacheDirectory.Remove(filename)
-					return PatchedHttpFileContentsValue{}, err
-				}
-			case http.StatusNotFound:
-				downloadedFile.Close()
-				c.cacheDirectory.Remove(filename)
-				continue ProcessURLs
-			default:
-				downloadedFile.Close()
-				c.cacheDirectory.Remove(filename)
-				if key.FetchOptions.GetAllowFail() {
-					continue ProcessURLs
-				}
-				return PatchedHttpFileContentsValue{}, fmt.Errorf("received unexpected HTTP response %#v", resp.Status)
-			}
-		}
-
-		var hasher hash.Hash
-		if integrity := key.FetchOptions.GetTarget().GetIntegrity(); integrity == nil {
-			hasher = sha256.New()
-		} else {
-			switch integrity.HashAlgorithm {
-			case model_fetch_pb.SubresourceIntegrity_SHA256:
-				hasher = sha256.New()
-			case model_fetch_pb.SubresourceIntegrity_SHA384:
-				hasher = sha512.New384()
-			case model_fetch_pb.SubresourceIntegrity_SHA512:
-				hasher = sha512.New()
-			default:
-				downloadedFile.Close()
-				c.cacheDirectory.Remove(filename)
-				return PatchedHttpFileContentsValue{}, errors.New("unknown subresource integrity hash algorithm")
-			}
-		}
-		if _, err := io.Copy(hasher, io.NewSectionReader(downloadedFile, 0, math.MaxInt64)); err != nil {
-			downloadedFile.Close()
-			c.cacheDirectory.Remove(filename)
-			return PatchedHttpFileContentsValue{}, fmt.Errorf("failed to hash file: %w", err)
-		}
-		hash := hasher.Sum(nil)
-
-		var sha256 []byte
-		if integrity := key.FetchOptions.GetTarget().GetIntegrity(); integrity == nil {
-			sha256 = hash
-		} else if !bytes.Equal(hash, integrity.Hash) {
-			downloadedFile.Close()
-			c.cacheDirectory.Remove(filename)
-			return PatchedHttpFileContentsValue{}, fmt.Errorf("file has hash %s, while %s was expected", hex.EncodeToString(hash), hex.EncodeToString(integrity.Hash))
-		}
-
-		// Compute a Merkle tree of the file and return it. The
-		// downloaded file is removed after uploading completes.
-		// any chunks of data in memory, as we would consume a large
-		// amount of memory otherwise.
-		fileMerkleTree, err := model_filesystem.CreateChunkDiscardingFileMerkleTree(ctx, fileCreationParameters, downloadedFile)
-		if err != nil {
-			return PatchedHttpFileContentsValue{}, err
-		}
-		if fileMerkleTree.Message == nil {
-			return model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](&model_analysis_pb.HttpFileContents_Value{
-				Exists: &model_analysis_pb.HttpFileContents_Value_Exists{},
-			}), nil
-		}
-		return model_core.NewPatchedMessage(
-			&model_analysis_pb.HttpFileContents_Value{
-				Exists: &model_analysis_pb.HttpFileContents_Value_Exists{
-					Contents: fileMerkleTree.Message,
-					Sha256:   sha256,
-				},
-			},
-			fileMerkleTree.Patcher,
-		), nil
+	fetchPlatformECDHPublicKey, err := crypto.ParsePKIXECDHPublicKey(registeredFetchPlatformValue.Message.FetchPlatformPkixPublicKey)
+	if err != nil {
+		return PatchedHttpFileContentsValue{}, fmt.Errorf("invalid fetch platform PKIX public key: %w", err)
 	}
 
-	// File not found.
-	return model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](&model_analysis_pb.HttpFileContents_Value{}), nil
+	fetchOptions := key.FetchOptions
+	if fetchOptions == nil {
+		return PatchedHttpFileContentsValue{}, errors.New("no fetch options provided")
+	}
+
+	referenceFormat := c.getReferenceFormat()
+	createdAction, err := model_core.MarshalAndEncode(
+		model_core.NewSimplePatchedMessage[TMetadata](
+			model_core.NewProtoMarshalable(&model_fetch_pb.Action{
+				FileCreationParameters: fileCreationParametersValue.Message.FileCreationParameters,
+				Target:                 fetchOptions.Target,
+			}),
+		),
+		referenceFormat,
+		actionEncoder,
+	)
+
+	var resultReference model_core.Decodable[TReference]
+	var errExecution error
+	for range c.executionClient.RunAction(
+		ctx,
+		fetchPlatformECDHPublicKey,
+		&model_executewithstorage.Action[TReference]{
+			Reference: model_core.CopyDecodable(
+				createdAction,
+				e.ReferenceObject(
+					createdAction.Value.GetLocalReference(),
+					e.CaptureCreatedObject(createdAction.Value),
+				),
+			),
+			Encoders: actionEncodersValue.Message.ActionEncoders,
+			Format: &model_core_pb.ObjectFormat{
+				Format: &model_core_pb.ObjectFormat_ProtoTypeName{
+					ProtoTypeName: "bonanza.model.fetch.Action",
+				},
+			},
+		},
+		&remoteexecution_pb.Action_AdditionalData{
+			ExecutionTimeout: &durationpb.Duration{Seconds: 3600},
+		},
+		&resultReference,
+		&errExecution,
+	) {
+		// TODO: Capture and propagate execution events?
+	}
+	if errExecution != nil {
+		return PatchedHttpFileContentsValue{}, errExecution
+	}
+
+	result, err := actionReaders.FetchResult.ReadParsedObject(ctx, resultReference)
+	if err != nil {
+		return PatchedHttpFileContentsValue{}, fmt.Errorf("failed to read completion event: %w", err)
+	}
+
+	switch outcome := result.Message.Outcome.(type) {
+	case *model_fetch_pb.Result_Success_:
+		success := model_core.Patch(e, model_core.Nested(result, outcome.Success))
+		return model_core.NewPatchedMessage(
+			&model_analysis_pb.HttpFileContents_Value{
+				Exists: success.Message,
+			},
+			model_core.MapReferenceMetadataToWalkers(success.Patcher),
+		), nil
+	case *model_fetch_pb.Result_Failure:
+		err := status.ErrorProto(outcome.Failure)
+		if fetchOptions.AllowFail || status.Code(err) == codes.NotFound {
+			return model_core.NewSimplePatchedMessage[dag.ObjectContentsWalker](
+				&model_analysis_pb.HttpFileContents_Value{},
+			), nil
+		}
+		return PatchedHttpFileContentsValue{}, fmt.Errorf("failed to fetch file: %w", err)
+	default:
+		return PatchedHttpFileContentsValue{}, errors.New("unkown fetch result type")
+	}
 }
