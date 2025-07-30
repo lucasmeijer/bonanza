@@ -72,13 +72,8 @@ func LookupParsedObjectReader[TReference object.BasicReference, TParsedObject an
 }
 
 func (r *poolBackedParsedObjectReader[TReference, TParsedObject]) ReadParsedObject(ctx context.Context, reference model_core.Decodable[TReference]) (TParsedObject, error) {
-	decodable, err := model_core.NewDecodable(reference.Value.GetLocalReference(), reference.GetDecodingParameters())
-	if err != nil {
-		return *new(TParsedObject), err
-	}
-
 	insertionKey := ParsedObjectEvictionKey{
-		reference: decodable,
+		reference: model_core.CopyDecodable(reference, reference.Value.GetLocalReference()),
 	}
 
 	i := r.ingester
