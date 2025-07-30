@@ -7,13 +7,12 @@ import (
 	model_filesystem "bonanza.build/pkg/model/filesystem"
 	"bonanza.build/pkg/storage/object"
 
-	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bb-storage/pkg/testutil"
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/stretchr/testify/require"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
 )
 
 func TestFileContentsIterator(t *testing.T) {
