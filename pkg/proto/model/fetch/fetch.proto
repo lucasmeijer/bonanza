@@ -18,17 +18,13 @@ message SubresourceIntegrity {
   bytes hash = 2;
 }
 
-message Options {
+message Target {
   // List of mirror URLs referencing the same file.
   repeated string urls = 1;
 
   // Optional checksum of the file to download, provided in the
   // Subresource Integrity (SRI) format.
   SubresourceIntegrity integrity = 2;
-
-  // If not set, let the function fail if the server returns a HTTP
-  // status code other than 200 and 404.
-  bool allow_fail = 3;
 
   message Header {
     // Name of the HTTP header to set.
@@ -39,5 +35,5 @@ message Options {
   }
 
   // HTTP headers to send to servers as part of outgoing requests.
-  repeated Header headers = 4;
+  repeated Header headers = 3;
 }

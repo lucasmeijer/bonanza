@@ -886,10 +886,20 @@ message Glob {
   }
 }
 
+message HttpFetchOptions {
+  // The URL of the file to fetch.
+  bonanza.model.fetch.Target target = 1;
+
+  // Optional checksum of the file to download, provided in the
+  // If not set, let the function fail if the server returns a HTTP
+  // status code other than 200 and 404.
+  bool allow_fail = 2;
+}
+
 message HttpArchiveContents {
   message Key {
     // URLs and options for determining how to fetch the file.
-    bonanza.model.fetch.Options fetch_options = 1;
+    HttpFetchOptions fetch_options = 1;
 
     enum Format {
       // The format of the archive is not specified.
@@ -935,7 +945,7 @@ message HttpArchiveContents {
 message HttpFileContents {
   message Key {
     // URLs and options for determining how to fetch the file.
-    bonanza.model.fetch.Options fetch_options = 1;
+    HttpFetchOptions fetch_options = 1;
   }
 
   message Value {

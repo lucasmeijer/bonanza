@@ -879,8 +879,10 @@ func (c *baseComputer[TReference, TMetadata]) fetchModuleFromRegistry(
 
 	sourceJSONContentsValue := e.GetHttpFileContentsValue(
 		&model_analysis_pb.HttpFileContents_Key{
-			FetchOptions: &model_fetch_pb.Options{
-				Urls: []string{sourceJSONURL},
+			FetchOptions: &model_analysis_pb.HttpFetchOptions{
+				Target: &model_fetch_pb.Target{
+					Urls: []string{sourceJSONURL},
+				},
 			},
 		},
 	)
@@ -921,9 +923,11 @@ func (c *baseComputer[TReference, TMetadata]) fetchModuleFromRegistry(
 	// that needs downloading is done.
 	missingDependencies := false
 	archiveContentsValue := e.GetHttpArchiveContentsValue(&model_analysis_pb.HttpArchiveContents_Key{
-		FetchOptions: &model_fetch_pb.Options{
-			Urls:      []string{sourceJSON.URL},
-			Integrity: integrity,
+		FetchOptions: &model_analysis_pb.HttpFetchOptions{
+			Target: &model_fetch_pb.Target{
+				Urls:      []string{sourceJSON.URL},
+				Integrity: integrity,
+			},
 		},
 		Format: archiveFormat,
 	})
@@ -952,9 +956,11 @@ func (c *baseComputer[TReference, TMetadata]) fetchModuleFromRegistry(
 		}
 
 		patchContentsValue := e.GetHttpFileContentsValue(&model_analysis_pb.HttpFileContents_Key{
-			FetchOptions: &model_fetch_pb.Options{
-				Urls:      []string{patchURL},
-				Integrity: integrity,
+			FetchOptions: &model_analysis_pb.HttpFetchOptions{
+				Target: &model_fetch_pb.Target{
+					Urls:      []string{patchURL},
+					Integrity: integrity,
+				},
 			},
 		})
 		if !patchContentsValue.IsSet() {
@@ -1506,21 +1512,23 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doDownload(thread *
 		return nil, err
 	}
 
-	headersEntries := make([]*model_fetch_pb.Options_Header, 0, len(headers))
+	headersEntries := make([]*model_fetch_pb.Target_Header, 0, len(headers))
 	for _, name := range slices.Sorted(maps.Keys(headers)) {
-		headersEntries = append(headersEntries, &model_fetch_pb.Options_Header{
+		headersEntries = append(headersEntries, &model_fetch_pb.Target_Header{
 			Name:  name,
 			Value: headers[name],
 		})
 	}
 
 	fileContentsValue := mrc.environment.GetHttpFileContentsValue(&model_analysis_pb.HttpFileContents_Key{
-		FetchOptions: &model_fetch_pb.Options{
-			Urls:      urls,
-			Integrity: integrityMessage,
+		FetchOptions: &model_analysis_pb.HttpFetchOptions{
+			Target: &model_fetch_pb.Target{
+				Urls:      urls,
+				Integrity: integrityMessage,
+				Headers:   headersEntries,
+				// TODO: Set auth!
+			},
 			AllowFail: allowFail,
-			Headers:   headersEntries,
-			// TODO: Set auth!
 		},
 	})
 
@@ -1642,10 +1650,12 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doDownloadAndExtrac
 	}
 
 	archiveContentsValue := mrc.environment.GetHttpArchiveContentsValue(&model_analysis_pb.HttpArchiveContents_Key{
-		FetchOptions: &model_fetch_pb.Options{
+		FetchOptions: &model_analysis_pb.HttpFetchOptions{
+			Target: &model_fetch_pb.Target{
+				Integrity: integrityMessage,
+				Urls:      urls,
+			},
 			AllowFail: allowFail,
-			Integrity: integrityMessage,
-			Urls:      urls,
 		},
 		Format: archiveFormat,
 	})

@@ -299,8 +299,10 @@ func (c *baseComputer[TReference, TMetadata]) ComputeModuleDotBazelContentsValue
 
 			fileContentsValue := e.GetHttpFileContentsValue(
 				&model_analysis_pb.HttpFileContents_Key{
-					FetchOptions: &model_fetch_pb.Options{
-						Urls: []string{moduleFileURL},
+					FetchOptions: &model_analysis_pb.HttpFetchOptions{
+						Target: &model_fetch_pb.Target{
+							Urls: []string{moduleFileURL},
+						},
 					},
 				})
 			if !fileContentsValue.IsSet() {

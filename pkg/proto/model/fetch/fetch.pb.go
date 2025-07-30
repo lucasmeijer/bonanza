@@ -122,30 +122,29 @@ func (x *SubresourceIntegrity) GetHash() []byte {
 	return nil
 }
 
-type Options struct {
+type Target struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Urls          []string               `protobuf:"bytes,1,rep,name=urls,proto3" json:"urls,omitempty"`
 	Integrity     *SubresourceIntegrity  `protobuf:"bytes,2,opt,name=integrity,proto3" json:"integrity,omitempty"`
-	AllowFail     bool                   `protobuf:"varint,3,opt,name=allow_fail,json=allowFail,proto3" json:"allow_fail,omitempty"`
-	Headers       []*Options_Header      `protobuf:"bytes,4,rep,name=headers,proto3" json:"headers,omitempty"`
+	Headers       []*Target_Header       `protobuf:"bytes,3,rep,name=headers,proto3" json:"headers,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *Options) Reset() {
-	*x = Options{}
+func (x *Target) Reset() {
+	*x = Target{}
 	mi := &file_pkg_proto_model_fetch_fetch_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *Options) String() string {
+func (x *Target) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Options) ProtoMessage() {}
+func (*Target) ProtoMessage() {}
 
-func (x *Options) ProtoReflect() protoreflect.Message {
+func (x *Target) ProtoReflect() protoreflect.Message {
 	mi := &file_pkg_proto_model_fetch_fetch_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -157,40 +156,33 @@ func (x *Options) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Options.ProtoReflect.Descriptor instead.
-func (*Options) Descriptor() ([]byte, []int) {
+// Deprecated: Use Target.ProtoReflect.Descriptor instead.
+func (*Target) Descriptor() ([]byte, []int) {
 	return file_pkg_proto_model_fetch_fetch_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *Options) GetUrls() []string {
+func (x *Target) GetUrls() []string {
 	if x != nil {
 		return x.Urls
 	}
 	return nil
 }
 
-func (x *Options) GetIntegrity() *SubresourceIntegrity {
+func (x *Target) GetIntegrity() *SubresourceIntegrity {
 	if x != nil {
 		return x.Integrity
 	}
 	return nil
 }
 
-func (x *Options) GetAllowFail() bool {
-	if x != nil {
-		return x.AllowFail
-	}
-	return false
-}
-
-func (x *Options) GetHeaders() []*Options_Header {
+func (x *Target) GetHeaders() []*Target_Header {
 	if x != nil {
 		return x.Headers
 	}
 	return nil
 }
 
-type Options_Header struct {
+type Target_Header struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
@@ -198,20 +190,20 @@ type Options_Header struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *Options_Header) Reset() {
-	*x = Options_Header{}
+func (x *Target_Header) Reset() {
+	*x = Target_Header{}
 	mi := &file_pkg_proto_model_fetch_fetch_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *Options_Header) String() string {
+func (x *Target_Header) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Options_Header) ProtoMessage() {}
+func (*Target_Header) ProtoMessage() {}
 
-func (x *Options_Header) ProtoReflect() protoreflect.Message {
+func (x *Target_Header) ProtoReflect() protoreflect.Message {
 	mi := &file_pkg_proto_model_fetch_fetch_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -223,19 +215,19 @@ func (x *Options_Header) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Options_Header.ProtoReflect.Descriptor instead.
-func (*Options_Header) Descriptor() ([]byte, []int) {
+// Deprecated: Use Target_Header.ProtoReflect.Descriptor instead.
+func (*Target_Header) Descriptor() ([]byte, []int) {
 	return file_pkg_proto_model_fetch_fetch_proto_rawDescGZIP(), []int{1, 0}
 }
 
-func (x *Options_Header) GetName() string {
+func (x *Target_Header) GetName() string {
 	if x != nil {
 		return x.Name
 	}
 	return ""
 }
 
-func (x *Options_Header) GetValue() string {
+func (x *Target_Header) GetValue() string {
 	if x != nil {
 		return x.Value
 	}
@@ -256,13 +248,11 @@ const file_pkg_proto_model_fetch_fetch_proto_rawDesc = "" +
 	"\n" +
 	"\x06SHA384\x10\x01\x12\n" +
 	"\n" +
-	"\x06SHA512\x10\x02\"\xf8\x01\n" +
-	"\aOptions\x12\x12\n" +
+	"\x06SHA512\x10\x02\"\xd7\x01\n" +
+	"\x06Target\x12\x12\n" +
 	"\x04urls\x18\x01 \x03(\tR\x04urls\x12G\n" +
-	"\tintegrity\x18\x02 \x01(\v2).bonanza.model.fetch.SubresourceIntegrityR\tintegrity\x12\x1d\n" +
-	"\n" +
-	"allow_fail\x18\x03 \x01(\bR\tallowFail\x12=\n" +
-	"\aheaders\x18\x04 \x03(\v2#.bonanza.model.fetch.Options.HeaderR\aheaders\x1a2\n" +
+	"\tintegrity\x18\x02 \x01(\v2).bonanza.model.fetch.SubresourceIntegrityR\tintegrity\x12<\n" +
+	"\aheaders\x18\x03 \x03(\v2\".bonanza.model.fetch.Target.HeaderR\aheaders\x1a2\n" +
 	"\x06Header\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05valueB%Z#bonanza.build/pkg/proto/model/fetchb\x06proto3"
@@ -284,13 +274,13 @@ var file_pkg_proto_model_fetch_fetch_proto_msgTypes = make([]protoimpl.MessageIn
 var file_pkg_proto_model_fetch_fetch_proto_goTypes = []any{
 	(SubresourceIntegrity_HashAlgorithm)(0), // 0: bonanza.model.fetch.SubresourceIntegrity.HashAlgorithm
 	(*SubresourceIntegrity)(nil),            // 1: bonanza.model.fetch.SubresourceIntegrity
-	(*Options)(nil),                         // 2: bonanza.model.fetch.Options
-	(*Options_Header)(nil),                  // 3: bonanza.model.fetch.Options.Header
+	(*Target)(nil),                          // 2: bonanza.model.fetch.Target
+	(*Target_Header)(nil),                   // 3: bonanza.model.fetch.Target.Header
 }
 var file_pkg_proto_model_fetch_fetch_proto_depIdxs = []int32{
 	0, // 0: bonanza.model.fetch.SubresourceIntegrity.hash_algorithm:type_name -> bonanza.model.fetch.SubresourceIntegrity.HashAlgorithm
-	1, // 1: bonanza.model.fetch.Options.integrity:type_name -> bonanza.model.fetch.SubresourceIntegrity
-	3, // 2: bonanza.model.fetch.Options.headers:type_name -> bonanza.model.fetch.Options.Header
+	1, // 1: bonanza.model.fetch.Target.integrity:type_name -> bonanza.model.fetch.SubresourceIntegrity
+	3, // 2: bonanza.model.fetch.Target.headers:type_name -> bonanza.model.fetch.Target.Header
 	3, // [3:3] is the sub-list for method output_type
 	3, // [3:3] is the sub-list for method input_type
 	3, // [3:3] is the sub-list for extension type_name

@@ -32,7 +32,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeHttpFileContentsValue(ctx c
 	}
 
 ProcessURLs:
-	for _, url := range key.FetchOptions.GetUrls() {
+	for _, url := range key.FetchOptions.GetTarget().GetUrls() {
 		// Store copies of the file in a local cache directory.
 		// TODO: Remove this feature once our storage is robust enough.
 		urlHash := sha256.Sum256([]byte(url))
@@ -52,7 +52,7 @@ ProcessURLs:
 				downloadedFile.Close()
 				return PatchedHttpFileContentsValue{}, err
 			}
-			for _, entry := range key.FetchOptions.GetHeaders() {
+			for _, entry := range key.FetchOptions.GetTarget().GetHeaders() {
 				req.Header.Set(entry.Name, entry.Value)
 			}
 
@@ -86,7 +86,7 @@ ProcessURLs:
 		}
 
 		var hasher hash.Hash
-		if integrity := key.FetchOptions.GetIntegrity(); integrity == nil {
+		if integrity := key.FetchOptions.GetTarget().GetIntegrity(); integrity == nil {
 			hasher = sha256.New()
 		} else {
 			switch integrity.HashAlgorithm {
@@ -110,7 +110,7 @@ ProcessURLs:
 		hash := hasher.Sum(nil)
 
 		var sha256 []byte
-		if integrity := key.FetchOptions.GetIntegrity(); integrity == nil {
+		if integrity := key.FetchOptions.GetTarget().GetIntegrity(); integrity == nil {
 			sha256 = hash
 		} else if !bytes.Equal(hash, integrity.Hash) {
 			downloadedFile.Close()
