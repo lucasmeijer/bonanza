@@ -13,8 +13,8 @@ import (
 type ParsedObjectEvictionKey struct {
 	// TODO: Have a stable key for identifying readers. That will
 	// allow us to get cache hits between builds.
-	reader     any
-	reference  model_core.Decodable[object.LocalReference]
+	reader    any
+	reference model_core.Decodable[object.LocalReference]
 }
 
 type cachedParsedObject struct {
