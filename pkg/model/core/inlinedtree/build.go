@@ -156,10 +156,13 @@ func Build[
 			inlinedSizeBytes := candidatesInlinedSizeBytes[i]
 			if candidate.ExternalMessage.Message != nil {
 				parentExternal := model_core.NewSimplePatchedMessage[TMetadata](TParentMessagePtr(new(TParentMessage)))
-				decodableBogusCreatedObject := model_core.NewDecodable(
+				decodableBogusCreatedObject, err := model_core.NewDecodable(
 					bogusCreatedObject,
 					make([]byte, candidate.Encoder.GetDecodingParametersSizeBytes()),
 				)
+				if err != nil {
+					return output, err
+				}
 				candidate.ParentAppender(parentExternal, &decodableBogusCreatedObject)
 				externalSizeBytes := parentExternal.Patcher.GetReferencesSizeBytes() + marshalOptions.Size(parentExternal.Message)
 				parentExternal.Discard()

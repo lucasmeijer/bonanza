@@ -56,15 +56,16 @@ func newBaseComputerTester(ctrl *gomock.Controller) *baseComputerTester {
 	)
 
 	bzlFileBuiltins, buildFileBuiltins := model_starlark.GetBuiltins[model_core.CreatedObjectTree, model_core.CreatedObjectTree]()
+
 	return &baseComputerTester{
 		computer: model_analysis.NewBaseComputer[model_core.CreatedObjectTree, model_core.CreatedObjectTree](
 			parsedObjectPoolIngester,
-			model_core.NewDecodable(
+			util.Must(model_core.NewDecodable(
 				model_core.CreatedObjectTree{
 					Contents: object.MustNewContents(object_pb.ReferenceFormat_SHA256_V1, nil, []byte("Build specification")),
 				},
-				[]byte("Build specification"),
-			),
+				[]byte("decodeparams"),
+			)),
 			buildSpecificationEncoder,
 			filePool,
 			executionClient,

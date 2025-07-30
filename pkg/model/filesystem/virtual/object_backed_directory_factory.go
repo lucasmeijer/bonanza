@@ -82,7 +82,10 @@ func (df *ObjectBackedDirectoryFactory) resolveHandle(r io.ByteReader) (virtual.
 		}
 		decodingParameters = append(decodingParameters, b)
 	}
-	clusterReference := model_core.NewDecodable(localReference, decodingParameters)
+	clusterReference, err := model_core.NewDecodable(localReference, decodingParameters)
+	if err != nil {
+		return virtual.DirectoryChild{}, virtual.StatusErrBadHandle
+	}
 
 	directoryIndex, err := varint.ReadForward[uint](r)
 	if err != nil {

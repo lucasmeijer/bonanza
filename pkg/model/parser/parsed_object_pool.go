@@ -13,9 +13,8 @@ import (
 type ParsedObjectEvictionKey struct {
 	// TODO: Have a stable key for identifying readers. That will
 	// allow us to get cache hits between builds.
-	reader             any
-	reference          object.LocalReference
-	decodingParameters string
+	reader    any
+	reference model_core.Decodable[object.LocalReference]
 }
 
 type cachedParsedObject struct {
@@ -74,9 +73,7 @@ func LookupParsedObjectReader[TReference object.BasicReference, TParsedObject an
 
 func (r *poolBackedParsedObjectReader[TReference, TParsedObject]) ReadParsedObject(ctx context.Context, reference model_core.Decodable[TReference]) (TParsedObject, error) {
 	insertionKey := ParsedObjectEvictionKey{
-		reader:             r,
-		reference:          reference.Value.GetLocalReference(),
-		decodingParameters: string(reference.GetDecodingParameters()),
+		reference: model_core.CopyDecodable(reference, reference.Value.GetLocalReference()),
 	}
 
 	i := r.ingester

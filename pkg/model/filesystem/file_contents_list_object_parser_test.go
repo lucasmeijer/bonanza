@@ -11,6 +11,7 @@ import (
 	"bonanza.build/pkg/storage/object"
 
 	"github.com/buildbarn/bb-storage/pkg/testutil"
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/stretchr/testify/require"
 
 	"google.golang.org/grpc/codes"
@@ -245,11 +246,11 @@ func TestFileContentsListObjectParser(t *testing.T) {
 			model_filesystem.FileContentsList[object.LocalReference]{
 				{
 					EndBytes:  200,
-					Reference: model_core.NewDecodable(object.MustNewSHA256V1LocalReference("38dc1b3b70088a0bde56511eeb571e0b5aa873407ad198148befb347ef31282a", 200, 0, 0, 0), []byte{1, 2, 3, 4}),
+					Reference: util.Must(model_core.NewDecodable(object.MustNewSHA256V1LocalReference("38dc1b3b70088a0bde56511eeb571e0b5aa873407ad198148befb347ef31282a", 200, 0, 0, 0), []byte{1, 2, 3, 4})),
 				},
 				{
 					EndBytes:  500,
-					Reference: model_core.NewDecodable(object.MustNewSHA256V1LocalReference("635fef9b02b336f9254473d6b09c41f5027c38046c46bb514afc788292c1508e", 300, 0, 0, 0), []byte{1, 2, 3, 4}),
+					Reference: util.Must(model_core.NewDecodable(object.MustNewSHA256V1LocalReference("635fef9b02b336f9254473d6b09c41f5027c38046c46bb514afc788292c1508e", 300, 0, 0, 0), []byte{1, 2, 3, 4})),
 				},
 			},
 			fileContentsList,

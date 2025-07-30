@@ -64,7 +64,10 @@ func (ff *resolvableHandleAllocatingFileFactory) resolveHandle(r io.ByteReader) 
 			}
 			decodingParameters = append(decodingParameters, b)
 		}
-		reference = model_core.NewDecodable(localReference, decodingParameters)
+		reference, err = model_core.NewDecodable(localReference, decodingParameters)
+		if err != nil {
+			return virtual.DirectoryChild{}, virtual.StatusErrBadHandle
+		}
 	}
 
 	b, err := r.ReadByte()

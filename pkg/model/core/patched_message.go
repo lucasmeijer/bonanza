@@ -151,7 +151,7 @@ func MarshalAndEncode[TMetadata ReferenceMetadata](
 			Metadata: metadata,
 		},
 		decodingParameters,
-	), nil
+	)
 }
 
 // MarshalAny wraps a patched message into a model_core_pb.Any message.
