@@ -78,8 +78,7 @@ func (r *poolBackedParsedObjectReader[TReference, TParsedObject]) ReadParsedObje
 	}
 
 	insertionKey := ParsedObjectEvictionKey{
-		parserType: reflect.TypeOf(r.parser),
-		reference:  decodable,
+		reference: decodable,
 	}
 
 	i := r.ingester

@@ -240,16 +240,20 @@ func TestFileContentsListObjectParser(t *testing.T) {
 			/* decodingParameters = */ nil,
 		)
 		require.NoError(t, err)
+		decodable1, err := model_core.NewDecodable(object.MustNewSHA256V1LocalReference("38dc1b3b70088a0bde56511eeb571e0b5aa873407ad198148befb347ef31282a", 200, 0, 0, 0), []byte{1, 2, 3, 4})
+		require.NoError(t, err)
+		decodable2, err := model_core.NewDecodable(object.MustNewSHA256V1LocalReference("635fef9b02b336f9254473d6b09c41f5027c38046c46bb514afc788292c1508e", 300, 0, 0, 0), []byte{1, 2, 3, 4})
+		require.NoError(t, err)
 		require.Equal(
 			t,
 			model_filesystem.FileContentsList[object.LocalReference]{
 				{
 					EndBytes:  200,
-					Reference: model_core.NewDecodable(object.MustNewSHA256V1LocalReference("38dc1b3b70088a0bde56511eeb571e0b5aa873407ad198148befb347ef31282a", 200, 0, 0, 0), []byte{1, 2, 3, 4}),
+					Reference: decodable1,
 				},
 				{
 					EndBytes:  500,
-					Reference: model_core.NewDecodable(object.MustNewSHA256V1LocalReference("635fef9b02b336f9254473d6b09c41f5027c38046c46bb514afc788292c1508e", 300, 0, 0, 0), []byte{1, 2, 3, 4}),
+					Reference: decodable2,
 				},
 			},
 			fileContentsList,
