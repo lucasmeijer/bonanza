@@ -23,33 +23,42 @@ import (
 type Decodable[T any] struct {
 	Value T
 
-	// TODO: Considering that these parameters are at most
-	// aes.BlockSize bytes in size, would it make sense to replace
-	// this with a fixed size array?
-	decodingParameters string
+	// Lets use a fixed-size array for decoding parameters, so Decodable[] can be marshalled, and used as a key in a map.
+	// We know actual decoding parameters are always <=16 length.
+	decodingParameters       [16]byte
+	decodingParametersLength uint8
 }
 
 // NewDecodable is a helper function for creating instances of
 // Decodable[T].
-func NewDecodable[T any](value T, decodingParameters []byte) Decodable[T] {
-	return Decodable[T]{
-		Value:              value,
-		decodingParameters: string(decodingParameters),
+func NewDecodable[T any](value T, decodingParameters []byte) (Decodable[T], error) {
+	var d Decodable[T]
+	d.Value = value
+	if len(decodingParameters) > 16 {
+		return d, status.Errorf(
+			codes.InvalidArgument,
+			"DecodingParameters is %d bytes in size, which exceeds the permitted maximum of 16 bytes",
+			len(decodingParameters),
+		)
 	}
+	d.decodingParametersLength = uint8(len(decodingParameters))
+	copy(d.decodingParameters[:], decodingParameters)
+	return d, nil
 }
 
 // GetDecodingParameters returns the parameters needed to decode the
 // object associated with the value.
 func (d *Decodable[T]) GetDecodingParameters() []byte {
-	return []byte(d.decodingParameters)
+	return d.decodingParameters[:d.decodingParametersLength]
 }
 
 // CopyDecodable extracts the decoding parameters of a given
 // Decodable[T] and attaches it to another object.
 func CopyDecodable[T1, T2 any](from Decodable[T1], to T2) Decodable[T2] {
 	return Decodable[T2]{
-		Value:              to,
-		decodingParameters: from.decodingParameters,
+		Value:                    to,
+		decodingParameters:       from.decodingParameters,
+		decodingParametersLength: from.decodingParametersLength,
 	}
 }
 
@@ -78,7 +87,7 @@ func NewDecodableLocalReferenceFromString(referenceFormat object.ReferenceFormat
 		return bad, util.StatusWrapWithCode(err, codes.InvalidArgument, "Invalid decoding parameters")
 	}
 
-	return NewDecodable(localReference, decodingParameters), nil
+	return NewDecodable(localReference, decodingParameters)
 }
 
 // DecodableLocalReferenceToString converts a reference containing
@@ -103,7 +112,7 @@ func NewDecodableLocalReferenceFromWeakProto(referenceFormat object.ReferenceFor
 	if err != nil {
 		return Decodable[object.LocalReference]{}, err
 	}
-	return NewDecodable(localReference, m.DecodingParameters), nil
+	return NewDecodable(localReference, m.DecodingParameters)
 }
 
 // DecodableLocalReferenceToWeakProto converts a reference containing

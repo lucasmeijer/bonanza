@@ -72,5 +72,5 @@ func (p *FileCreationParameters) EncodeChunk(data []byte) (model_core.Decodable[
 	if err != nil {
 		return model_core.Decodable[*object.Contents]{}, err
 	}
-	return model_core.NewDecodable(contents, decodingParameters), nil
+	return model_core.NewDecodable(contents, decodingParameters)
 }

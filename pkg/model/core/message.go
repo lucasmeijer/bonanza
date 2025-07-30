@@ -80,7 +80,7 @@ func FlattenDecodableReference[TReference any](m Message[*model_core_pb.Decodabl
 	if err != nil {
 		return badReference, err
 	}
-	return NewDecodable[TReference](reference, m.Message.DecodingParameters), nil
+	return NewDecodable[TReference](reference, m.Message.DecodingParameters)
 }
 
 // FlattenReferenceSet returns the actual references that are contained
