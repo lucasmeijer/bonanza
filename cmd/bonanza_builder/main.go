@@ -35,6 +35,7 @@ import (
 	"bonanza.build/pkg/remoteworker"
 	"bonanza.build/pkg/storage/dag"
 	"bonanza.build/pkg/storage/object"
+	object_existenceprecondition "bonanza.build/pkg/storage/object/existenceprecondition"
 	object_grpc "bonanza.build/pkg/storage/object/grpc"
 	object_namespacemapping "bonanza.build/pkg/storage/object/namespacemapping"
 
@@ -74,8 +75,10 @@ func main() {
 		if err != nil {
 			return util.StatusWrap(err, "Failed to create storage gRPC client")
 		}
-		objectDownloader := object_grpc.NewGRPCDownloader(
-			object_pb.NewDownloaderClient(storageGRPCClient),
+		objectDownloader := object_existenceprecondition.NewDownloader(
+			object_grpc.NewGRPCDownloader(
+				object_pb.NewDownloaderClient(storageGRPCClient),
+			),
 		)
 		parsedObjectPool, err := model_parser.NewParsedObjectPoolFromConfiguration(configuration.ParsedObjectPool)
 		if err != nil {

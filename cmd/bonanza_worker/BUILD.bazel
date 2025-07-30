@@ -16,6 +16,7 @@ go_library(
         "//pkg/proto/storage/dag",
         "//pkg/proto/storage/object",
         "//pkg/remoteworker",
+        "//pkg/storage/object/existenceprecondition",
         "//pkg/storage/object/grpc",
         "@com_github_buildbarn_bb_remote_execution//pkg/clock",
         "@com_github_buildbarn_bb_remote_execution//pkg/filesystem/pool",

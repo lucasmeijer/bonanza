@@ -30,6 +30,7 @@ go_library(
         "//pkg/remoteworker",
         "//pkg/storage/dag",
         "//pkg/storage/object",
+        "//pkg/storage/object/existenceprecondition",
         "//pkg/storage/object/grpc",
         "//pkg/storage/object/namespacemapping",
         "@com_github_buildbarn_bb_remote_execution//pkg/filesystem/pool",

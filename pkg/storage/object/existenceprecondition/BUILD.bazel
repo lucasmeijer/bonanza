@@ -1,0 +1,13 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "existenceprecondition",
+    srcs = ["downloader.go"],
+    importpath = "bonanza.build/pkg/storage/object/existenceprecondition",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/storage/object",
+        "@org_golang_google_grpc//codes",
+        "@org_golang_google_grpc//status",
+    ],
+)
