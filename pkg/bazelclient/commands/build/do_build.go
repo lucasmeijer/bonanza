@@ -328,7 +328,7 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 		IgnoreRootModuleDevDependencies:        args.CommonFlags.IgnoreDevDependency,
 		BuiltinsModuleNames:                    args.CommonFlags.BuiltinsModule,
 		RepoPlatform:                           args.CommonFlags.RepoPlatform,
-		CommandEncoders:                        defaultEncoders,
+		ActionEncoders:                         defaultEncoders,
 		TargetPlatforms:                        targetPlatforms,
 		RuleImplementationWrapperIdentifier:    args.CommonFlags.RuleImplementationWrapperIdentifier,
 		SubruleImplementationWrapperIdentifier: args.CommonFlags.SubruleImplementationWrapperIdentifier,

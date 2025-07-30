@@ -26,13 +26,13 @@ import (
 )
 
 func (c *baseComputer[TReference, TMetadata]) ComputeRepoPlatformHostPathValue(ctx context.Context, key *model_analysis_pb.RepoPlatformHostPath_Key, e RepoPlatformHostPathEnvironment[TReference, TMetadata]) (PatchedRepoPlatformHostPathValue, error) {
-	commandEncoder, gotCommandEncoder := e.GetCommandEncoderObjectValue(&model_analysis_pb.CommandEncoderObject_Key{})
+	actionEncoder, gotActionEncoder := e.GetActionEncoderObjectValue(&model_analysis_pb.ActionEncoderObject_Key{})
 	directoryCreationParameters, gotDirectoryCreationParameters := e.GetDirectoryCreationParametersObjectValue(&model_analysis_pb.DirectoryCreationParametersObject_Key{})
 	directoryCreationParametersMessage := e.GetDirectoryCreationParametersValue(&model_analysis_pb.DirectoryCreationParameters_Key{})
 	directoryReaders, gotDirectoryReaders := e.GetDirectoryReadersValue(&model_analysis_pb.DirectoryReaders_Key{})
 	fileCreationParametersMessage := e.GetFileCreationParametersValue(&model_analysis_pb.FileCreationParameters_Key{})
 	repoPlatform := e.GetRegisteredRepoPlatformValue(&model_analysis_pb.RegisteredRepoPlatform_Key{})
-	if !gotCommandEncoder ||
+	if !gotActionEncoder ||
 		!gotDirectoryCreationParameters ||
 		!directoryCreationParametersMessage.IsSet() ||
 		!gotDirectoryReaders ||
@@ -50,7 +50,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRepoPlatformHostPathValue(c
 	referenceFormat := c.getReferenceFormat()
 	environmentVariableList, _, err := convertDictToEnvironmentVariableList(
 		environment,
-		commandEncoder,
+		actionEncoder,
 		referenceFormat,
 		model_core.WalkableCreatedObjectCapturer,
 	)
@@ -105,7 +105,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRepoPlatformHostPathValue(c
 			environmentVariableList.Patcher,
 		),
 		referenceFormat,
-		commandEncoder,
+		actionEncoder,
 	)
 	if err != nil {
 		return PatchedRepoPlatformHostPathValue{}, fmt.Errorf("failed to create command: %w", err)
@@ -140,7 +140,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeRepoPlatformHostPathValue(c
 			})
 		}),
 		referenceFormat,
-		commandEncoder,
+		actionEncoder,
 	)
 	if err != nil {
 		return PatchedRepoPlatformHostPathValue{}, fmt.Errorf("failed to create action: %w", err)

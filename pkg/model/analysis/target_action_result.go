@@ -37,7 +37,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 			model_core.MapReferenceMetadataToWalkers(patchedID2.Patcher),
 		),
 	)
-	commandEncoder, gotCommandEncoder := e.GetCommandEncoderObjectValue(&model_analysis_pb.CommandEncoderObject_Key{})
+	actionEncoder, gotActionEncoder := e.GetActionEncoderObjectValue(&model_analysis_pb.ActionEncoderObject_Key{})
 	directoryReaders, gotDirectoryReaders := e.GetDirectoryReadersValue(&model_analysis_pb.DirectoryReaders_Key{})
 	patchedID3 := model_core.Patch(e, id)
 	inputRoot := e.GetTargetActionInputRootValue(
@@ -48,7 +48,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 			model_core.MapReferenceMetadataToWalkers(patchedID3.Patcher),
 		),
 	)
-	if !action.IsSet() || !command.IsSet() || !gotCommandEncoder || !gotDirectoryReaders || !inputRoot.IsSet() {
+	if !action.IsSet() || !command.IsSet() || !gotActionEncoder || !gotDirectoryReaders || !inputRoot.IsSet() {
 		return PatchedTargetActionResultValue{}, evaluation.ErrMissingDependency
 	}
 
@@ -70,7 +70,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeTargetActionResultValue(ctx
 			})
 		}),
 		referenceFormat,
-		commandEncoder,
+		actionEncoder,
 	)
 	if err != nil {
 		return PatchedTargetActionResultValue{}, fmt.Errorf("failed to create action: %w", err)

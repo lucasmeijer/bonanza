@@ -24,9 +24,9 @@ import (
 )
 
 func (c *baseComputer[TReference, TMetadata]) ComputeActionResultValue(ctx context.Context, key model_core.Message[*model_analysis_pb.ActionResult_Key, TReference], e ActionResultEnvironment[TReference, TMetadata]) (PatchedActionResultValue, error) {
-	commandEncodersValue := e.GetCommandEncodersValue(&model_analysis_pb.CommandEncoders_Key{})
-	commandReaders, gotCommandReaders := e.GetCommandReadersValue(&model_analysis_pb.CommandReaders_Key{})
-	if !commandEncodersValue.IsSet() || !gotCommandReaders {
+	actionEncodersValue := e.GetActionEncodersValue(&model_analysis_pb.ActionEncoders_Key{})
+	actionReaders, gotActionReaders := e.GetActionReadersValue(&model_analysis_pb.ActionReaders_Key{})
+	if !actionEncodersValue.IsSet() || !gotActionReaders {
 		return PatchedActionResultValue{}, evaluation.ErrMissingDependency
 	}
 
@@ -50,7 +50,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeActionResultValue(ctx conte
 	if err != nil {
 		return PatchedActionResultValue{}, fmt.Errorf("invalid action reference: %w", err)
 	}
-	action, err := commandReaders.Action.ReadParsedObject(ctx, actionReference)
+	action, err := actionReaders.CommandAction.ReadParsedObject(ctx, actionReference)
 	if err != nil {
 		return PatchedActionResultValue{}, fmt.Errorf("failed to read action: %w", err)
 	}
@@ -67,7 +67,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeActionResultValue(ctx conte
 		platformECDHPublicKey,
 		&model_executewithstorage.Action[TReference]{
 			Reference: actionReference,
-			Encoders:  commandEncodersValue.Message.CommandEncoders,
+			Encoders:  actionEncodersValue.Message.ActionEncoders,
 			Format: &model_core_pb.ObjectFormat{
 				Format: &model_core_pb.ObjectFormat_ProtoTypeName{
 					ProtoTypeName: "bonanza.model.command.Action",
@@ -87,7 +87,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeActionResultValue(ctx conte
 		return PatchedActionResultValue{}, errExecution
 	}
 
-	result, err := commandReaders.Result.ReadParsedObject(ctx, resultReference)
+	result, err := actionReaders.CommandResult.ReadParsedObject(ctx, resultReference)
 	if err != nil {
 		return PatchedActionResultValue{}, fmt.Errorf("failed to read completion event: %w", err)
 	}
@@ -106,7 +106,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeActionResultValue(ctx conte
 
 func convertDictToEnvironmentVariableList[TMetadata model_core.ReferenceMetadata](
 	environment map[string]string,
-	commandEncoder model_encoding.BinaryEncoder,
+	actionEncoder model_encoding.BinaryEncoder,
 	referenceFormat object.ReferenceFormat,
 	capturer model_core.CreatedObjectCapturer[TMetadata],
 ) (model_core.PatchedMessage[[]*model_command_pb.EnvironmentVariableList_Element, TMetadata], btree.ParentNodeComputer[*model_command_pb.EnvironmentVariableList_Element, TMetadata], error) {
@@ -123,7 +123,7 @@ func convertDictToEnvironmentVariableList[TMetadata model_core.ReferenceMetadata
 		1<<16,
 		1<<18,
 		btree.NewObjectCreatingNodeMerger(
-			commandEncoder,
+			actionEncoder,
 			referenceFormat,
 			parentNodeComputer,
 		),

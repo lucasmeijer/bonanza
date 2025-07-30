@@ -12,11 +12,11 @@ genrule(
 go_library(
     name = "analysis",
     srcs = [
+        "action_encoders.go",
+        "action_readers.go",
         "action_result.go",
         "base_computer.go",
         "canonical_repo_name.go",
-        "command_encoders.go",
-        "command_readers.go",
         "compatible_execution_platforms.go",
         "compatible_toolchains_for_type.go",
         "compiled_bzl_file.go",

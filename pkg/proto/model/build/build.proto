@@ -97,9 +97,9 @@ message BuildSpecification {
   // module extensions and repository rules.
   string repo_platform = 10;
 
-  // Encoders that should be used when creating Command messages that
-  // are processed by workers.
-  repeated bonanza.model.encoding.BinaryEncoder command_encoders = 11;
+  // Encoders that should be used when creating Action and Result
+  // messages that are processed and created by workers.
+  repeated bonanza.model.encoding.BinaryEncoder action_encoders = 11;
 
   // Apparent labels of the platform()s for which targets need to be
   // built.

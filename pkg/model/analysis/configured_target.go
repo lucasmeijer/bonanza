@@ -581,7 +581,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 		}
 
 		allBuiltinsModulesNames := e.GetBuiltinsModuleNamesValue(&model_analysis_pb.BuiltinsModuleNames_Key{})
-		commandEncoder, gotCommandEncoder := e.GetCommandEncoderObjectValue(&model_analysis_pb.CommandEncoderObject_Key{})
+		actionEncoder, gotActionEncoder := e.GetActionEncoderObjectValue(&model_analysis_pb.ActionEncoderObject_Key{})
 		directoryCreationParameters, gotDirectoryCreationParameters := e.GetDirectoryCreationParametersObjectValue(&model_analysis_pb.DirectoryCreationParametersObject_Key{})
 		fileCreationParameters, gotFileCreationParameters := e.GetFileCreationParametersObjectValue(&model_analysis_pb.FileCreationParametersObject_Key{})
 		ruleValue := e.GetCompiledBzlFileGlobalValue(&model_analysis_pb.CompiledBzlFileGlobal_Key{
@@ -589,7 +589,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 		})
 		ruleImplementationWrappers, gotRuleImplementationWrappers := e.GetRuleImplementationWrappersValue(&model_analysis_pb.RuleImplementationWrappers_Key{})
 		if !allBuiltinsModulesNames.IsSet() ||
-			!gotCommandEncoder ||
+			!gotActionEncoder ||
 			!gotDirectoryCreationParameters ||
 			!gotFileCreationParameters ||
 			!ruleValue.IsSet() ||
@@ -1236,7 +1236,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeConfiguredTargetValue(ctx c
 			outputs:                     model_starlark.NewStructFromDict[TReference, TMetadata](nil, outputsValues),
 			execGroups:                  execGroups,
 			outputRegistrar:             &outputRegistrar,
-			commandEncoder:              commandEncoder,
+			actionEncoder:               actionEncoder,
 			directoryCreationParameters: directoryCreationParameters,
 			fileCreationParameters:      fileCreationParameters,
 		}
@@ -1675,7 +1675,7 @@ type ruleContext[TReference object.BasicReference, TMetadata BaseComputerReferen
 	execGroups                  []ruleContextExecGroupState
 	tags                        *starlark.List
 	outputRegistrar             *targetOutputRegistrar[TReference, TMetadata]
-	commandEncoder              model_encoding.BinaryEncoder
+	actionEncoder               model_encoding.BinaryEncoder
 	directoryCreationParameters *model_filesystem.DirectoryCreationParameters
 	fileCreationParameters      *model_filesystem.FileCreationParameters
 	actions                     []model_core.PatchedMessage[*model_analysis_pb.ConfiguredTarget_Value_Action_Leaf, TMetadata]
@@ -2494,7 +2494,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 
 	envList, envParentNodeComputer, err := convertDictToEnvironmentVariableList(
 		env,
-		rc.commandEncoder,
+		rc.actionEncoder,
 		valueEncodingOptions.ObjectReferenceFormat,
 		rc.environment,
 	)
@@ -2531,7 +2531,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 		outputPathPatternSet.Add(strings.SplitSeq(output.packageRelativePath.String(), "/"))
 	}
 	outputPathPatternChildren, err := outputPathPatternSet.ToProto(
-		rc.commandEncoder,
+		rc.actionEncoder,
 		rc.computer.getInlinedTreeOptions(),
 		rc.environment,
 	)
@@ -2662,7 +2662,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 			},
 			{
 				ExternalMessage: model_core.ProtoListToMarshalable(envList),
-				Encoder:         rc.commandEncoder,
+				Encoder:         rc.actionEncoder,
 				ParentAppender: func(
 					actionDefinition model_core.PatchedMessage[*model_analysis_pb.TargetActionDefinition, TMetadata],
 					externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
@@ -2707,7 +2707,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 			},
 			{
 				ExternalMessage: model_core.ProtoToMarshalable(outputPathPatternChildren),
-				Encoder:         rc.commandEncoder,
+				Encoder:         rc.actionEncoder,
 				ParentAppender: func(
 					actionDefinition model_core.PatchedMessage[*model_analysis_pb.TargetActionDefinition, TMetadata],
 					externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],
@@ -2722,7 +2722,7 @@ func (rca *ruleContextActions[TReference, TMetadata]) doRun(thread *starlark.Thr
 			},
 			{
 				ExternalMessage: model_core.ProtoToMarshalable(createdInitialOutputDirectory.Message),
-				Encoder:         rc.commandEncoder,
+				Encoder:         rc.actionEncoder,
 				ParentAppender: func(
 					actionDefinition model_core.PatchedMessage[*model_analysis_pb.TargetActionDefinition, TMetadata],
 					externalObject *model_core.Decodable[model_core.CreatedObject[TMetadata]],

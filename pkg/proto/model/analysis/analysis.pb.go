@@ -181,6 +181,114 @@ func (HttpArchiveContents_Key_Format) EnumDescriptor() ([]byte, []int) {
 	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{38, 0, 0}
 }
 
+type ActionEncoderObject struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ActionEncoderObject) Reset() {
+	*x = ActionEncoderObject{}
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ActionEncoderObject) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ActionEncoderObject) ProtoMessage() {}
+
+func (x *ActionEncoderObject) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ActionEncoderObject.ProtoReflect.Descriptor instead.
+func (*ActionEncoderObject) Descriptor() ([]byte, []int) {
+	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{0}
+}
+
+type ActionEncoders struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ActionEncoders) Reset() {
+	*x = ActionEncoders{}
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ActionEncoders) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ActionEncoders) ProtoMessage() {}
+
+func (x *ActionEncoders) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ActionEncoders.ProtoReflect.Descriptor instead.
+func (*ActionEncoders) Descriptor() ([]byte, []int) {
+	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{1}
+}
+
+type ActionReaders struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ActionReaders) Reset() {
+	*x = ActionReaders{}
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ActionReaders) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ActionReaders) ProtoMessage() {}
+
+func (x *ActionReaders) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ActionReaders.ProtoReflect.Descriptor instead.
+func (*ActionReaders) Descriptor() ([]byte, []int) {
+	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{2}
+}
+
 type ExecuteRequest struct {
 	state                 protoimpl.MessageState   `protogen:"open.v1"`
 	PlatformPkixPublicKey []byte                   `protobuf:"bytes,1,opt,name=platform_pkix_public_key,json=platformPkixPublicKey,proto3" json:"platform_pkix_public_key,omitempty"`
@@ -192,7 +300,7 @@ type ExecuteRequest struct {
 
 func (x *ExecuteRequest) Reset() {
 	*x = ExecuteRequest{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[0]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -204,7 +312,7 @@ func (x *ExecuteRequest) String() string {
 func (*ExecuteRequest) ProtoMessage() {}
 
 func (x *ExecuteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[0]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -217,7 +325,7 @@ func (x *ExecuteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExecuteRequest.ProtoReflect.Descriptor instead.
 func (*ExecuteRequest) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{0}
+	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ExecuteRequest) GetPlatformPkixPublicKey() []byte {
@@ -249,7 +357,7 @@ type ActionResult struct {
 
 func (x *ActionResult) Reset() {
 	*x = ActionResult{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[1]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -261,7 +369,7 @@ func (x *ActionResult) String() string {
 func (*ActionResult) ProtoMessage() {}
 
 func (x *ActionResult) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[1]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -274,7 +382,7 @@ func (x *ActionResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActionResult.ProtoReflect.Descriptor instead.
 func (*ActionResult) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{1}
+	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{4}
 }
 
 type BuildSpecification struct {
@@ -285,7 +393,7 @@ type BuildSpecification struct {
 
 func (x *BuildSpecification) Reset() {
 	*x = BuildSpecification{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[2]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -297,7 +405,7 @@ func (x *BuildSpecification) String() string {
 func (*BuildSpecification) ProtoMessage() {}
 
 func (x *BuildSpecification) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[2]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -310,7 +418,7 @@ func (x *BuildSpecification) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BuildSpecification.ProtoReflect.Descriptor instead.
 func (*BuildSpecification) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{2}
+	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{5}
 }
 
 type BuiltinsModuleNames struct {
@@ -321,7 +429,7 @@ type BuiltinsModuleNames struct {
 
 func (x *BuiltinsModuleNames) Reset() {
 	*x = BuiltinsModuleNames{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[3]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -333,7 +441,7 @@ func (x *BuiltinsModuleNames) String() string {
 func (*BuiltinsModuleNames) ProtoMessage() {}
 
 func (x *BuiltinsModuleNames) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[3]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -346,7 +454,7 @@ func (x *BuiltinsModuleNames) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BuiltinsModuleNames.ProtoReflect.Descriptor instead.
 func (*BuiltinsModuleNames) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{3}
+	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{6}
 }
 
 type BuildResult struct {
@@ -357,7 +465,7 @@ type BuildResult struct {
 
 func (x *BuildResult) Reset() {
 	*x = BuildResult{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[4]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -369,7 +477,7 @@ func (x *BuildResult) String() string {
 func (*BuildResult) ProtoMessage() {}
 
 func (x *BuildResult) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[4]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -382,7 +490,7 @@ func (x *BuildResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BuildResult.ProtoReflect.Descriptor instead.
 func (*BuildResult) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{4}
+	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{7}
 }
 
 type CanonicalRepoName struct {
@@ -393,7 +501,7 @@ type CanonicalRepoName struct {
 
 func (x *CanonicalRepoName) Reset() {
 	*x = CanonicalRepoName{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[5]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -405,7 +513,7 @@ func (x *CanonicalRepoName) String() string {
 func (*CanonicalRepoName) ProtoMessage() {}
 
 func (x *CanonicalRepoName) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[5]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -418,114 +526,6 @@ func (x *CanonicalRepoName) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CanonicalRepoName.ProtoReflect.Descriptor instead.
 func (*CanonicalRepoName) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{5}
-}
-
-type CommandEncoderObject struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *CommandEncoderObject) Reset() {
-	*x = CommandEncoderObject{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[6]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CommandEncoderObject) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CommandEncoderObject) ProtoMessage() {}
-
-func (x *CommandEncoderObject) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[6]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CommandEncoderObject.ProtoReflect.Descriptor instead.
-func (*CommandEncoderObject) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{6}
-}
-
-type CommandEncoders struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *CommandEncoders) Reset() {
-	*x = CommandEncoders{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[7]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CommandEncoders) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CommandEncoders) ProtoMessage() {}
-
-func (x *CommandEncoders) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[7]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CommandEncoders.ProtoReflect.Descriptor instead.
-func (*CommandEncoders) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{7}
-}
-
-type CommandReaders struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *CommandReaders) Reset() {
-	*x = CommandReaders{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[8]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CommandReaders) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CommandReaders) ProtoMessage() {}
-
-func (x *CommandReaders) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[8]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CommandReaders.ProtoReflect.Descriptor instead.
-func (*CommandReaders) Descriptor() ([]byte, []int) {
 	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{8}
 }
 
@@ -3899,6 +3899,158 @@ func (*VisibleTarget) Descriptor() ([]byte, []int) {
 	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{87}
 }
 
+type ActionEncoderObject_Key struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ActionEncoderObject_Key) Reset() {
+	*x = ActionEncoderObject_Key{}
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[88]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ActionEncoderObject_Key) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ActionEncoderObject_Key) ProtoMessage() {}
+
+func (x *ActionEncoderObject_Key) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[88]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ActionEncoderObject_Key.ProtoReflect.Descriptor instead.
+func (*ActionEncoderObject_Key) Descriptor() ([]byte, []int) {
+	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{0, 0}
+}
+
+type ActionEncoders_Key struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ActionEncoders_Key) Reset() {
+	*x = ActionEncoders_Key{}
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[89]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ActionEncoders_Key) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ActionEncoders_Key) ProtoMessage() {}
+
+func (x *ActionEncoders_Key) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[89]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ActionEncoders_Key.ProtoReflect.Descriptor instead.
+func (*ActionEncoders_Key) Descriptor() ([]byte, []int) {
+	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{1, 0}
+}
+
+type ActionEncoders_Value struct {
+	state          protoimpl.MessageState    `protogen:"open.v1"`
+	ActionEncoders []*encoding.BinaryEncoder `protobuf:"bytes,1,rep,name=action_encoders,json=actionEncoders,proto3" json:"action_encoders,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ActionEncoders_Value) Reset() {
+	*x = ActionEncoders_Value{}
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[90]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ActionEncoders_Value) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ActionEncoders_Value) ProtoMessage() {}
+
+func (x *ActionEncoders_Value) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[90]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ActionEncoders_Value.ProtoReflect.Descriptor instead.
+func (*ActionEncoders_Value) Descriptor() ([]byte, []int) {
+	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{1, 1}
+}
+
+func (x *ActionEncoders_Value) GetActionEncoders() []*encoding.BinaryEncoder {
+	if x != nil {
+		return x.ActionEncoders
+	}
+	return nil
+}
+
+type ActionReaders_Key struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ActionReaders_Key) Reset() {
+	*x = ActionReaders_Key{}
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[91]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ActionReaders_Key) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ActionReaders_Key) ProtoMessage() {}
+
+func (x *ActionReaders_Key) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[91]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ActionReaders_Key.ProtoReflect.Descriptor instead.
+func (*ActionReaders_Key) Descriptor() ([]byte, []int) {
+	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{2, 0}
+}
+
 type ActionResult_Key struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	ExecuteRequest *ExecuteRequest        `protobuf:"bytes,1,opt,name=execute_request,json=executeRequest,proto3" json:"execute_request,omitempty"`
@@ -3908,7 +4060,7 @@ type ActionResult_Key struct {
 
 func (x *ActionResult_Key) Reset() {
 	*x = ActionResult_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[88]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[92]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3920,7 +4072,7 @@ func (x *ActionResult_Key) String() string {
 func (*ActionResult_Key) ProtoMessage() {}
 
 func (x *ActionResult_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[88]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[92]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3933,7 +4085,7 @@ func (x *ActionResult_Key) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActionResult_Key.ProtoReflect.Descriptor instead.
 func (*ActionResult_Key) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{1, 0}
+	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{4, 0}
 }
 
 func (x *ActionResult_Key) GetExecuteRequest() *ExecuteRequest {
@@ -3953,7 +4105,7 @@ type ActionResult_Value struct {
 
 func (x *ActionResult_Value) Reset() {
 	*x = ActionResult_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[89]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[93]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3965,7 +4117,7 @@ func (x *ActionResult_Value) String() string {
 func (*ActionResult_Value) ProtoMessage() {}
 
 func (x *ActionResult_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[89]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[93]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3978,7 +4130,7 @@ func (x *ActionResult_Value) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActionResult_Value.ProtoReflect.Descriptor instead.
 func (*ActionResult_Value) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{1, 1}
+	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{4, 1}
 }
 
 func (x *ActionResult_Value) GetExitCode() int64 {
@@ -4003,7 +4155,7 @@ type BuildSpecification_Key struct {
 
 func (x *BuildSpecification_Key) Reset() {
 	*x = BuildSpecification_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[90]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[94]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4015,7 +4167,7 @@ func (x *BuildSpecification_Key) String() string {
 func (*BuildSpecification_Key) ProtoMessage() {}
 
 func (x *BuildSpecification_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[90]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[94]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4028,7 +4180,7 @@ func (x *BuildSpecification_Key) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BuildSpecification_Key.ProtoReflect.Descriptor instead.
 func (*BuildSpecification_Key) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{2, 0}
+	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{5, 0}
 }
 
 type BuildSpecification_Value struct {
@@ -4040,7 +4192,7 @@ type BuildSpecification_Value struct {
 
 func (x *BuildSpecification_Value) Reset() {
 	*x = BuildSpecification_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[91]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[95]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4052,7 +4204,7 @@ func (x *BuildSpecification_Value) String() string {
 func (*BuildSpecification_Value) ProtoMessage() {}
 
 func (x *BuildSpecification_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[91]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[95]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4065,7 +4217,7 @@ func (x *BuildSpecification_Value) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BuildSpecification_Value.ProtoReflect.Descriptor instead.
 func (*BuildSpecification_Value) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{2, 1}
+	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{5, 1}
 }
 
 func (x *BuildSpecification_Value) GetBuildSpecification() *build.BuildSpecification {
@@ -4083,7 +4235,7 @@ type BuiltinsModuleNames_Key struct {
 
 func (x *BuiltinsModuleNames_Key) Reset() {
 	*x = BuiltinsModuleNames_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[92]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[96]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4095,7 +4247,7 @@ func (x *BuiltinsModuleNames_Key) String() string {
 func (*BuiltinsModuleNames_Key) ProtoMessage() {}
 
 func (x *BuiltinsModuleNames_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[92]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[96]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4108,7 +4260,7 @@ func (x *BuiltinsModuleNames_Key) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BuiltinsModuleNames_Key.ProtoReflect.Descriptor instead.
 func (*BuiltinsModuleNames_Key) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{3, 0}
+	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{6, 0}
 }
 
 type BuiltinsModuleNames_Value struct {
@@ -4120,7 +4272,7 @@ type BuiltinsModuleNames_Value struct {
 
 func (x *BuiltinsModuleNames_Value) Reset() {
 	*x = BuiltinsModuleNames_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[93]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[97]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4132,7 +4284,7 @@ func (x *BuiltinsModuleNames_Value) String() string {
 func (*BuiltinsModuleNames_Value) ProtoMessage() {}
 
 func (x *BuiltinsModuleNames_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[93]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[97]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4145,7 +4297,7 @@ func (x *BuiltinsModuleNames_Value) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BuiltinsModuleNames_Value.ProtoReflect.Descriptor instead.
 func (*BuiltinsModuleNames_Value) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{3, 1}
+	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{6, 1}
 }
 
 func (x *BuiltinsModuleNames_Value) GetBuiltinsModuleNames() []string {
@@ -4163,7 +4315,7 @@ type BuildResult_Key struct {
 
 func (x *BuildResult_Key) Reset() {
 	*x = BuildResult_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[94]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[98]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4175,7 +4327,7 @@ func (x *BuildResult_Key) String() string {
 func (*BuildResult_Key) ProtoMessage() {}
 
 func (x *BuildResult_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[94]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[98]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4188,7 +4340,7 @@ func (x *BuildResult_Key) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BuildResult_Key.ProtoReflect.Descriptor instead.
 func (*BuildResult_Key) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{4, 0}
+	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{7, 0}
 }
 
 type BuildResult_Value struct {
@@ -4199,7 +4351,7 @@ type BuildResult_Value struct {
 
 func (x *BuildResult_Value) Reset() {
 	*x = BuildResult_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[95]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[99]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4211,7 +4363,7 @@ func (x *BuildResult_Value) String() string {
 func (*BuildResult_Value) ProtoMessage() {}
 
 func (x *BuildResult_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[95]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[99]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4224,7 +4376,7 @@ func (x *BuildResult_Value) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BuildResult_Value.ProtoReflect.Descriptor instead.
 func (*BuildResult_Value) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{4, 1}
+	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{7, 1}
 }
 
 type CanonicalRepoName_Key struct {
@@ -4237,7 +4389,7 @@ type CanonicalRepoName_Key struct {
 
 func (x *CanonicalRepoName_Key) Reset() {
 	*x = CanonicalRepoName_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[96]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[100]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4249,7 +4401,7 @@ func (x *CanonicalRepoName_Key) String() string {
 func (*CanonicalRepoName_Key) ProtoMessage() {}
 
 func (x *CanonicalRepoName_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[96]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[100]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4262,7 +4414,7 @@ func (x *CanonicalRepoName_Key) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CanonicalRepoName_Key.ProtoReflect.Descriptor instead.
 func (*CanonicalRepoName_Key) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{5, 0}
+	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{8, 0}
 }
 
 func (x *CanonicalRepoName_Key) GetFromCanonicalRepo() string {
@@ -4288,7 +4440,7 @@ type CanonicalRepoName_Value struct {
 
 func (x *CanonicalRepoName_Value) Reset() {
 	*x = CanonicalRepoName_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[97]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[101]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4300,7 +4452,7 @@ func (x *CanonicalRepoName_Value) String() string {
 func (*CanonicalRepoName_Value) ProtoMessage() {}
 
 func (x *CanonicalRepoName_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[97]
+	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[101]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4313,7 +4465,7 @@ func (x *CanonicalRepoName_Value) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CanonicalRepoName_Value.ProtoReflect.Descriptor instead.
 func (*CanonicalRepoName_Value) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{5, 1}
+	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{8, 1}
 }
 
 func (x *CanonicalRepoName_Value) GetToCanonicalRepo() string {
@@ -4321,158 +4473,6 @@ func (x *CanonicalRepoName_Value) GetToCanonicalRepo() string {
 		return x.ToCanonicalRepo
 	}
 	return ""
-}
-
-type CommandEncoderObject_Key struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *CommandEncoderObject_Key) Reset() {
-	*x = CommandEncoderObject_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[98]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CommandEncoderObject_Key) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CommandEncoderObject_Key) ProtoMessage() {}
-
-func (x *CommandEncoderObject_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[98]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CommandEncoderObject_Key.ProtoReflect.Descriptor instead.
-func (*CommandEncoderObject_Key) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{6, 0}
-}
-
-type CommandEncoders_Key struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *CommandEncoders_Key) Reset() {
-	*x = CommandEncoders_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[99]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CommandEncoders_Key) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CommandEncoders_Key) ProtoMessage() {}
-
-func (x *CommandEncoders_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[99]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CommandEncoders_Key.ProtoReflect.Descriptor instead.
-func (*CommandEncoders_Key) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{7, 0}
-}
-
-type CommandEncoders_Value struct {
-	state           protoimpl.MessageState    `protogen:"open.v1"`
-	CommandEncoders []*encoding.BinaryEncoder `protobuf:"bytes,1,rep,name=command_encoders,json=commandEncoders,proto3" json:"command_encoders,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
-}
-
-func (x *CommandEncoders_Value) Reset() {
-	*x = CommandEncoders_Value{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[100]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CommandEncoders_Value) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CommandEncoders_Value) ProtoMessage() {}
-
-func (x *CommandEncoders_Value) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[100]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CommandEncoders_Value.ProtoReflect.Descriptor instead.
-func (*CommandEncoders_Value) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{7, 1}
-}
-
-func (x *CommandEncoders_Value) GetCommandEncoders() []*encoding.BinaryEncoder {
-	if x != nil {
-		return x.CommandEncoders
-	}
-	return nil
-}
-
-type CommandReaders_Key struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *CommandReaders_Key) Reset() {
-	*x = CommandReaders_Key{}
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[101]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CommandReaders_Key) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CommandReaders_Key) ProtoMessage() {}
-
-func (x *CommandReaders_Key) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_model_analysis_analysis_proto_msgTypes[101]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CommandReaders_Key.ProtoReflect.Descriptor instead.
-func (*CommandReaders_Key) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_model_analysis_analysis_proto_rawDescGZIP(), []int{8, 0}
 }
 
 type CompatibleExecutionPlatforms_Key struct {
@@ -12227,7 +12227,15 @@ var File_pkg_proto_model_analysis_analysis_proto protoreflect.FileDescriptor
 
 const file_pkg_proto_model_analysis_analysis_proto_rawDesc = "" +
 	"\n" +
-	"'pkg/proto/model/analysis/analysis.proto\x12\x16bonanza.model.analysis\x1a\x1egoogle/protobuf/duration.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1egoogle/protobuf/wrappers.proto\x1a!pkg/proto/model/build/build.proto\x1a%pkg/proto/model/command/command.proto\x1a\x1fpkg/proto/model/core/core.proto\x1a'pkg/proto/model/encoding/encoding.proto\x1a!pkg/proto/model/fetch/fetch.proto\x1a+pkg/proto/model/filesystem/filesystem.proto\x1a'pkg/proto/model/starlark/starlark.proto\"\x88\x02\n" +
+	"'pkg/proto/model/analysis/analysis.proto\x12\x16bonanza.model.analysis\x1a\x1egoogle/protobuf/duration.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1egoogle/protobuf/wrappers.proto\x1a!pkg/proto/model/build/build.proto\x1a%pkg/proto/model/command/command.proto\x1a\x1fpkg/proto/model/core/core.proto\x1a'pkg/proto/model/encoding/encoding.proto\x1a!pkg/proto/model/fetch/fetch.proto\x1a+pkg/proto/model/filesystem/filesystem.proto\x1a'pkg/proto/model/starlark/starlark.proto\"\x1c\n" +
+	"\x13ActionEncoderObject\x1a\x05\n" +
+	"\x03Key\"p\n" +
+	"\x0eActionEncoders\x1a\x05\n" +
+	"\x03Key\x1aW\n" +
+	"\x05Value\x12N\n" +
+	"\x0faction_encoders\x18\x01 \x03(\v2%.bonanza.model.encoding.BinaryEncoderR\x0eactionEncoders\"\x16\n" +
+	"\rActionReaders\x1a\x05\n" +
+	"\x03Key\"\x88\x02\n" +
 	"\x0eExecuteRequest\x127\n" +
 	"\x18platform_pkix_public_key\x18\x01 \x01(\fR\x15platformPkixPublicKey\x12u\n" +
 	"\x10action_reference\x18\x02 \x01(\v2&.bonanza.model.core.DecodableReferenceB\"\xea\xd7 \x1e\x12\x1cbonanza.model.command.ActionR\x0factionReference\x12F\n" +
@@ -12254,15 +12262,7 @@ const file_pkg_proto_model_analysis_analysis_proto_rawDesc = "" +
 	"\x13from_canonical_repo\x18\x01 \x01(\tR\x11fromCanonicalRepo\x12(\n" +
 	"\x10to_apparent_repo\x18\x02 \x01(\tR\x0etoApparentRepo\x1a3\n" +
 	"\x05Value\x12*\n" +
-	"\x11to_canonical_repo\x18\x01 \x01(\tR\x0ftoCanonicalRepo\"\x1d\n" +
-	"\x14CommandEncoderObject\x1a\x05\n" +
-	"\x03Key\"s\n" +
-	"\x0fCommandEncoders\x1a\x05\n" +
-	"\x03Key\x1aY\n" +
-	"\x05Value\x12P\n" +
-	"\x10command_encoders\x18\x01 \x03(\v2%.bonanza.model.encoding.BinaryEncoderR\x0fcommandEncoders\"\x17\n" +
-	"\x0eCommandReaders\x1a\x05\n" +
-	"\x03Key\"\xd0\x01\n" +
+	"\x11to_canonical_repo\x18\x01 \x01(\tR\x0ftoCanonicalRepo\"\xd0\x01\n" +
 	"\x1cCompatibleExecutionPlatforms\x1aK\n" +
 	"\x03Key\x12D\n" +
 	"\vconstraints\x18\x01 \x03(\v2\".bonanza.model.analysis.ConstraintR\vconstraints\x1ac\n" +
@@ -12859,15 +12859,15 @@ var file_pkg_proto_model_analysis_analysis_proto_goTypes = []any{
 	(DirectoryLayout)(0),                                       // 0: bonanza.model.analysis.DirectoryLayout
 	(Args_Leaf_UseParamFile_Format)(0),                         // 1: bonanza.model.analysis.Args.Leaf.UseParamFile.Format
 	(HttpArchiveContents_Key_Format)(0),                        // 2: bonanza.model.analysis.HttpArchiveContents.Key.Format
-	(*ExecuteRequest)(nil),                                     // 3: bonanza.model.analysis.ExecuteRequest
-	(*ActionResult)(nil),                                       // 4: bonanza.model.analysis.ActionResult
-	(*BuildSpecification)(nil),                                 // 5: bonanza.model.analysis.BuildSpecification
-	(*BuiltinsModuleNames)(nil),                                // 6: bonanza.model.analysis.BuiltinsModuleNames
-	(*BuildResult)(nil),                                        // 7: bonanza.model.analysis.BuildResult
-	(*CanonicalRepoName)(nil),                                  // 8: bonanza.model.analysis.CanonicalRepoName
-	(*CommandEncoderObject)(nil),                               // 9: bonanza.model.analysis.CommandEncoderObject
-	(*CommandEncoders)(nil),                                    // 10: bonanza.model.analysis.CommandEncoders
-	(*CommandReaders)(nil),                                     // 11: bonanza.model.analysis.CommandReaders
+	(*ActionEncoderObject)(nil),                                // 3: bonanza.model.analysis.ActionEncoderObject
+	(*ActionEncoders)(nil),                                     // 4: bonanza.model.analysis.ActionEncoders
+	(*ActionReaders)(nil),                                      // 5: bonanza.model.analysis.ActionReaders
+	(*ExecuteRequest)(nil),                                     // 6: bonanza.model.analysis.ExecuteRequest
+	(*ActionResult)(nil),                                       // 7: bonanza.model.analysis.ActionResult
+	(*BuildSpecification)(nil),                                 // 8: bonanza.model.analysis.BuildSpecification
+	(*BuiltinsModuleNames)(nil),                                // 9: bonanza.model.analysis.BuiltinsModuleNames
+	(*BuildResult)(nil),                                        // 10: bonanza.model.analysis.BuildResult
+	(*CanonicalRepoName)(nil),                                  // 11: bonanza.model.analysis.CanonicalRepoName
 	(*CompatibleExecutionPlatforms)(nil),                       // 12: bonanza.model.analysis.CompatibleExecutionPlatforms
 	(*CompatibleToolchainsForType)(nil),                        // 13: bonanza.model.analysis.CompatibleToolchainsForType
 	(*CompiledBzlFile)(nil),                                    // 14: bonanza.model.analysis.CompiledBzlFile
@@ -12947,20 +12947,20 @@ var file_pkg_proto_model_analysis_analysis_proto_goTypes = []any{
 	(*UsedModuleExtensions)(nil),                               // 88: bonanza.model.analysis.UsedModuleExtensions
 	(*UserDefinedTransition)(nil),                              // 89: bonanza.model.analysis.UserDefinedTransition
 	(*VisibleTarget)(nil),                                      // 90: bonanza.model.analysis.VisibleTarget
-	(*ActionResult_Key)(nil),                                   // 91: bonanza.model.analysis.ActionResult.Key
-	(*ActionResult_Value)(nil),                                 // 92: bonanza.model.analysis.ActionResult.Value
-	(*BuildSpecification_Key)(nil),                             // 93: bonanza.model.analysis.BuildSpecification.Key
-	(*BuildSpecification_Value)(nil),                           // 94: bonanza.model.analysis.BuildSpecification.Value
-	(*BuiltinsModuleNames_Key)(nil),                            // 95: bonanza.model.analysis.BuiltinsModuleNames.Key
-	(*BuiltinsModuleNames_Value)(nil),                          // 96: bonanza.model.analysis.BuiltinsModuleNames.Value
-	(*BuildResult_Key)(nil),                                    // 97: bonanza.model.analysis.BuildResult.Key
-	(*BuildResult_Value)(nil),                                  // 98: bonanza.model.analysis.BuildResult.Value
-	(*CanonicalRepoName_Key)(nil),                              // 99: bonanza.model.analysis.CanonicalRepoName.Key
-	(*CanonicalRepoName_Value)(nil),                            // 100: bonanza.model.analysis.CanonicalRepoName.Value
-	(*CommandEncoderObject_Key)(nil),                           // 101: bonanza.model.analysis.CommandEncoderObject.Key
-	(*CommandEncoders_Key)(nil),                                // 102: bonanza.model.analysis.CommandEncoders.Key
-	(*CommandEncoders_Value)(nil),                              // 103: bonanza.model.analysis.CommandEncoders.Value
-	(*CommandReaders_Key)(nil),                                 // 104: bonanza.model.analysis.CommandReaders.Key
+	(*ActionEncoderObject_Key)(nil),                            // 91: bonanza.model.analysis.ActionEncoderObject.Key
+	(*ActionEncoders_Key)(nil),                                 // 92: bonanza.model.analysis.ActionEncoders.Key
+	(*ActionEncoders_Value)(nil),                               // 93: bonanza.model.analysis.ActionEncoders.Value
+	(*ActionReaders_Key)(nil),                                  // 94: bonanza.model.analysis.ActionReaders.Key
+	(*ActionResult_Key)(nil),                                   // 95: bonanza.model.analysis.ActionResult.Key
+	(*ActionResult_Value)(nil),                                 // 96: bonanza.model.analysis.ActionResult.Value
+	(*BuildSpecification_Key)(nil),                             // 97: bonanza.model.analysis.BuildSpecification.Key
+	(*BuildSpecification_Value)(nil),                           // 98: bonanza.model.analysis.BuildSpecification.Value
+	(*BuiltinsModuleNames_Key)(nil),                            // 99: bonanza.model.analysis.BuiltinsModuleNames.Key
+	(*BuiltinsModuleNames_Value)(nil),                          // 100: bonanza.model.analysis.BuiltinsModuleNames.Value
+	(*BuildResult_Key)(nil),                                    // 101: bonanza.model.analysis.BuildResult.Key
+	(*BuildResult_Value)(nil),                                  // 102: bonanza.model.analysis.BuildResult.Value
+	(*CanonicalRepoName_Key)(nil),                              // 103: bonanza.model.analysis.CanonicalRepoName.Key
+	(*CanonicalRepoName_Value)(nil),                            // 104: bonanza.model.analysis.CanonicalRepoName.Value
 	(*CompatibleExecutionPlatforms_Key)(nil),                   // 105: bonanza.model.analysis.CompatibleExecutionPlatforms.Key
 	(*CompatibleExecutionPlatforms_Value)(nil),                 // 106: bonanza.model.analysis.CompatibleExecutionPlatforms.Value
 	(*CompatibleToolchainsForType_Key)(nil),                    // 107: bonanza.model.analysis.CompatibleToolchainsForType.Key
@@ -13129,8 +13129,8 @@ var file_pkg_proto_model_analysis_analysis_proto_goTypes = []any{
 	(*filesystem.DirectoryContents)(nil),                       // 270: bonanza.model.filesystem.DirectoryContents
 	(*fetch.Target)(nil),                                       // 271: bonanza.model.fetch.Target
 	(*starlark.Repo_Definition)(nil),                           // 272: bonanza.model.starlark.Repo.Definition
-	(*build.BuildSpecification)(nil),                           // 273: bonanza.model.build.BuildSpecification
-	(*encoding.BinaryEncoder)(nil),                             // 274: bonanza.model.encoding.BinaryEncoder
+	(*encoding.BinaryEncoder)(nil),                             // 273: bonanza.model.encoding.BinaryEncoder
+	(*build.BuildSpecification)(nil),                           // 274: bonanza.model.build.BuildSpecification
 	(*starlark.CompiledProgram)(nil),                           // 275: bonanza.model.starlark.CompiledProgram
 	(*starlark.Value)(nil),                                     // 276: bonanza.model.starlark.Value
 	(*wrapperspb.StringValue)(nil),                             // 277: google.protobuf.StringValue
@@ -13179,10 +13179,10 @@ var file_pkg_proto_model_analysis_analysis_proto_depIdxs = []int32{
 	60,  // 23: bonanza.model.analysis.RegisteredToolchain.target_compatible_with:type_name -> bonanza.model.analysis.Constraint
 	264, // 24: bonanza.model.analysis.TargetActionId.configuration_reference:type_name -> bonanza.model.core.DecodableReference
 	250, // 25: bonanza.model.analysis.ModuleExtension.users:type_name -> bonanza.model.analysis.ModuleExtension.User
-	3,   // 26: bonanza.model.analysis.ActionResult.Key.execute_request:type_name -> bonanza.model.analysis.ExecuteRequest
-	264, // 27: bonanza.model.analysis.ActionResult.Value.outputs_reference:type_name -> bonanza.model.core.DecodableReference
-	273, // 28: bonanza.model.analysis.BuildSpecification.Value.build_specification:type_name -> bonanza.model.build.BuildSpecification
-	274, // 29: bonanza.model.analysis.CommandEncoders.Value.command_encoders:type_name -> bonanza.model.encoding.BinaryEncoder
+	273, // 26: bonanza.model.analysis.ActionEncoders.Value.action_encoders:type_name -> bonanza.model.encoding.BinaryEncoder
+	6,   // 27: bonanza.model.analysis.ActionResult.Key.execute_request:type_name -> bonanza.model.analysis.ExecuteRequest
+	264, // 28: bonanza.model.analysis.ActionResult.Value.outputs_reference:type_name -> bonanza.model.core.DecodableReference
+	274, // 29: bonanza.model.analysis.BuildSpecification.Value.build_specification:type_name -> bonanza.model.build.BuildSpecification
 	60,  // 30: bonanza.model.analysis.CompatibleExecutionPlatforms.Key.constraints:type_name -> bonanza.model.analysis.Constraint
 	61,  // 31: bonanza.model.analysis.CompatibleExecutionPlatforms.Value.execution_platforms:type_name -> bonanza.model.analysis.ExecutionPlatform
 	264, // 32: bonanza.model.analysis.CompatibleToolchainsForType.Key.configuration_reference:type_name -> bonanza.model.core.DecodableReference
@@ -13278,7 +13278,7 @@ var file_pkg_proto_model_analysis_analysis_proto_depIdxs = []int32{
 	264, // 122: bonanza.model.analysis.ResolvedToolchains.Key.configuration_reference:type_name -> bonanza.model.core.DecodableReference
 	291, // 123: bonanza.model.analysis.ResolvedToolchains.Key.toolchains:type_name -> bonanza.model.starlark.ToolchainType
 	264, // 124: bonanza.model.analysis.Select.Key.configuration_reference:type_name -> bonanza.model.core.DecodableReference
-	3,   // 125: bonanza.model.analysis.SuccessfulActionResult.Key.execute_request:type_name -> bonanza.model.analysis.ExecuteRequest
+	6,   // 125: bonanza.model.analysis.SuccessfulActionResult.Key.execute_request:type_name -> bonanza.model.analysis.ExecuteRequest
 	264, // 126: bonanza.model.analysis.SuccessfulActionResult.Value.outputs_reference:type_name -> bonanza.model.core.DecodableReference
 	292, // 127: bonanza.model.analysis.Target.Value.definition:type_name -> bonanza.model.starlark.Target.Definition
 	78,  // 128: bonanza.model.analysis.TargetAction.Key.id:type_name -> bonanza.model.analysis.TargetActionId

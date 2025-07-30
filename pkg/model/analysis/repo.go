@@ -1261,8 +1261,8 @@ func newRepositoryOS[TReference object.BasicReference, TMetadata BaseComputerRef
 type moduleOrRepositoryContextEnvironment[TReference object.BasicReference, TMetadata any] interface {
 	model_core.ExistingObjectCapturer[TReference, TMetadata]
 
+	GetActionEncoderObjectValue(*model_analysis_pb.ActionEncoderObject_Key) (model_encoding.BinaryEncoder, bool)
 	GetActionResultValue(model_core.PatchedMessage[*model_analysis_pb.ActionResult_Key, dag.ObjectContentsWalker]) model_core.Message[*model_analysis_pb.ActionResult_Value, TReference]
-	GetCommandEncoderObjectValue(*model_analysis_pb.CommandEncoderObject_Key) (model_encoding.BinaryEncoder, bool)
 	GetDirectoryCreationParametersObjectValue(*model_analysis_pb.DirectoryCreationParametersObject_Key) (*model_filesystem.DirectoryCreationParameters, bool)
 	GetDirectoryCreationParametersValue(*model_analysis_pb.DirectoryCreationParameters_Key) model_core.Message[*model_analysis_pb.DirectoryCreationParameters_Value, TReference]
 	GetDirectoryReadersValue(key *model_analysis_pb.DirectoryReaders_Key) (*DirectoryReaders[TReference], bool)
@@ -1285,7 +1285,7 @@ type moduleOrRepositoryContext[TReference object.BasicReference, TMetadata BaseC
 	environment            moduleOrRepositoryContextEnvironment[TReference, TMetadata]
 	subdirectoryComponents []path.Component
 
-	commandEncoder                     model_encoding.BinaryEncoder
+	actionEncoder                      model_encoding.BinaryEncoder
 	defaultWorkingDirectoryPath        *model_starlark.BarePath
 	directoryCreationParameters        *model_filesystem.DirectoryCreationParameters
 	directoryCreationParametersMessage *model_filesystem_pb.DirectoryCreationParameters
@@ -1332,10 +1332,10 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) resolveRepoDirector
 	return repoDirectory, nil
 }
 
-func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) maybeGetCommandEncoder() {
-	if mrc.commandEncoder == nil {
-		if v, ok := mrc.environment.GetCommandEncoderObjectValue(&model_analysis_pb.CommandEncoderObject_Key{}); ok {
-			mrc.commandEncoder = v
+func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) maybeGetActionEncoder() {
+	if mrc.actionEncoder == nil {
+		if v, ok := mrc.environment.GetActionEncoderObjectValue(&model_analysis_pb.ActionEncoderObject_Key{}); ok {
+			mrc.actionEncoder = v
 		}
 	}
 }
@@ -1724,7 +1724,7 @@ func bytesToValidString(p []byte) (string, bool) {
 	}
 }
 
-func newArgumentsBuilder[TMetadata model_core.ReferenceMetadata](commandEncoder model_encoding.BinaryEncoder, referenceFormat object.ReferenceFormat, objectCapturer model_core.CreatedObjectCapturer[TMetadata]) (btree.Builder[*model_command_pb.ArgumentList_Element, TMetadata], btree.ParentNodeComputer[*model_command_pb.ArgumentList_Element, TMetadata]) {
+func newArgumentsBuilder[TMetadata model_core.ReferenceMetadata](actionEncoder model_encoding.BinaryEncoder, referenceFormat object.ReferenceFormat, objectCapturer model_core.CreatedObjectCapturer[TMetadata]) (btree.Builder[*model_command_pb.ArgumentList_Element, TMetadata], btree.ParentNodeComputer[*model_command_pb.ArgumentList_Element, TMetadata]) {
 	parentNodeComputer := func(createdObject model_core.Decodable[model_core.CreatedObject[TMetadata]], childNodes []*model_command_pb.ArgumentList_Element) model_core.PatchedMessage[*model_command_pb.ArgumentList_Element, TMetadata] {
 		return model_core.BuildPatchedMessage(func(patcher *model_core.ReferenceMessagePatcher[TMetadata]) *model_command_pb.ArgumentList_Element {
 			return &model_command_pb.ArgumentList_Element{
@@ -1738,7 +1738,7 @@ func newArgumentsBuilder[TMetadata model_core.ReferenceMetadata](commandEncoder 
 		1<<16,
 		1<<18,
 		btree.NewObjectCreatingNodeMerger(
-			commandEncoder,
+			actionEncoder,
 			referenceFormat,
 			parentNodeComputer,
 		),
@@ -1746,7 +1746,7 @@ func newArgumentsBuilder[TMetadata model_core.ReferenceMetadata](commandEncoder 
 }
 
 func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	mrc.maybeGetCommandEncoder()
+	mrc.maybeGetActionEncoder()
 	mrc.maybeGetDirectoryCreationParameters()
 	mrc.maybeGetDirectoryCreationParametersMessage()
 	mrc.maybeGetDirectoryReaders()
@@ -1755,7 +1755,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 	mrc.maybeGetFileReader()
 	mrc.maybeGetRepoPlatform()
 	stableInputRootPathError := mrc.maybeGetStableInputRootPath()
-	if mrc.commandEncoder == nil ||
+	if mrc.actionEncoder == nil ||
 		mrc.directoryCreationParameters == nil ||
 		mrc.directoryCreationParametersMessage == nil ||
 		mrc.directoryReaders == nil ||
@@ -1802,7 +1802,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 	// variables to B-trees, so that they can
 	// be attached to the Command message.
 	referenceFormat := mrc.computer.getReferenceFormat()
-	argumentsBuilder, argumentsParentNodeComputer := newArgumentsBuilder(mrc.commandEncoder, referenceFormat, model_core.WalkableCreatedObjectCapturer)
+	argumentsBuilder, argumentsParentNodeComputer := newArgumentsBuilder(mrc.actionEncoder, referenceFormat, model_core.WalkableCreatedObjectCapturer)
 	for _, argument := range arguments {
 		var argumentStr string
 		switch typedArgument := argument.(type) {
@@ -1830,7 +1830,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 
 	environmentVariableList, envParentNodeComputer, err := convertDictToEnvironmentVariableList(
 		environment,
-		mrc.commandEncoder,
+		mrc.actionEncoder,
 		referenceFormat,
 		model_core.WalkableCreatedObjectCapturer,
 	)
@@ -1862,7 +1862,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 		outputPathPatternChildren, err = model_command.PrependDirectoryToPathPatternChildren(
 			mrc.subdirectoryComponents[i-1].String(),
 			outputPathPatternChildren,
-			mrc.commandEncoder,
+			mrc.actionEncoder,
 			inlinedTreeOptions,
 			model_core.WalkableCreatedObjectCapturer,
 		)
@@ -1890,7 +1890,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 			// Fields that can be stored externally if needed.
 			{
 				ExternalMessage: model_core.ProtoListToMarshalable(argumentList),
-				Encoder:         mrc.commandEncoder,
+				Encoder:         mrc.actionEncoder,
 				ParentAppender: func(
 					command model_core.PatchedMessage[*model_command_pb.Command, dag.ObjectContentsWalker],
 					externalObject *model_core.Decodable[model_core.CreatedObject[dag.ObjectContentsWalker]],
@@ -1905,7 +1905,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 			},
 			{
 				ExternalMessage: model_core.ProtoListToMarshalable(environmentVariableList),
-				Encoder:         mrc.commandEncoder,
+				Encoder:         mrc.actionEncoder,
 				ParentAppender: func(
 					command model_core.PatchedMessage[*model_command_pb.Command, dag.ObjectContentsWalker],
 					externalObject *model_core.Decodable[model_core.CreatedObject[dag.ObjectContentsWalker]],
@@ -1920,7 +1920,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 			},
 			{
 				ExternalMessage: model_core.ProtoToMarshalable(outputPathPatternChildren),
-				Encoder:         mrc.commandEncoder,
+				Encoder:         mrc.actionEncoder,
 				ParentAppender: func(
 					command model_core.PatchedMessage[*model_command_pb.Command, dag.ObjectContentsWalker],
 					externalObject *model_core.Decodable[model_core.CreatedObject[dag.ObjectContentsWalker]],
@@ -1942,7 +1942,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 	createdCommand, err := model_core.MarshalAndEncode(
 		model_core.ProtoToMarshalable(command),
 		referenceFormat,
-		mrc.commandEncoder,
+		mrc.actionEncoder,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create command: %w", err)
@@ -1965,7 +1965,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doExecute(thread *s
 			})
 		}),
 		referenceFormat,
-		mrc.commandEncoder,
+		mrc.actionEncoder,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create action: %w", err)
@@ -2214,13 +2214,13 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doRead(thread *star
 	// root (e.g., a file provided by the operating system or stored
 	// in the home directory). Invoke "cat" to read the file's
 	// contents.
-	mrc.maybeGetCommandEncoder()
+	mrc.maybeGetActionEncoder()
 	mrc.maybeGetDirectoryCreationParametersMessage()
 	mrc.maybeGetFileCreationParameters()
 	mrc.maybeGetFileCreationParametersMessage()
 	mrc.maybeGetRepoPlatform()
 	stableInputRootPathError := mrc.maybeGetStableInputRootPath()
-	if mrc.commandEncoder == nil ||
+	if mrc.actionEncoder == nil ||
 		mrc.directoryCreationParametersMessage == nil ||
 		mrc.fileCreationParameters == nil ||
 		mrc.fileCreationParametersMessage == nil ||
@@ -2241,7 +2241,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doRead(thread *star
 	referenceFormat := mrc.computer.getReferenceFormat()
 	environmentVariableList, _, err := convertDictToEnvironmentVariableList(
 		environment,
-		mrc.commandEncoder,
+		mrc.actionEncoder,
 		referenceFormat,
 		model_core.WalkableCreatedObjectCapturer,
 	)
@@ -2274,7 +2274,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doRead(thread *star
 			environmentVariableList.Patcher,
 		),
 		referenceFormat,
-		mrc.commandEncoder,
+		mrc.actionEncoder,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create command: %w", err)
@@ -2297,7 +2297,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doRead(thread *star
 			})
 		}),
 		referenceFormat,
-		mrc.commandEncoder,
+		mrc.actionEncoder,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create action: %w", err)
@@ -2368,14 +2368,14 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doWatch(thread *sta
 }
 
 func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doWhich(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	mrc.maybeGetCommandEncoder()
+	mrc.maybeGetActionEncoder()
 	mrc.maybeGetDirectoryCreationParameters()
 	mrc.maybeGetDirectoryCreationParametersMessage()
 	mrc.maybeGetDirectoryReaders()
 	mrc.maybeGetFileCreationParametersMessage()
 	mrc.maybeGetFileReader()
 	mrc.maybeGetRepoPlatform()
-	if mrc.commandEncoder == nil ||
+	if mrc.actionEncoder == nil ||
 		mrc.directoryCreationParameters == nil ||
 		mrc.directoryCreationParametersMessage == nil ||
 		mrc.directoryReaders == nil ||
@@ -2400,7 +2400,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doWhich(thread *sta
 	referenceFormat := mrc.computer.getReferenceFormat()
 	environmentVariableList, _, err := convertDictToEnvironmentVariableList(
 		environment,
-		mrc.commandEncoder,
+		mrc.actionEncoder,
 		referenceFormat,
 		model_core.WalkableCreatedObjectCapturer,
 	)
@@ -2437,7 +2437,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doWhich(thread *sta
 			environmentVariableList.Patcher,
 		),
 		referenceFormat,
-		mrc.commandEncoder,
+		mrc.actionEncoder,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create command: %w", err)
@@ -2477,7 +2477,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) doWhich(thread *sta
 			})
 		}),
 		referenceFormat,
-		mrc.commandEncoder,
+		mrc.actionEncoder,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create action: %w", err)
@@ -2581,12 +2581,12 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) Exists(p *model_sta
 	// root (e.g., a file provided by the operating system or stored
 	// in the home directory). Invoke "test -e" to check the file's
 	// existence.
-	mrc.maybeGetCommandEncoder()
+	mrc.maybeGetActionEncoder()
 	mrc.maybeGetDirectoryCreationParametersMessage()
 	mrc.maybeGetFileCreationParameters()
 	mrc.maybeGetFileCreationParametersMessage()
 	mrc.maybeGetRepoPlatform()
-	if mrc.commandEncoder == nil ||
+	if mrc.actionEncoder == nil ||
 		mrc.directoryCreationParametersMessage == nil ||
 		mrc.fileCreationParameters == nil ||
 		mrc.fileCreationParametersMessage == nil ||
@@ -2603,7 +2603,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) Exists(p *model_sta
 	referenceFormat := mrc.computer.getReferenceFormat()
 	environmentVariableList, _, err := convertDictToEnvironmentVariableList(
 		environment,
-		mrc.commandEncoder,
+		mrc.actionEncoder,
 		referenceFormat,
 		model_core.WalkableCreatedObjectCapturer,
 	)
@@ -2641,7 +2641,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) Exists(p *model_sta
 			environmentVariableList.Patcher,
 		),
 		referenceFormat,
-		mrc.commandEncoder,
+		mrc.actionEncoder,
 	)
 	if err != nil {
 		return false, fmt.Errorf("failed to create command: %w", err)
@@ -2664,7 +2664,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) Exists(p *model_sta
 			})
 		}),
 		referenceFormat,
-		mrc.commandEncoder,
+		mrc.actionEncoder,
 	)
 	if err != nil {
 		return false, fmt.Errorf("failed to create action: %w", err)
@@ -2726,14 +2726,14 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) Readdir(p *model_st
 	// Ideally we'd run "find . -depth 1 -print0", but that does not
 	// return paths in sorted order. Sorting on our end leads to
 	// unnecessary cache invalidation.
-	mrc.maybeGetCommandEncoder()
+	mrc.maybeGetActionEncoder()
 	mrc.maybeGetDirectoryCreationParametersMessage()
 	mrc.maybeGetDirectoryReaders()
 	mrc.maybeGetFileCreationParameters()
 	mrc.maybeGetFileCreationParametersMessage()
 	mrc.maybeGetFileReader()
 	mrc.maybeGetRepoPlatform()
-	if mrc.commandEncoder == nil ||
+	if mrc.actionEncoder == nil ||
 		mrc.directoryCreationParametersMessage == nil ||
 		mrc.directoryReaders == nil ||
 		mrc.fileCreationParameters == nil ||
@@ -2752,7 +2752,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) Readdir(p *model_st
 	referenceFormat := mrc.computer.getReferenceFormat()
 	environmentVariableList, _, err := convertDictToEnvironmentVariableList(
 		environment,
-		mrc.commandEncoder,
+		mrc.actionEncoder,
 		referenceFormat,
 		model_core.WalkableCreatedObjectCapturer,
 	)
@@ -2785,7 +2785,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) Readdir(p *model_st
 			environmentVariableList.Patcher,
 		),
 		referenceFormat,
-		mrc.commandEncoder,
+		mrc.actionEncoder,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create command: %w", err)
@@ -2808,7 +2808,7 @@ func (mrc *moduleOrRepositoryContext[TReference, TMetadata]) Readdir(p *model_st
 			})
 		}),
 		referenceFormat,
-		mrc.commandEncoder,
+		mrc.actionEncoder,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create action: %w", err)

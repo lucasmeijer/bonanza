@@ -15,6 +15,24 @@ import "pkg/proto/model/starlark/starlark.proto";
 
 option go_package = "bonanza.build/pkg/proto/model/analysis";
 
+message ActionEncoderObject {
+  message Key {}
+}
+
+message ActionEncoders {
+  message Key {}
+
+  message Value {
+    // Encoders that should be used when creating Action messages that
+    // are processed by workers.
+    repeated bonanza.model.encoding.BinaryEncoder action_encoders = 1;
+  }
+}
+
+message ActionReaders {
+  message Key {}
+}
+
 message ExecuteRequest {
   // The elliptic-curve public key that identifies the platform that
   // should be used to execute the action in PKIX, ASN.1 DER form.
@@ -92,24 +110,6 @@ message CanonicalRepoName {
     // provided apparent repo name.
     string to_canonical_repo = 1;
   }
-}
-
-message CommandEncoderObject {
-  message Key {}
-}
-
-message CommandEncoders {
-  message Key {}
-
-  message Value {
-    // Encoders that should be used when creating Command messages that
-    // are processed by workers.
-    repeated bonanza.model.encoding.BinaryEncoder command_encoders = 1;
-  }
-}
-
-message CommandReaders {
-  message Key {}
 }
 
 message CompatibleExecutionPlatforms {

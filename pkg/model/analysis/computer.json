@@ -1,9 +1,33 @@
 {
    "functions": {
+      "ActionEncoderObject": {
+         "dependsOn": [
+            "ActionEncoders"
+         ],
+         "nativeValueType": {
+            "imports": {
+               "model_encoding": "bonanza.build/pkg/model/encoding"
+            },
+            "type": "model_encoding.BinaryEncoder"
+         }
+      },
+      "ActionEncoders": {
+         "dependsOn": [
+            "BuildSpecification"
+         ]
+      },
+      "ActionReaders": {
+         "dependsOn": [
+            "ActionEncoderObject"
+         ],
+         "nativeValueType": {
+            "type": "*ActionReaders[TReference]"
+         }
+      },
       "ActionResult": {
          "dependsOn": [
-            "CommandEncoders",
-            "CommandReaders"
+            "ActionEncoders",
+            "ActionReaders"
          ],
          "keyContainsReferences": true
       },
@@ -33,30 +57,6 @@
             "ModuleExtensionRepoNames",
             "ModuleRepoMapping"
          ]
-      },
-      "CommandEncoderObject": {
-         "dependsOn": [
-            "CommandEncoders"
-         ],
-         "nativeValueType": {
-            "imports": {
-               "model_encoding": "bonanza.build/pkg/model/encoding"
-            },
-            "type": "model_encoding.BinaryEncoder"
-         }
-      },
-      "CommandEncoders": {
-         "dependsOn": [
-            "BuildSpecification"
-         ]
-      },
-      "CommandReaders": {
-         "dependsOn": [
-            "CommandEncoderObject"
-         ],
-         "nativeValueType": {
-            "type": "*CommandReaders[TReference]"
-         }
       },
       "CompatibleExecutionPlatforms": {
          "dependsOn": [
@@ -119,9 +119,9 @@
       },
       "ConfiguredTarget": {
          "dependsOn": [
+            "ActionEncoderObject",
             "BuiltinsModuleNames",
             "CanonicalRepoName",
-            "CommandEncoderObject",
             "CompiledBzlFileDecodedGlobals",
             "CompiledBzlFileFunctionFactory",
             "CompiledBzlFileGlobal",
@@ -301,10 +301,10 @@
       },
       "ModuleExtensionRepos": {
          "dependsOn": [
+            "ActionEncoderObject",
             "ActionResult",
             "BuiltinsModuleNames",
             "CanonicalRepoName",
-            "CommandEncoderObject",
             "CompiledBzlFileDecodedGlobals",
             "CompiledBzlFileFunctionFactory",
             "CompiledBzlFileGlobal",
@@ -444,11 +444,11 @@
       },
       "Repo": {
          "dependsOn": [
+            "ActionEncoderObject",
             "ActionResult",
             "BuildSpecification",
             "BuiltinsModuleNames",
             "CanonicalRepoName",
-            "CommandEncoderObject",
             "CompiledBzlFileDecodedGlobals",
             "CompiledBzlFileFunctionFactory",
             "DirectoryCreationParameters",
@@ -482,7 +482,7 @@
       },
       "RepoPlatformHostPath": {
          "dependsOn": [
-            "CommandEncoderObject",
+            "ActionEncoderObject",
             "DirectoryCreationParameters",
             "DirectoryCreationParametersObject",
             "DirectoryReaders",
@@ -534,7 +534,7 @@
       },
       "StableInputRootPath": {
          "dependsOn": [
-            "CommandEncoderObject",
+            "ActionEncoderObject",
             "DirectoryCreationParameters",
             "DirectoryCreationParametersObject",
             "DirectoryReaders",
@@ -574,10 +574,10 @@
       },
       "TargetActionCommand": {
          "dependsOn": [
+            "ActionEncoderObject",
+            "ActionReaders",
             "BuiltinsModuleNames",
             "CanonicalRepoName",
-            "CommandEncoderObject",
-            "CommandReaders",
             "CompiledBzlFileDecodedGlobals",
             "CompiledBzlFileFunctionFactory",
             "DirectoryCreationParameters",
@@ -604,7 +604,7 @@
       },
       "TargetActionResult": {
          "dependsOn": [
-            "CommandEncoderObject",
+            "ActionEncoderObject",
             "DirectoryReaders",
             "SuccessfulActionResult",
             "TargetAction",
