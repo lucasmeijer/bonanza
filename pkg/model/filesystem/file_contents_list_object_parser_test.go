@@ -10,6 +10,7 @@ import (
 	model_filesystem_pb "bonanza.build/pkg/proto/model/filesystem"
 	"bonanza.build/pkg/storage/object"
 
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/buildbarn/bb-storage/pkg/testutil"
 	"github.com/stretchr/testify/require"
 
@@ -240,20 +241,16 @@ func TestFileContentsListObjectParser(t *testing.T) {
 			/* decodingParameters = */ nil,
 		)
 		require.NoError(t, err)
-		decodable1, err := model_core.NewDecodable(object.MustNewSHA256V1LocalReference("38dc1b3b70088a0bde56511eeb571e0b5aa873407ad198148befb347ef31282a", 200, 0, 0, 0), []byte{1, 2, 3, 4})
-		require.NoError(t, err)
-		decodable2, err := model_core.NewDecodable(object.MustNewSHA256V1LocalReference("635fef9b02b336f9254473d6b09c41f5027c38046c46bb514afc788292c1508e", 300, 0, 0, 0), []byte{1, 2, 3, 4})
-		require.NoError(t, err)
 		require.Equal(
 			t,
 			model_filesystem.FileContentsList[object.LocalReference]{
 				{
 					EndBytes:  200,
-					Reference: decodable1,
+					Reference: util.Must(model_core.NewDecodable(object.MustNewSHA256V1LocalReference("38dc1b3b70088a0bde56511eeb571e0b5aa873407ad198148befb347ef31282a", 200, 0, 0, 0), []byte{1, 2, 3, 4})),
 				},
 				{
 					EndBytes:  500,
-					Reference: decodable2,
+					Reference: util.Must(model_core.NewDecodable(object.MustNewSHA256V1LocalReference("635fef9b02b336f9254473d6b09c41f5027c38046c46bb514afc788292c1508e", 300, 0, 0, 0), []byte{1, 2, 3, 4})),
 				},
 			},
 			fileContentsList,

@@ -23,8 +23,9 @@ import (
 type Decodable[T any] struct {
 	Value T
 
-	// Lets use a fixed-size array for decoding parameters, so Decodable[] can be marshalled, and used as a key in a map.
-	// We know actual decoding parameters are always <=16 length.
+	// Let's use a fixed-size array for decoding parameters, so Decodable[]
+	// can be marshaled, and used as a key in a map.
+	// We know actual decoding parameters are always <= 16 length.
 	decodingParameters       [16]byte
 	decodingParametersLength uint8
 }
@@ -34,15 +35,15 @@ type Decodable[T any] struct {
 func NewDecodable[T any](value T, decodingParameters []byte) (Decodable[T], error) {
 	var d Decodable[T]
 	d.Value = value
-	if len(decodingParameters) > 16 {
+	if len(decodingParameters) > len(d.decodingParameters) {
 		return d, status.Errorf(
 			codes.InvalidArgument,
-			"DecodingParameters is %d bytes in size, which exceeds the permitted maximum of 16 bytes",
+			"DecodingParameters is %d bytes in size, which exceeds the permitted maximum of %d bytes",
 			len(decodingParameters),
+			len(d.decodingParameters),
 		)
 	}
-	d.decodingParametersLength = uint8(len(decodingParameters))
-	copy(d.decodingParameters[:], decodingParameters)
+	d.decodingParametersLength = uint8(copy(d.decodingParameters[:], decodingParameters))
 	return d, nil
 }
 
