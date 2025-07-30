@@ -364,8 +364,10 @@ func (e *builderExecutor) Execute(ctx context.Context, action *model_executewith
 				e.filePool,
 				e.cacheDirectory,
 				&builderExecutionClient{
-					base:         e.executionClient,
-					instanceName: instanceName,
+					base:                          e.executionClient,
+					dagUploaderClient:             e.dagUploaderClient,
+					objectContentsWalkerSemaphore: e.objectContentsWalkerSemaphore,
+					instanceName:                  instanceName,
 				},
 				e.bzlFileBuiltins,
 				e.buildFileBuiltins,
@@ -631,11 +633,30 @@ func (e *builderExecutor) Execute(ctx context.Context, action *model_executewith
 }
 
 type builderExecutionClient struct {
-	base         remoteexecution.Client[*model_executewithstorage.Action[object.GlobalReference], model_core.Decodable[object.LocalReference], model_core.Decodable[object.LocalReference]]
-	instanceName object.InstanceName
+	base                          remoteexecution.Client[*model_executewithstorage.Action[object.GlobalReference], model_core.Decodable[object.LocalReference], model_core.Decodable[object.LocalReference]]
+	dagUploaderClient             dag_pb.UploaderClient
+	objectContentsWalkerSemaphore *semaphore.Weighted
+	instanceName                  object.InstanceName
 }
 
 func (e *builderExecutionClient) RunAction(ctx context.Context, platformECDHPublicKey *ecdh.PublicKey, action *model_executewithstorage.Action[builderReference], actionAdditionalData *remoteexecution_pb.Action_AdditionalData, resultReference *model_core.Decodable[builderReference], errOut *error) iter.Seq[model_core.Decodable[builderReference]] {
+	// If the action is one that the caller has constructed but has
+	// not been uploaded to storage yet, we need to upload it before
+	// calling into the scheduler.
+	if actionReference := action.Reference.Value; actionReference.embeddedMetadata.contents != nil {
+		if err := dag.UploadDAG(
+			ctx,
+			e.dagUploaderClient,
+			e.instanceName.WithLocalReference(actionReference.GetLocalReference()),
+			actionReference.embeddedMetadata.ToObjectContentsWalker(),
+			e.objectContentsWalkerSemaphore,
+			object.Unlimited,
+		); err != nil {
+			*errOut = util.StatusWrap(err, "Failed to upload action")
+			return func(yield func(model_core.Decodable[builderReference]) bool) {}
+		}
+	}
+
 	// Re-add instance name to the action reference.
 	ctxWithCancel, cancel := context.WithCancel(ctx)
 	var baseResultReference model_core.Decodable[object.LocalReference]
