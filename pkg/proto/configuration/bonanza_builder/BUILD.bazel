@@ -11,6 +11,7 @@ proto_library(
         "@com_github_buildbarn_bb_remote_execution//pkg/proto/configuration/filesystem:filesystem_proto",
         "@com_github_buildbarn_bb_storage//pkg/proto/configuration/global:global_proto",
         "@com_github_buildbarn_bb_storage//pkg/proto/configuration/grpc:grpc_proto",
+        "@com_github_buildbarn_bb_storage//pkg/proto/configuration/x509:x509_proto",
     ],
 )
 
@@ -24,6 +25,7 @@ go_proto_library(
         "@com_github_buildbarn_bb_remote_execution//pkg/proto/configuration/filesystem",
         "@com_github_buildbarn_bb_storage//pkg/proto/configuration/global",
         "@com_github_buildbarn_bb_storage//pkg/proto/configuration/grpc",
+        "@com_github_buildbarn_bb_storage//pkg/proto/configuration/x509",
     ],
 )
 

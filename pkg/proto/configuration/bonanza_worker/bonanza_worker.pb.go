@@ -12,6 +12,7 @@ import (
 	virtual "github.com/buildbarn/bb-remote-execution/pkg/proto/configuration/filesystem/virtual"
 	global "github.com/buildbarn/bb-storage/pkg/proto/configuration/global"
 	grpc "github.com/buildbarn/bb-storage/pkg/proto/configuration/grpc"
+	x509 "github.com/buildbarn/bb-storage/pkg/proto/configuration/x509"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	durationpb "google.golang.org/protobuf/types/known/durationpb"
@@ -164,23 +165,23 @@ func (x *BuildDirectoryConfiguration) GetMount() *virtual.MountConfiguration {
 }
 
 type RunnerConfiguration struct {
-	state                               protoimpl.MessageState    `protogen:"open.v1"`
-	Endpoint                            *grpc.ClientConfiguration `protobuf:"bytes,1,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
-	Concurrency                         uint64                    `protobuf:"varint,2,opt,name=concurrency,proto3" json:"concurrency,omitempty"`
-	PlatformPrivateKeys                 []string                  `protobuf:"bytes,3,rep,name=platform_private_keys,json=platformPrivateKeys,proto3" json:"platform_private_keys,omitempty"`
-	ClientCertificateAuthorities        string                    `protobuf:"bytes,4,opt,name=client_certificate_authorities,json=clientCertificateAuthorities,proto3" json:"client_certificate_authorities,omitempty"`
-	SizeClass                           uint32                    `protobuf:"varint,5,opt,name=size_class,json=sizeClass,proto3" json:"size_class,omitempty"`
-	IsLargestSizeClass                  bool                      `protobuf:"varint,6,opt,name=is_largest_size_class,json=isLargestSizeClass,proto3" json:"is_largest_size_class,omitempty"`
-	ShuffleDirectoryListings            bool                      `protobuf:"varint,7,opt,name=shuffle_directory_listings,json=shuffleDirectoryListings,proto3" json:"shuffle_directory_listings,omitempty"`
-	HiddenFilesPattern                  string                    `protobuf:"bytes,8,opt,name=hidden_files_pattern,json=hiddenFilesPattern,proto3" json:"hidden_files_pattern,omitempty"`
-	MaximumExecutionTimeoutCompensation *durationpb.Duration      `protobuf:"bytes,9,opt,name=maximum_execution_timeout_compensation,json=maximumExecutionTimeoutCompensation,proto3" json:"maximum_execution_timeout_compensation,omitempty"`
-	MaximumWritableFileUploadDelay      *durationpb.Duration      `protobuf:"bytes,10,opt,name=maximum_writable_file_upload_delay,json=maximumWritableFileUploadDelay,proto3" json:"maximum_writable_file_upload_delay,omitempty"`
-	MaximumFilePoolFileCount            int64                     `protobuf:"varint,11,opt,name=maximum_file_pool_file_count,json=maximumFilePoolFileCount,proto3" json:"maximum_file_pool_file_count,omitempty"`
-	MaximumFilePoolSizeBytes            int64                     `protobuf:"varint,12,opt,name=maximum_file_pool_size_bytes,json=maximumFilePoolSizeBytes,proto3" json:"maximum_file_pool_size_bytes,omitempty"`
-	WorkerId                            map[string]string         `protobuf:"bytes,13,rep,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	EnvironmentVariables                map[string]string         `protobuf:"bytes,14,rep,name=environment_variables,json=environmentVariables,proto3" json:"environment_variables,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	BuildDirectoryOwnerUserId           uint32                    `protobuf:"varint,15,opt,name=build_directory_owner_user_id,json=buildDirectoryOwnerUserId,proto3" json:"build_directory_owner_user_id,omitempty"`
-	BuildDirectoryOwnerGroupId          uint32                    `protobuf:"varint,16,opt,name=build_directory_owner_group_id,json=buildDirectoryOwnerGroupId,proto3" json:"build_directory_owner_group_id,omitempty"`
+	state                               protoimpl.MessageState                       `protogen:"open.v1"`
+	Endpoint                            *grpc.ClientConfiguration                    `protobuf:"bytes,1,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
+	Concurrency                         uint64                                       `protobuf:"varint,2,opt,name=concurrency,proto3" json:"concurrency,omitempty"`
+	PlatformPrivateKeys                 []string                                     `protobuf:"bytes,3,rep,name=platform_private_keys,json=platformPrivateKeys,proto3" json:"platform_private_keys,omitempty"`
+	ClientCertificateVerifier           *x509.ClientCertificateVerifierConfiguration `protobuf:"bytes,4,opt,name=client_certificate_verifier,json=clientCertificateVerifier,proto3" json:"client_certificate_verifier,omitempty"`
+	SizeClass                           uint32                                       `protobuf:"varint,5,opt,name=size_class,json=sizeClass,proto3" json:"size_class,omitempty"`
+	IsLargestSizeClass                  bool                                         `protobuf:"varint,6,opt,name=is_largest_size_class,json=isLargestSizeClass,proto3" json:"is_largest_size_class,omitempty"`
+	ShuffleDirectoryListings            bool                                         `protobuf:"varint,7,opt,name=shuffle_directory_listings,json=shuffleDirectoryListings,proto3" json:"shuffle_directory_listings,omitempty"`
+	HiddenFilesPattern                  string                                       `protobuf:"bytes,8,opt,name=hidden_files_pattern,json=hiddenFilesPattern,proto3" json:"hidden_files_pattern,omitempty"`
+	MaximumExecutionTimeoutCompensation *durationpb.Duration                         `protobuf:"bytes,9,opt,name=maximum_execution_timeout_compensation,json=maximumExecutionTimeoutCompensation,proto3" json:"maximum_execution_timeout_compensation,omitempty"`
+	MaximumWritableFileUploadDelay      *durationpb.Duration                         `protobuf:"bytes,10,opt,name=maximum_writable_file_upload_delay,json=maximumWritableFileUploadDelay,proto3" json:"maximum_writable_file_upload_delay,omitempty"`
+	MaximumFilePoolFileCount            int64                                        `protobuf:"varint,11,opt,name=maximum_file_pool_file_count,json=maximumFilePoolFileCount,proto3" json:"maximum_file_pool_file_count,omitempty"`
+	MaximumFilePoolSizeBytes            int64                                        `protobuf:"varint,12,opt,name=maximum_file_pool_size_bytes,json=maximumFilePoolSizeBytes,proto3" json:"maximum_file_pool_size_bytes,omitempty"`
+	WorkerId                            map[string]string                            `protobuf:"bytes,13,rep,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	EnvironmentVariables                map[string]string                            `protobuf:"bytes,14,rep,name=environment_variables,json=environmentVariables,proto3" json:"environment_variables,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	BuildDirectoryOwnerUserId           uint32                                       `protobuf:"varint,15,opt,name=build_directory_owner_user_id,json=buildDirectoryOwnerUserId,proto3" json:"build_directory_owner_user_id,omitempty"`
+	BuildDirectoryOwnerGroupId          uint32                                       `protobuf:"varint,16,opt,name=build_directory_owner_group_id,json=buildDirectoryOwnerGroupId,proto3" json:"build_directory_owner_group_id,omitempty"`
 	unknownFields                       protoimpl.UnknownFields
 	sizeCache                           protoimpl.SizeCache
 }
@@ -236,11 +237,11 @@ func (x *RunnerConfiguration) GetPlatformPrivateKeys() []string {
 	return nil
 }
 
-func (x *RunnerConfiguration) GetClientCertificateAuthorities() string {
+func (x *RunnerConfiguration) GetClientCertificateVerifier() *x509.ClientCertificateVerifierConfiguration {
 	if x != nil {
-		return x.ClientCertificateAuthorities
+		return x.ClientCertificateVerifier
 	}
-	return ""
+	return nil
 }
 
 func (x *RunnerConfiguration) GetSizeClass() uint32 {
@@ -331,7 +332,7 @@ var File_pkg_proto_configuration_bonanza_worker_bonanza_worker_proto protoreflec
 
 const file_pkg_proto_configuration_bonanza_worker_bonanza_worker_proto_rawDesc = "" +
 	"\n" +
-	";pkg/proto/configuration/bonanza_worker/bonanza_worker.proto\x12$bonanza.configuration.bonanza_worker\x1a\x1egoogle/protobuf/duration.proto\x1a3pkg/proto/configuration/filesystem/filesystem.proto\x1a8pkg/proto/configuration/filesystem/virtual/virtual.proto\x1a+pkg/proto/configuration/global/global.proto\x1a'pkg/proto/configuration/grpc/grpc.proto\x1a1pkg/proto/configuration/model/parser/parser.proto\"\xd7\x04\n" +
+	";pkg/proto/configuration/bonanza_worker/bonanza_worker.proto\x12$bonanza.configuration.bonanza_worker\x1a\x1egoogle/protobuf/duration.proto\x1a3pkg/proto/configuration/filesystem/filesystem.proto\x1a8pkg/proto/configuration/filesystem/virtual/virtual.proto\x1a+pkg/proto/configuration/global/global.proto\x1a'pkg/proto/configuration/grpc/grpc.proto\x1a1pkg/proto/configuration/model/parser/parser.proto\x1a'pkg/proto/configuration/x509/x509.proto\"\xd7\x04\n" +
 	"\x18ApplicationConfiguration\x12E\n" +
 	"\x06global\x18\x01 \x01(\v2-.buildbarn.configuration.global.ConfigurationR\x06global\x12a\n" +
 	"\x13storage_grpc_client\x18\x02 \x01(\v21.buildbarn.configuration.grpc.ClientConfigurationR\x11storageGrpcClient\x12e\n" +
@@ -341,13 +342,13 @@ const file_pkg_proto_configuration_bonanza_worker_bonanza_worker_proto_rawDesc =
 	"\x12parsed_object_pool\x18\x06 \x01(\v24.bonanza.configuration.model.parser.ParsedObjectPoolR\x10parsedObjectPool\"\xc8\x01\n" +
 	"\x1bBuildDirectoryConfiguration\x12S\n" +
 	"\arunners\x18\x01 \x03(\v29.bonanza.configuration.bonanza_worker.RunnerConfigurationR\arunners\x12T\n" +
-	"\x05mount\x18\x02 \x01(\v2>.buildbarn.configuration.filesystem.virtual.MountConfigurationR\x05mount\"\x96\n" +
+	"\x05mount\x18\x02 \x01(\v2>.buildbarn.configuration.filesystem.virtual.MountConfigurationR\x05mount\"\xd7\n" +
 	"\n" +
 	"\x13RunnerConfiguration\x12M\n" +
 	"\bendpoint\x18\x01 \x01(\v21.buildbarn.configuration.grpc.ClientConfigurationR\bendpoint\x12 \n" +
 	"\vconcurrency\x18\x02 \x01(\x04R\vconcurrency\x122\n" +
-	"\x15platform_private_keys\x18\x03 \x03(\tR\x13platformPrivateKeys\x12D\n" +
-	"\x1eclient_certificate_authorities\x18\x04 \x01(\tR\x1cclientCertificateAuthorities\x12\x1d\n" +
+	"\x15platform_private_keys\x18\x03 \x03(\tR\x13platformPrivateKeys\x12\x84\x01\n" +
+	"\x1bclient_certificate_verifier\x18\x04 \x01(\v2D.buildbarn.configuration.x509.ClientCertificateVerifierConfigurationR\x19clientCertificateVerifier\x12\x1d\n" +
 	"\n" +
 	"size_class\x18\x05 \x01(\rR\tsizeClass\x121\n" +
 	"\x15is_largest_size_class\x18\x06 \x01(\bR\x12isLargestSizeClass\x12<\n" +
@@ -393,7 +394,8 @@ var file_pkg_proto_configuration_bonanza_worker_bonanza_worker_proto_goTypes = [
 	(*filesystem.FilePoolConfiguration)(nil), // 7: buildbarn.configuration.filesystem.FilePoolConfiguration
 	(*parser.ParsedObjectPool)(nil),          // 8: bonanza.configuration.model.parser.ParsedObjectPool
 	(*virtual.MountConfiguration)(nil),       // 9: buildbarn.configuration.filesystem.virtual.MountConfiguration
-	(*durationpb.Duration)(nil),              // 10: google.protobuf.Duration
+	(*x509.ClientCertificateVerifierConfiguration)(nil), // 10: buildbarn.configuration.x509.ClientCertificateVerifierConfiguration
+	(*durationpb.Duration)(nil),                         // 11: google.protobuf.Duration
 }
 var file_pkg_proto_configuration_bonanza_worker_bonanza_worker_proto_depIdxs = []int32{
 	5,  // 0: bonanza.configuration.bonanza_worker.ApplicationConfiguration.global:type_name -> buildbarn.configuration.global.Configuration
@@ -405,15 +407,16 @@ var file_pkg_proto_configuration_bonanza_worker_bonanza_worker_proto_depIdxs = [
 	2,  // 6: bonanza.configuration.bonanza_worker.BuildDirectoryConfiguration.runners:type_name -> bonanza.configuration.bonanza_worker.RunnerConfiguration
 	9,  // 7: bonanza.configuration.bonanza_worker.BuildDirectoryConfiguration.mount:type_name -> buildbarn.configuration.filesystem.virtual.MountConfiguration
 	6,  // 8: bonanza.configuration.bonanza_worker.RunnerConfiguration.endpoint:type_name -> buildbarn.configuration.grpc.ClientConfiguration
-	10, // 9: bonanza.configuration.bonanza_worker.RunnerConfiguration.maximum_execution_timeout_compensation:type_name -> google.protobuf.Duration
-	10, // 10: bonanza.configuration.bonanza_worker.RunnerConfiguration.maximum_writable_file_upload_delay:type_name -> google.protobuf.Duration
-	3,  // 11: bonanza.configuration.bonanza_worker.RunnerConfiguration.worker_id:type_name -> bonanza.configuration.bonanza_worker.RunnerConfiguration.WorkerIdEntry
-	4,  // 12: bonanza.configuration.bonanza_worker.RunnerConfiguration.environment_variables:type_name -> bonanza.configuration.bonanza_worker.RunnerConfiguration.EnvironmentVariablesEntry
-	13, // [13:13] is the sub-list for method output_type
-	13, // [13:13] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	10, // 9: bonanza.configuration.bonanza_worker.RunnerConfiguration.client_certificate_verifier:type_name -> buildbarn.configuration.x509.ClientCertificateVerifierConfiguration
+	11, // 10: bonanza.configuration.bonanza_worker.RunnerConfiguration.maximum_execution_timeout_compensation:type_name -> google.protobuf.Duration
+	11, // 11: bonanza.configuration.bonanza_worker.RunnerConfiguration.maximum_writable_file_upload_delay:type_name -> google.protobuf.Duration
+	3,  // 12: bonanza.configuration.bonanza_worker.RunnerConfiguration.worker_id:type_name -> bonanza.configuration.bonanza_worker.RunnerConfiguration.WorkerIdEntry
+	4,  // 13: bonanza.configuration.bonanza_worker.RunnerConfiguration.environment_variables:type_name -> bonanza.configuration.bonanza_worker.RunnerConfiguration.EnvironmentVariablesEntry
+	14, // [14:14] is the sub-list for method output_type
+	14, // [14:14] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_pkg_proto_configuration_bonanza_worker_bonanza_worker_proto_init() }

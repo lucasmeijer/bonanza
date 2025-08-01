@@ -15,6 +15,7 @@ exports_files(["LICENSE"])
 # gazelle:resolve proto go pkg/proto/configuration/global/global.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/global
 # gazelle:resolve proto go pkg/proto/configuration/grpc/grpc.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/grpc
 # gazelle:resolve proto go pkg/proto/configuration/http/http.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/http
+# gazelle:resolve proto go pkg/proto/configuration/x509/x509.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/x509
 # gazelle:resolve proto google/rpc/status.proto @googleapis//google/rpc:status_proto
 # gazelle:resolve proto pkg/proto/configuration/blockdevice/blockdevice.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/blockdevice:blockdevice_proto
 # gazelle:resolve proto pkg/proto/configuration/eviction/eviction.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/eviction:eviction_proto
@@ -23,6 +24,7 @@ exports_files(["LICENSE"])
 # gazelle:resolve proto pkg/proto/configuration/global/global.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/global:global_proto
 # gazelle:resolve proto pkg/proto/configuration/grpc/grpc.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/grpc:grpc_proto
 # gazelle:resolve proto pkg/proto/configuration/http/http.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/http:http_proto
+# gazelle:resolve proto pkg/proto/configuration/x509/x509.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/x509:x509_proto
 gazelle(
     name = "gazelle",
 )

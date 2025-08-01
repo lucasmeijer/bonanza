@@ -6,6 +6,7 @@ import "pkg/proto/configuration/filesystem/filesystem.proto";
 import "pkg/proto/configuration/global/global.proto";
 import "pkg/proto/configuration/grpc/grpc.proto";
 import "pkg/proto/configuration/model/parser/parser.proto";
+import "pkg/proto/configuration/x509/x509.proto";
 
 option go_package = "bonanza.build/pkg/proto/configuration/bonanza_builder";
 
@@ -53,11 +54,11 @@ message ApplicationConfiguration {
   // type "PRIVATE KEY".
   repeated string platform_private_keys = 11;
 
-  // Client certificate authorities to consider when authenticating the
-  // client certificate that is provided as part of the build request
-  // submitted by clients. This effectively controls which clients are
-  // permitted to use this worker.
-  string client_certificate_authorities = 12;
+  // Strategy for verifying X.509 client certificates that are provided
+  // as part of the build request submitted by clients. This effectively
+  // controls which clients are permitted to use this worker.
+  buildbarn.configuration.x509.ClientCertificateVerifierConfiguration
+      client_certificate_verifier = 12;
 
   // Fields that need to be attached to the ID of the worker, as
   // announced to the scheduler.

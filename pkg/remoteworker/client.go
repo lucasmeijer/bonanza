@@ -8,7 +8,6 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
-	"encoding/pem"
 	"io"
 	"log"
 	"sort"
@@ -20,11 +19,13 @@ import (
 	remoteexecution_pb "bonanza.build/pkg/proto/remoteexecution"
 	remoteworker_pb "bonanza.build/pkg/proto/remoteworker"
 
+	"github.com/buildbarn/bb-storage/pkg/auth"
 	"github.com/buildbarn/bb-storage/pkg/clock"
 	"github.com/buildbarn/bb-storage/pkg/otel"
 	"github.com/buildbarn/bb-storage/pkg/program"
 	"github.com/buildbarn/bb-storage/pkg/random"
 	"github.com/buildbarn/bb-storage/pkg/util"
+	bb_x509 "github.com/buildbarn/bb-storage/pkg/x509"
 	"github.com/secure-io/siv-go"
 
 	"google.golang.org/grpc/codes"
@@ -39,13 +40,13 @@ import (
 // worker, while also obtaining requests for executing actions.
 type Client struct {
 	// Constant fields.
-	scheduler                    remoteworker_pb.OperationQueueClient
-	executor                     Executor[[]byte, []byte, []byte]
-	clock                        clock.Clock
-	randomNumberGenerator        random.ThreadSafeGenerator
-	privateKeys                  []*ecdh.PrivateKey
-	clientCertificateAuthorities *x509.CertPool
-	isLargestSizeClass           bool
+	scheduler                 remoteworker_pb.OperationQueueClient
+	executor                  Executor[[]byte, []byte, []byte]
+	clock                     clock.Clock
+	randomNumberGenerator     random.ThreadSafeGenerator
+	privateKeys               []*ecdh.PrivateKey
+	clientCertificateVerifier *bb_x509.ClientCertificateVerifier
+	isLargestSizeClass        bool
 
 	// Mutable fields that are always set.
 	request                         remoteworker_pb.SynchronizeRequest
@@ -85,7 +86,7 @@ func NewClient(
 	clock clock.Clock,
 	randomNumberGenerator random.ThreadSafeGenerator,
 	unsortedPrivateKeys []*ecdh.PrivateKey,
-	clientCertificateAuthorities *x509.CertPool,
+	clientCertificateVerifier *bb_x509.ClientCertificateVerifier,
 	workerID map[string]string,
 	sizeClass uint32,
 	isLargestSizeClass bool,
@@ -119,13 +120,13 @@ func NewClient(
 	}
 
 	return &Client{
-		scheduler:                    scheduler,
-		executor:                     executor,
-		clock:                        clock,
-		randomNumberGenerator:        randomNumberGenerator,
-		privateKeys:                  sortedPrivateKeys,
-		clientCertificateAuthorities: clientCertificateAuthorities,
-		isLargestSizeClass:           isLargestSizeClass,
+		scheduler:                 scheduler,
+		executor:                  executor,
+		clock:                     clock,
+		randomNumberGenerator:     randomNumberGenerator,
+		privateKeys:               sortedPrivateKeys,
+		clientCertificateVerifier: clientCertificateVerifier,
+		isLargestSizeClass:        isLargestSizeClass,
 
 		request: remoteworker_pb.SynchronizeRequest{
 			WorkerId:   workerID,
@@ -158,34 +159,22 @@ func (c *Client) startExecution(desiredState *remoteworker_pb.DesiredState_Execu
 	}
 
 	// Validate the provided client certificate.
-	var clientCertificate *x509.Certificate
-	intermediates := x509.NewCertPool()
+	clientCertificateChain := make([]*x509.Certificate, 0, len(action.ClientCertificateChain))
 	for i, rawCertificate := range action.ClientCertificateChain {
 		certificate, err := x509.ParseCertificate(rawCertificate)
 		if err != nil {
 			return util.StatusWrapfWithCode(err, codes.InvalidArgument, "Invalid certificate at index %d of client certificate chain", i)
 		}
-		if clientCertificate == nil {
-			clientCertificate = certificate
-		} else {
-			intermediates.AddCert(certificate)
-		}
+		clientCertificateChain = append(clientCertificateChain, certificate)
 	}
-	if clientCertificate == nil {
-		return status.Error(codes.InvalidArgument, "Empty client certificate chain")
-	}
-	if _, err := clientCertificate.Verify(x509.VerifyOptions{
-		Intermediates: intermediates,
-		Roots:         c.clientCertificateAuthorities,
-		CurrentTime:   c.clock.Now(),
-		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-	}); err != nil {
-		return util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to validate client certificate")
+	authenticationMetadata, err := c.clientCertificateVerifier.VerifyClientCertificate(clientCertificateChain)
+	if err != nil {
+		return util.StatusWrap(err, "Failed to validate client certificate")
 	}
 
 	// Obtain the shared secret used to decrypt actions and encrypt
 	// execution events.
-	clientECDHPublicKey, err := crypto.PublicKeyToECDHPublicKey(clientCertificate.PublicKey)
+	clientECDHPublicKey, err := crypto.PublicKeyToECDHPublicKey(clientCertificateChain[0].PublicKey)
 	if err != nil {
 		return err
 	}
@@ -246,8 +235,13 @@ func (c *Client) startExecution(desiredState *remoteworker_pb.DesiredState_Execu
 	// Launch another goroutine that invokes the executor.
 	ctx, executionCancellation := context.WithCancel(
 		otel.NewContextWithW3CTraceContext(
-			context.Background(),
-			desiredState.W3CTraceContext))
+			auth.NewContextWithAuthenticationMetadata(
+				context.Background(),
+				authenticationMetadata,
+			),
+			desiredState.W3CTraceContext,
+		),
+	)
 	executionCompleted := make(chan struct{})
 	go func() {
 		event, virtualExecutionDuration, result, err := c.executor.Execute(ctx, plaintextAction, effectiveExecutionTimeout, executionEvents)
@@ -599,22 +593,4 @@ func ParsePlatformPrivateKeys(privateKeys []string) ([]*ecdh.PrivateKey, error) 
 		platformPrivateKeys = append(platformPrivateKeys, platformPrivateKey)
 	}
 	return platformPrivateKeys, nil
-}
-
-// ParseClientCertificateAuthorities converts a series of X.509 in PEM
-// blocks to a certificate pool, so that it can be provided to
-// NewClient().
-func ParseClientCertificateAuthorities(certificateAuthorities string) (*x509.CertPool, error) {
-	clientCertificateAuthorities := x509.NewCertPool()
-	for certificateBlock, remainder := pem.Decode([]byte(certificateAuthorities)); certificateBlock != nil; certificateBlock, remainder = pem.Decode(remainder) {
-		if certificateBlock.Type != "CERTIFICATE" {
-			return nil, status.Error(codes.InvalidArgument, "Client certificate authority is not of type CERTIFICATE")
-		}
-		certificate, err := x509.ParseCertificate(certificateBlock.Bytes)
-		if err != nil {
-			return nil, util.StatusWrapWithCode(err, codes.InvalidArgument, "Invalid certificate in client certificate authorities")
-		}
-		clientCertificateAuthorities.AddCert(certificate)
-	}
-	return clientCertificateAuthorities, nil
 }

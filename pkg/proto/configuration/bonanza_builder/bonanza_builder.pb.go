@@ -11,6 +11,7 @@ import (
 	filesystem "github.com/buildbarn/bb-remote-execution/pkg/proto/configuration/filesystem"
 	global "github.com/buildbarn/bb-storage/pkg/proto/configuration/global"
 	grpc "github.com/buildbarn/bb-storage/pkg/proto/configuration/grpc"
+	x509 "github.com/buildbarn/bb-storage/pkg/proto/configuration/x509"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -26,18 +27,18 @@ const (
 )
 
 type ApplicationConfiguration struct {
-	state                           protoimpl.MessageState            `protogen:"open.v1"`
-	Global                          *global.Configuration             `protobuf:"bytes,1,opt,name=global,proto3" json:"global,omitempty"`
-	StorageGrpcClient               *grpc.ClientConfiguration         `protobuf:"bytes,3,opt,name=storage_grpc_client,json=storageGrpcClient,proto3" json:"storage_grpc_client,omitempty"`
-	FilePool                        *filesystem.FilePoolConfiguration `protobuf:"bytes,5,opt,name=file_pool,json=filePool,proto3" json:"file_pool,omitempty"`
-	ExecutionGrpcClient             *grpc.ClientConfiguration         `protobuf:"bytes,7,opt,name=execution_grpc_client,json=executionGrpcClient,proto3" json:"execution_grpc_client,omitempty"`
-	ExecutionClientPrivateKey       string                            `protobuf:"bytes,8,opt,name=execution_client_private_key,json=executionClientPrivateKey,proto3" json:"execution_client_private_key,omitempty"`
-	ExecutionClientCertificateChain string                            `protobuf:"bytes,9,opt,name=execution_client_certificate_chain,json=executionClientCertificateChain,proto3" json:"execution_client_certificate_chain,omitempty"`
-	RemoteWorkerGrpcClient          *grpc.ClientConfiguration         `protobuf:"bytes,10,opt,name=remote_worker_grpc_client,json=remoteWorkerGrpcClient,proto3" json:"remote_worker_grpc_client,omitempty"`
-	PlatformPrivateKeys             []string                          `protobuf:"bytes,11,rep,name=platform_private_keys,json=platformPrivateKeys,proto3" json:"platform_private_keys,omitempty"`
-	ClientCertificateAuthorities    string                            `protobuf:"bytes,12,opt,name=client_certificate_authorities,json=clientCertificateAuthorities,proto3" json:"client_certificate_authorities,omitempty"`
-	WorkerId                        map[string]string                 `protobuf:"bytes,13,rep,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	ParsedObjectPool                *parser.ParsedObjectPool          `protobuf:"bytes,14,opt,name=parsed_object_pool,json=parsedObjectPool,proto3" json:"parsed_object_pool,omitempty"`
+	state                           protoimpl.MessageState                       `protogen:"open.v1"`
+	Global                          *global.Configuration                        `protobuf:"bytes,1,opt,name=global,proto3" json:"global,omitempty"`
+	StorageGrpcClient               *grpc.ClientConfiguration                    `protobuf:"bytes,3,opt,name=storage_grpc_client,json=storageGrpcClient,proto3" json:"storage_grpc_client,omitempty"`
+	FilePool                        *filesystem.FilePoolConfiguration            `protobuf:"bytes,5,opt,name=file_pool,json=filePool,proto3" json:"file_pool,omitempty"`
+	ExecutionGrpcClient             *grpc.ClientConfiguration                    `protobuf:"bytes,7,opt,name=execution_grpc_client,json=executionGrpcClient,proto3" json:"execution_grpc_client,omitempty"`
+	ExecutionClientPrivateKey       string                                       `protobuf:"bytes,8,opt,name=execution_client_private_key,json=executionClientPrivateKey,proto3" json:"execution_client_private_key,omitempty"`
+	ExecutionClientCertificateChain string                                       `protobuf:"bytes,9,opt,name=execution_client_certificate_chain,json=executionClientCertificateChain,proto3" json:"execution_client_certificate_chain,omitempty"`
+	RemoteWorkerGrpcClient          *grpc.ClientConfiguration                    `protobuf:"bytes,10,opt,name=remote_worker_grpc_client,json=remoteWorkerGrpcClient,proto3" json:"remote_worker_grpc_client,omitempty"`
+	PlatformPrivateKeys             []string                                     `protobuf:"bytes,11,rep,name=platform_private_keys,json=platformPrivateKeys,proto3" json:"platform_private_keys,omitempty"`
+	ClientCertificateVerifier       *x509.ClientCertificateVerifierConfiguration `protobuf:"bytes,12,opt,name=client_certificate_verifier,json=clientCertificateVerifier,proto3" json:"client_certificate_verifier,omitempty"`
+	WorkerId                        map[string]string                            `protobuf:"bytes,13,rep,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	ParsedObjectPool                *parser.ParsedObjectPool                     `protobuf:"bytes,14,opt,name=parsed_object_pool,json=parsedObjectPool,proto3" json:"parsed_object_pool,omitempty"`
 	unknownFields                   protoimpl.UnknownFields
 	sizeCache                       protoimpl.SizeCache
 }
@@ -128,11 +129,11 @@ func (x *ApplicationConfiguration) GetPlatformPrivateKeys() []string {
 	return nil
 }
 
-func (x *ApplicationConfiguration) GetClientCertificateAuthorities() string {
+func (x *ApplicationConfiguration) GetClientCertificateVerifier() *x509.ClientCertificateVerifierConfiguration {
 	if x != nil {
-		return x.ClientCertificateAuthorities
+		return x.ClientCertificateVerifier
 	}
-	return ""
+	return nil
 }
 
 func (x *ApplicationConfiguration) GetWorkerId() map[string]string {
@@ -153,7 +154,7 @@ var File_pkg_proto_configuration_bonanza_builder_bonanza_builder_proto protorefl
 
 const file_pkg_proto_configuration_bonanza_builder_bonanza_builder_proto_rawDesc = "" +
 	"\n" +
-	"=pkg/proto/configuration/bonanza_builder/bonanza_builder.proto\x12%bonanza.configuration.bonanza_builder\x1a3pkg/proto/configuration/filesystem/filesystem.proto\x1a+pkg/proto/configuration/global/global.proto\x1a'pkg/proto/configuration/grpc/grpc.proto\x1a1pkg/proto/configuration/model/parser/parser.proto\"\x86\b\n" +
+	"=pkg/proto/configuration/bonanza_builder/bonanza_builder.proto\x12%bonanza.configuration.bonanza_builder\x1a3pkg/proto/configuration/filesystem/filesystem.proto\x1a+pkg/proto/configuration/global/global.proto\x1a'pkg/proto/configuration/grpc/grpc.proto\x1a1pkg/proto/configuration/model/parser/parser.proto\x1a'pkg/proto/configuration/x509/x509.proto\"\xc7\b\n" +
 	"\x18ApplicationConfiguration\x12E\n" +
 	"\x06global\x18\x01 \x01(\v2-.buildbarn.configuration.global.ConfigurationR\x06global\x12a\n" +
 	"\x13storage_grpc_client\x18\x03 \x01(\v21.buildbarn.configuration.grpc.ClientConfigurationR\x11storageGrpcClient\x12V\n" +
@@ -163,8 +164,8 @@ const file_pkg_proto_configuration_bonanza_builder_bonanza_builder_proto_rawDesc
 	"\"execution_client_certificate_chain\x18\t \x01(\tR\x1fexecutionClientCertificateChain\x12l\n" +
 	"\x19remote_worker_grpc_client\x18\n" +
 	" \x01(\v21.buildbarn.configuration.grpc.ClientConfigurationR\x16remoteWorkerGrpcClient\x122\n" +
-	"\x15platform_private_keys\x18\v \x03(\tR\x13platformPrivateKeys\x12D\n" +
-	"\x1eclient_certificate_authorities\x18\f \x01(\tR\x1cclientCertificateAuthorities\x12j\n" +
+	"\x15platform_private_keys\x18\v \x03(\tR\x13platformPrivateKeys\x12\x84\x01\n" +
+	"\x1bclient_certificate_verifier\x18\f \x01(\v2D.buildbarn.configuration.x509.ClientCertificateVerifierConfigurationR\x19clientCertificateVerifier\x12j\n" +
 	"\tworker_id\x18\r \x03(\v2M.bonanza.configuration.bonanza_builder.ApplicationConfiguration.WorkerIdEntryR\bworkerId\x12b\n" +
 	"\x12parsed_object_pool\x18\x0e \x01(\v24.bonanza.configuration.model.parser.ParsedObjectPoolR\x10parsedObjectPool\x1a;\n" +
 	"\rWorkerIdEntry\x12\x10\n" +
@@ -190,7 +191,8 @@ var file_pkg_proto_configuration_bonanza_builder_bonanza_builder_proto_goTypes =
 	(*global.Configuration)(nil),             // 2: buildbarn.configuration.global.Configuration
 	(*grpc.ClientConfiguration)(nil),         // 3: buildbarn.configuration.grpc.ClientConfiguration
 	(*filesystem.FilePoolConfiguration)(nil), // 4: buildbarn.configuration.filesystem.FilePoolConfiguration
-	(*parser.ParsedObjectPool)(nil),          // 5: bonanza.configuration.model.parser.ParsedObjectPool
+	(*x509.ClientCertificateVerifierConfiguration)(nil), // 5: buildbarn.configuration.x509.ClientCertificateVerifierConfiguration
+	(*parser.ParsedObjectPool)(nil),                     // 6: bonanza.configuration.model.parser.ParsedObjectPool
 }
 var file_pkg_proto_configuration_bonanza_builder_bonanza_builder_proto_depIdxs = []int32{
 	2, // 0: bonanza.configuration.bonanza_builder.ApplicationConfiguration.global:type_name -> buildbarn.configuration.global.Configuration
@@ -198,13 +200,14 @@ var file_pkg_proto_configuration_bonanza_builder_bonanza_builder_proto_depIdxs =
 	4, // 2: bonanza.configuration.bonanza_builder.ApplicationConfiguration.file_pool:type_name -> buildbarn.configuration.filesystem.FilePoolConfiguration
 	3, // 3: bonanza.configuration.bonanza_builder.ApplicationConfiguration.execution_grpc_client:type_name -> buildbarn.configuration.grpc.ClientConfiguration
 	3, // 4: bonanza.configuration.bonanza_builder.ApplicationConfiguration.remote_worker_grpc_client:type_name -> buildbarn.configuration.grpc.ClientConfiguration
-	1, // 5: bonanza.configuration.bonanza_builder.ApplicationConfiguration.worker_id:type_name -> bonanza.configuration.bonanza_builder.ApplicationConfiguration.WorkerIdEntry
-	5, // 6: bonanza.configuration.bonanza_builder.ApplicationConfiguration.parsed_object_pool:type_name -> bonanza.configuration.model.parser.ParsedObjectPool
-	7, // [7:7] is the sub-list for method output_type
-	7, // [7:7] is the sub-list for method input_type
-	7, // [7:7] is the sub-list for extension type_name
-	7, // [7:7] is the sub-list for extension extendee
-	0, // [0:7] is the sub-list for field type_name
+	5, // 5: bonanza.configuration.bonanza_builder.ApplicationConfiguration.client_certificate_verifier:type_name -> buildbarn.configuration.x509.ClientCertificateVerifierConfiguration
+	1, // 6: bonanza.configuration.bonanza_builder.ApplicationConfiguration.worker_id:type_name -> bonanza.configuration.bonanza_builder.ApplicationConfiguration.WorkerIdEntry
+	6, // 7: bonanza.configuration.bonanza_builder.ApplicationConfiguration.parsed_object_pool:type_name -> bonanza.configuration.model.parser.ParsedObjectPool
+	8, // [8:8] is the sub-list for method output_type
+	8, // [8:8] is the sub-list for method input_type
+	8, // [8:8] is the sub-list for extension type_name
+	8, // [8:8] is the sub-list for extension extendee
+	0, // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_pkg_proto_configuration_bonanza_builder_bonanza_builder_proto_init() }

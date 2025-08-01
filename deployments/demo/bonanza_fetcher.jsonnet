@@ -36,15 +36,19 @@ local statePath = std.extVar('STATE_PATH');
       -----END PRIVATE KEY-----
     |||,
   ],
-  clientCertificateAuthorities: |||
-    -----BEGIN CERTIFICATE-----
-    MIIBFjCByaADAgECAhQehgruMx6qQ/4f985cRD+3B5tBJDAFBgMrZXAwADAgFw0y
-    NTA3MjExNDAwNDNaGA8yMDUyMTIwNjE0MDA0M1owADAqMAUGAytlcAMhAOXY2Z9C
-    AQ0fEdGOBVNQNnpkSR/kDd6B/rvYogriKaTVo1MwUTAdBgNVHQ4EFgQUhxs9zWAB
-    5Hk8jy6sNKZd8ykNcd0wHwYDVR0jBBgwFoAUhxs9zWAB5Hk8jy6sNKZd8ykNcd0w
-    DwYDVR0TAQH/BAUwAwEB/zAFBgMrZXADQQC+/DhfeldkbnqWg0fBPV9HY39kL2lT
-    253seXn65SwVp5Kryf9bfFEfF715YIrcQjsyg3EDD8jw+qQho5bZ/pMF
-    -----END CERTIFICATE-----
-  |||,
+  clientCertificateVerifier: {
+    clientCertificateAuthorities: |||
+      -----BEGIN CERTIFICATE-----
+      MIIBFjCByaADAgECAhQehgruMx6qQ/4f985cRD+3B5tBJDAFBgMrZXAwADAgFw0y
+      NTA3MjExNDAwNDNaGA8yMDUyMTIwNjE0MDA0M1owADAqMAUGAytlcAMhAOXY2Z9C
+      AQ0fEdGOBVNQNnpkSR/kDd6B/rvYogriKaTVo1MwUTAdBgNVHQ4EFgQUhxs9zWAB
+      5Hk8jy6sNKZd8ykNcd0wHwYDVR0jBBgwFoAUhxs9zWAB5Hk8jy6sNKZd8ykNcd0w
+      DwYDVR0TAQH/BAUwAwEB/zAFBgMrZXADQQC+/DhfeldkbnqWg0fBPV9HY39kL2lT
+      253seXn65SwVp5Kryf9bfFEfF715YIrcQjsyg3EDD8jw+qQho5bZ/pMF
+      -----END CERTIFICATE-----
+    |||,
+    validationJmespathExpression: '`true`',
+    metadataExtractionJmespathExpression: '`{}`',
+  },
   concurrency: 10,
 }

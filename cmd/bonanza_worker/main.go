@@ -34,6 +34,7 @@ import (
 	"github.com/buildbarn/bb-storage/pkg/program"
 	"github.com/buildbarn/bb-storage/pkg/random"
 	"github.com/buildbarn/bb-storage/pkg/util"
+	"github.com/buildbarn/bb-storage/pkg/x509"
 	"github.com/google/uuid"
 
 	"golang.org/x/sync/semaphore"
@@ -130,7 +131,7 @@ func main() {
 				if err != nil {
 					return err
 				}
-				clientCertificateAuthorities, err := remoteworker.ParseClientCertificateAuthorities(runnerConfiguration.ClientCertificateAuthorities)
+				clientCertificateVerifier, err := x509.NewClientCertificateVerifierFromConfiguration(runnerConfiguration.ClientCertificateVerifier)
 				if err != nil {
 					return err
 				}
@@ -210,7 +211,7 @@ func main() {
 						clock.SystemClock,
 						random.CryptoThreadSafeGenerator,
 						platformPrivateKeys,
-						clientCertificateAuthorities,
+						clientCertificateVerifier,
 						workerID,
 						runnerConfiguration.SizeClass,
 						runnerConfiguration.IsLargestSizeClass,

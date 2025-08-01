@@ -8,6 +8,7 @@ import "pkg/proto/configuration/filesystem/virtual/virtual.proto";
 import "pkg/proto/configuration/global/global.proto";
 import "pkg/proto/configuration/grpc/grpc.proto";
 import "pkg/proto/configuration/model/parser/parser.proto";
+import "pkg/proto/configuration/x509/x509.proto";
 
 option go_package = "bonanza.build/pkg/proto/configuration/bonanza_worker";
 
@@ -58,11 +59,11 @@ message RunnerConfiguration {
   // type "PRIVATE KEY".
   repeated string platform_private_keys = 3;
 
-  // Client certificate authorities to consider when authenticating the
-  // client certificate that is provided as part of the action. This
-  // effectively controls which clients are permitted to use this
-  // worker.
-  string client_certificate_authorities = 4;
+  // Strategy for verifying X.509 client certificates that are provided
+  // as part of the build request submitted by clients. This effectively
+  // controls which clients are permitted to use this worker.
+  buildbarn.configuration.x509.ClientCertificateVerifierConfiguration
+      client_certificate_verifier = 4;
 
   // The size of this worker in terms of CPU count and memory size. When
   // all workers of this platform have the same size, it is sufficient
