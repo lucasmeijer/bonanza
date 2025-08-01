@@ -20,19 +20,19 @@ bazel_dep(name = "toolchains_llvm", version = "1.4.0")
 
 git_override(
     module_name = "bazel_remote_apis",
-    commit = "9ef19c6b5fbf77d6dd9d84d75fbb5a20a6b62ef1",
+    commit = "e94a7ece2a1e8da1dcf278a0baf2edfe7baafb94",
     remote = "https://github.com/bazelbuild/remote-apis.git",
 )
 
 git_override(
     module_name = "com_github_buildbarn_bb_remote_execution",
-    commit = "d879803aa1fa8d3bf566e5038155435a47522d6e",
+    commit = "58b88e8adfbd4cb5c32905383ef9c35ea1f9598e",
     remote = "https://github.com/buildbarn/bb-remote-execution.git",
 )
 
 git_override(
     module_name = "com_github_buildbarn_bb_storage",
-    commit = "226829e872c3e8ec8e197b1f5ca8b0609dfa20fa",
+    commit = "b446105f8b1f02d23a31f4a4c18d44f4fe9aecf2",
     patches = ["//:patches/com_github_buildbarn_bb_storage/no-golint.diff"],
     remote = "https://github.com/buildbarn/bb-storage.git",
 )
