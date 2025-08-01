@@ -1,14 +1,15 @@
 module(name = "build_bonanza")
 
-bazel_dep(name = "aspect_bazel_lib", version = "2.19.4")
-bazel_dep(name = "aspect_rules_js", version = "2.3.8")
+bazel_dep(name = "apple_support", version = "1.22.1")  # For https://github.com/bazelbuild/apple_support/pull/373.
+bazel_dep(name = "aspect_bazel_lib", version = "2.20.0")
+bazel_dep(name = "aspect_rules_js", version = "2.4.2")
 bazel_dep(name = "bazel_remote_apis", version = "0.0.0")
 bazel_dep(name = "bazel_skylib", version = "1.8.1")
 bazel_dep(name = "com_github_buildbarn_bb_remote_execution")
 bazel_dep(name = "com_github_buildbarn_bb_storage")
 bazel_dep(name = "com_github_buildbarn_go_xdr")
 bazel_dep(name = "gazelle", version = "0.44.0")
-bazel_dep(name = "googleapis", version = "0.0.0-20250604-de157ca3")
+bazel_dep(name = "googleapis", version = "0.0.0-20250703-f9d6fe4a")
 bazel_dep(name = "jsonnet_go", version = "0.21.0")
 bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "toolchains_protoc", version = "0.4.3")  # must come BEFORE protobuf so the toolchain registration wins
