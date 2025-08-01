@@ -102,7 +102,7 @@ func main() {
 			if configuration.Concurrency > 1 {
 				workerID["thread"] = fmt.Sprintf("%0*d", concurrencyLength, threadID)
 			}
-			maps.Copy(workerID, workerID)
+			maps.Copy(workerID, configuration.WorkerId)
 			workerName, err := json.Marshal(workerID)
 			if err != nil {
 				return util.StatusWrap(err, "Failed to marshal worker ID")
