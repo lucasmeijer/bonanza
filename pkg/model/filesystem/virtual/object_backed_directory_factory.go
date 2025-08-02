@@ -286,11 +286,11 @@ func (d *objectBackedDirectory) VirtualLookup(ctx context.Context, name path.Com
 	return virtual.DirectoryChild{}, virtual.StatusErrNoEnt
 }
 
-func (d *objectBackedDirectory) VirtualOpenChild(ctx context.Context, name path.Component, shareAccess virtual.ShareMask, createAttributes *virtual.Attributes, existingOptions *virtual.OpenExistingOptions, requested virtual.AttributesMask, openedFileAttributes *virtual.Attributes) (virtual.Leaf, virtual.AttributesMask, virtual.ChangeInfo, virtual.Status) {
+func (d *objectBackedDirectory) VirtualOpenChild(ctx context.Context, name path.Component, shareAccess virtual.ShareMask, createAttributes *virtual.Attributes, existingOptions *virtual.OpenExistingOptions, requested virtual.AttributesMask, openedFileAttributes *virtual.Attributes) (virtual.Child[virtual.Directory, virtual.Leaf, virtual.Node], virtual.AttributesMask, virtual.ChangeInfo, virtual.Status) {
 	df := d.factory
 	directory, s := d.getDirectory(ctx)
 	if s != virtual.StatusOK {
-		return nil, 0, virtual.ChangeInfo{}, s
+		return virtual.DirectoryChild{}, 0, virtual.ChangeInfo{}, s
 	}
 
 	n := name.String()
@@ -299,7 +299,11 @@ func (d *objectBackedDirectory) VirtualOpenChild(ctx context.Context, name path.
 		len(directories),
 		func(i int) int { return strings.Compare(n, directories[i].Name) },
 	); ok {
-		return virtual.ReadOnlyDirectoryOpenChildWrongFileType(existingOptions, virtual.StatusErrIsDir)
+		leaf, mask, changeInfo, status := virtual.ReadOnlyDirectoryOpenChildWrongFileType(existingOptions, virtual.StatusErrIsDir)
+		if leaf != nil {
+			return virtual.DirectoryChild{}.FromLeaf(leaf), mask, changeInfo, status
+		}
+		return virtual.DirectoryChild{}, mask, changeInfo, status
 	}
 
 	leaves, err := model_filesystem.DirectoryGetLeaves(
@@ -309,7 +313,7 @@ func (d *objectBackedDirectory) VirtualOpenChild(ctx context.Context, name path.
 	)
 	if err != nil {
 		df.errorLogger.Log(util.StatusWrapf(err, "Failed to fetch leaves of directory cluster with reference %s", d.clusterReference))
-		return nil, 0, virtual.ChangeInfo{}, virtual.StatusErrIO
+		return virtual.DirectoryChild{}, 0, virtual.ChangeInfo{}, virtual.StatusErrIO
 	}
 
 	files := leaves.Message.Files
@@ -318,15 +322,15 @@ func (d *objectBackedDirectory) VirtualOpenChild(ctx context.Context, name path.
 		func(i int) int { return strings.Compare(n, files[i].Name) },
 	); ok {
 		if existingOptions == nil {
-			return nil, 0, virtual.ChangeInfo{}, virtual.StatusErrExist
+			return virtual.DirectoryChild{}, 0, virtual.ChangeInfo{}, virtual.StatusErrExist
 		}
 
 		leaf, s := d.lookupFile(model_core.Nested(leaves, files[i]))
 		if s != virtual.StatusOK {
-			return nil, 0, virtual.ChangeInfo{}, s
+			return virtual.DirectoryChild{}, 0, virtual.ChangeInfo{}, s
 		}
 		s = leaf.VirtualOpenSelf(ctx, shareAccess, existingOptions, requested, openedFileAttributes)
-		return leaf, existingOptions.ToAttributesMask(), virtual.ChangeInfo{}, s
+		return virtual.DirectoryChild{}.FromLeaf(leaf), existingOptions.ToAttributesMask(), virtual.ChangeInfo{}, s
 	}
 
 	symlinks := leaves.Message.Symlinks
@@ -334,7 +338,11 @@ func (d *objectBackedDirectory) VirtualOpenChild(ctx context.Context, name path.
 		len(symlinks),
 		func(i int) int { return strings.Compare(n, symlinks[i].Name) },
 	); ok {
-		return virtual.ReadOnlyDirectoryOpenChildWrongFileType(existingOptions, virtual.StatusErrSymlink)
+		leaf, mask, changeInfo, status := virtual.ReadOnlyDirectoryOpenChildWrongFileType(existingOptions, virtual.StatusErrSymlink)
+		if leaf != nil {
+			return virtual.DirectoryChild{}.FromLeaf(leaf), mask, changeInfo, status
+		}
+		return virtual.DirectoryChild{}, mask, changeInfo, status
 	}
 
 	return virtual.ReadOnlyDirectoryOpenChildDoesntExist(createAttributes)

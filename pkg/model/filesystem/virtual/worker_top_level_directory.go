@@ -84,7 +84,7 @@ func (d *WorkerTopLevelDirectory) VirtualLookup(ctx context.Context, name path.C
 	return child, virtual.StatusOK
 }
 
-func (WorkerTopLevelDirectory) VirtualOpenChild(ctx context.Context, name path.Component, shareAccess virtual.ShareMask, createAttributes *virtual.Attributes, existingOptions *virtual.OpenExistingOptions, requested virtual.AttributesMask, openedFileAttributes *virtual.Attributes) (virtual.Leaf, virtual.AttributesMask, virtual.ChangeInfo, virtual.Status) {
+func (WorkerTopLevelDirectory) VirtualOpenChild(ctx context.Context, name path.Component, shareAccess virtual.ShareMask, createAttributes *virtual.Attributes, existingOptions *virtual.OpenExistingOptions, requested virtual.AttributesMask, openedFileAttributes *virtual.Attributes) (virtual.Child[virtual.Directory, virtual.Leaf, virtual.Node], virtual.AttributesMask, virtual.ChangeInfo, virtual.Status) {
 	return virtual.ReadOnlyDirectoryOpenChildDoesntExist(createAttributes)
 }
 
