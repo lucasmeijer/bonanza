@@ -28,6 +28,7 @@ import (
 	"bonanza.build/pkg/storage/dag"
 	"bonanza.build/pkg/storage/object"
 	object_namespacemapping "bonanza.build/pkg/storage/object/namespacemapping"
+	object_suspending "bonanza.build/pkg/storage/object/suspending"
 
 	re_clock "github.com/buildbarn/bb-remote-execution/pkg/clock"
 	"github.com/buildbarn/bb-remote-execution/pkg/filesystem/pool"
@@ -91,24 +92,25 @@ type TopLevelDirectory interface {
 }
 
 type localExecutor struct {
-	objectDownloader               object.Downloader[object.GlobalReference]
-	parsedObjectPool               *model_parser.ParsedObjectPool
-	dagUploaderClient              dag_pb.UploaderClient
-	objectContentsWalkerSemaphore  *semaphore.Weighted
-	topLevelDirectory              TopLevelDirectory
-	handleAllocator                virtual.StatefulHandleAllocator
-	filePool                       pool.FilePool
-	symlinkFactory                 virtual.SymlinkFactory
-	initialContentsSorter          virtual.Sorter
-	hiddenFilesMatcher             virtual.StringMatcher
-	runner                         runner_pb.RunnerClient
-	clock                          clock.Clock
-	uuidGenerator                  util.UUIDGenerator
-	maximumWritableFileUploadDelay time.Duration
-	environmentVariables           map[string]string
-	buildDirectoryOwnerUserID      uint32
-	buildDirectoryOwnerGroupID     uint32
-	readinessCheckingDirectory     virtual.Directory
+	objectDownloader                    object.Downloader[object.GlobalReference]
+	parsedObjectPool                    *model_parser.ParsedObjectPool
+	dagUploaderClient                   dag_pb.UploaderClient
+	objectContentsWalkerSemaphore       *semaphore.Weighted
+	topLevelDirectory                   TopLevelDirectory
+	handleAllocator                     virtual.StatefulHandleAllocator
+	filePool                            pool.FilePool
+	symlinkFactory                      virtual.SymlinkFactory
+	initialContentsSorter               virtual.Sorter
+	hiddenFilesMatcher                  virtual.StringMatcher
+	runner                              runner_pb.RunnerClient
+	clock                               clock.Clock
+	uuidGenerator                       util.UUIDGenerator
+	maximumWritableFileUploadDelay      time.Duration
+	environmentVariables                map[string]string
+	buildDirectoryOwnerUserID           uint32
+	buildDirectoryOwnerGroupID          uint32
+	readinessCheckingDirectory          virtual.Directory
+	maximumExecutionTimeoutCompensation time.Duration
 }
 
 func NewLocalExecutor(
@@ -129,26 +131,28 @@ func NewLocalExecutor(
 	environmentVariables map[string]string,
 	buildDirectoryOwnerUserID uint32,
 	buildDirectoryOwnerGroupID uint32,
+	maximumExecutionTimeoutCompensation time.Duration,
 ) remoteworker.Executor[*model_executewithstorage.Action[object.GlobalReference], model_core.Decodable[object.LocalReference], model_core.Decodable[object.LocalReference]] {
 	return &localExecutor{
-		objectDownloader:               objectDownloader,
-		parsedObjectPool:               parsedObjectPool,
-		dagUploaderClient:              dagUploaderClient,
-		objectContentsWalkerSemaphore:  objectContentsWalkerSemaphore,
-		topLevelDirectory:              topLevelDirectory,
-		handleAllocator:                handleAllocator,
-		filePool:                       filePool,
-		symlinkFactory:                 symlinkFactory,
-		initialContentsSorter:          initialContentsSorter,
-		hiddenFilesMatcher:             hiddenFilesMatcher,
-		runner:                         runner,
-		clock:                          clock,
-		uuidGenerator:                  uuidGenerator,
-		maximumWritableFileUploadDelay: maximumWritableFileUploadDelay,
-		environmentVariables:           environmentVariables,
-		buildDirectoryOwnerUserID:      buildDirectoryOwnerUserID,
-		buildDirectoryOwnerGroupID:     buildDirectoryOwnerGroupID,
-		readinessCheckingDirectory:     handleAllocator.New().AsStatelessDirectory(virtual.NewStaticDirectory(nil)),
+		objectDownloader:                    objectDownloader,
+		parsedObjectPool:                    parsedObjectPool,
+		dagUploaderClient:                   dagUploaderClient,
+		objectContentsWalkerSemaphore:       objectContentsWalkerSemaphore,
+		topLevelDirectory:                   topLevelDirectory,
+		handleAllocator:                     handleAllocator,
+		filePool:                            filePool,
+		symlinkFactory:                      symlinkFactory,
+		initialContentsSorter:               initialContentsSorter,
+		hiddenFilesMatcher:                  hiddenFilesMatcher,
+		runner:                              runner,
+		clock:                               clock,
+		uuidGenerator:                       uuidGenerator,
+		maximumWritableFileUploadDelay:      maximumWritableFileUploadDelay,
+		environmentVariables:                environmentVariables,
+		buildDirectoryOwnerUserID:           buildDirectoryOwnerUserID,
+		buildDirectoryOwnerGroupID:          buildDirectoryOwnerGroupID,
+		readinessCheckingDirectory:          handleAllocator.New().AsStatelessDirectory(virtual.NewStaticDirectory(nil)),
+		maximumExecutionTimeoutCompensation: maximumExecutionTimeoutCompensation,
 	}
 }
 
@@ -198,6 +202,7 @@ func captureLog(ctx context.Context, buildDirectory virtual.PrepopulatedDirector
 }
 
 func (e *localExecutor) Execute(ctx context.Context, action *model_executewithstorage.Action[object.GlobalReference], executionTimeout time.Duration, executionEvents chan<- model_core.Decodable[object.LocalReference]) (model_core.Decodable[object.LocalReference], time.Duration, remoteworker_pb.CurrentState_Completed_Result, error) {
+	// Reject actions that this worker can't process.
 	if !proto.Equal(action.Format, &model_core_pb.ObjectFormat{
 		Format: &model_core_pb.ObjectFormat_ProtoTypeName{
 			ProtoTypeName: "bonanza.model.command.Action",
@@ -206,8 +211,28 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_executewithst
 		var badReference model_core.Decodable[object.LocalReference]
 		return badReference, 0, 0, status.Error(codes.InvalidArgument, "This worker cannot execute actions of this type")
 	}
-	// Fetch the Command message, so that we know the arguments and
-	// environment variables of the process to spawn.
+
+	// Create a clock that compensates for time that's spent
+	// downloading objects from storage. This is needed to
+	// accurately enforce execution timeouts.
+	suspendableClock := re_clock.NewSuspendableClock(
+		e.clock,
+		e.maximumExecutionTimeoutCompensation,
+		/* timeoutThreshold = */ time.Second/10,
+	)
+	parsedObjectPoolIngester := model_parser.NewParsedObjectPoolIngester(
+		e.parsedObjectPool,
+		model_parser.NewDownloadingParsedObjectReader(
+			object_suspending.NewDownloader(
+				object_namespacemapping.NewNamespaceAddingDownloader(
+					e.objectDownloader,
+					action.Reference.Value.InstanceName,
+				),
+				suspendableClock,
+			),
+		),
+	)
+
 	referenceFormat := action.Reference.Value.GetReferenceFormat()
 	actionEncoder, err := model_encoding.NewBinaryEncoderFromProto(
 		action.Encoders,
@@ -218,15 +243,10 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_executewithst
 		return badReference, 0, 0, status.Error(codes.InvalidArgument, "Invalid action encoders")
 	}
 
-	parsedObjectPoolIngester := model_parser.NewParsedObjectPoolIngester(
-		e.parsedObjectPool,
-		model_parser.NewDownloadingParsedObjectReader(
-			object_namespacemapping.NewNamespaceAddingDownloader(e.objectDownloader, action.Reference.Value.InstanceName),
-		),
-	)
-
 	var virtualExecutionDuration time.Duration
 	result := model_core.BuildPatchedMessage(func(resultPatcher *model_core.ReferenceMessagePatcher[dag.ObjectContentsWalker]) *model_command_pb.Result {
+		// Fetch the Command message, so that we know the arguments
+		// and environment variables of the process to spawn.
 		var result model_command_pb.Result
 		actionReader := model_parser.LookupParsedObjectReader[object.LocalReference](
 			parsedObjectPoolIngester,
@@ -442,7 +462,7 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_executewithst
 
 		// Invoke the command.
 		buildDirectoryPath := (*path.Trace)(nil).Append(buildDirectoryName)
-		ctxWithTimeout, cancelTimeout := e.clock.NewContextWithTimeout(ctxWithIOError, executionTimeout)
+		ctxWithTimeout, cancelTimeout := suspendableClock.NewContextWithTimeout(ctxWithIOError, executionTimeout)
 		runResponse, runErr := e.runner.Run(ctxWithTimeout, &runner_pb.RunRequest{
 			Arguments:            arguments,
 			EnvironmentVariables: environmentVariables,

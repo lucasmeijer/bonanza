@@ -84,4 +84,5 @@ local statePath = std.extVar('STATE_PATH');
       },
     },
   }],
+  maximumExecutionTimeoutCompensation: '3600s',
 }

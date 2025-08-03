@@ -1,0 +1,12 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "suspending",
+    srcs = ["downloader.go"],
+    importpath = "bonanza.build/pkg/storage/object/suspending",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/storage/object",
+        "@com_github_buildbarn_bb_remote_execution//pkg/clock",
+    ],
+)

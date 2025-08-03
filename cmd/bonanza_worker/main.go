@@ -88,6 +88,11 @@ func main() {
 			return util.StatusWrap(err, "Failed to create file pool")
 		}
 
+		maximumExecutionTimeoutCompensation := configuration.MaximumExecutionTimeoutCompensation
+		if err := maximumExecutionTimeoutCompensation.CheckValid(); err != nil {
+			return util.StatusWrap(err, "Invalid maximum execution timeout compensation")
+		}
+
 		for _, buildDirectoryConfiguration := range configuration.BuildDirectories {
 			mount, handleAllocator, err := virtual_configuration.NewMountFromConfiguration(
 				buildDirectoryConfiguration.Mount,
@@ -201,6 +206,7 @@ func main() {
 						runnerConfiguration.EnvironmentVariables,
 						runnerConfiguration.BuildDirectoryOwnerUserId,
 						runnerConfiguration.BuildDirectoryOwnerGroupId,
+						maximumExecutionTimeoutCompensation,
 					)
 
 					client, err := remoteworker.NewClient(

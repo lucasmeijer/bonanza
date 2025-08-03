@@ -33,6 +33,21 @@ message ApplicationConfiguration {
   // Cache that resides in memory of objects read from storage that have
   // been decoded and parsed.
   bonanza.configuration.model.parser.ParsedObjectPool parsed_object_pool = 6;
+
+  // Because the virtual file system only loads input root contents from
+  // object storage lazily, build actions may block during execution. To
+  // prevent these delays from causing spurious test timeouts, this
+  // implementation is capable of compensating the execution timeout of
+  // actions based on storage latency observed.
+  //
+  // To prevent build actions from abusing this system (i.e., extending
+  // the execution timeout indefinitely by accessing files that are
+  // known to be slow), this option can be used to specify the maximum
+  // amount of time the build action is permitted to run in excess of
+  // the originally specified execution timeout.
+  //
+  // Recommended value: 3600s
+  google.protobuf.Duration maximum_execution_timeout_compensation = 7;
 }
 
 message BuildDirectoryConfiguration {
