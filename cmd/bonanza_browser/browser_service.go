@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"path"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -23,6 +24,7 @@ import (
 	model_encoding "bonanza.build/pkg/model/encoding"
 	model_parser "bonanza.build/pkg/model/parser"
 	browser_pb "bonanza.build/pkg/proto/browser"
+	buildqueuestate_pb "bonanza.build/pkg/proto/buildqueuestate"
 	model_core_pb "bonanza.build/pkg/proto/model/core"
 	model_encoding_pb "bonanza.build/pkg/proto/model/encoding"
 	model_evaluation_pb "bonanza.build/pkg/proto/model/evaluation"
@@ -46,6 +48,7 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -55,16 +58,18 @@ var stylesheet string
 // BrowserService is capable of serving pages for inspecting the
 // contents of objects in storage.
 type BrowserService struct {
-	objectDownloader object.Downloader[object.GlobalReference]
-	parsedObjectPool *model_parser.ParsedObjectPool
+	buildQueueStateClient buildqueuestate_pb.BuildQueueStateClient
+	objectDownloader      object.Downloader[object.GlobalReference]
+	parsedObjectPool      *model_parser.ParsedObjectPool
 }
 
 // NewBrowserService creates a new BrowserService that serves pages,
 // displaying the contents contained in a given storage backend.
-func NewBrowserService(objectDownloader object.Downloader[object.GlobalReference], parsedObjectPool *model_parser.ParsedObjectPool) *BrowserService {
+func NewBrowserService(buildQueueStateClient buildqueuestate_pb.BuildQueueStateClient, objectDownloader object.Downloader[object.GlobalReference], parsedObjectPool *model_parser.ParsedObjectPool) *BrowserService {
 	return &BrowserService{
-		objectDownloader: objectDownloader,
-		parsedObjectPool: parsedObjectPool,
+		buildQueueStateClient: buildQueueStateClient,
+		objectDownloader:      objectDownloader,
+		parsedObjectPool:      parsedObjectPool,
 	}
 }
 
@@ -85,7 +90,7 @@ func wrapHandler(handler func(http.ResponseWriter, *http.Request) (g.Node, error
 
 // RegisterHandlers registers handlers for serving web pages in a mux.
 func (s *BrowserService) RegisterHandlers(mux *http.ServeMux) {
-	mux.HandleFunc("/{$}", wrapHandler(s.doWelcome))
+	// Storage related endpoints.
 	mux.HandleFunc(
 		"/evaluation/{instance_name}/{reference_format}/{reference}/{key}",
 		wrapHandler(s.doEvaluation),
@@ -102,6 +107,10 @@ func (s *BrowserService) RegisterHandlers(mux *http.ServeMux) {
 		"/object/{instance_name}/{reference_format}/{reference}/raw",
 		wrapHandler(s.doRawObject),
 	)
+
+	// Scheduler related endpoints.
+	mux.HandleFunc("/{$}", wrapHandler(s.doPlatformQueues))
+	mux.HandleFunc("/workers/{filter}", wrapHandler(s.doWorkers))
 }
 
 func renderPage(title string, body []g.Node) g.Node {
@@ -123,24 +132,6 @@ func renderPage(title string, body []g.Node) g.Node {
 			body...,
 		),
 	})
-}
-
-func (s *BrowserService) doWelcome(w http.ResponseWriter, r *http.Request) (g.Node, error) {
-	return renderPage("Bonanza Browser", []g.Node{
-		h.Div(
-			h.Class("mx-auto p-4 max-w-[100rem]"),
-
-			h.Div(
-				h.Class("card bg-base-200 p-4 shadow"),
-				h.H1(
-					h.Class("card-title text-2xl mb-4"),
-					g.Text("Welcome to Bonanza Browser!"),
-				),
-
-				h.P(g.Text("TODO: Document this service.")),
-			),
-		),
-	}), nil
 }
 
 // getReferenceFromRequest extracts the instance name, reference format,
@@ -1006,6 +997,327 @@ func (s *BrowserService) doRawObject(w http.ResponseWriter, r *http.Request) (g.
 		},
 		2,
 	)
+}
+
+func marshalAndURLEncode(m proto.Message) (string, error) {
+	data, err := proto.Marshal(m)
+	if err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(data), nil
+}
+
+func timeoutToText(timeout *timestamppb.Timestamp, now time.Time) string {
+	if timeout == nil {
+		return "∞"
+	}
+	if timeout.CheckValid() != nil {
+		return "?"
+	}
+	return timeout.AsTime().Sub(now).Truncate(time.Second).String()
+}
+
+func (s *BrowserService) doPlatformQueues(w http.ResponseWriter, r *http.Request) (g.Node, error) {
+	now := time.Now()
+	response, err := s.buildQueueStateClient.ListPlatformQueues(r.Context(), &emptypb.Empty{})
+	if err != nil {
+		return nil, util.StatusWrap(err, "Failed to list platform queues")
+	}
+	tableRows := make([]g.Node, 0, len(response.PlatformQueues))
+	for _, pq := range response.PlatformQueues {
+		for i, scq := range pq.SizeClassQueues {
+			// For each platform queue, add a multi-row
+			// column on the left hand side containing the
+			// PKIX public keys.
+			var cells []g.Node
+			if i == 0 {
+				pkixPublicKeys := append(
+					make([]g.Node, 0, 2+2*len(pq.PkixPublicKeys)),
+					h.Class("font-mono"),
+					h.RowSpan(strconv.FormatInt(int64(len(pq.SizeClassQueues)), 10)),
+				)
+				for _, pkixPublicKey := range pq.PkixPublicKeys {
+					pkixPublicKeys = append(
+						pkixPublicKeys,
+						g.Text(base64.StdEncoding.EncodeToString(pkixPublicKey)),
+						h.Br(),
+					)
+				}
+				cells = append(cells, h.Td(pkixPublicKeys...))
+			}
+
+			sizeClassQueueName := &buildqueuestate_pb.SizeClassQueueName{
+				PlatformPkixPublicKey: pq.PkixPublicKeys[0],
+				SizeClass:             scq.SizeClass,
+			}
+			sizeClassQueueNameStr, err := marshalAndURLEncode(sizeClassQueueName)
+			if err != nil {
+				return nil, util.StatusWrap(err, "Failed to marshal and encode size class queue name")
+			}
+			invocationName := &buildqueuestate_pb.InvocationName{
+				SizeClassQueueName: sizeClassQueueName,
+			}
+			invocationNameStr, err := marshalAndURLEncode(invocationName)
+			if err != nil {
+				return nil, util.StatusWrap(err, "Failed to marshal and encode invocation name")
+			}
+			listWorkersFilterExecutingStr, err := marshalAndURLEncode(&buildqueuestate_pb.ListWorkersRequest_Filter{
+				Type: &buildqueuestate_pb.ListWorkersRequest_Filter_Executing{
+					Executing: invocationName,
+				},
+			})
+			if err != nil {
+				return nil, util.StatusWrap(err, "Failed to marshal and encode executing workers filter")
+			}
+			listWorkersFilterIdleSynchronizingStr, err := marshalAndURLEncode(&buildqueuestate_pb.ListWorkersRequest_Filter{
+				Type: &buildqueuestate_pb.ListWorkersRequest_Filter_IdleSynchronizing{
+					IdleSynchronizing: invocationName,
+				},
+			})
+			if err != nil {
+				return nil, util.StatusWrap(err, "Failed to marshal and encode idle synchronizing workers filter")
+			}
+			listWorkersFilterAllStr, err := marshalAndURLEncode(&buildqueuestate_pb.ListWorkersRequest_Filter{
+				Type: &buildqueuestate_pb.ListWorkersRequest_Filter_All{
+					All: sizeClassQueueName,
+				},
+			})
+			if err != nil {
+				return nil, util.StatusWrap(err, "Failed to marshal and encode all workers filter")
+			}
+
+			// Counters that are tracked per size class queue.
+			tableRows = append(
+				tableRows,
+				h.Tr(
+					append(
+						cells,
+						h.Td(h.Class("text-right"), g.Textf("%d", scq.SizeClass)),
+						h.Td(h.Class("text-right"), g.Text(timeoutToText(scq.Timeout, now))),
+						h.Td(
+							h.Class("text-right"),
+							h.A(
+								h.Class("link link-primary"),
+								h.Href("queued_operations/"+invocationNameStr),
+								g.Textf("%d", scq.RootInvocation.QueuedOperationsCount),
+							),
+						),
+						h.Td(
+							h.Class("text-right"),
+							h.A(
+								h.Class("link link-primary"),
+								h.Href("invocation_children/"+invocationNameStr+"/QUEUED"),
+								g.Textf("%d", scq.RootInvocation.QueuedChildrenCount),
+							),
+						),
+						h.Td(
+							h.Class("text-right"),
+							h.A(
+								h.Class("link link-primary"),
+								h.Href("invocation_children/"+invocationNameStr+"/ACTIVE"),
+								g.Textf("%d", scq.RootInvocation.ActiveChildrenCount),
+							),
+						),
+						h.Td(
+							h.Class("text-right"),
+							h.A(
+								h.Class("link link-primary"),
+								h.Href("invocation_children/"+invocationNameStr+"/ALL"),
+								g.Textf("%d", scq.RootInvocation.ChildrenCount),
+							),
+						),
+						h.Td(
+							h.Class("text-right"),
+							h.A(
+								h.Class("link link-primary"),
+								h.Href("workers/"+listWorkersFilterExecutingStr),
+								g.Textf("%d", scq.RootInvocation.ExecutingWorkersCount),
+							),
+						),
+						h.Td(
+							h.Class("text-right"),
+							g.Textf("%d", scq.RootInvocation.IdleWorkersCount),
+						),
+						h.Td(
+							h.Class("text-right"),
+							h.A(
+								h.Class("link link-primary"),
+								h.Href("workers/"+listWorkersFilterIdleSynchronizingStr),
+								g.Textf("%d", scq.RootInvocation.IdleSynchronizingWorkersCount),
+							),
+						),
+						h.Td(
+							h.Class("text-right"),
+							h.A(
+								h.Class("link link-primary"),
+								h.Href("workers/"+listWorkersFilterAllStr),
+								g.Textf("%d", scq.WorkersCount),
+							),
+						),
+						h.Td(
+							h.Class("text-right"),
+							h.A(
+								h.Class("link link-primary"),
+								h.Href("drains/"+sizeClassQueueNameStr),
+								g.Textf("%d", scq.DrainsCount),
+							),
+						),
+					)...,
+				),
+			)
+		}
+	}
+
+	return renderPage("Platform queues", []g.Node{
+		h.Div(
+			h.Class("w-full p-4"),
+
+			h.Div(
+				h.Class("card bg-base-200 p-4 shadow"),
+				h.H1(
+					h.Class("card-title text-2xl mb-4"),
+					g.Text("Platform queues"),
+				),
+				h.Table(
+					h.Class("table"),
+					h.THead(
+						h.Class("text-center"),
+						h.Tr(
+							h.Th(
+								h.RowSpan("3"),
+								g.Text("PKIX public keys"),
+							),
+							h.Th(
+								h.RowSpan("3"),
+								g.Text("Size class"),
+							),
+							h.Th(
+								h.RowSpan("3"),
+								g.Text("Timeout"),
+							),
+							h.Th(
+								h.ColSpan("7"),
+								g.Text("Root invocation"),
+							),
+							h.Th(
+								h.RowSpan("3"),
+								g.Text("All workers"),
+							),
+							h.Th(
+								h.RowSpan("3"),
+								g.Text("Drains"),
+							),
+						),
+						h.Tr(
+							h.Th(
+								h.RowSpan("2"),
+								g.Text("Queued operations"),
+							),
+							h.Th(
+								h.ColSpan("3"),
+								g.Text("Children"),
+							),
+							h.Th(
+								h.ColSpan("3"),
+								g.Text("Workers"),
+							),
+						),
+						h.Tr(
+							h.Th(g.Text("Queued")),
+							h.Th(g.Text("Active")),
+							h.Th(g.Text("All")),
+							h.Th(g.Text("Executing")),
+							h.Th(g.Text("Idle")),
+							h.Th(g.Text("Idle synchronizing")),
+						),
+					),
+					h.TBody(tableRows...),
+				),
+			),
+		),
+	}), nil
+}
+
+const pageSize = 1000
+
+func (s *BrowserService) doWorkers(w http.ResponseWriter, r *http.Request) (g.Node, error) {
+	filterData, err := base64.RawURLEncoding.DecodeString(r.PathValue("filter"))
+	if err != nil {
+		return nil, util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to decode filter")
+	}
+	var filter buildqueuestate_pb.ListWorkersRequest_Filter
+	if err := proto.Unmarshal(filterData, &filter); err != nil {
+		return nil, util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to unmarshal filter")
+	}
+
+	now := time.Now()
+	response, err := s.buildQueueStateClient.ListWorkers(r.Context(), &buildqueuestate_pb.ListWorkersRequest{
+		Filter:   &filter,
+		PageSize: pageSize,
+		// StartAfter: startAfter,
+	})
+	if err != nil {
+		return nil, util.StatusWrap(err, "Failed to list workers")
+	}
+
+	tableRows := make([]g.Node, 0, len(response.Workers))
+	for _, worker := range response.Workers {
+		workerID := make([]g.Node, 0, 2*len(worker.Id))
+		for _, key := range slices.Sorted(maps.Keys(worker.Id)) {
+			workerID = append(
+				workerID,
+				h.Span(
+					h.Class("badge badge-primary text-nowrap"),
+					g.Textf("%s=%#v", key, worker.Id[key]),
+				),
+				g.Text(" "),
+			)
+		}
+		tableRows = append(
+			tableRows,
+			h.Tr(
+				h.Td(workerID...),
+				h.Td(h.Class("text-right"), g.Text(timeoutToText(worker.Timeout, now))),
+				h.Td(g.Text("TODO")),
+				h.Td(g.Text("TODO")),
+			),
+		)
+	}
+
+	return renderPage("Workers", []g.Node{
+		h.Div(
+			h.Class("w-full p-4"),
+
+			h.Div(
+				h.Class("card bg-base-200 p-4 shadow"),
+				h.H1(
+					h.Class("card-title text-2xl mb-4"),
+					g.Text("Workers"),
+				),
+				h.Table(
+					h.Class("table"),
+					h.THead(
+						h.Class("text-center"),
+						h.Tr(
+							h.Th(
+								g.Text("Worker ID"),
+							),
+							h.Th(
+								g.Text("Worker timeout"),
+							),
+							h.Th(
+								g.Text("Operation name"),
+							),
+							h.Th(
+								g.Text("Operation timeout"),
+							),
+						),
+					),
+					h.TBody(tableRows...),
+				),
+			),
+		),
+	}), nil
 }
 
 type ProtoList[

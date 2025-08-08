@@ -5,6 +5,9 @@ local statePath = std.extVar('STATE_PATH');
     listenAddresses: [':9982'],
     authenticationPolicy: { allow: {} },
   }],
+  buildQueueStateGrpcClient: {
+    address: 'unix://%s/bonanza_scheduler_buildqueuestate.sock' % statePath,
+  },
   storageGrpcClient: {
     address: 'unix://%s/bonanza_storage_frontend.sock' % statePath,
   },

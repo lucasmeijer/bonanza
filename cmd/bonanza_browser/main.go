@@ -6,6 +6,7 @@ import (
 	"os"
 
 	model_parser "bonanza.build/pkg/model/parser"
+	buildqueuestate_pb "bonanza.build/pkg/proto/buildqueuestate"
 	"bonanza.build/pkg/proto/configuration/bonanza_browser"
 	object_pb "bonanza.build/pkg/proto/storage/object"
 	object_grpc "bonanza.build/pkg/storage/object/grpc"
@@ -40,6 +41,11 @@ func main() {
 			return util.StatusWrap(err, "Failed to apply global configuration options")
 		}
 
+		buildQueueStateGRPCClient, err := grpcClientFactory.NewClientFromConfiguration(configuration.BuildQueueStateGrpcClient)
+		if err != nil {
+			return util.StatusWrap(err, "Failed to create build queue state gRPC client")
+		}
+
 		storageGRPCClient, err := grpcClientFactory.NewClientFromConfiguration(configuration.StorageGrpcClient)
 		if err != nil {
 			return util.StatusWrap(err, "Failed to create storage gRPC client")
@@ -53,7 +59,11 @@ func main() {
 		}
 
 		mux := http.NewServeMux()
-		browserService := NewBrowserService(objectDownloader, parsedObjectPool)
+		browserService := NewBrowserService(
+			buildqueuestate_pb.NewBuildQueueStateClient(buildQueueStateGRPCClient),
+			objectDownloader,
+			parsedObjectPool,
+		)
 		browserService.RegisterHandlers(mux)
 		bb_http.NewServersFromConfigurationAndServe(
 			configuration.HttpServers,

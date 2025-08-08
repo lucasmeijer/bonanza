@@ -9,6 +9,10 @@ local statePath = std.extVar('STATE_PATH');
     listenPaths: [statePath + '/bonanza_scheduler_workers.sock'],
     authenticationPolicy: { allow: {} },
   }],
+  buildQueueStateGrpcServers: [{
+    listenPaths: [statePath + '/bonanza_scheduler_buildqueuestate.sock'],
+    authenticationPolicy: { allow: {} },
+  }],
   actionRouter: {
     simple: {
       initialSizeClassAnalyzer: {
