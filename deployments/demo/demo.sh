@@ -28,6 +28,9 @@ export OS=$(uname)
 export USER_ID=$(id -u)
 export GROUP_ID=$(id -g)
 
+# Used to create worker IDs.
+export HOSTNAME=$(hostname)
+
 # Launch processes that should be killed last.
 set -m
 for replica in a b; do

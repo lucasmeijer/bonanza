@@ -63,7 +63,7 @@ local statePath = std.extVar('STATE_PATH');
       maximumWritableFileUploadDelay: '60s',
       maximumFilePoolFileCount: 1e5,
       maximumFilePoolSizeBytes: 1e9,
-      workerId: { host: 'localhost' },
+      workerId: { host: std.extVar('HOSTNAME') },
       buildDirectoryOwnerUserId: std.extVar('USER_ID'),
       buildDirectoryOwnerGroupId: std.extVar('GROUP_ID'),
     }],

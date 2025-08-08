@@ -69,4 +69,5 @@ local statePath = std.extVar('STATE_PATH');
     validationJmespathExpression: '`true`',
     metadataExtractionJmespathExpression: '`{}`',
   },
+  workerId: { host: std.extVar('HOSTNAME') },
 }
