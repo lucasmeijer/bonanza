@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"math/rand/v2"
 	"testing"
 
 	model_core "bonanza.build/pkg/model/core"
@@ -15,7 +16,6 @@ import (
 
 	"github.com/buildbarn/bb-storage/pkg/testutil"
 	"github.com/buildbarn/bb-storage/pkg/util"
-	"github.com/seehuhn/mt19937"
 	"github.com/stretchr/testify/require"
 
 	"go.uber.org/mock/gomock"
@@ -89,17 +89,16 @@ func TestCreateFileMerkleTree(t *testing.T) {
 		require.Equal(t, []model_core.ReferenceMetadata{metadata1}, metadata)
 	})
 
-	t.Run("MersenneTwister1GB", func(t *testing.T) {
+	t.Run("ChaCha8_1GB", func(t *testing.T) {
 		// Create a Merkle tree for a 1 GB file consisting of
-		// the first 1 GB of data returned by a Mersenne Twister
-		// with the seed set to zero. The resulting tree should
-		// have a height of two.
-		twister := mt19937.New()
-		twister.Seed(0)
+		// the first 1 GB of data returned by a ChaCha8 random
+		// number generator with the seed set to zero. The
+		// resulting tree should have a height of two.
+		rng := rand.NewChaCha8([32]byte{})
 		rootFileContents, err := model_filesystem.CreateFileMerkleTree(
 			ctx,
 			fileCreationParameters,
-			io.LimitReader(twister, 1<<30),
+			io.LimitReader(rng, 1<<30),
 			model_filesystem.NewSimpleFileMerkleTreeCapturer(model_core.DiscardingCreatedObjectCapturer),
 		)
 		require.NoError(t, err)
@@ -116,7 +115,7 @@ func TestCreateFileMerkleTree(t *testing.T) {
 			TotalSizeBytes: 1 << 30,
 		}, rootFileContents.Message)
 		require.Equal(t, object.OutgoingReferencesList[object.LocalReference]{
-			object.MustNewSHA256V1LocalReference("d27b22873ac805f9d165d2cc096b22c9e83cab6d122b85bdbe470fa548e57622", 1760, 2, 32, 16256),
+			object.MustNewSHA256V1LocalReference("8212b25f2779ea08fccc7d1895e1272743736fd9a720e67d626e8ca4d8a21508", 1760, 2, 32, 15444),
 		}, references)
 	})
 }
