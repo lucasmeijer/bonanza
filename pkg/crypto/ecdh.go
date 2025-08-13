@@ -62,19 +62,12 @@ func ParsePKIXECDHPublicKey(pkixPublicKey []byte) (*ecdh.PublicKey, error) {
 	return PublicKeyToECDHPublicKey(parsedPublicKey)
 }
 
-// ParsePEMWithPKCS8ECDHPrivateKey parses a PCKS #8 encoded ECDH, ECDSA
+// ParsePKCS8ECDHPrivateKey parses a PCKS #8 encoded ECDH, ECDSA
 // or Ed25519 private key. All of them are converted to an instance of
 // *ecdh.PrivateKey, so that Elliptic Curve Diffie-Hellman can be
 // performed on them.
-func ParsePEMWithPKCS8ECDHPrivateKey(data []byte) (*ecdh.PrivateKey, error) {
-	privateKeyBlock, _ := pem.Decode(data)
-	if privateKeyBlock == nil {
-		return nil, status.Error(codes.InvalidArgument, "Private key does not contain a PEM block")
-	}
-	if privateKeyBlock.Type != "PRIVATE KEY" {
-		return nil, status.Error(codes.InvalidArgument, "Private key PEM block is not of type PRIVATE KEY")
-	}
-	privateKey, err := x509.ParsePKCS8PrivateKey(privateKeyBlock.Bytes)
+func ParsePKCS8ECDHPrivateKey(data []byte) (*ecdh.PrivateKey, error) {
+	privateKey, err := x509.ParsePKCS8PrivateKey(data)
 	if err != nil {
 		return nil, err
 	}
@@ -97,4 +90,19 @@ func ParsePEMWithPKCS8ECDHPrivateKey(data []byte) (*ecdh.PrivateKey, error) {
 	default:
 		return nil, status.Error(codes.InvalidArgument, "Private key is not of type ECDH, ECDSA or Ed25519")
 	}
+}
+
+// ParsePEMWithPKCS8ECDHPrivateKey parses a PEM block containing a PCKS
+// #8 encoded ECDH, ECDSA or Ed25519 private key. All of them are
+// converted to an instance of *ecdh.PrivateKey, so that Elliptic Curve
+// Diffie-Hellman can be performed on them.
+func ParsePEMWithPKCS8ECDHPrivateKey(data []byte) (*ecdh.PrivateKey, error) {
+	privateKeyBlock, _ := pem.Decode(data)
+	if privateKeyBlock == nil {
+		return nil, status.Error(codes.InvalidArgument, "Private key does not contain a PEM block")
+	}
+	if privateKeyBlock.Type != "PRIVATE KEY" {
+		return nil, status.Error(codes.InvalidArgument, "Private key PEM block is not of type PRIVATE KEY")
+	}
+	return ParsePKCS8ECDHPrivateKey(privateKeyBlock.Bytes)
 }
