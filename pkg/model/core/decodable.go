@@ -50,7 +50,12 @@ func NewDecodable[T any](value T, decodingParameters []byte) (Decodable[T], erro
 // GetDecodingParameters returns the parameters needed to decode the
 // object associated with the value.
 func (d *Decodable[T]) GetDecodingParameters() []byte {
-	return d.decodingParameters[:d.decodingParametersLength]
+	// Pull a copy of the decoding parameters instead of returning a
+	// slice directly. In many cases Decodable[T] is used in
+	// combination with large objects (e.g., *object.Contents). We
+	// don't want to keep the underlying object in memory if only
+	// the decoding parameters need to be retained.
+	return append([]byte(nil), d.decodingParameters[:d.decodingParametersLength]...)
 }
 
 // CopyDecodable extracts the decoding parameters of a given
