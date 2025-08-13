@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	remoteexecution_pb "bonanza.build/pkg/proto/remoteexecution"
+	encryptedaction_pb "bonanza.build/pkg/proto/encryptedaction"
 	"bonanza.build/pkg/scheduler/initialsizeclass"
 
 	"github.com/buildbarn/bb-storage/pkg/testutil"
@@ -23,13 +23,13 @@ func TestActionTimeoutExtractor(t *testing.T) {
 		// protocol requires that an explicit timeout is
 		// provided. Clients must provide explicit timeouts for
 		// their actions.
-		_, err := actionTimeoutExtractor.ExtractTimeout(&remoteexecution_pb.Action{})
+		_, err := actionTimeoutExtractor.ExtractTimeout(&encryptedaction_pb.Action{})
 		testutil.RequireEqualStatus(t, status.Error(codes.InvalidArgument, "No execution timeout provided"), err)
 	})
 
 	t.Run("InvalidTimeout", func(t *testing.T) {
-		_, err := actionTimeoutExtractor.ExtractTimeout(&remoteexecution_pb.Action{
-			AdditionalData: &remoteexecution_pb.Action_AdditionalData{
+		_, err := actionTimeoutExtractor.ExtractTimeout(&encryptedaction_pb.Action{
+			AdditionalData: &encryptedaction_pb.Action_AdditionalData{
 				ExecutionTimeout: &durationpb.Duration{Nanos: 1000000000},
 			},
 		})
@@ -37,8 +37,8 @@ func TestActionTimeoutExtractor(t *testing.T) {
 	})
 
 	t.Run("TimeoutTooLow", func(t *testing.T) {
-		_, err := actionTimeoutExtractor.ExtractTimeout(&remoteexecution_pb.Action{
-			AdditionalData: &remoteexecution_pb.Action_AdditionalData{
+		_, err := actionTimeoutExtractor.ExtractTimeout(&encryptedaction_pb.Action{
+			AdditionalData: &encryptedaction_pb.Action_AdditionalData{
 				ExecutionTimeout: &durationpb.Duration{Seconds: -1},
 			},
 		})
@@ -46,8 +46,8 @@ func TestActionTimeoutExtractor(t *testing.T) {
 	})
 
 	t.Run("TimeoutTooHigh", func(t *testing.T) {
-		_, err := actionTimeoutExtractor.ExtractTimeout(&remoteexecution_pb.Action{
-			AdditionalData: &remoteexecution_pb.Action_AdditionalData{
+		_, err := actionTimeoutExtractor.ExtractTimeout(&encryptedaction_pb.Action{
+			AdditionalData: &encryptedaction_pb.Action_AdditionalData{
 				ExecutionTimeout: &durationpb.Duration{Seconds: 7201},
 			},
 		})
@@ -55,8 +55,8 @@ func TestActionTimeoutExtractor(t *testing.T) {
 	})
 
 	t.Run("Success", func(t *testing.T) {
-		timeout, err := actionTimeoutExtractor.ExtractTimeout(&remoteexecution_pb.Action{
-			AdditionalData: &remoteexecution_pb.Action_AdditionalData{
+		timeout, err := actionTimeoutExtractor.ExtractTimeout(&encryptedaction_pb.Action{
+			AdditionalData: &encryptedaction_pb.Action_AdditionalData{
 				ExecutionTimeout: &durationpb.Duration{Seconds: 900},
 			},
 		})

@@ -3,19 +3,18 @@ package remoteexecution
 import (
 	"context"
 	"crypto/ecdh"
-	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
 	"iter"
 
+	"bonanza.build/pkg/encryptedaction"
+	encryptedaction_pb "bonanza.build/pkg/proto/encryptedaction"
 	remoteexecution_pb "bonanza.build/pkg/proto/remoteexecution"
 
 	"github.com/buildbarn/bb-storage/pkg/util"
-	"github.com/secure-io/siv-go"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/proto"
 )
 
 type remoteClient struct {
@@ -42,7 +41,7 @@ func NewRemoteClient(
 // its execution on a worker. An iterator is returned that yields any
 // execution events reported by the worker. Upon completion, the result
 // is set.
-func (c *remoteClient) RunAction(ctx context.Context, platformECDHPublicKey *ecdh.PublicKey, action []byte, actionAdditionalData *remoteexecution_pb.Action_AdditionalData, result *[]byte, errOut *error) iter.Seq[[]byte] {
+func (c *remoteClient) RunAction(ctx context.Context, platformECDHPublicKey *ecdh.PublicKey, actionPlaintext []byte, actionAdditionalData *encryptedaction_pb.Action_AdditionalData, result *[]byte, errOut *error) iter.Seq[[]byte] {
 	marshaledPlatformECDHPublicKey, err := x509.MarshalPKIXPublicKey(platformECDHPublicKey)
 	if err != nil {
 		*errOut = util.StatusWrapfWithCode(err, codes.InvalidArgument, "Failed to obtain marshal platform ECDH public key")
@@ -56,34 +55,22 @@ func (c *remoteClient) RunAction(ctx context.Context, platformECDHPublicKey *ecd
 		return func(func([]byte) bool) {}
 	}
 
-	actionKey := append([]byte(nil), sharedSecret...)
-	actionKey[0] ^= 1
-	actionAEAD, err := siv.NewGCM(actionKey)
-	if err != nil {
-		*errOut = util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to create AES-GCM-SIV for action")
-		return func(func([]byte) bool) {}
-	}
-	actionNonce := make([]byte, actionAEAD.NonceSize())
-
 	// Encrypt the action.
-	marshaledActionAdditionalData, err := proto.Marshal(actionAdditionalData)
-	if err != nil {
-		*errOut = util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to marshal action additional data")
+	action := &encryptedaction_pb.Action{
+		PlatformPkixPublicKey:  marshaledPlatformECDHPublicKey,
+		ClientCertificateChain: c.clientCertificateChain,
+		AdditionalData:         actionAdditionalData,
+	}
+	if err := encryptedaction.ActionSetCiphertext(action, sharedSecret, actionPlaintext); err != nil {
+		*errOut = err
 		return func(func([]byte) bool) {}
 	}
-	actionCiphertext := actionAEAD.Seal(nil, actionNonce, action, marshaledActionAdditionalData)
 
 	return func(yield func([]byte) bool) {
 		ctxWithCancel, cancel := context.WithCancel(ctx)
 		defer cancel()
 		client, err := c.executionClient.Execute(ctxWithCancel, &remoteexecution_pb.ExecuteRequest{
-			Action: &remoteexecution_pb.Action{
-				PlatformPkixPublicKey:  marshaledPlatformECDHPublicKey,
-				ClientCertificateChain: c.clientCertificateChain,
-				Nonce:                  actionNonce,
-				AdditionalData:         actionAdditionalData,
-				Ciphertext:             actionCiphertext,
-			},
+			Action: action,
 			// TODO: Priority.
 		})
 		if err != nil {
@@ -99,7 +86,7 @@ func (c *remoteClient) RunAction(ctx context.Context, platformECDHPublicKey *ecd
 			}
 		}()
 
-		executionEventAdditionalData := sha256.Sum256(actionCiphertext)
+		eventEncoder := encryptedaction.NewEventEncoder(action, sharedSecret)
 		for {
 			response, err := client.Recv()
 			if err != nil {
@@ -113,20 +100,7 @@ func (c *remoteClient) RunAction(ctx context.Context, platformECDHPublicKey *ecd
 				// Unmarshal it and yield it to the
 				// caller.
 				if lastEventMessage := stage.Executing.LastEvent; lastEventMessage != nil {
-					lastEventKey := append([]byte(nil), sharedSecret...)
-					lastEventKey[0] ^= 2
-					completionEventAEAD, err := siv.NewGCM(lastEventKey)
-					if err != nil {
-						*errOut = util.StatusWrapWithCode(err, codes.Internal, "Failed to create AES-GCM-SIV for last event")
-						return
-					}
-
-					lastEvent, err := completionEventAEAD.Open(
-						/* dst = */ nil,
-						lastEventMessage.Nonce,
-						lastEventMessage.Ciphertext,
-						executionEventAdditionalData[:],
-					)
+					lastEvent, err := eventEncoder.DecodeEvent(lastEventMessage, false)
 					if err != nil {
 						*errOut = util.StatusWrapWithCode(err, codes.Internal, "Failed to decrypt last event")
 						return
@@ -146,20 +120,7 @@ func (c *remoteClient) RunAction(ctx context.Context, platformECDHPublicKey *ecd
 					return
 				}
 
-				completionEventKey := append([]byte(nil), sharedSecret...)
-				completionEventKey[0] ^= 3
-				completionEventAEAD, err := siv.NewGCM(completionEventKey)
-				if err != nil {
-					*errOut = util.StatusWrapWithCode(err, codes.Internal, "Failed to create AES-GCM-SIV for completion event")
-					return
-				}
-
-				completionEvent, err := completionEventAEAD.Open(
-					/* dst = */ nil,
-					completionEventMessage.Nonce,
-					completionEventMessage.Ciphertext,
-					executionEventAdditionalData[:],
-				)
+				completionEvent, err := eventEncoder.DecodeEvent(completionEventMessage, true)
 				if err != nil {
 					*errOut = util.StatusWrapWithCode(err, codes.Internal, "Failed to decrypt completion event")
 					return

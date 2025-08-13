@@ -7,7 +7,7 @@
 package remoteworker
 
 import (
-	remoteexecution "bonanza.build/pkg/proto/remoteexecution"
+	encryptedaction "bonanza.build/pkg/proto/encryptedaction"
 	status "google.golang.org/genproto/googleapis/rpc/status"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -521,9 +521,9 @@ func (x *CurrentState_Rejected) GetReason() *status.Status {
 }
 
 type CurrentState_Executing struct {
-	state         protoimpl.MessageState          `protogen:"open.v1"`
-	TaskUuid      string                          `protobuf:"bytes,1,opt,name=task_uuid,json=taskUuid,proto3" json:"task_uuid,omitempty"`
-	Event         *remoteexecution.ExecutionEvent `protobuf:"bytes,2,opt,name=event,proto3" json:"event,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TaskUuid      string                 `protobuf:"bytes,1,opt,name=task_uuid,json=taskUuid,proto3" json:"task_uuid,omitempty"`
+	Event         *encryptedaction.Event `protobuf:"bytes,2,opt,name=event,proto3" json:"event,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -565,7 +565,7 @@ func (x *CurrentState_Executing) GetTaskUuid() string {
 	return ""
 }
 
-func (x *CurrentState_Executing) GetEvent() *remoteexecution.ExecutionEvent {
+func (x *CurrentState_Executing) GetEvent() *encryptedaction.Event {
 	if x != nil {
 		return x.Event
 	}
@@ -573,11 +573,11 @@ func (x *CurrentState_Executing) GetEvent() *remoteexecution.ExecutionEvent {
 }
 
 type CurrentState_Completed struct {
-	state                    protoimpl.MessageState          `protogen:"open.v1"`
-	TaskUuid                 string                          `protobuf:"bytes,1,opt,name=task_uuid,json=taskUuid,proto3" json:"task_uuid,omitempty"`
-	Event                    *remoteexecution.ExecutionEvent `protobuf:"bytes,2,opt,name=event,proto3" json:"event,omitempty"`
-	VirtualExecutionDuration *durationpb.Duration            `protobuf:"bytes,3,opt,name=virtual_execution_duration,json=virtualExecutionDuration,proto3" json:"virtual_execution_duration,omitempty"`
-	Result                   CurrentState_Completed_Result   `protobuf:"varint,4,opt,name=result,proto3,enum=bonanza.remoteworker.CurrentState_Completed_Result" json:"result,omitempty"`
+	state                    protoimpl.MessageState        `protogen:"open.v1"`
+	TaskUuid                 string                        `protobuf:"bytes,1,opt,name=task_uuid,json=taskUuid,proto3" json:"task_uuid,omitempty"`
+	Event                    *encryptedaction.Event        `protobuf:"bytes,2,opt,name=event,proto3" json:"event,omitempty"`
+	VirtualExecutionDuration *durationpb.Duration          `protobuf:"bytes,3,opt,name=virtual_execution_duration,json=virtualExecutionDuration,proto3" json:"virtual_execution_duration,omitempty"`
+	Result                   CurrentState_Completed_Result `protobuf:"varint,4,opt,name=result,proto3,enum=bonanza.remoteworker.CurrentState_Completed_Result" json:"result,omitempty"`
 	unknownFields            protoimpl.UnknownFields
 	sizeCache                protoimpl.SizeCache
 }
@@ -619,7 +619,7 @@ func (x *CurrentState_Completed) GetTaskUuid() string {
 	return ""
 }
 
-func (x *CurrentState_Completed) GetEvent() *remoteexecution.ExecutionEvent {
+func (x *CurrentState_Completed) GetEvent() *encryptedaction.Event {
 	if x != nil {
 		return x.Event
 	}
@@ -687,7 +687,7 @@ func (x *DesiredState_VerifyingPublicKeys) GetVerificationPkixPublicKeys() [][]b
 type DesiredState_Executing struct {
 	state                     protoimpl.MessageState  `protogen:"open.v1"`
 	TaskUuid                  string                  `protobuf:"bytes,1,opt,name=task_uuid,json=taskUuid,proto3" json:"task_uuid,omitempty"`
-	Action                    *remoteexecution.Action `protobuf:"bytes,2,opt,name=action,proto3" json:"action,omitempty"`
+	Action                    *encryptedaction.Action `protobuf:"bytes,2,opt,name=action,proto3" json:"action,omitempty"`
 	EffectiveExecutionTimeout *durationpb.Duration    `protobuf:"bytes,3,opt,name=effective_execution_timeout,json=effectiveExecutionTimeout,proto3" json:"effective_execution_timeout,omitempty"`
 	QueuedTimestamp           *timestamppb.Timestamp  `protobuf:"bytes,4,opt,name=queued_timestamp,json=queuedTimestamp,proto3" json:"queued_timestamp,omitempty"`
 	AuxiliaryMetadata         []*anypb.Any            `protobuf:"bytes,5,rep,name=auxiliary_metadata,json=auxiliaryMetadata,proto3" json:"auxiliary_metadata,omitempty"`
@@ -733,7 +733,7 @@ func (x *DesiredState_Executing) GetTaskUuid() string {
 	return ""
 }
 
-func (x *DesiredState_Executing) GetAction() *remoteexecution.Action {
+func (x *DesiredState_Executing) GetAction() *encryptedaction.Action {
 	if x != nil {
 		return x.Action
 	}
@@ -772,7 +772,7 @@ var File_pkg_proto_remoteworker_remoteworker_proto protoreflect.FileDescriptor
 
 const file_pkg_proto_remoteworker_remoteworker_proto_rawDesc = "" +
 	"\n" +
-	")pkg/proto/remoteworker/remoteworker.proto\x12\x14bonanza.remoteworker\x1a\x19google/protobuf/any.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17google/rpc/status.proto\x1a/pkg/proto/remoteexecution/remoteexecution.proto\"\xf3\x03\n" +
+	")pkg/proto/remoteworker/remoteworker.proto\x12\x14bonanza.remoteworker\x1a\x19google/protobuf/any.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17google/rpc/status.proto\x1a/pkg/proto/encryptedaction/encryptedaction.proto\"\xf3\x03\n" +
 	"\x12SynchronizeRequest\x12S\n" +
 	"\tworker_id\x18\x01 \x03(\v26.bonanza.remoteworker.SynchronizeRequest.WorkerIdEntryR\bworkerId\x12S\n" +
 	"\vpublic_keys\x18\x02 \x03(\v22.bonanza.remoteworker.SynchronizeRequest.PublicKeyR\n" +
@@ -786,7 +786,7 @@ const file_pkg_proto_remoteworker_remoteworker_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1ab\n" +
 	"\tPublicKey\x12&\n" +
 	"\x0fpkix_public_key\x18\x01 \x01(\fR\rpkixPublicKey\x12-\n" +
-	"\x12verification_zeros\x18\x02 \x01(\fR\x11verificationZeros\"\xb5\x06\n" +
+	"\x12verification_zeros\x18\x02 \x01(\fR\x11verificationZeros\"\xa3\x06\n" +
 	"\fCurrentState\x12,\n" +
 	"\x04idle\x18\x01 \x01(\v2\x16.google.protobuf.EmptyH\x00R\x04idle\x12I\n" +
 	"\brejected\x18\x02 \x01(\v2+.bonanza.remoteworker.CurrentState.RejectedH\x00R\brejected\x12L\n" +
@@ -794,13 +794,13 @@ const file_pkg_proto_remoteworker_remoteworker_proto_rawDesc = "" +
 	"\tcompleted\x18\x04 \x01(\v2,.bonanza.remoteworker.CurrentState.CompletedH\x00R\tcompleted\x1aS\n" +
 	"\bRejected\x12\x1b\n" +
 	"\ttask_uuid\x18\x01 \x01(\tR\btaskUuid\x12*\n" +
-	"\x06reason\x18\x02 \x01(\v2\x12.google.rpc.StatusR\x06reason\x1ag\n" +
+	"\x06reason\x18\x02 \x01(\v2\x12.google.rpc.StatusR\x06reason\x1a^\n" +
 	"\tExecuting\x12\x1b\n" +
-	"\ttask_uuid\x18\x01 \x01(\tR\btaskUuid\x12=\n" +
-	"\x05event\x18\x02 \x01(\v2'.bonanza.remoteexecution.ExecutionEventR\x05event\x1a\xc1\x02\n" +
+	"\ttask_uuid\x18\x01 \x01(\tR\btaskUuid\x124\n" +
+	"\x05event\x18\x02 \x01(\v2\x1e.bonanza.encryptedaction.EventR\x05event\x1a\xb8\x02\n" +
 	"\tCompleted\x12\x1b\n" +
-	"\ttask_uuid\x18\x01 \x01(\tR\btaskUuid\x12=\n" +
-	"\x05event\x18\x02 \x01(\v2'.bonanza.remoteexecution.ExecutionEventR\x05event\x12W\n" +
+	"\ttask_uuid\x18\x01 \x01(\tR\btaskUuid\x124\n" +
+	"\x05event\x18\x02 \x01(\v2\x1e.bonanza.encryptedaction.EventR\x05event\x12W\n" +
 	"\x1avirtual_execution_duration\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\x18virtualExecutionDuration\x12K\n" +
 	"\x06result\x18\x04 \x01(\x0e23.bonanza.remoteworker.CurrentState.Completed.ResultR\x06result\"2\n" +
 	"\x06Result\x12\r\n" +
@@ -820,7 +820,7 @@ const file_pkg_proto_remoteworker_remoteworker_proto_rawDesc = "" +
 	"\x1dverification_pkix_public_keys\x18\x01 \x03(\fR\x1averificationPkixPublicKeys\x1a\xfb\x03\n" +
 	"\tExecuting\x12\x1b\n" +
 	"\ttask_uuid\x18\x01 \x01(\tR\btaskUuid\x127\n" +
-	"\x06action\x18\x02 \x01(\v2\x1f.bonanza.remoteexecution.ActionR\x06action\x12Y\n" +
+	"\x06action\x18\x02 \x01(\v2\x1f.bonanza.encryptedaction.ActionR\x06action\x12Y\n" +
 	"\x1beffective_execution_timeout\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\x19effectiveExecutionTimeout\x12E\n" +
 	"\x10queued_timestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\x0fqueuedTimestamp\x12C\n" +
 	"\x12auxiliary_metadata\x18\x05 \x03(\v2\x14.google.protobuf.AnyR\x11auxiliaryMetadata\x12m\n" +
@@ -863,9 +863,9 @@ var file_pkg_proto_remoteworker_remoteworker_proto_goTypes = []any{
 	(*emptypb.Empty)(nil),                    // 13: google.protobuf.Empty
 	(*timestamppb.Timestamp)(nil),            // 14: google.protobuf.Timestamp
 	(*status.Status)(nil),                    // 15: google.rpc.Status
-	(*remoteexecution.ExecutionEvent)(nil),   // 16: bonanza.remoteexecution.ExecutionEvent
+	(*encryptedaction.Event)(nil),            // 16: bonanza.encryptedaction.Event
 	(*durationpb.Duration)(nil),              // 17: google.protobuf.Duration
-	(*remoteexecution.Action)(nil),           // 18: bonanza.remoteexecution.Action
+	(*encryptedaction.Action)(nil),           // 18: bonanza.encryptedaction.Action
 	(*anypb.Any)(nil),                        // 19: google.protobuf.Any
 }
 var file_pkg_proto_remoteworker_remoteworker_proto_depIdxs = []int32{
@@ -882,11 +882,11 @@ var file_pkg_proto_remoteworker_remoteworker_proto_depIdxs = []int32{
 	13, // 10: bonanza.remoteworker.DesiredState.idle:type_name -> google.protobuf.Empty
 	11, // 11: bonanza.remoteworker.DesiredState.executing:type_name -> bonanza.remoteworker.DesiredState.Executing
 	15, // 12: bonanza.remoteworker.CurrentState.Rejected.reason:type_name -> google.rpc.Status
-	16, // 13: bonanza.remoteworker.CurrentState.Executing.event:type_name -> bonanza.remoteexecution.ExecutionEvent
-	16, // 14: bonanza.remoteworker.CurrentState.Completed.event:type_name -> bonanza.remoteexecution.ExecutionEvent
+	16, // 13: bonanza.remoteworker.CurrentState.Executing.event:type_name -> bonanza.encryptedaction.Event
+	16, // 14: bonanza.remoteworker.CurrentState.Completed.event:type_name -> bonanza.encryptedaction.Event
 	17, // 15: bonanza.remoteworker.CurrentState.Completed.virtual_execution_duration:type_name -> google.protobuf.Duration
 	0,  // 16: bonanza.remoteworker.CurrentState.Completed.result:type_name -> bonanza.remoteworker.CurrentState.Completed.Result
-	18, // 17: bonanza.remoteworker.DesiredState.Executing.action:type_name -> bonanza.remoteexecution.Action
+	18, // 17: bonanza.remoteworker.DesiredState.Executing.action:type_name -> bonanza.encryptedaction.Action
 	17, // 18: bonanza.remoteworker.DesiredState.Executing.effective_execution_timeout:type_name -> google.protobuf.Duration
 	14, // 19: bonanza.remoteworker.DesiredState.Executing.queued_timestamp:type_name -> google.protobuf.Timestamp
 	19, // 20: bonanza.remoteworker.DesiredState.Executing.auxiliary_metadata:type_name -> google.protobuf.Any

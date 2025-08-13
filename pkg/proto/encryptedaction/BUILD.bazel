@@ -1,0 +1,24 @@
+load("@rules_go//go:def.bzl", "go_library")
+load("@rules_go//proto:def.bzl", "go_proto_library")
+load("@rules_proto//proto:defs.bzl", "proto_library")
+
+proto_library(
+    name = "encryptedaction_proto",
+    srcs = ["encryptedaction.proto"],
+    visibility = ["//visibility:public"],
+    deps = ["@protobuf//:duration_proto"],
+)
+
+go_proto_library(
+    name = "encryptedaction_go_proto",
+    importpath = "bonanza.build/pkg/proto/encryptedaction",
+    proto = ":encryptedaction_proto",
+    visibility = ["//visibility:public"],
+)
+
+go_library(
+    name = "encryptedaction",
+    embed = [":encryptedaction_go_proto"],
+    importpath = "bonanza.build/pkg/proto/encryptedaction",
+    visibility = ["//visibility:public"],
+)

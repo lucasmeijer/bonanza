@@ -1,0 +1,94 @@
+syntax = "proto3";
+
+package bonanza.encryptedaction;
+
+import "google/protobuf/duration.proto";
+
+option go_package = "bonanza.build/pkg/proto/encryptedaction";
+
+message Action {
+  // The elliptic-curve public key that identifies the platform that
+  // should be used to execute the action in PKIX, ASN.1 DER form.
+  bytes platform_pkix_public_key = 1;
+
+  // ASN.1 DER data of the client certificate that the client needs to
+  // present to the worker to authenticate, followed by any intermediate
+  // certificates.
+  //
+  // The public key embedded in the client certificate at index zero
+  // must be an elliptic-curve type. When Ed25519, the public key will
+  // be converted to an X25519 public key by mapping its Edwards point
+  // to a Montgomery point using the birational map provided in RFC
+  // 7748.
+  repeated bytes client_certificate_chain = 2;
+
+  // The 12-byte nonce that was used to compute the ciphertext.
+  //
+  // If deduplication of in-flight operations is desired, the client
+  // SHOULD provide a nonce consisting of all zeros. If no deduplication
+  // is desired, the nonce SHOULD be randomly generated.
+  bytes nonce = 3;
+
+  message AdditionalData {
+    // Fingerprint of the action that the scheduler may use to record
+    // resource usage statistics of the action. The fingerprint is
+    // expected to remain stable if minor changes are made to the action
+    // that are unlikely to affect its resource usage characteristics.
+    bytes stable_fingerprint = 1;
+
+    // A timeout after which the execution should be killed. If the
+    // client specifies a timeout that is longer than the scheduler's or
+    // worker's maximum timeout, the server MUST reject the request.
+    //
+    // The timeout is only intended to cover the "execution" of the
+    // specified action and not time in queue nor any overheads before
+    // or after execution such as marshalling inputs/outputs. The server
+    // SHOULD avoid including time spent the client doesn't have control
+    // over, and MAY extend or reduce the timeout to account for delays
+    // or speedups that occur during execution itself (e.g., lazily
+    // loading data from the Content Addressable Storage, live migration
+    // of virtual machines, emulation overhead).
+    google.protobuf.Duration execution_timeout = 2;
+  }
+
+  // Parameters that describe the action that are provided in plaintext.
+  // These are provided in plaintext, so that they can be used by the
+  // scheduler to make improved scheduling decisions.
+  //
+  // This field also acts as the additional data when computing the
+  // ciphertext.
+  AdditionalData additional_data = 4;
+
+  // Definition of the action to execute that can be used by the worker,
+  // encrypted using AES-GCM-SIV (RFC 8452).
+  //
+  // The key to use is obtained by performing ECDH key derivation
+  // against the elliptic-curve key in the client certificate and the
+  // worker's elliptic-curve key, and XOR'ing the first byte of the
+  // shared secret with 1.
+  //
+  // Clients and workers are free to encode actions definitions in any
+  // format of choice. However, if Protobuf messages are used, they
+  // SHOULD be wrapped inside google.protobuf.Any. That way workers are
+  // able to accurately reject actions of the wrong type.
+  bytes ciphertext = 5;
+}
+
+message Event {
+  // The 12-byte nonce that was used to compute the ciphertext, which
+  // SHOULD be randomly generated.
+  bytes nonce = 1;
+
+  // Event reported by the worker during the execution, encrypted using
+  // AES-GCM-SIV (RFC 8452).
+  //
+  // The key to use is obtained by performing ECDH key derivation
+  // against the elliptic-curve key in the client certificate and the
+  // worker's elliptic-curve key, and XOR'ing the first byte of the
+  // shared secret with a value documented at the place of use.
+  //
+  // A SHA-256 hash of Action.ciphertext is used as additional data
+  // during the encryption process, allowing the client to validate that
+  // the returned ciphertext actually corresponds to the current action.
+  bytes ciphertext = 2;
+}

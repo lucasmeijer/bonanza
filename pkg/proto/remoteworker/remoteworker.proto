@@ -7,7 +7,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 import "google/rpc/status.proto";
-import "pkg/proto/remoteexecution/remoteexecution.proto";
+import "pkg/proto/encryptedaction/encryptedaction.proto";
 
 option go_package = "bonanza.build/pkg/proto/remoteworker";
 
@@ -32,7 +32,7 @@ option go_package = "bonanza.build/pkg/proto/remoteworker";
 // resynchronize. Calls to Synchronize() are guaranteed to be
 // non-blocking when it is executing a build action. They may be
 // blocking in case the worker is idle or reporting the completion of a
-// build action.  In that case the scheduler may decide to let the call
+// build action. In that case the scheduler may decide to let the call
 // hang until more work is available.
 service OperationQueue {
   rpc Synchronize(SynchronizeRequest) returns (SynchronizeResponse);
@@ -115,7 +115,7 @@ message CurrentState {
 
     // Event to report to the client, indicating the current state of
     // execution.
-    bonanza.remoteexecution.ExecutionEvent event = 2;
+    bonanza.encryptedaction.Event event = 2;
   }
 
   message Completed {
@@ -130,7 +130,7 @@ message CurrentState {
     // provided timeout or the worker does not belong to the largest
     // size class, as that would allow the scheduler to return an
     // erroneous failure to the client.
-    bonanza.remoteexecution.ExecutionEvent event = 2;
+    bonanza.encryptedaction.Event event = 2;
 
     // The amount of time the worker spent executing the action command,
     // potentially computed using a worker-specific virtual clock.
@@ -227,7 +227,7 @@ message DesiredState {
     // Addressable Storage, the scheduler also needs to access this
     // information. It is passed on to prevent duplicate requests
     // against storage.
-    bonanza.remoteexecution.Action action = 2;
+    bonanza.encryptedaction.Action action = 2;
 
     google.protobuf.Duration effective_execution_timeout = 3;
 

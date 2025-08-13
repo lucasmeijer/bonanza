@@ -12,7 +12,8 @@ go_library(
     deps = [
         "//pkg/crypto",
         "//pkg/ds",
-        "//pkg/proto/remoteexecution",
+        "//pkg/encryptedaction",
+        "//pkg/proto/encryptedaction",
         "//pkg/proto/remoteworker",
         "@com_github_buildbarn_bb_storage//pkg/auth",
         "@com_github_buildbarn_bb_storage//pkg/clock",
@@ -21,7 +22,6 @@ go_library(
         "@com_github_buildbarn_bb_storage//pkg/random",
         "@com_github_buildbarn_bb_storage//pkg/util",
         "@com_github_buildbarn_bb_storage//pkg/x509",
-        "@com_github_secure_io_siv_go//:siv-go",
         "@org_golang_google_grpc//codes",
         "@org_golang_google_grpc//status",
         "@org_golang_google_protobuf//proto",

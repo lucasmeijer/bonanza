@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	remoteexecution_pb "bonanza.build/pkg/proto/remoteexecution"
+	encryptedaction_pb "bonanza.build/pkg/proto/encryptedaction"
 	"bonanza.build/pkg/scheduler/initialsizeclass"
 
 	"github.com/stretchr/testify/require"
@@ -19,8 +19,8 @@ func TestFallbackAnalyzer(t *testing.T) {
 		initialsizeclass.NewActionTimeoutExtractor(time.Hour),
 	)
 
-	exampleAction := &remoteexecution_pb.Action{
-		AdditionalData: &remoteexecution_pb.Action_AdditionalData{
+	exampleAction := &encryptedaction_pb.Action{
+		AdditionalData: &encryptedaction_pb.Action_AdditionalData{
 			ExecutionTimeout: &durationpb.Duration{Seconds: 300},
 		},
 	}

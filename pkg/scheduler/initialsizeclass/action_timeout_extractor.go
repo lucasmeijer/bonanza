@@ -3,7 +3,7 @@ package initialsizeclass
 import (
 	"time"
 
-	remoteexecution_pb "bonanza.build/pkg/proto/remoteexecution"
+	encryptedaction_pb "bonanza.build/pkg/proto/encryptedaction"
 
 	"github.com/buildbarn/bb-storage/pkg/util"
 
@@ -29,7 +29,7 @@ func NewActionTimeoutExtractor(maximumExecutionTimeout time.Duration) *ActionTim
 // ExtractTimeout extracts the execution timeout field from an Action,
 // converting it to a time.Duration. It returns errors in case the
 // provided execution timeout is invalid or out of bounds.
-func (e ActionTimeoutExtractor) ExtractTimeout(action *remoteexecution_pb.Action) (time.Duration, error) {
+func (e ActionTimeoutExtractor) ExtractTimeout(action *encryptedaction_pb.Action) (time.Duration, error) {
 	executionTimeoutMessage := action.AdditionalData.GetExecutionTimeout()
 	if executionTimeoutMessage == nil {
 		return 0, status.Error(codes.InvalidArgument, "No execution timeout provided")

@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	remoteexecution_pb "bonanza.build/pkg/proto/remoteexecution"
+	encryptedaction_pb "bonanza.build/pkg/proto/encryptedaction"
 )
 
 // Analyzer of Actions, determining which worker size class is the most
@@ -16,7 +16,7 @@ type Analyzer interface {
 	// All methods called against the Selector that is returned and
 	// any Learners yielded from it should be called while holding a
 	// global lock.
-	Analyze(ctx context.Context, action *remoteexecution_pb.Action) (Selector, error)
+	Analyze(ctx context.Context, action *encryptedaction_pb.Action) (Selector, error)
 }
 
 // Selector of a size class for an analyzed action.

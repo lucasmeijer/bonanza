@@ -26,6 +26,7 @@ import (
 	model_executewithstorage "bonanza.build/pkg/model/executewithstorage"
 	model_filesystem "bonanza.build/pkg/model/filesystem"
 	model_parser "bonanza.build/pkg/model/parser"
+	encryptedaction_pb "bonanza.build/pkg/proto/encryptedaction"
 	model_build_pb "bonanza.build/pkg/proto/model/build"
 	model_core_pb "bonanza.build/pkg/proto/model/core"
 	model_encoding_pb "bonanza.build/pkg/proto/model/encoding"
@@ -558,7 +559,7 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 				},
 			},
 		},
-		&remoteexecution_pb.Action_AdditionalData{
+		&encryptedaction_pb.Action_AdditionalData{
 			ExecutionTimeout: &durationpb.Duration{Seconds: 24 * 60 * 60},
 		},
 		&resultReference,

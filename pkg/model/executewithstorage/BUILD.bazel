@@ -10,10 +10,10 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/model/core",
+        "//pkg/proto/encryptedaction",
         "//pkg/proto/model/core",
         "//pkg/proto/model/encoding",
         "//pkg/proto/model/executewithstorage",
-        "//pkg/proto/remoteexecution",
         "//pkg/proto/remoteworker",
         "//pkg/remoteexecution",
         "//pkg/remoteworker",

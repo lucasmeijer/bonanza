@@ -6,10 +6,10 @@ import (
 	"iter"
 
 	model_core "bonanza.build/pkg/model/core"
+	encryptedaction_pb "bonanza.build/pkg/proto/encryptedaction"
 	model_core_pb "bonanza.build/pkg/proto/model/core"
 	model_encoding_pb "bonanza.build/pkg/proto/model/encoding"
 	model_executewithstorage_pb "bonanza.build/pkg/proto/model/executewithstorage"
-	remoteexecution_pb "bonanza.build/pkg/proto/remoteexecution"
 	"bonanza.build/pkg/remoteexecution"
 	"bonanza.build/pkg/storage/object"
 
@@ -55,7 +55,7 @@ func (c *client) RunAction(
 	ctx context.Context,
 	platformECDHPublicKey *ecdh.PublicKey,
 	action *Action[object.GlobalReference],
-	actionAdditionalData *remoteexecution_pb.Action_AdditionalData,
+	actionAdditionalData *encryptedaction_pb.Action_AdditionalData,
 	resultReferenceOut *model_core.Decodable[object.LocalReference],
 	errOut *error,
 ) iter.Seq[model_core.Decodable[object.LocalReference]] {

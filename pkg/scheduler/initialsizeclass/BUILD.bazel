@@ -12,7 +12,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/proto/configuration/scheduler",
-        "//pkg/proto/remoteexecution",
+        "//pkg/proto/encryptedaction",
         "@com_github_buildbarn_bb_storage//pkg/util",
         "@org_golang_google_grpc//codes",
         "@org_golang_google_grpc//status",
@@ -27,7 +27,7 @@ go_test(
     ],
     deps = [
         ":initialsizeclass",
-        "//pkg/proto/remoteexecution",
+        "//pkg/proto/encryptedaction",
         "@com_github_buildbarn_bb_storage//pkg/testutil",
         "@com_github_stretchr_testify//require",
         "@org_golang_google_grpc//codes",

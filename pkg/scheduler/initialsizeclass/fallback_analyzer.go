@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	remoteexecution_pb "bonanza.build/pkg/proto/remoteexecution"
+	encryptedaction_pb "bonanza.build/pkg/proto/encryptedaction"
 )
 
 type fallbackAnalyzer struct {
@@ -25,7 +25,7 @@ func NewFallbackAnalyzer(actionTimeoutExtractor *ActionTimeoutExtractor) Analyze
 	}
 }
 
-func (a *fallbackAnalyzer) Analyze(ctx context.Context, action *remoteexecution_pb.Action) (Selector, error) {
+func (a *fallbackAnalyzer) Analyze(ctx context.Context, action *encryptedaction_pb.Action) (Selector, error) {
 	timeout, err := a.actionTimeoutExtractor.ExtractTimeout(action)
 	if err != nil {
 		return nil, err

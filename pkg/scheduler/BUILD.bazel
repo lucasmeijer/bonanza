@@ -8,6 +8,7 @@ go_library(
     deps = [
         "//pkg/crypto",
         "//pkg/proto/buildqueuestate",
+        "//pkg/proto/encryptedaction",
         "//pkg/proto/remoteexecution",
         "//pkg/proto/remoteworker",
         "//pkg/scheduler/initialsizeclass",

@@ -7,13 +7,13 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 import "google/rpc/status.proto";
-import "pkg/proto/remoteexecution/remoteexecution.proto";
+import "pkg/proto/encryptedaction/encryptedaction.proto";
 
 option go_package = "bonanza.build/pkg/proto/buildqueuestate";
 
 // BuildQueueState can be used to inspect the internal state of
 // InMemoryBuildQueue and perform administrative operations against it.
-// It is used by bb_scheduler's web UI.
+// It is used by bonanza_browser.
 service BuildQueueState {
   // Get information about an operation that is currently known by the
   // scheduler.
@@ -120,7 +120,7 @@ message InvocationName {
 }
 
 message OperationState {
-  // The name of the operation. In the case of bb_scheduler, the
+  // The name of the operation. In the case of bonanza_scheduler, the
   // operation name will be a UUID.
   string name = 1;
 
@@ -135,7 +135,7 @@ message OperationState {
   google.protobuf.Timestamp queued_timestamp = 4;
 
   // The Action message that the client instructed the worker to execute.
-  bonanza.remoteexecution.Action action = 5;
+  bonanza.encryptedaction.Action action = 5;
 
   // When not set, it indicates that one or more Execute() or
   // WaitExecution() calls are currently taking place for this

@@ -20,6 +20,7 @@ go_library(
         "//pkg/model/executewithstorage",
         "//pkg/model/filesystem",
         "//pkg/model/parser",
+        "//pkg/proto/encryptedaction",
         "//pkg/proto/model/analysis",
         "//pkg/proto/model/build",
         "//pkg/proto/model/core",

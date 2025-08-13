@@ -9,10 +9,10 @@ import (
 	"bonanza.build/pkg/evaluation"
 	model_core "bonanza.build/pkg/model/core"
 	model_executewithstorage "bonanza.build/pkg/model/executewithstorage"
+	encryptedaction_pb "bonanza.build/pkg/proto/encryptedaction"
 	model_analysis_pb "bonanza.build/pkg/proto/model/analysis"
 	model_core_pb "bonanza.build/pkg/proto/model/core"
 	model_fetch_pb "bonanza.build/pkg/proto/model/fetch"
-	remoteexecution_pb "bonanza.build/pkg/proto/remoteexecution"
 	"bonanza.build/pkg/storage/dag"
 
 	"google.golang.org/grpc/codes"
@@ -78,7 +78,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeHttpFileContentsValue(ctx c
 				},
 			},
 		},
-		&remoteexecution_pb.Action_AdditionalData{
+		&encryptedaction_pb.Action_AdditionalData{
 			ExecutionTimeout: &durationpb.Duration{Seconds: 3600},
 		},
 		&resultReference,

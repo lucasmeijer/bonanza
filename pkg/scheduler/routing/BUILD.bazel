@@ -11,7 +11,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/proto/configuration/scheduler",
-        "//pkg/proto/remoteexecution",
+        "//pkg/proto/encryptedaction",
         "//pkg/scheduler/initialsizeclass",
         "//pkg/scheduler/invocation",
         "@com_github_buildbarn_bb_storage//pkg/util",

@@ -3,7 +3,7 @@ package routing
 import (
 	"context"
 
-	remoteexecution_pb "bonanza.build/pkg/proto/remoteexecution"
+	encryptedaction_pb "bonanza.build/pkg/proto/encryptedaction"
 	"bonanza.build/pkg/scheduler/initialsizeclass"
 	"bonanza.build/pkg/scheduler/invocation"
 
@@ -29,7 +29,7 @@ func NewSimpleActionRouter(invocationKeyExtractors []invocation.KeyExtractor, in
 	}
 }
 
-func (ar *simpleActionRouter) RouteAction(ctx context.Context, action *remoteexecution_pb.Action) ([]invocation.Key, initialsizeclass.Selector, error) {
+func (ar *simpleActionRouter) RouteAction(ctx context.Context, action *encryptedaction_pb.Action) ([]invocation.Key, initialsizeclass.Selector, error) {
 	invocationKeys := make([]invocation.Key, 0, len(ar.invocationKeyExtractors))
 	for _, invocationKeyExtractor := range ar.invocationKeyExtractors {
 		invocationKey, err := invocationKeyExtractor.ExtractKey(ctx)

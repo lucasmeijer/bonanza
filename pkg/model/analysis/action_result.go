@@ -14,10 +14,10 @@ import (
 	"bonanza.build/pkg/model/core/btree"
 	model_encoding "bonanza.build/pkg/model/encoding"
 	model_executewithstorage "bonanza.build/pkg/model/executewithstorage"
+	encryptedaction_pb "bonanza.build/pkg/proto/encryptedaction"
 	model_analysis_pb "bonanza.build/pkg/proto/model/analysis"
 	model_command_pb "bonanza.build/pkg/proto/model/command"
 	model_core_pb "bonanza.build/pkg/proto/model/core"
-	remoteexecution_pb "bonanza.build/pkg/proto/remoteexecution"
 	"bonanza.build/pkg/storage/object"
 
 	"google.golang.org/grpc/status"
@@ -74,7 +74,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeActionResultValue(ctx conte
 				},
 			},
 		},
-		&remoteexecution_pb.Action_AdditionalData{
+		&encryptedaction_pb.Action_AdditionalData{
 			StableFingerprint: commandReferenceSHA256[:],
 			ExecutionTimeout:  executeRequest.Message.ExecutionTimeout,
 		},

@@ -22,6 +22,7 @@ import (
 
 	"bonanza.build/pkg/crypto"
 	buildqueuestate_pb "bonanza.build/pkg/proto/buildqueuestate"
+	encryptedaction_pb "bonanza.build/pkg/proto/encryptedaction"
 	remoteexecution_pb "bonanza.build/pkg/proto/remoteexecution"
 	remoteworker_pb "bonanza.build/pkg/proto/remoteworker"
 	"bonanza.build/pkg/scheduler/initialsizeclass"
@@ -2238,9 +2239,9 @@ func (o *operation) waitExecution(bq *InMemoryBuildQueue, out remoteexecution_pb
 			}
 			done = true
 		} else if t.currentWorker != nil {
-			// Attach an ExecutionEvent in case the worker
+			// Attach an execution event in case the worker
 			// posted once since our last response.
-			var lastEvent *remoteexecution_pb.ExecutionEvent
+			var lastEvent *encryptedaction_pb.Event
 			if executionEventsReturned != t.executionEventsSeen {
 				lastEvent = t.lastExecutionEvent
 				executionEventsReturned = t.executionEventsSeen
@@ -2417,7 +2418,7 @@ type task struct {
 	initialSizeClassLearner initialsizeclass.Learner
 	mayExistWithoutWaiters  bool
 
-	lastExecutionEvent  *remoteexecution_pb.ExecutionEvent
+	lastExecutionEvent  *encryptedaction_pb.Event
 	executionEventsSeen uint
 	failureErr          error
 	stageChangeWakeup   chan struct{}

@@ -1,22 +1,20 @@
 load("@rules_go//go:def.bzl", "go_library")
 
 go_library(
-    name = "remoteexecution",
+    name = "encryptedaction",
     srcs = [
-        "client.go",
-        "proto_client.go",
-        "remote_client.go",
+        "action.go",
+        "aead.go",
+        "event_encoder.go",
     ],
-    importpath = "bonanza.build/pkg/remoteexecution",
+    importpath = "bonanza.build/pkg/encryptedaction",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/encryptedaction",
         "//pkg/proto/encryptedaction",
-        "//pkg/proto/remoteexecution",
         "@com_github_buildbarn_bb_storage//pkg/util",
+        "@com_github_secure_io_siv_go//:siv-go",
         "@org_golang_google_grpc//codes",
         "@org_golang_google_grpc//status",
         "@org_golang_google_protobuf//proto",
-        "@org_golang_google_protobuf//types/known/anypb",
     ],
 )

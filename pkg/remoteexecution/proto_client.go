@@ -5,7 +5,7 @@ import (
 	"crypto/ecdh"
 	"iter"
 
-	remoteexecution_pb "bonanza.build/pkg/proto/remoteexecution"
+	encryptedaction_pb "bonanza.build/pkg/proto/encryptedaction"
 
 	"github.com/buildbarn/bb-storage/pkg/util"
 
@@ -50,7 +50,7 @@ func NewProtoClient[
 	}
 }
 
-func (c *protoClient[TAction, TEvent, TResult, TEventPtr, TResultPtr]) RunAction(ctx context.Context, platformECDHPublicKey *ecdh.PublicKey, action TAction, actionAdditionalData *remoteexecution_pb.Action_AdditionalData, resultOut *TResultPtr, errOut *error) iter.Seq[TEventPtr] {
+func (c *protoClient[TAction, TEvent, TResult, TEventPtr, TResultPtr]) RunAction(ctx context.Context, platformECDHPublicKey *ecdh.PublicKey, action TAction, actionAdditionalData *encryptedaction_pb.Action_AdditionalData, resultOut *TResultPtr, errOut *error) iter.Seq[TEventPtr] {
 	// Marshal the action. We wrap the action in a google.protobuf.Any,
 	// so that the worker can reliably reject the action if it's not
 	// the right type for that kind of worker.

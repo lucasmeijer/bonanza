@@ -7,7 +7,7 @@
 package buildqueuestate
 
 import (
-	remoteexecution "bonanza.build/pkg/proto/remoteexecution"
+	encryptedaction "bonanza.build/pkg/proto/encryptedaction"
 	status "google.golang.org/genproto/googleapis/rpc/status"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -290,7 +290,7 @@ type OperationState struct {
 	InvocationName   *InvocationName         `protobuf:"bytes,2,opt,name=invocation_name,json=invocationName,proto3" json:"invocation_name,omitempty"`
 	ExpectedDuration *durationpb.Duration    `protobuf:"bytes,3,opt,name=expected_duration,json=expectedDuration,proto3" json:"expected_duration,omitempty"`
 	QueuedTimestamp  *timestamppb.Timestamp  `protobuf:"bytes,4,opt,name=queued_timestamp,json=queuedTimestamp,proto3" json:"queued_timestamp,omitempty"`
-	Action           *remoteexecution.Action `protobuf:"bytes,5,opt,name=action,proto3" json:"action,omitempty"`
+	Action           *encryptedaction.Action `protobuf:"bytes,5,opt,name=action,proto3" json:"action,omitempty"`
 	Timeout          *timestamppb.Timestamp  `protobuf:"bytes,6,opt,name=timeout,proto3" json:"timeout,omitempty"`
 	// Types that are valid to be assigned to Stage:
 	//
@@ -361,7 +361,7 @@ func (x *OperationState) GetQueuedTimestamp() *timestamppb.Timestamp {
 	return nil
 }
 
-func (x *OperationState) GetAction() *remoteexecution.Action {
+func (x *OperationState) GetAction() *encryptedaction.Action {
 	if x != nil {
 		return x.Action
 	}
@@ -2007,7 +2007,7 @@ var File_pkg_proto_buildqueuestate_buildqueuestate_proto protoreflect.FileDescri
 
 const file_pkg_proto_buildqueuestate_buildqueuestate_proto_rawDesc = "" +
 	"\n" +
-	"/pkg/proto/buildqueuestate/buildqueuestate.proto\x12\x17bonanza.buildqueuestate\x1a\x19google/protobuf/any.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17google/rpc/status.proto\x1a/pkg/proto/remoteexecution/remoteexecution.proto\"V\n" +
+	"/pkg/proto/buildqueuestate/buildqueuestate.proto\x12\x17bonanza.buildqueuestate\x1a\x19google/protobuf/any.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17google/rpc/status.proto\x1a/pkg/proto/encryptedaction/encryptedaction.proto\"V\n" +
 	"\x0ePaginationInfo\x12\x1f\n" +
 	"\vstart_index\x18\x01 \x01(\rR\n" +
 	"startIndex\x12#\n" +
@@ -2024,7 +2024,7 @@ const file_pkg_proto_buildqueuestate_buildqueuestate_proto_rawDesc = "" +
 	"\x0finvocation_name\x18\x02 \x01(\v2'.bonanza.buildqueuestate.InvocationNameR\x0einvocationName\x12F\n" +
 	"\x11expected_duration\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\x10expectedDuration\x12E\n" +
 	"\x10queued_timestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\x0fqueuedTimestamp\x127\n" +
-	"\x06action\x18\x05 \x01(\v2\x1f.bonanza.remoteexecution.ActionR\x06action\x124\n" +
+	"\x06action\x18\x05 \x01(\v2\x1f.bonanza.encryptedaction.ActionR\x06action\x124\n" +
 	"\atimeout\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\atimeout\x120\n" +
 	"\x06queued\x18\a \x01(\v2\x16.google.protobuf.EmptyH\x00R\x06queued\x126\n" +
 	"\texecuting\x18\b \x01(\v2\x16.google.protobuf.EmptyH\x00R\texecuting\x126\n" +
@@ -2231,7 +2231,7 @@ var file_pkg_proto_buildqueuestate_buildqueuestate_proto_goTypes = []any{
 	(*anypb.Any)(nil),                              // 39: google.protobuf.Any
 	(*durationpb.Duration)(nil),                    // 40: google.protobuf.Duration
 	(*timestamppb.Timestamp)(nil),                  // 41: google.protobuf.Timestamp
-	(*remoteexecution.Action)(nil),                 // 42: bonanza.remoteexecution.Action
+	(*encryptedaction.Action)(nil),                 // 42: bonanza.encryptedaction.Action
 	(*emptypb.Empty)(nil),                          // 43: google.protobuf.Empty
 	(*status.Status)(nil),                          // 44: google.rpc.Status
 }
@@ -2241,7 +2241,7 @@ var file_pkg_proto_buildqueuestate_buildqueuestate_proto_depIdxs = []int32{
 	4,  // 2: bonanza.buildqueuestate.OperationState.invocation_name:type_name -> bonanza.buildqueuestate.InvocationName
 	40, // 3: bonanza.buildqueuestate.OperationState.expected_duration:type_name -> google.protobuf.Duration
 	41, // 4: bonanza.buildqueuestate.OperationState.queued_timestamp:type_name -> google.protobuf.Timestamp
-	42, // 5: bonanza.buildqueuestate.OperationState.action:type_name -> bonanza.remoteexecution.Action
+	42, // 5: bonanza.buildqueuestate.OperationState.action:type_name -> bonanza.encryptedaction.Action
 	41, // 6: bonanza.buildqueuestate.OperationState.timeout:type_name -> google.protobuf.Timestamp
 	43, // 7: bonanza.buildqueuestate.OperationState.queued:type_name -> google.protobuf.Empty
 	43, // 8: bonanza.buildqueuestate.OperationState.executing:type_name -> google.protobuf.Empty

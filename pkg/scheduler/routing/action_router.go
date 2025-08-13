@@ -3,7 +3,7 @@ package routing
 import (
 	"context"
 
-	remoteexecution_pb "bonanza.build/pkg/proto/remoteexecution"
+	encryptedaction_pb "bonanza.build/pkg/proto/encryptedaction"
 	"bonanza.build/pkg/scheduler/initialsizeclass"
 	"bonanza.build/pkg/scheduler/invocation"
 )
@@ -19,5 +19,5 @@ import (
 //   - To create an initial size class selector, which InMemoryBuildQueue
 //     can use to select the appropriate worker size.
 type ActionRouter interface {
-	RouteAction(ctx context.Context, action *remoteexecution_pb.Action) ([]invocation.Key, initialsizeclass.Selector, error)
+	RouteAction(ctx context.Context, action *encryptedaction_pb.Action) ([]invocation.Key, initialsizeclass.Selector, error)
 }

@@ -5,10 +5,8 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/ecdh"
-	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
-	"io"
 	"log"
 	"sort"
 	"sync/atomic"
@@ -16,7 +14,8 @@ import (
 
 	"bonanza.build/pkg/crypto"
 	"bonanza.build/pkg/ds"
-	remoteexecution_pb "bonanza.build/pkg/proto/remoteexecution"
+	"bonanza.build/pkg/encryptedaction"
+	encryptedaction_pb "bonanza.build/pkg/proto/encryptedaction"
 	remoteworker_pb "bonanza.build/pkg/proto/remoteworker"
 
 	"github.com/buildbarn/bb-storage/pkg/auth"
@@ -26,11 +25,9 @@ import (
 	"github.com/buildbarn/bb-storage/pkg/random"
 	"github.com/buildbarn/bb-storage/pkg/util"
 	bb_x509 "github.com/buildbarn/bb-storage/pkg/x509"
-	"github.com/secure-io/siv-go"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -61,8 +58,7 @@ type Client struct {
 	completionEvent                    *[]byte
 	completionVirtualExecutionDuration time.Duration
 	completionResult                   remoteworker_pb.CurrentState_Completed_Result
-	executionSharedSecret              []byte
-	eventAdditionalData                [sha256.Size]byte
+	eventEncoder                       *encryptedaction.EventEncoder
 }
 
 type clientKey struct {
@@ -184,30 +180,17 @@ func (c *Client) startExecution(desiredState *remoteworker_pb.DesiredState_Execu
 	}
 
 	// Decrypt and unmarshal the action payload.
-	actionKey := append([]byte(nil), sharedSecret...)
-	actionKey[0] ^= 1
-	actionAEAD, err := siv.NewGCM(actionKey)
-	if err != nil {
-		return util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to create AEAD for decrypting action")
-	}
-	additionalData := action.AdditionalData
-	if additionalData == nil {
-		return status.Error(codes.InvalidArgument, "Action does not contain additional data")
-	}
-	marshaledAdditionalData, err := proto.Marshal(additionalData)
-	if err != nil {
-		return util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to marshal additional data")
-	}
-	plaintextAction, err := actionAEAD.Open(nil, action.Nonce, action.Ciphertext, marshaledAdditionalData)
+	plaintextAction, err := encryptedaction.ActionGetPlaintext(action, sharedSecret)
 	if err != nil {
 		return util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to decrypt action")
 	}
 
 	// Validate that the execution timeout provided by the scheduler.
-	if err := additionalData.ExecutionTimeout.CheckValid(); err != nil {
+	originalExecutionTimeoutMessage := action.AdditionalData.ExecutionTimeout
+	if err := originalExecutionTimeoutMessage.CheckValid(); err != nil {
 		return util.StatusWrapWithCode(err, codes.InvalidArgument, "Invalid original execution timeout")
 	}
-	originalExecutionTimeout := additionalData.ExecutionTimeout.AsDuration()
+	originalExecutionTimeout := originalExecutionTimeoutMessage.AsDuration()
 	if err := desiredState.EffectiveExecutionTimeout.CheckValid(); err != nil {
 		return util.StatusWrapWithCode(err, codes.InvalidArgument, "Invalid effective execution timeout")
 	}
@@ -285,8 +268,7 @@ func (c *Client) startExecution(desiredState *remoteworker_pb.DesiredState_Execu
 
 	c.executionCancellation = executionCancellation
 	c.executionCompleted = executionCompleted
-	c.executionSharedSecret = sharedSecret
-	c.eventAdditionalData = sha256.Sum256(action.Ciphertext)
+	c.eventEncoder = encryptedaction.NewEventEncoder(action, sharedSecret)
 
 	// Change state to indicate the build has started.
 	c.request.CurrentState.WorkerState = &remoteworker_pb.CurrentState_Executing_{
@@ -321,26 +303,6 @@ func (c *Client) touchSchedulerMayThinkExecuting() {
 	// scheduler has purged our state.
 	until := c.nextSynchronizationAt.Add(time.Minute)
 	c.schedulerMayThinkExecutingUntil = &until
-}
-
-// encryptEvent encrypts an execution or completion event, so that it
-// can be sent back to the scheduler in such a way that only the client
-// is able to decrypt it.
-func (c *Client) encryptEvent(event []byte, sharedSecretModifier byte) (*remoteexecution_pb.ExecutionEvent, error) {
-	eventKey := append([]byte(nil), c.executionSharedSecret...)
-	eventKey[0] ^= sharedSecretModifier
-	eventAEAD, err := siv.NewGCM(eventKey)
-	if err != nil {
-		return nil, util.StatusWrapWithCode(err, codes.Internal, "Failed to create AEAD for encrypting event")
-	}
-	nonce := make([]byte, eventAEAD.NonceSize())
-	if _, err := io.ReadFull(c.randomNumberGenerator, nonce); err != nil {
-		return nil, util.StatusWrapWithCode(err, codes.Internal, "Failed to generate nonce")
-	}
-	return &remoteexecution_pb.ExecutionEvent{
-		Nonce:      nonce,
-		Ciphertext: eventAEAD.Seal(nil, nonce, event, c.eventAdditionalData[:]),
-	}, nil
 }
 
 // Run an iteration of the Remote Worker client, by performing a single
@@ -380,10 +342,10 @@ func (c *Client) Run(ctx context.Context) (bool, error) {
 				//
 				// TODO: We should omit the event if we're not the
 				// largest size class!
-				var event *remoteexecution_pb.ExecutionEvent
+				var event *encryptedaction_pb.Event
 				if c.completionEvent != nil {
 					var err error
-					event, err = c.encryptEvent(*c.completionEvent, 3)
+					event, err = c.eventEncoder.EncodeEvent(*c.completionEvent, true, c.randomNumberGenerator)
 					if err != nil {
 						return false, util.StatusWrap(err, "Failed to marshal completion event")
 					}
@@ -411,7 +373,7 @@ func (c *Client) Run(ctx context.Context) (bool, error) {
 			// any execution events that we can send to the
 			// scheduler.
 			if latestExecutionEvent := c.latestExecutionEvent.Swap(nil); latestExecutionEvent != nil {
-				event, err := c.encryptEvent(*latestExecutionEvent, 2)
+				event, err := c.eventEncoder.EncodeEvent(*latestExecutionEvent, false, c.randomNumberGenerator)
 				if err != nil {
 					return false, util.StatusWrap(err, "Failed to marshal execution event")
 				}

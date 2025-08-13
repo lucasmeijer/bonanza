@@ -21,6 +21,7 @@ import (
 	model_parser "bonanza.build/pkg/model/parser"
 	model_starlark "bonanza.build/pkg/model/starlark"
 	"bonanza.build/pkg/proto/configuration/bonanza_builder"
+	encryptedaction_pb "bonanza.build/pkg/proto/encryptedaction"
 	model_analysis_pb "bonanza.build/pkg/proto/model/analysis"
 	model_build_pb "bonanza.build/pkg/proto/model/build"
 	model_core_pb "bonanza.build/pkg/proto/model/core"
@@ -618,7 +619,7 @@ type builderExecutionClient struct {
 	instanceName                  object.InstanceName
 }
 
-func (e *builderExecutionClient) RunAction(ctx context.Context, platformECDHPublicKey *ecdh.PublicKey, action *model_executewithstorage.Action[builderReference], actionAdditionalData *remoteexecution_pb.Action_AdditionalData, resultReference *model_core.Decodable[builderReference], errOut *error) iter.Seq[model_core.Decodable[builderReference]] {
+func (e *builderExecutionClient) RunAction(ctx context.Context, platformECDHPublicKey *ecdh.PublicKey, action *model_executewithstorage.Action[builderReference], actionAdditionalData *encryptedaction_pb.Action_AdditionalData, resultReference *model_core.Decodable[builderReference], errOut *error) iter.Seq[model_core.Decodable[builderReference]] {
 	// If the action is one that the caller has constructed but has
 	// not been uploaded to storage yet, we need to upload it before
 	// calling into the scheduler.
