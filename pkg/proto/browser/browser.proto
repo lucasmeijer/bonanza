@@ -34,4 +34,9 @@ message Cookie {
   // Encoders that were recently provided by the user, or were part of
   // recently accessed objects.
   repeated RecentlyObservedEncoder recently_observed_encoders = 1;
+
+  // PCKS #8 encoded, ECDH, ECDSA or Ed25519 private keys that can be
+  // used to decrypt and display actions that are being processed by the
+  // scheduler.
+  repeated bytes ecdh_private_keys = 2;
 }

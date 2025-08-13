@@ -14,7 +14,9 @@ go_library(
     importpath = "bonanza.build/cmd/bonanza_browser",
     visibility = ["//visibility:private"],
     deps = [
+        "//pkg/crypto",
         "//pkg/encoding/varint",
+        "//pkg/encryptedaction",
         "//pkg/model/core",
         "//pkg/model/core/btree",
         "//pkg/model/encoding",
@@ -27,6 +29,7 @@ go_library(
         "//pkg/proto/model/core",
         "//pkg/proto/model/encoding",
         "//pkg/proto/model/evaluation",
+        "//pkg/proto/model/executewithstorage",
         "//pkg/proto/model/filesystem",
         "//pkg/proto/storage/object",
         "//pkg/storage/object",

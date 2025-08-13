@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/ecdh"
+	"crypto/x509"
 	_ "embed"
 	"encoding/base64"
 	"encoding/hex"
@@ -18,7 +20,9 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"bonanza.build/pkg/crypto"
 	"bonanza.build/pkg/encoding/varint"
+	"bonanza.build/pkg/encryptedaction"
 	model_core "bonanza.build/pkg/model/core"
 	"bonanza.build/pkg/model/core/btree"
 	model_encoding "bonanza.build/pkg/model/encoding"
@@ -28,6 +32,7 @@ import (
 	model_core_pb "bonanza.build/pkg/proto/model/core"
 	model_encoding_pb "bonanza.build/pkg/proto/model/encoding"
 	model_evaluation_pb "bonanza.build/pkg/proto/model/evaluation"
+	model_executewithstorage_pb "bonanza.build/pkg/proto/model/executewithstorage"
 	object_pb "bonanza.build/pkg/proto/storage/object"
 	"bonanza.build/pkg/storage/object"
 	object_namespacemapping "bonanza.build/pkg/storage/object/namespacemapping"
@@ -110,6 +115,7 @@ func (s *BrowserService) RegisterHandlers(mux *http.ServeMux) {
 
 	// Scheduler related endpoints.
 	mux.HandleFunc("/{$}", wrapHandler(s.doPlatformQueues))
+	mux.HandleFunc("/operation/{operation_name}", wrapHandler(s.doOperation))
 	mux.HandleFunc("/workers/{filter}", wrapHandler(s.doWorkers))
 }
 
@@ -210,15 +216,11 @@ func getCookie(r *http.Request) *browser_pb.Cookie {
 	return &cookieMessage
 }
 
-func setCookie(w http.ResponseWriter, recentlyObservedEncoders []*browser_pb.RecentlyObservedEncoder) {
-	if cookie, err := proto.Marshal(
-		&browser_pb.Cookie{
-			RecentlyObservedEncoders: recentlyObservedEncoders,
-		},
-	); err == nil {
+func setCookie(w http.ResponseWriter, cookieMessage *browser_pb.Cookie) {
+	if cookieBytes, err := proto.Marshal(cookieMessage); err == nil {
 		http.SetCookie(w, &http.Cookie{
 			Name:     "bonanza_browser",
-			Value:    base64.RawURLEncoding.EncodeToString(cookie),
+			Value:    base64.RawURLEncoding.EncodeToString(cookieBytes),
 			Path:     "/",
 			HttpOnly: true,
 			SameSite: http.SameSiteStrictMode,
@@ -243,7 +245,7 @@ func getEncoderFromForm(r *http.Request) ([]*browser_pb.RecentlyObservedEncoder,
 	}}, "", nil
 }
 
-func getEncodersFromRequest(r *http.Request) ([]*browser_pb.RecentlyObservedEncoder, string, error) {
+func getEncodersFromRequest(r *http.Request) (*browser_pb.Cookie, string, error) {
 	recentlyObservedEncoders, currentEncoderConfigurationStr, err := getEncoderFromForm(r)
 
 	// Restore any recently observed encoders from the cookie.
@@ -269,7 +271,8 @@ func getEncodersFromRequest(r *http.Request) ([]*browser_pb.RecentlyObservedEnco
 			currentEncoderConfigurationStr = string(marshaled)
 		}
 	}
-	return recentlyObservedEncoders, currentEncoderConfigurationStr, err
+	cookie.RecentlyObservedEncoders = recentlyObservedEncoders
+	return cookie, currentEncoderConfigurationStr, err
 }
 
 // renderTabsLiftWithNeutralContent renders a set of tabs with the
@@ -534,9 +537,9 @@ func renderEvaluationPage(
 	valueNodes []g.Node,
 	dependenciesNodes []g.Node,
 	currentEncoderConfiguration string,
-	recentlyObservedEncoders []*browser_pb.RecentlyObservedEncoder,
+	cookie *browser_pb.Cookie,
 ) g.Node {
-	setCookie(w, recentlyObservedEncoders)
+	setCookie(w, cookie)
 
 	evaluationCard := []g.Node{
 		h.Class("card bg-base-200 message-contents w-2/3 p-4 shadow"),
@@ -581,7 +584,7 @@ func renderEvaluationPage(
 					h.Class("flex flex-col w-1/3 space-y-4"),
 					renderReferenceCard("Evaluation list reference", evaluationListReference),
 				},
-				renderEncoderSelector(recentlyObservedEncoders, currentEncoderConfiguration)...,
+				renderEncoderSelector(cookie.RecentlyObservedEncoders, currentEncoderConfiguration)...,
 			)...),
 
 			h.Div(evaluationCard...),
@@ -611,13 +614,14 @@ func (s *BrowserService) doEvaluation(w http.ResponseWriter, r *http.Request) (g
 			url.PathEscape(evaluationListReference.Value.InstanceName.String()),
 			referenceFormat.ToProto().String(),
 		),
-		now: time.Now(),
+		referenceFormat: &referenceFormat,
+		now:             time.Now(),
 	}
 	keyJSONNodes := jsonRenderer.renderTopLevelMessage(
 		model_core.NewTopLevelMessage(keyAny.Message.ProtoReflect(), keyAny.OutgoingReferences),
 	)
 
-	recentlyObservedEncoders, currentEncoderConfigurationStr, err := getEncodersFromRequest(r)
+	cookie, currentEncoderConfigurationStr, err := getEncodersFromRequest(r)
 	if err != nil {
 		errNodes := renderErrorAlert(fmt.Errorf("failed to obtain encoder configuration: %w", err))
 		return renderEvaluationPage(
@@ -627,12 +631,12 @@ func (s *BrowserService) doEvaluation(w http.ResponseWriter, r *http.Request) (g
 			errNodes,
 			errNodes,
 			currentEncoderConfigurationStr,
-			recentlyObservedEncoders,
+			cookie,
 		), nil
 	}
 
 	binaryEncoder, err := model_encoding.NewBinaryEncoderFromProto(
-		recentlyObservedEncoders[0].Configuration,
+		cookie.RecentlyObservedEncoders[0].Configuration,
 		uint32(referenceFormat.GetMaximumObjectSizeBytes()),
 	)
 	if err != nil {
@@ -644,7 +648,7 @@ func (s *BrowserService) doEvaluation(w http.ResponseWriter, r *http.Request) (g
 			errNodes,
 			errNodes,
 			currentEncoderConfigurationStr,
-			recentlyObservedEncoders,
+			cookie,
 		), nil
 	}
 
@@ -675,7 +679,7 @@ func (s *BrowserService) doEvaluation(w http.ResponseWriter, r *http.Request) (g
 			errNodes,
 			errNodes,
 			currentEncoderConfigurationStr,
-			recentlyObservedEncoders,
+			cookie,
 		), nil
 	}
 
@@ -711,7 +715,7 @@ func (s *BrowserService) doEvaluation(w http.ResponseWriter, r *http.Request) (g
 			errNodes,
 			errNodes,
 			currentEncoderConfigurationStr,
-			recentlyObservedEncoders,
+			cookie,
 		), nil
 	}
 
@@ -728,7 +732,7 @@ func (s *BrowserService) doEvaluation(w http.ResponseWriter, r *http.Request) (g
 				errNodes,
 				errNodes,
 				currentEncoderConfigurationStr,
-				recentlyObservedEncoders,
+				cookie,
 			), nil
 		}
 
@@ -795,13 +799,13 @@ func (s *BrowserService) doEvaluation(w http.ResponseWriter, r *http.Request) (g
 	}
 
 	// Rendering values might reveal the existence of additional encoders.
-	newRecentlyObservedEncoders := trimRecentlyObservedEncoders(
+	cookie.RecentlyObservedEncoders = trimRecentlyObservedEncoders(
 		append(
 			append(
-				[]*browser_pb.RecentlyObservedEncoder{recentlyObservedEncoders[0]},
+				[]*browser_pb.RecentlyObservedEncoder{cookie.RecentlyObservedEncoders[0]},
 				jsonRenderer.observedEncoders...,
 			),
-			recentlyObservedEncoders[1:]...,
+			cookie.RecentlyObservedEncoders[1:]...,
 		),
 	)
 	return renderEvaluationPage(
@@ -811,7 +815,7 @@ func (s *BrowserService) doEvaluation(w http.ResponseWriter, r *http.Request) (g
 		valueNodes,
 		dependenciesNodes,
 		currentEncoderConfigurationStr,
-		newRecentlyObservedEncoders,
+		cookie,
 	), nil
 }
 
@@ -823,10 +827,10 @@ func renderObjectPage(
 	payloadRenderers []payloadRenderer,
 	currentPayloadRendererIndex int,
 	currentEncoderConfiguration string,
-	recentlyObservedEncoders []*browser_pb.RecentlyObservedEncoder,
+	cookie *browser_pb.Cookie,
 	payload []g.Node,
 ) g.Node {
-	setCookie(w, recentlyObservedEncoders)
+	setCookie(w, cookie)
 
 	formatTabs := make([][]g.Node, 0, len(payloadRenderers))
 	for _, payloadRenderer := range payloadRenderers {
@@ -846,7 +850,7 @@ func renderObjectPage(
 					h.Class("flex flex-col w-1/3 space-y-4"),
 					renderReferenceCard("Object reference", decodableReference),
 				},
-				renderEncoderSelector(recentlyObservedEncoders, currentEncoderConfiguration)...,
+				renderEncoderSelector(cookie.RecentlyObservedEncoders, currentEncoderConfiguration)...,
 			)...),
 
 			h.Div(
@@ -906,7 +910,7 @@ func (s *BrowserService) doObject(
 		}
 	}
 
-	recentlyObservedEncoders, currentEncoderConfigurationStr, err := getEncodersFromRequest(r)
+	cookie, currentEncoderConfigurationStr, err := getEncodersFromRequest(r)
 	if err != nil {
 		return renderObjectPage(
 			w,
@@ -914,7 +918,7 @@ func (s *BrowserService) doObject(
 			payloadRenderers,
 			currentPayloadRendererIndex,
 			currentEncoderConfigurationStr,
-			recentlyObservedEncoders,
+			cookie,
 			renderErrorAlert(fmt.Errorf("failed to obtain encoder configuration: %w", err)),
 		), nil
 	}
@@ -928,24 +932,24 @@ func (s *BrowserService) doObject(
 			payloadRenderers,
 			currentPayloadRendererIndex,
 			currentEncoderConfigurationStr,
-			recentlyObservedEncoders,
+			cookie,
 			renderErrorAlert(fmt.Errorf("failed to download object: %w", err)),
 		), nil
 	}
 	rendered, encodersInObject := payloadRenderers[currentPayloadRendererIndex].render(
 		r,
 		model_core.CopyDecodable(objectReference, o),
-		recentlyObservedEncoders[0].Configuration,
+		cookie.RecentlyObservedEncoders[0].Configuration,
 	)
 
 	// Rendering might reveal the existence of additional encoders.
-	newRecentlyObservedEncoders := trimRecentlyObservedEncoders(
+	cookie.RecentlyObservedEncoders = trimRecentlyObservedEncoders(
 		append(
 			append(
-				[]*browser_pb.RecentlyObservedEncoder{recentlyObservedEncoders[0]},
+				[]*browser_pb.RecentlyObservedEncoder{cookie.RecentlyObservedEncoders[0]},
 				encodersInObject...,
 			),
-			recentlyObservedEncoders[1:]...,
+			cookie.RecentlyObservedEncoders[1:]...,
 		),
 	)
 
@@ -955,7 +959,7 @@ func (s *BrowserService) doObject(
 		payloadRenderers,
 		currentPayloadRendererIndex,
 		currentEncoderConfigurationStr,
-		newRecentlyObservedEncoders,
+		cookie,
 		rendered,
 	), nil
 }
@@ -1021,7 +1025,7 @@ func (s *BrowserService) doPlatformQueues(w http.ResponseWriter, r *http.Request
 	now := time.Now()
 	response, err := s.buildQueueStateClient.ListPlatformQueues(r.Context(), &emptypb.Empty{})
 	if err != nil {
-		return nil, util.StatusWrap(err, "Failed to list platform queues")
+		return nil, fmt.Errorf("failed to list platform queues: %w", err)
 	}
 	tableRows := make([]g.Node, 0, len(response.PlatformQueues))
 	for _, pq := range response.PlatformQueues {
@@ -1052,14 +1056,14 @@ func (s *BrowserService) doPlatformQueues(w http.ResponseWriter, r *http.Request
 			}
 			sizeClassQueueNameStr, err := marshalAndURLEncode(sizeClassQueueName)
 			if err != nil {
-				return nil, util.StatusWrap(err, "Failed to marshal and encode size class queue name")
+				return nil, fmt.Errorf("failed to marshal and encode size class queue name: %w", err)
 			}
 			invocationName := &buildqueuestate_pb.InvocationName{
 				SizeClassQueueName: sizeClassQueueName,
 			}
 			invocationNameStr, err := marshalAndURLEncode(invocationName)
 			if err != nil {
-				return nil, util.StatusWrap(err, "Failed to marshal and encode invocation name")
+				return nil, fmt.Errorf("failed to marshal and encode invocation name: %w", err)
 			}
 			listWorkersFilterExecutingStr, err := marshalAndURLEncode(&buildqueuestate_pb.ListWorkersRequest_Filter{
 				Type: &buildqueuestate_pb.ListWorkersRequest_Filter_Executing{
@@ -1067,7 +1071,7 @@ func (s *BrowserService) doPlatformQueues(w http.ResponseWriter, r *http.Request
 				},
 			})
 			if err != nil {
-				return nil, util.StatusWrap(err, "Failed to marshal and encode executing workers filter")
+				return nil, fmt.Errorf("failed to marshal and encode executing workers filter: %w", err)
 			}
 			listWorkersFilterIdleSynchronizingStr, err := marshalAndURLEncode(&buildqueuestate_pb.ListWorkersRequest_Filter{
 				Type: &buildqueuestate_pb.ListWorkersRequest_Filter_IdleSynchronizing{
@@ -1075,7 +1079,7 @@ func (s *BrowserService) doPlatformQueues(w http.ResponseWriter, r *http.Request
 				},
 			})
 			if err != nil {
-				return nil, util.StatusWrap(err, "Failed to marshal and encode idle synchronizing workers filter")
+				return nil, fmt.Errorf("failed to marshal and encode idle synchronizing workers filter: %w", err)
 			}
 			listWorkersFilterAllStr, err := marshalAndURLEncode(&buildqueuestate_pb.ListWorkersRequest_Filter{
 				Type: &buildqueuestate_pb.ListWorkersRequest_Filter_All{
@@ -1083,7 +1087,7 @@ func (s *BrowserService) doPlatformQueues(w http.ResponseWriter, r *http.Request
 				},
 			})
 			if err != nil {
-				return nil, util.StatusWrap(err, "Failed to marshal and encode all workers filter")
+				return nil, fmt.Errorf("failed to marshal and encode all workers filter: %w", err)
 			}
 
 			// Counters that are tracked per size class queue.
@@ -1238,16 +1242,285 @@ func (s *BrowserService) doPlatformQueues(w http.ResponseWriter, r *http.Request
 	}), nil
 }
 
+func (s *BrowserService) doOperation(w http.ResponseWriter, r *http.Request) (g.Node, error) {
+	operationName := r.PathValue("operation_name")
+	response, err := s.buildQueueStateClient.GetOperation(r.Context(), &buildqueuestate_pb.GetOperationRequest{
+		OperationName: operationName,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get operation: %w", err)
+	}
+	operation := response.Operation
+
+	invocationName := operation.GetInvocationName()
+	sizeClassQueueName := invocationName.GetSizeClassQueueName()
+	rawInvocationIDs := invocationName.GetIds()
+	invocationIDs := make([]g.Node, 0, len(rawInvocationIDs))
+	for _, rawInvocationID := range rawInvocationIDs {
+		invocationIDs = append(
+			invocationIDs,
+			h.Li(
+				h.A(
+					h.Href("TODO"),
+					g.Text(protojson.Format(rawInvocationID)),
+				),
+			),
+		)
+	}
+
+	cookie := getCookie(r)
+	if err := r.ParseForm(); err != nil {
+		return nil, fmt.Errorf("failed to parse form: %w", err)
+	}
+	if providedPrivateKey := r.FormValue("private_key"); providedPrivateKey != "" {
+		privateKey, err := crypto.ParsePEMWithPKCS8ECDHPrivateKey([]byte(providedPrivateKey))
+		if err != nil {
+			return nil, fmt.Errorf("invalid private key: %w", err)
+		}
+		marshaledPrivateKey, err := x509.MarshalPKCS8PrivateKey(privateKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal private key: %w", err)
+		}
+		cookie.EcdhPrivateKeys = append([][]byte{marshaledPrivateKey}, cookie.EcdhPrivateKeys...)
+		if maximumCount := 10; len(cookie.EcdhPrivateKeys) > maximumCount {
+			cookie.EcdhPrivateKeys = cookie.EcdhPrivateKeys[:maximumCount]
+		}
+	}
+
+	action := operation.GetAction()
+	if action == nil {
+		return nil, errors.New("no action provided")
+	}
+	platformECDHPublicKey, err := crypto.ParsePKIXECDHPublicKey(action.PlatformPkixPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("action contains an invalid platform PKIX public key: %w", err)
+	}
+	clientCertificateChain := action.ClientCertificateChain
+	if len(clientCertificateChain) == 0 {
+		return nil, errors.New("action contains no client certificate chain")
+	}
+	clientCertificate, err := x509.ParseCertificate(clientCertificateChain[0])
+	if err != nil {
+		return nil, fmt.Errorf("action contains an invalid client certificate: %w", err)
+	}
+	clientECDHPublicKey, err := crypto.PublicKeyToECDHPublicKey(clientCertificate.PublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract public key from client certificate in action: %w", err)
+	}
+
+	var ecdhPrivateKey *ecdh.PrivateKey
+	var ecdhPublicKey *ecdh.PublicKey
+	for _, rawECDHPrivateKey := range cookie.EcdhPrivateKeys {
+		ecdhPrivateKey, err = crypto.ParsePKCS8ECDHPrivateKey(rawECDHPrivateKey)
+		if err == nil {
+			if ecdhPrivateKey.PublicKey().Equal(platformECDHPublicKey) {
+				ecdhPublicKey = clientECDHPublicKey
+				break
+			} else if ecdhPrivateKey.PublicKey().Equal(clientECDHPublicKey) {
+				ecdhPublicKey = platformECDHPublicKey
+				break
+			}
+		}
+	}
+
+	var actionNode g.Node
+	if ecdhPublicKey == nil {
+		platformPKIXPublicKey, _ := x509.MarshalPKIXPublicKey(platformECDHPublicKey)
+		clientPKIXPublicKey, _ := x509.MarshalPKIXPublicKey(clientECDHPublicKey)
+		actionNode = h.Div(
+			g.Text("No ECDH private key available for platform PKIX public key "),
+			h.Span(
+				h.Class("font-mono"),
+				g.Text(base64.StdEncoding.EncodeToString(platformPKIXPublicKey)),
+			),
+			g.Text(" or client PKIX public key "),
+			h.Span(
+				h.Class("font-mono"),
+				g.Text(base64.StdEncoding.EncodeToString(clientPKIXPublicKey)),
+			),
+			g.Text(", meaning that this action cannot be displayed. "),
+			g.Text("Please provide the private key corresponding to one of these two public keys below."),
+
+			h.Form(
+				h.Method("post"),
+				h.Textarea(
+					h.Class("font-mono textarea w-full"),
+					h.Name("private_key"),
+					h.Rows("10"),
+					h.Placeholder(`-----BEGIN PRIVATE KEY-----
+...
+-----END PRIVATE KEY-----`),
+				),
+				h.Div(
+					h.Class("card-actions justify-end mt-4"),
+					h.Button(
+						h.Class("btn btn-primary"),
+						g.Text("Decrypt action"),
+					),
+				),
+			),
+		)
+	} else {
+		sharedSecret, err := ecdhPrivateKey.ECDH(ecdhPublicKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to compute action shared secret: %w", err)
+		}
+
+		// Decrypt action message.
+		actionPlaintext, err := encryptedaction.ActionGetPlaintext(action, sharedSecret)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decrypt action: %w", err)
+		}
+		var actionMessage anypb.Any
+		if err := proto.Unmarshal(actionPlaintext, &actionMessage); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal action: %w", err)
+		}
+
+		// Give special treatment to actions that use the
+		// "executewithstorage" protocol. For these we can
+		// extract the storage namespace and object format,
+		// allowing us to make the action reference clickable.
+		jsonRenderer := messageJSONRenderer{
+			now: time.Now(),
+		}
+		var executeWithStorageAction model_executewithstorage_pb.Action
+		if actionMessage.UnmarshalTo(&executeWithStorageAction) == nil {
+			namespace, err := object.NewNamespace(executeWithStorageAction.Namespace)
+			if err != nil {
+				return nil, fmt.Errorf("invalid namespace: %#v", err)
+			}
+			jsonRenderer.basePath = path.Join(
+				"../../object",
+				namespace.InstanceName.String(),
+				namespace.ReferenceFormat.ToProto().String(),
+			)
+			jsonRenderer.fallbackObjectFormat = executeWithStorageAction.ActionFormat
+			jsonRenderer.referenceFormat = &namespace.ReferenceFormat
+		}
+
+		actionNode = h.Div(
+			append(
+				[]g.Node{
+					h.Class("block card my-2 p-4 bg-neutral text-neutral-content font-mono h-auto! overflow-x-auto"),
+				},
+				jsonRenderer.renderTopLevelMessage(
+					model_core.NewSimpleTopLevelMessage[object.LocalReference](actionMessage.ProtoReflect()),
+				)...,
+			)...,
+		)
+		cookie.RecentlyObservedEncoders = trimRecentlyObservedEncoders(
+			append(
+				append(
+					[]*browser_pb.RecentlyObservedEncoder(nil),
+					jsonRenderer.observedEncoders...,
+				),
+				cookie.RecentlyObservedEncoders...,
+			),
+		)
+	}
+
+	setCookie(w, cookie)
+	return renderPage("Operation", []g.Node{
+		h.Div(
+			h.Class("w-full p-4"),
+
+			h.Div(
+				h.Class("card bg-base-200 p-4 shadow"),
+				h.H1(
+					h.Class("card-title text-2xl mb-4"),
+					g.Text("Operation"),
+				),
+
+				h.Table(
+					h.Class("table"),
+					h.Tr(
+						h.Th(
+							h.Class("whitespace-nowrap"),
+							g.Text("Name:"),
+						),
+						h.Td(
+							h.Span(
+								h.Class("font-mono"),
+								g.Text(operationName),
+							),
+						),
+					),
+					h.Tr(
+						h.Th(
+							h.Class("whitespace-nowrap"),
+							g.Text("Platform PKIX public key:"),
+						),
+						h.Td(
+							h.Class("font-mono"),
+							g.Text(base64.StdEncoding.EncodeToString(sizeClassQueueName.GetPlatformPkixPublicKey())),
+						),
+					),
+					h.Tr(
+						h.Th(
+							h.Class("whitespace-nowrap"),
+							g.Text("Size class:"),
+						),
+						h.Td(
+							g.Textf("%d", sizeClassQueueName.GetSizeClass()),
+						),
+					),
+					h.Tr(
+						h.Th(
+							h.Class("whitespace-nowrap"),
+							g.Text("Invocation IDs:"),
+						),
+						h.Td(
+							h.Class("break-all"),
+							h.Ul(invocationIDs...),
+						),
+					),
+					h.Tr(
+						h.Th(
+							h.Class("whitespace-nowrap"),
+							g.Text("Timeout:"),
+						),
+						h.Td(g.Textf("%d", operation.GetPriority())),
+					),
+					h.Tr(
+						h.Th(
+							h.Class("whitespace-nowrap"),
+							g.Text("Priority:"),
+						),
+						h.Td(g.Textf("%d", operation.GetPriority())),
+					),
+					h.Tr(
+						h.Th(
+							h.Class("whitespace-nowrap"),
+							g.Text("Expected duration:"),
+						),
+						h.Td(g.Text(operation.GetExpectedDuration().AsDuration().String())),
+					),
+				),
+			),
+
+			h.Div(
+				h.Class("card bg-base-200 message-contents p-4 shadow my-2"),
+				h.H1(
+					h.Class("card-title text-2xl mb-4"),
+					g.Text("Action"),
+				),
+
+				actionNode,
+			),
+		),
+	}), nil
+}
+
 const pageSize = 1000
 
 func (s *BrowserService) doWorkers(w http.ResponseWriter, r *http.Request) (g.Node, error) {
 	filterData, err := base64.RawURLEncoding.DecodeString(r.PathValue("filter"))
 	if err != nil {
-		return nil, util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to decode filter")
+		return nil, fmt.Errorf("failed to decode filter: %w", err)
 	}
 	var filter buildqueuestate_pb.ListWorkersRequest_Filter
 	if err := proto.Unmarshal(filterData, &filter); err != nil {
-		return nil, util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to unmarshal filter")
+		return nil, fmt.Errorf("failed to unmarshal filter: %w", err)
 	}
 
 	now := time.Now()
@@ -1257,7 +1530,7 @@ func (s *BrowserService) doWorkers(w http.ResponseWriter, r *http.Request) (g.No
 		// StartAfter: startAfter,
 	})
 	if err != nil {
-		return nil, util.StatusWrap(err, "Failed to list workers")
+		return nil, fmt.Errorf("failed to list workers: %w", err)
 	}
 
 	tableRows := make([]g.Node, 0, len(response.Workers))
@@ -1273,15 +1546,34 @@ func (s *BrowserService) doWorkers(w http.ResponseWriter, r *http.Request) (g.No
 				g.Text(" "),
 			)
 		}
-		tableRows = append(
-			tableRows,
-			h.Tr(
-				h.Td(workerID...),
-				h.Td(h.Class("text-right"), g.Text(timeoutToText(worker.Timeout, now))),
-				h.Td(g.Text("TODO")),
-				h.Td(g.Text("TODO")),
-			),
-		)
+		cells := []g.Node{
+			h.Td(workerID...),
+			h.Td(h.Class("text-right"), g.Text(timeoutToText(worker.Timeout, now))),
+		}
+		if operation := worker.CurrentOperation; operation != nil {
+			cells = append(
+				cells,
+				h.Td(
+					h.A(
+						h.Class("link link-primary"),
+						h.Href("../operation/"+operation.Name),
+						g.Text(operation.Name),
+					),
+				),
+				h.Td(h.Class("text-right"), g.Text(timeoutToText(operation.Timeout, now))),
+			)
+		} else {
+			cellText := "idle"
+			if worker.Drained {
+				cellText = "drained"
+			}
+			cells = append(cells, h.Td(
+				h.Class("text-center"),
+				h.ColSpan("2"),
+				g.Text(cellText),
+			))
+		}
+		tableRows = append(tableRows, h.Tr(cells...))
 	}
 
 	return renderPage("Workers", []g.Node{
@@ -1495,10 +1787,59 @@ func (textPayloadRenderer) render(r *http.Request, o model_core.Decodable[*objec
 // with syntax highlighting applied. Any references to other objects
 // contained in these messages are rendered as clickable links.
 type messageJSONRenderer struct {
-	basePath string
-	now      time.Time
+	basePath             string
+	fallbackObjectFormat *model_core_pb.ObjectFormat
+	referenceFormat      *object.ReferenceFormat
+	now                  time.Time
 
 	observedEncoders []*browser_pb.RecentlyObservedEncoder
+}
+
+func (d *messageJSONRenderer) renderReferenceField(fieldDescriptor protoreflect.FieldDescriptor, reference model_core.Decodable[object.LocalReference]) []g.Node {
+	fieldOptions := fieldDescriptor.Options().(*descriptorpb.FieldOptions)
+	objectFormat := proto.GetExtension(fieldOptions, model_core_pb.E_ObjectFormat).(*model_core_pb.ObjectFormat)
+	if objectFormat == nil {
+		objectFormat = d.fallbackObjectFormat
+	}
+
+	rawReference := model_core.DecodableLocalReferenceToString(reference)
+	if objectFormat == nil {
+		// Field is a valid reference, but there is no type
+		// information. Just show the reference without turning
+		// it into a link.
+		return []g.Node{
+			h.Span(
+				h.Class("whitespace-nowrap"),
+				g.Textf("%#v", rawReference),
+			),
+		}
+	}
+
+	// Field is a valid reference for which we have type information
+	// in the field options. Emit a link to the object.
+	var link string
+	switch format := objectFormat.GetFormat().(type) {
+	case *model_core_pb.ObjectFormat_Raw:
+		link = path.Join(d.basePath, rawReference, "raw")
+	case *model_core_pb.ObjectFormat_ProtoTypeName:
+		link = path.Join(d.basePath, rawReference, "proto", format.ProtoTypeName)
+	case *model_core_pb.ObjectFormat_ProtoListTypeName:
+		link = path.Join(d.basePath, rawReference, "proto_list", format.ProtoListTypeName)
+	default:
+		return []g.Node{
+			h.Span(
+				h.Class("text-red-600"),
+				g.Text("[ Reference field with unknown object format type ]"),
+			),
+		}
+	}
+	return []g.Node{
+		h.A(
+			h.Class("link link-accent whitespace-nowrap"),
+			h.Href(link),
+			g.Textf("%#v", rawReference),
+		),
+	}
 }
 
 func (d *messageJSONRenderer) renderField(fieldDescriptor protoreflect.FieldDescriptor, value model_core.Message[protoreflect.Value, object.LocalReference]) []g.Node {
@@ -1522,37 +1863,16 @@ func (d *messageJSONRenderer) renderField(fieldDescriptor protoreflect.FieldDesc
 		v = value.Message.Bytes()
 
 	case protoreflect.GroupKind, protoreflect.MessageKind:
-		if r, ok := value.Message.Message().Interface().(*model_core_pb.DecodableReference); ok {
-			if reference, err := model_core.FlattenDecodableReference(model_core.Nested(value, r)); err == nil {
-				if fieldOptions, ok := fieldDescriptor.Options().(*descriptorpb.FieldOptions); ok {
-					// Field is a valid reference for
-					// which we have type information in
-					// the field options. Emit a link to
-					// the object.
-					objectFormat := proto.GetExtension(fieldOptions, model_core_pb.E_ObjectFormat).(*model_core_pb.ObjectFormat)
-					rawReference := model_core.DecodableLocalReferenceToString(reference)
-					var link string
-					switch format := objectFormat.GetFormat().(type) {
-					case *model_core_pb.ObjectFormat_Raw:
-						link = path.Join(d.basePath, rawReference, "raw")
-					case *model_core_pb.ObjectFormat_ProtoTypeName:
-						link = path.Join(d.basePath, rawReference, "proto", format.ProtoTypeName)
-					case *model_core_pb.ObjectFormat_ProtoListTypeName:
-						link = path.Join(d.basePath, rawReference, "proto_list", format.ProtoListTypeName)
-					default:
-						return []g.Node{
-							h.Span(
-								h.Class("text-red-600"),
-								g.Text("[ Reference field with unknown object format ]"),
-							),
-						}
-					}
-					return []g.Node{
-						h.A(
-							h.Class("link link-accent whitespace-nowrap"),
-							h.Href(link),
-							g.Textf("%#v", rawReference),
-						),
+		if d.basePath != "" {
+			switch r := value.Message.Message().Interface().(type) {
+			case *model_core_pb.DecodableReference:
+				if reference, err := model_core.FlattenDecodableReference(model_core.Nested(value, r)); err == nil {
+					return d.renderReferenceField(fieldDescriptor, reference)
+				}
+			case *model_core_pb.WeakDecodableReference:
+				if d.referenceFormat != nil {
+					if reference, err := model_core.NewDecodableLocalReferenceFromWeakProto(*d.referenceFormat, r); err == nil {
+						return d.renderReferenceField(fieldDescriptor, reference)
 					}
 				}
 			}
@@ -1818,9 +2138,11 @@ func (messageJSONPayloadRenderer) render(r *http.Request, o model_core.Decodable
 	if err := proto.Unmarshal(decodedObject, message.Interface()); err != nil {
 		return renderErrorAlert(fmt.Errorf("failed to unmarshal message: %w", err)), nil
 	}
+	referenceFormat := o.Value.GetReferenceFormat()
 	d := messageJSONRenderer{
-		basePath: "../..",
-		now:      time.Now(),
+		basePath:        "../..",
+		referenceFormat: &referenceFormat,
+		now:             time.Now(),
 	}
 	rendered := d.renderTopLevelMessage(model_core.NewTopLevelMessage(message, o.Value))
 	return rendered, d.observedEncoders
@@ -1873,9 +2195,11 @@ func (messageListJSONPayloadRenderer) render(r *http.Request, o model_core.Decod
 		decodedObject = decodedObject[length:]
 	}
 
+	referenceFormat := o.Value.GetReferenceFormat()
 	d := messageJSONRenderer{
-		basePath: "../..",
-		now:      time.Now(),
+		basePath:        "../..",
+		referenceFormat: &referenceFormat,
+		now:             time.Now(),
 	}
 	rendered := d.renderMessageList(model_core.NewMessage(elements, o.Value))
 	return rendered, d.observedEncoders
