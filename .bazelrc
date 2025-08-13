@@ -1,3 +1,6 @@
 run --workspace_status_command="bash tools/workspace-status.sh"
 common --incompatible_enable_proto_toolchain_resolution
 common --protocopt=--fatal_warnings
+
+# Enable stamping for container builds to include git SHA in versions
+build --stamp

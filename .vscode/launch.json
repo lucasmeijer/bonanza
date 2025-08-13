@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Attach to Delve",
+      "type": "go",
+      "request": "attach",
+      "mode": "remote",
+      "remotePath": "",                 // optional, use if paths differ
+      "port": 2345,
+      "host": "91.99.197.208",
+      "apiVersion": 2,
+      "showLog": true
+    }
+  ]
+}
