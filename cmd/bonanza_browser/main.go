@@ -36,17 +36,17 @@ func main() {
 		if err := util.UnmarshalConfigurationFromFile(os.Args[1], &configuration); err != nil {
 			return util.StatusWrapf(err, "Failed to read configuration from %s", os.Args[1])
 		}
-		lifecycleState, grpcClientFactory, err := global.ApplyConfiguration(configuration.Global)
+		lifecycleState, grpcClientFactory, err := global.ApplyConfiguration(configuration.Global, dependenciesGroup)
 		if err != nil {
 			return util.StatusWrap(err, "Failed to apply global configuration options")
 		}
 
-		buildQueueStateGRPCClient, err := grpcClientFactory.NewClientFromConfiguration(configuration.BuildQueueStateGrpcClient)
+		buildQueueStateGRPCClient, err := grpcClientFactory.NewClientFromConfiguration(configuration.BuildQueueStateGrpcClient, dependenciesGroup)
 		if err != nil {
 			return util.StatusWrap(err, "Failed to create build queue state gRPC client")
 		}
 
-		storageGRPCClient, err := grpcClientFactory.NewClientFromConfiguration(configuration.StorageGrpcClient)
+		storageGRPCClient, err := grpcClientFactory.NewClientFromConfiguration(configuration.StorageGrpcClient, dependenciesGroup)
 		if err != nil {
 			return util.StatusWrap(err, "Failed to create storage gRPC client")
 		}

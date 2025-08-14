@@ -291,6 +291,10 @@ func (r *changeTrackingDirectoryNormalizingPathResolver[TReference, TMetadata]) 
 	return nil, errors.New("drive letters are not supported")
 }
 
+func (r *changeTrackingDirectoryNormalizingPathResolver[TReference, TMetadata]) OnShare(server, share string) (path.ComponentWalker, error) {
+	return nil, errors.New("shares are not supported")
+}
+
 func (r *changeTrackingDirectoryNormalizingPathResolver[TReference, TMetadata]) OnDirectory(name path.Component) (path.GotDirectoryOrSymlink, error) {
 	d := r.directories.Peek()
 	if err := d.maybeLoadContents(r.loadOptions); err != nil {

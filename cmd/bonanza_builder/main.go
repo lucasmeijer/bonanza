@@ -64,12 +64,12 @@ func main() {
 		if err := util.UnmarshalConfigurationFromFile(os.Args[1], &configuration); err != nil {
 			return util.StatusWrapf(err, "Failed to read configuration from %s", os.Args[1])
 		}
-		lifecycleState, grpcClientFactory, err := global.ApplyConfiguration(configuration.Global)
+		lifecycleState, grpcClientFactory, err := global.ApplyConfiguration(configuration.Global, dependenciesGroup)
 		if err != nil {
 			return util.StatusWrap(err, "Failed to apply global configuration options")
 		}
 
-		storageGRPCClient, err := grpcClientFactory.NewClientFromConfiguration(configuration.StorageGrpcClient)
+		storageGRPCClient, err := grpcClientFactory.NewClientFromConfiguration(configuration.StorageGrpcClient, dependenciesGroup)
 		if err != nil {
 			return util.StatusWrap(err, "Failed to create storage gRPC client")
 		}
@@ -88,7 +88,7 @@ func main() {
 			return util.StatusWrap(err, "Failed to create file pool")
 		}
 
-		executionGRPCClient, err := grpcClientFactory.NewClientFromConfiguration(configuration.ExecutionGrpcClient)
+		executionGRPCClient, err := grpcClientFactory.NewClientFromConfiguration(configuration.ExecutionGrpcClient, dependenciesGroup)
 		if err != nil {
 			return util.StatusWrap(err, "Failed to create execution gRPC client")
 		}
@@ -102,7 +102,7 @@ func main() {
 			return util.StatusWrap(err, "Failed to parse execution client certificate chain")
 		}
 
-		remoteWorkerConnection, err := grpcClientFactory.NewClientFromConfiguration(configuration.RemoteWorkerGrpcClient)
+		remoteWorkerConnection, err := grpcClientFactory.NewClientFromConfiguration(configuration.RemoteWorkerGrpcClient, dependenciesGroup)
 		if err != nil {
 			return util.StatusWrap(err, "Failed to create remote worker RPC client")
 		}
@@ -112,7 +112,7 @@ func main() {
 		if err != nil {
 			return err
 		}
-		clientCertificateVerifier, err := x509.NewClientCertificateVerifierFromConfiguration(configuration.ClientCertificateVerifier)
+		clientCertificateVerifier, err := x509.NewClientCertificateVerifierFromConfiguration(configuration.ClientCertificateVerifier, dependenciesGroup)
 		if err != nil {
 			return err
 		}

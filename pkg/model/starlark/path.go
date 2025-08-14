@@ -302,6 +302,11 @@ func (r *PathResolver) OnDriveLetter(drive rune) (bb_path.ComponentWalker, error
 	return r, nil
 }
 
+func (r *PathResolver) OnShare(server, share string) (bb_path.ComponentWalker, error) {
+	r.CurrentPath = nil
+	return r, nil
+}
+
 func (r *PathResolver) OnDirectory(name bb_path.Component) (bb_path.GotDirectoryOrSymlink, error) {
 	r.CurrentPath = r.CurrentPath.Append(name)
 	return bb_path.GotDirectory{

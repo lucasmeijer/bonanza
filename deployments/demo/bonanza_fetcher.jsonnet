@@ -47,8 +47,8 @@ local statePath = std.extVar('STATE_PATH');
       253seXn65SwVp5Kryf9bfFEfF715YIrcQjsyg3EDD8jw+qQho5bZ/pMF
       -----END CERTIFICATE-----
     |||,
-    validationJmespathExpression: '`true`',
-    metadataExtractionJmespathExpression: '`{}`',
+    validationJmespathExpression: { expression: '`true`' },
+    metadataExtractionJmespathExpression: { expression: '`{}`' },
   },
   concurrency: 10,
   workerId: { host: std.extVar('HOSTNAME') },

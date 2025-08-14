@@ -1,6 +1,5 @@
 module(name = "build_bonanza")
 
-bazel_dep(name = "apple_support", version = "1.22.1")  # For https://github.com/bazelbuild/apple_support/pull/373.
 bazel_dep(name = "aspect_bazel_lib", version = "2.20.0")
 bazel_dep(name = "aspect_rules_js", version = "2.4.2")
 bazel_dep(name = "bazel_remote_apis", version = "0.0.0")
@@ -27,13 +26,13 @@ git_override(
 
 git_override(
     module_name = "com_github_buildbarn_bb_remote_execution",
-    commit = "58b88e8adfbd4cb5c32905383ef9c35ea1f9598e",
+    commit = "5b4f5a6879e1c5fac56a426f26b4416cb8f38e81",
     remote = "https://github.com/buildbarn/bb-remote-execution.git",
 )
 
 git_override(
     module_name = "com_github_buildbarn_bb_storage",
-    commit = "b446105f8b1f02d23a31f4a4c18d44f4fe9aecf2",
+    commit = "7bb781bdf07d77d62083e916275567a6f9fa64e4",
     patches = ["//:patches/com_github_buildbarn_bb_storage/no-golint.diff"],
     remote = "https://github.com/buildbarn/bb-storage.git",
 )

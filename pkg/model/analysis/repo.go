@@ -488,6 +488,10 @@ func (r *changeTrackingDirectoryResolver[TReference, TMetadata]) OnDriveLetter(d
 	return nil, errors.New("drive letters are not supported")
 }
 
+func (r *changeTrackingDirectoryResolver[TReference, TMetadata]) OnShare(server, share string) (path.ComponentWalker, error) {
+	return nil, errors.New("shares are not supported")
+}
+
 func (r *changeTrackingDirectoryResolver[TReference, TMetadata]) OnDirectory(name path.Component) (path.GotDirectoryOrSymlink, error) {
 	d := r.stack.Peek()
 	if err := d.maybeLoadContents(r.loadOptions); err != nil {
@@ -669,6 +673,10 @@ func (r *changeTrackingDirectoryExistingFileResolver[TReference, TMetadata]) OnD
 	return nil, errors.New("drive letters are not supported")
 }
 
+func (r *changeTrackingDirectoryExistingFileResolver[TReference, TMetadata]) OnShare(server, share string) (path.ComponentWalker, error) {
+	return nil, errors.New("shares are not supported")
+}
+
 var errDirectoryDoesNotExist = errors.New("directory does not exist")
 
 func (r *changeTrackingDirectoryExistingFileResolver[TReference, TMetadata]) OnDirectory(name path.Component) (path.GotDirectoryOrSymlink, error) {
@@ -725,6 +733,10 @@ func (r *changeTrackingDirectoryNewDirectoryResolver[TReference, TMetadata]) OnD
 	return nil, errors.New("drive letters are not supported")
 }
 
+func (r *changeTrackingDirectoryNewDirectoryResolver[TReference, TMetadata]) OnShare(server, share string) (path.ComponentWalker, error) {
+	return nil, errors.New("shares are not supported")
+}
+
 func (r *changeTrackingDirectoryNewDirectoryResolver[TReference, TMetadata]) OnDirectory(name path.Component) (path.GotDirectoryOrSymlink, error) {
 	d := r.stack.Peek()
 	if err := d.maybeLoadContents(r.loadOptions); err != nil {
@@ -771,6 +783,10 @@ func (r *changeTrackingDirectoryNewFileResolver[TReference, TMetadata]) OnRelati
 }
 
 func (r *changeTrackingDirectoryNewFileResolver[TReference, TMetadata]) OnDriveLetter(driveLetter rune) (path.ComponentWalker, error) {
+	return nil, errors.New("drive letters are not supported")
+}
+
+func (r *changeTrackingDirectoryNewFileResolver[TReference, TMetadata]) OnShare(server, share string) (path.ComponentWalker, error) {
 	return nil, errors.New("drive letters are not supported")
 }
 

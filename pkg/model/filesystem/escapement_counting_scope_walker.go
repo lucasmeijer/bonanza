@@ -50,6 +50,11 @@ func (sw *EscapementCountingScopeWalker) OnDriveLetter(drive rune) (path.Compone
 	return path.VoidComponentWalker, nil
 }
 
+func (sw *EscapementCountingScopeWalker) OnShare(server, share string) (path.ComponentWalker, error) {
+	sw.levels = nil
+	return path.VoidComponentWalker, nil
+}
+
 type leadingEscapementCountingComponentWalker struct {
 	scopeWalker *EscapementCountingScopeWalker
 }

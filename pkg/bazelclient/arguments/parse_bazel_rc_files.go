@@ -49,6 +49,10 @@ func (r *bazelRCPathResolver) OnDriveLetter(drive rune) (path.ComponentWalker, e
 	return nil, status.Error(codes.Unimplemented, "Drive letters not supported")
 }
 
+func (r *bazelRCPathResolver) OnShare(server, share string) (path.ComponentWalker, error) {
+	return nil, status.Error(codes.Unimplemented, "Shares not supported")
+}
+
 func (r *bazelRCPathResolver) OnDirectory(name path.Component) (path.GotDirectoryOrSymlink, error) {
 	d := r.stack.Peek()
 	child, err := d.EnterDirectory(name)

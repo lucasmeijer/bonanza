@@ -51,13 +51,13 @@ func main() {
 		if err := util.UnmarshalConfigurationFromFile(os.Args[1], &configuration); err != nil {
 			return util.StatusWrapf(err, "Failed to read configuration from %s", os.Args[1])
 		}
-		lifecycleState, grpcClientFactory, err := global.ApplyConfiguration(configuration.Global)
+		lifecycleState, grpcClientFactory, err := global.ApplyConfiguration(configuration.Global, dependenciesGroup)
 		if err != nil {
 			return util.StatusWrap(err, "Failed to apply global configuration options")
 		}
 
 		// Storage access for reading commands and input files.
-		storageGRPCClient, err := grpcClientFactory.NewClientFromConfiguration(configuration.StorageGrpcClient)
+		storageGRPCClient, err := grpcClientFactory.NewClientFromConfiguration(configuration.StorageGrpcClient, dependenciesGroup)
 		if err != nil {
 			return util.StatusWrap(err, "Failed to create storage gRPC client")
 		}
@@ -74,7 +74,7 @@ func main() {
 		objectContentsWalkerSemaphore := semaphore.NewWeighted(int64(runtime.NumCPU()))
 
 		// Create connection with scheduler.
-		schedulerConnection, err := grpcClientFactory.NewClientFromConfiguration(configuration.SchedulerGrpcClient)
+		schedulerConnection, err := grpcClientFactory.NewClientFromConfiguration(configuration.SchedulerGrpcClient, dependenciesGroup)
 		if err != nil {
 			return util.StatusWrap(err, "Failed to create scheduler RPC client")
 		}
@@ -131,7 +131,7 @@ func main() {
 				if err != nil {
 					return err
 				}
-				clientCertificateVerifier, err := x509.NewClientCertificateVerifierFromConfiguration(runnerConfiguration.ClientCertificateVerifier)
+				clientCertificateVerifier, err := x509.NewClientCertificateVerifierFromConfiguration(runnerConfiguration.ClientCertificateVerifier, dependenciesGroup)
 				if err != nil {
 					return err
 				}
@@ -156,7 +156,7 @@ func main() {
 				// used in combination with a runner process. Having a separate
 				// runner process also makes it possible to apply privilege
 				// separation.
-				runnerConnection, err := grpcClientFactory.NewClientFromConfiguration(runnerConfiguration.Endpoint)
+				runnerConnection, err := grpcClientFactory.NewClientFromConfiguration(runnerConfiguration.Endpoint, dependenciesGroup)
 				if err != nil {
 					return util.StatusWrap(err, "Failed to create runner RPC client")
 				}

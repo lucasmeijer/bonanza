@@ -40,7 +40,7 @@ func main() {
 		if err := util.UnmarshalConfigurationFromFile(os.Args[1], &configuration); err != nil {
 			return util.StatusWrapf(err, "Failed to read configuration from %s", os.Args[1])
 		}
-		lifecycleState, grpcClientFactory, err := global.ApplyConfiguration(configuration.Global)
+		lifecycleState, grpcClientFactory, err := global.ApplyConfiguration(configuration.Global, dependenciesGroup)
 		if err != nil {
 			return util.StatusWrap(err, "Failed to apply global configuration options")
 		}
@@ -51,11 +51,11 @@ func main() {
 		maximumUnfinalizedParentsLimit := object.NewLimit(configuration.MaximumUnfinalizedParentsLimit)
 
 		// Construct object and tag stores for mirrored replicas.
-		objectStoreA, tagStoreA, err := createShardsForReplica(grpcClientFactory, configuration.ShardsReplicaA)
+		objectStoreA, tagStoreA, err := createShardsForReplica(grpcClientFactory, configuration.ShardsReplicaA, dependenciesGroup)
 		if err != nil {
 			return util.StatusWrap(err, "Failed to create storage shards for replica A")
 		}
-		objectStoreB, tagStoreB, err := createShardsForReplica(grpcClientFactory, configuration.ShardsReplicaB)
+		objectStoreB, tagStoreB, err := createShardsForReplica(grpcClientFactory, configuration.ShardsReplicaB, dependenciesGroup)
 		if err != nil {
 			return util.StatusWrap(err, "Failed to create storage shards for replica B")
 		}
@@ -118,7 +118,7 @@ func main() {
 	})
 }
 
-func createShardsForReplica(grpcClientFactory bb_grpc.ClientFactory, shards map[string]*bonanza_storage_frontend.ApplicationConfiguration_Shard) (object.Store[object.GlobalReference, []byte], tag.Store[object.Namespace, object.GlobalReference, []byte], error) {
+func createShardsForReplica(grpcClientFactory bb_grpc.ClientFactory, shards map[string]*bonanza_storage_frontend.ApplicationConfiguration_Shard, dependenciesGroup program.Group) (object.Store[object.GlobalReference, []byte], tag.Store[object.Namespace, object.GlobalReference, []byte], error) {
 	// Create object & tag stores for each shard.
 	shardNames := make([]string, 0, len(shards))
 	weightedShards := make([]object_sharded.WeightedShard, 0, len(shards))
@@ -127,7 +127,7 @@ func createShardsForReplica(grpcClientFactory bb_grpc.ClientFactory, shards map[
 	tagResolvers := make([]tag.Resolver[object.Namespace], 0, len(shards))
 	tagUpdaters := make([]tag.Updater[object.GlobalReference, []byte], 0, len(shards))
 	for key, shard := range shards {
-		grpcClient, err := grpcClientFactory.NewClientFromConfiguration(shard.Client)
+		grpcClient, err := grpcClientFactory.NewClientFromConfiguration(shard.Client, dependenciesGroup)
 		if err != nil {
 			return nil, nil, util.StatusWrapf(err, "Failed to create gRPC client for shard with key %#v", key)
 		}
