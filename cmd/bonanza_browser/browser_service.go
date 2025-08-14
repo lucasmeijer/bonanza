@@ -1600,6 +1600,7 @@ func (s *BrowserService) doWorkers(w http.ResponseWriter, r *http.Request) (g.No
 			cells = append(
 				cells,
 				h.Td(
+					h.Class("font-mono"),
 					h.A(
 						h.Class("link link-primary"),
 						h.Href("../operation/"+operation.Name),
