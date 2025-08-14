@@ -1037,7 +1037,7 @@ func (s *BrowserService) doPlatformQueues(w http.ResponseWriter, r *http.Request
 			if i == 0 {
 				pkixPublicKeys := append(
 					make([]g.Node, 0, 2+2*len(pq.PkixPublicKeys)),
-					h.Class("font-mono"),
+					h.Class("break-all font-mono"),
 					h.RowSpan(strconv.FormatInt(int64(len(pq.SizeClassQueues)), 10)),
 				)
 				for _, pkixPublicKey := range pq.PkixPublicKeys {
