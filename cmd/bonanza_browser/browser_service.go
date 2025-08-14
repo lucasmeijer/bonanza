@@ -1324,6 +1324,7 @@ func (s *BrowserService) doOperation(w http.ResponseWriter, r *http.Request) (g.
 	}
 
 	var actionNode g.Node
+	now := time.Now()
 	if ecdhPublicKey == nil {
 		platformPKIXPublicKey, _ := x509.MarshalPKIXPublicKey(platformECDHPublicKey)
 		clientPKIXPublicKey, _ := x509.MarshalPKIXPublicKey(clientECDHPublicKey)
@@ -1381,7 +1382,7 @@ func (s *BrowserService) doOperation(w http.ResponseWriter, r *http.Request) (g.
 		// extract the storage namespace and object format,
 		// allowing us to make the action reference clickable.
 		jsonRenderer := messageJSONRenderer{
-			now: time.Now(),
+			now: now,
 		}
 		var executeWithStorageAction model_executewithstorage_pb.Action
 		if actionMessage.UnmarshalTo(&executeWithStorageAction) == nil {
@@ -1401,7 +1402,7 @@ func (s *BrowserService) doOperation(w http.ResponseWriter, r *http.Request) (g.
 		actionNode = h.Div(
 			append(
 				[]g.Node{
-					h.Class("block card my-2 p-4 bg-neutral text-neutral-content font-mono h-auto! overflow-x-auto"),
+					h.Class("block card p-4 bg-neutral text-neutral-content font-mono h-auto! overflow-x-auto"),
 				},
 				jsonRenderer.renderTopLevelMessage(
 					model_core.NewSimpleTopLevelMessage[object.LocalReference](actionMessage.ProtoReflect()),
@@ -1422,90 +1423,92 @@ func (s *BrowserService) doOperation(w http.ResponseWriter, r *http.Request) (g.
 	setCookie(w, cookie)
 	return renderPage("Operation", []g.Node{
 		h.Div(
-			h.Class("w-full p-4"),
-
+			h.Class("flex w-full space-x-4 p-4"),
 			h.Div(
-				h.Class("card bg-base-200 p-4 shadow"),
-				h.H1(
-					h.Class("card-title text-2xl mb-4"),
-					g.Text("Operation"),
-				),
+				h.Class("flex flex-col w-1/3 space-y-4"),
+				h.Div(
+					h.Class("card bg-base-200 p-4 shadow"),
+					h.H1(
+						h.Class("card-title text-2xl mb-4"),
+						g.Text("Operation"),
+					),
 
-				h.Table(
-					h.Class("table"),
-					h.Tr(
-						h.Th(
-							h.Class("whitespace-nowrap"),
-							g.Text("Name:"),
-						),
-						h.Td(
-							h.Span(
-								h.Class("font-mono"),
+					h.Table(
+						h.Class("table"),
+						h.Tr(
+							h.Th(
+								h.Class("whitespace-nowrap"),
+								g.Text("Name:"),
+							),
+							h.Td(
+								h.Class("break-all font-mono"),
 								g.Text(operationName),
 							),
 						),
-					),
-					h.Tr(
-						h.Th(
-							h.Class("whitespace-nowrap"),
-							g.Text("Platform PKIX public key:"),
+						h.Tr(
+							h.Th(
+								h.Class("whitespace-nowrap"),
+								g.Text("Platform PKIX public key:"),
+							),
+							h.Td(
+								h.Class("break-all font-mono"),
+								g.Text(base64.StdEncoding.EncodeToString(sizeClassQueueName.GetPlatformPkixPublicKey())),
+							),
 						),
-						h.Td(
-							h.Class("font-mono"),
-							g.Text(base64.StdEncoding.EncodeToString(sizeClassQueueName.GetPlatformPkixPublicKey())),
+						h.Tr(
+							h.Th(
+								h.Class("whitespace-nowrap"),
+								g.Text("Size class:"),
+							),
+							h.Td(
+								g.Textf("%d", sizeClassQueueName.GetSizeClass()),
+							),
 						),
-					),
-					h.Tr(
-						h.Th(
-							h.Class("whitespace-nowrap"),
-							g.Text("Size class:"),
+						h.Tr(
+							h.Th(
+								h.Class("whitespace-nowrap"),
+								g.Text("Invocation IDs:"),
+							),
+							h.Td(
+								h.Class("break-all"),
+								h.Ul(invocationIDs...),
+							),
 						),
-						h.Td(
-							g.Textf("%d", sizeClassQueueName.GetSizeClass()),
+						h.Tr(
+							h.Th(
+								h.Class("whitespace-nowrap"),
+								g.Text("Timeout:"),
+							),
+							h.Td(g.Text(timeoutToText(operation.Timeout, now))),
 						),
-					),
-					h.Tr(
-						h.Th(
-							h.Class("whitespace-nowrap"),
-							g.Text("Invocation IDs:"),
+						h.Tr(
+							h.Th(
+								h.Class("whitespace-nowrap"),
+								g.Text("Priority:"),
+							),
+							h.Td(g.Textf("%d", operation.GetPriority())),
 						),
-						h.Td(
-							h.Class("break-all"),
-							h.Ul(invocationIDs...),
+						h.Tr(
+							h.Th(
+								h.Class("whitespace-nowrap"),
+								g.Text("Expected duration:"),
+							),
+							h.Td(g.Text(operation.GetExpectedDuration().AsDuration().String())),
 						),
-					),
-					h.Tr(
-						h.Th(
-							h.Class("whitespace-nowrap"),
-							g.Text("Timeout:"),
-						),
-						h.Td(g.Textf("%d", operation.GetPriority())),
-					),
-					h.Tr(
-						h.Th(
-							h.Class("whitespace-nowrap"),
-							g.Text("Priority:"),
-						),
-						h.Td(g.Textf("%d", operation.GetPriority())),
-					),
-					h.Tr(
-						h.Th(
-							h.Class("whitespace-nowrap"),
-							g.Text("Expected duration:"),
-						),
-						h.Td(g.Text(operation.GetExpectedDuration().AsDuration().String())),
 					),
 				),
 			),
 
 			h.Div(
-				h.Class("card bg-base-200 message-contents p-4 shadow my-2"),
-				h.H1(
-					h.Class("card-title text-2xl mb-4"),
-					g.Text("Action"),
+				h.Class("w-2/3"),
+				h.Div(
+					h.Class("card bg-base-200 message-contents p-4 shadow"),
+					h.H1(
+						h.Class("card-title text-2xl mb-4"),
+						g.Text("Action"),
+					),
+					actionNode,
 				),
-
-				actionNode,
 			),
 		),
 	}), nil
