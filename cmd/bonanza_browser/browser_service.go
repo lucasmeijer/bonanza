@@ -1363,18 +1363,27 @@ func (s *BrowserService) doOperation(w http.ResponseWriter, r *http.Request) (g.
 		platformPKIXPublicKey, _ := x509.MarshalPKIXPublicKey(platformECDHPublicKey)
 		clientPKIXPublicKey, _ := x509.MarshalPKIXPublicKey(clientECDHPublicKey)
 		actionNode = h.Div(
-			g.Text("No ECDH private key available for platform PKIX public key "),
-			h.Span(
-				h.Class("font-mono"),
-				g.Text(base64.StdEncoding.EncodeToString(platformPKIXPublicKey)),
+			h.P(
+				g.Text("No ECDH private key available that can be used to decrypt this action. Please provide the private key corresponding to one of the following two PKIX public keys:"),
 			),
-			g.Text(" or client PKIX public key "),
-			h.Span(
-				h.Class("font-mono"),
-				g.Text(base64.StdEncoding.EncodeToString(clientPKIXPublicKey)),
+
+			h.Ul(
+				h.Class("list-disc list-inside m-4"),
+				h.Li(
+					h.B(g.Text("Client: ")),
+					h.Span(
+						h.Class("font-mono"),
+						g.Text(base64.StdEncoding.EncodeToString(clientPKIXPublicKey)),
+					),
+				),
+				h.Li(
+					h.B(g.Text("Platform: ")),
+					h.Span(
+						h.Class("font-mono"),
+						g.Text(base64.StdEncoding.EncodeToString(platformPKIXPublicKey)),
+					),
+				),
 			),
-			g.Text(", meaning that this action cannot be displayed. "),
-			g.Text("Please provide the private key corresponding to one of these two public keys below."),
 
 			h.Form(
 				h.Method("post"),
