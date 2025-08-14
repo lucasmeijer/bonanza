@@ -342,8 +342,8 @@ message ListOperationsRequest {
   google.protobuf.Any filter_invocation_id = 3;
 
   enum ExecutionStage {
-    // Match any operation, regardless of it's stage.
-    ANY = 0;
+    // Match any operation, regardless of its stage.
+    ALL = 0;
 
     // Currently idle, awaiting a free machine to execute.
     QUEUED = 1;

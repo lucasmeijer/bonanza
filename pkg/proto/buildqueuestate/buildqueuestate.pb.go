@@ -30,7 +30,7 @@ const (
 type ListOperationsRequest_ExecutionStage int32
 
 const (
-	ListOperationsRequest_ANY       ListOperationsRequest_ExecutionStage = 0
+	ListOperationsRequest_ALL       ListOperationsRequest_ExecutionStage = 0
 	ListOperationsRequest_QUEUED    ListOperationsRequest_ExecutionStage = 1
 	ListOperationsRequest_EXECUTING ListOperationsRequest_ExecutionStage = 2
 	ListOperationsRequest_COMPLETED ListOperationsRequest_ExecutionStage = 3
@@ -39,13 +39,13 @@ const (
 // Enum value maps for ListOperationsRequest_ExecutionStage.
 var (
 	ListOperationsRequest_ExecutionStage_name = map[int32]string{
-		0: "ANY",
+		0: "ALL",
 		1: "QUEUED",
 		2: "EXECUTING",
 		3: "COMPLETED",
 	}
 	ListOperationsRequest_ExecutionStage_value = map[string]int32{
-		"ANY":       0,
+		"ALL":       0,
 		"QUEUED":    1,
 		"EXECUTING": 2,
 		"COMPLETED": 3,
@@ -983,7 +983,7 @@ func (x *ListOperationsRequest) GetFilterStage() ListOperationsRequest_Execution
 	if x != nil {
 		return x.FilterStage
 	}
-	return ListOperationsRequest_ANY
+	return ListOperationsRequest_ALL
 }
 
 type ListOperationsResponse struct {
@@ -2082,7 +2082,7 @@ const file_pkg_proto_buildqueuestate_buildqueuestate_proto_rawDesc = "" +
 	"StartAfter\x12%\n" +
 	"\x0eoperation_name\x18\x01 \x01(\tR\roperationName\"C\n" +
 	"\x0eExecutionStage\x12\a\n" +
-	"\x03ANY\x10\x00\x12\n" +
+	"\x03ALL\x10\x00\x12\n" +
 	"\n" +
 	"\x06QUEUED\x10\x01\x12\r\n" +
 	"\tEXECUTING\x10\x02\x12\r\n" +

@@ -992,7 +992,7 @@ func (bq *InMemoryBuildQueue) ListOperations(ctx context.Context, request *build
 	nameList := make([]string, 0, len(bq.operationsNameMap))
 	for name, o := range bq.operationsNameMap {
 		if (invocationKey == nil || o.invocation.hasInvocationKey(*invocationKey)) &&
-			(request.FilterStage == buildqueuestate_pb.ListOperationsRequest_ANY || request.FilterStage == o.task.getStage()) {
+			(request.FilterStage == buildqueuestate_pb.ListOperationsRequest_ALL || request.FilterStage == o.task.getStage()) {
 			nameList = append(nameList, name)
 		}
 	}

@@ -1202,7 +1202,7 @@ func (s *BrowserService) doPlatformQueues(w http.ResponseWriter, r *http.Request
 							h.Class("w-3/4"),
 							h.A(
 								h.Class("link link-primary"),
-								h.Href("operations/UNKNOWN"),
+								h.Href("operations/ALL"),
 								g.Textf("%d", operationsCount.PaginationInfo.GetTotalEntries()),
 							),
 						),
