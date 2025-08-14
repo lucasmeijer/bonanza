@@ -1183,7 +1183,7 @@ func (s *BrowserService) doPlatformQueues(w http.ResponseWriter, r *http.Request
 
 	return renderPage("Build queue", []g.Node{
 		h.Div(
-			h.Class("w-full p-4"),
+			h.Class("p-4"),
 
 			h.Div(
 				h.Class("card bg-base-200 p-4 shadow"),
