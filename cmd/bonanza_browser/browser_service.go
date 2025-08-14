@@ -1018,7 +1018,11 @@ func timeoutToText(timeout *timestamppb.Timestamp, now time.Time) string {
 	if timeout.CheckValid() != nil {
 		return "?"
 	}
-	return timeout.AsTime().Sub(now).Truncate(time.Second).String()
+	diff := timeout.AsTime().Sub(now)
+	if diff < 0 {
+		diff = 0
+	}
+	return diff.Truncate(time.Second).String()
 }
 
 func (s *BrowserService) doPlatformQueues(w http.ResponseWriter, r *http.Request) (g.Node, error) {
