@@ -1023,7 +1023,12 @@ func timeoutToText(timeout *timestamppb.Timestamp, now time.Time) string {
 
 func (s *BrowserService) doPlatformQueues(w http.ResponseWriter, r *http.Request) (g.Node, error) {
 	now := time.Now()
-	response, err := s.buildQueueStateClient.ListPlatformQueues(r.Context(), &emptypb.Empty{})
+	ctx := r.Context()
+	operationsCount, err := s.buildQueueStateClient.ListOperations(ctx, &buildqueuestate_pb.ListOperationsRequest{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list platform queues: %w", err)
+	}
+	response, err := s.buildQueueStateClient.ListPlatformQueues(ctx, &emptypb.Empty{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list platform queues: %w", err)
 	}
@@ -1172,12 +1177,37 @@ func (s *BrowserService) doPlatformQueues(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	return renderPage("Platform queues", []g.Node{
+	return renderPage("Build queue", []g.Node{
 		h.Div(
 			h.Class("w-full p-4"),
 
 			h.Div(
 				h.Class("card bg-base-200 p-4 shadow"),
+				h.H1(
+					h.Class("card-title text-2xl mb-4"),
+					g.Text("Build queue"),
+				),
+				h.Table(
+					h.Class("table table-fixed"),
+					h.Tr(
+						h.Th(
+							h.Class("w-1/4"),
+							g.Text("Total number of operations:"),
+						),
+						h.Td(
+							h.Class("w-3/4"),
+							h.A(
+								h.Class("link link-primary"),
+								h.Href("operations/UNKNOWN"),
+								g.Textf("%d", operationsCount.PaginationInfo.GetTotalEntries()),
+							),
+						),
+					),
+				),
+			),
+
+			h.Div(
+				h.Class("card bg-base-200 p-4 shadow my-4"),
 				h.H1(
 					h.Class("card-title text-2xl mb-4"),
 					g.Text("Platform queues"),

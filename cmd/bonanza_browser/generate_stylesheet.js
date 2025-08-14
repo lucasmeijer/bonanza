@@ -77,6 +77,7 @@ async function main() {
     'tab-active',
     'tab-content',
     'tab',
+    'table-fixed',
     'table-pin-cols',
     'table',
     'tabs-lift',
@@ -96,7 +97,9 @@ async function main() {
     'text-xs',
     'textarea',
     'w-1/3',
+    'w-1/4',
     'w-2/3',
+    'w-3/4',
     'w-full',
     'whitespace-nowrap',
   ])
