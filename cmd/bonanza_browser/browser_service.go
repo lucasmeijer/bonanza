@@ -1445,7 +1445,7 @@ func (s *BrowserService) doOperation(w http.ResponseWriter, r *http.Request) (g.
 		actionNode = h.Div(
 			append(
 				[]g.Node{
-					h.Class("block card p-4 bg-neutral text-neutral-content font-mono h-auto! overflow-x-auto"),
+					h.Class("block card p-4 bg-neutral message-contents text-neutral-content font-mono h-auto! overflow-x-auto"),
 				},
 				jsonRenderer.renderTopLevelMessage(
 					model_core.NewSimpleTopLevelMessage[object.LocalReference](actionMessage.ProtoReflect()),
@@ -1545,7 +1545,7 @@ func (s *BrowserService) doOperation(w http.ResponseWriter, r *http.Request) (g.
 			h.Div(
 				h.Class("w-2/3"),
 				h.Div(
-					h.Class("card bg-base-200 message-contents p-4 shadow"),
+					h.Class("card bg-base-200 p-4 shadow"),
 					h.H1(
 						h.Class("card-title text-2xl mb-4"),
 						g.Text("Action"),
