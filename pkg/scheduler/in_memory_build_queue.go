@@ -319,22 +319,44 @@ var (
 // capable of using multiple size classes, as a maximum size class and
 // initialsizeclass.Analyzer can be provided for specifying how
 // operations are assigned to size classes.
-func (bq *InMemoryBuildQueue) RegisterPredeclaredPlatformQueue(publicKeys []*ecdh.PublicKey, workerInvocationStickinessLimits []time.Duration, maximumQueuedBackgroundLearningOperations int, backgroundLearningOperationPriority int32, sizeClasses []uint32) error {
+func (bq *InMemoryBuildQueue) RegisterPredeclaredPlatformQueue(pkixPublicKeys [][]byte, workerInvocationStickinessLimits []time.Duration, maximumQueuedBackgroundLearningOperations int, backgroundLearningOperationPriority int32, sizeClasses []uint32) error {
+	// Perform basic validations of arguments.
+	if len(pkixPublicKeys) == 0 {
+		return status.Error(codes.InvalidArgument, "No public keys provided")
+	}
+	if !slices.IsSortedFunc(pkixPublicKeys, func(a, b []byte) int { return bytes.Compare(a, b) }) {
+		return status.Error(codes.InvalidArgument, "Public keys are not sorted")
+	}
+
 	if len(sizeClasses) < 1 {
 		return status.Error(codes.InvalidArgument, "No size classes provided")
 	}
-	for i := 1; i < len(sizeClasses); i++ {
-		if sizeClasses[i-1] >= sizeClasses[i] {
-			return status.Error(codes.InvalidArgument, "Size classes must be provided in sorted order")
-		}
+	if !slices.IsSorted(sizeClasses) {
+		return status.Error(codes.InvalidArgument, "Size classes must be provided in sorted order")
 	}
 
 	bq.enter(bq.clock.Now())
 	defer bq.leave()
 
-	panic("TODO: ADD PUBLIC KEYS!")
+	// Perform validation that requires looking at the current state
+	// of the scheduler.
+	newPublicKeys := make([]newPublicKey, 0, len(pkixPublicKeys))
+	for i, pkixPublicKey := range pkixPublicKeys {
+		if _, ok := bq.platformQueues[string(pkixPublicKey)]; ok {
+			return status.Errorf(codes.InvalidArgument, "PKIX public key at index %d is already associated with different platform queue", i)
+		}
+		publicKey, err := bq.getPlatformQueuePublicKey(pkixPublicKey)
+		if err != nil {
+			return util.StatusWrapfWithCode(err, codes.InvalidArgument, "Invalid PKIX public key at index %d", i)
+		}
+		newPublicKeys = append(newPublicKeys, newPublicKey{
+			publicKey: publicKey,
+		})
+	}
 
+	// Create the platform queue and size class queues.
 	pq := newPlatformQueue(workerInvocationStickinessLimits, maximumQueuedBackgroundLearningOperations, backgroundLearningOperationPriority)
+	pq.addNewPublicKeys(bq, newPublicKeys)
 	for _, sizeClass := range sizeClasses {
 		pq.addSizeClassQueue(bq, sizeClass, false)
 	}
@@ -529,24 +551,40 @@ func (bq *InMemoryBuildQueue) parsePKIXPublicKeyAndGetCurveIndex(pkixPublicKey [
 	return ecdhPublicKey, curveIndex, nil
 }
 
-// computeVerificationZeros computes the value of verification_zeros a
-// worker needs to provide to the scheduler for a given PKIX public key.
-func (bq *InMemoryBuildQueue) computeVerificationZeros(pkixPublicKey []byte) ([aes.BlockSize]byte, int, error) {
+// platformQueuePublicKey is a public key that is associated with a
+// platform queue. This public key is provided by the worker and can be
+// used by clients to sign actions.
+//
+// In addition to storing just the public key, it holds the expected
+// value of verification_zeros that a worker should send in order to be
+// trusted.
+type platformQueuePublicKey struct {
+	pkixPublicKey     []byte
+	verificationZeros [aes.BlockSize]byte
+	curveIndex        int
+}
+
+// getPlatformQueuePublicKey converts a user-provided PKIX public key to an
+// instance of platformQueuePublicKey.
+func (bq *InMemoryBuildQueue) getPlatformQueuePublicKey(pkixPublicKey []byte) (platformQueuePublicKey, error) {
 	ecdhPublicKey, curveIndex, err := bq.parsePKIXPublicKeyAndGetCurveIndex(pkixPublicKey)
 	if err != nil {
-		return [aes.BlockSize]byte{}, 0, err
+		return platformQueuePublicKey{}, err
 	}
 	sharedSecret, err := bq.verificationPrivateKeys[curveIndex].privateKey.ECDH(ecdhPublicKey)
 	if err != nil {
-		return [aes.BlockSize]byte{}, 0, util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to compute shared secret")
+		return platformQueuePublicKey{}, util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to compute shared secret")
 	}
 	blockCipher, err := aes.NewCipher(sharedSecret)
 	if err != nil {
-		return [aes.BlockSize]byte{}, 0, util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to create AES cipher")
+		return platformQueuePublicKey{}, util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to create AES cipher")
 	}
-	var verificationZeros [aes.BlockSize]byte
-	blockCipher.Encrypt(verificationZeros[:], verificationZeros[:])
-	return verificationZeros, curveIndex, nil
+	result := platformQueuePublicKey{
+		pkixPublicKey: pkixPublicKey,
+		curveIndex:    curveIndex,
+	}
+	blockCipher.Encrypt(result.verificationZeros[:], result.verificationZeros[:])
+	return result, nil
 }
 
 // Synchronize the state of a worker with the scheduler. This call is
@@ -591,10 +629,11 @@ func (bq *InMemoryBuildQueue) Synchronize(ctx context.Context, request *remotewo
 			for i := 0; i < len(pq.publicKeys); i++ {
 				publicKey := &pq.publicKeys[i]
 				var err error
-				publicKey.verificationZeros, _, err = bq.computeVerificationZeros(publicKey.pkixPublicKey)
+				newPublicKey, err := bq.getPlatformQueuePublicKey(publicKey.pkixPublicKey)
 				if err != nil {
 					return nil, util.StatusWrapWithCode(err, codes.Internal, "Failed to update cached verification zeros")
 				}
+				*publicKey = newPublicKey
 			}
 		}
 
@@ -638,10 +677,6 @@ func (bq *InMemoryBuildQueue) Synchronize(ctx context.Context, request *remotewo
 	)
 
 	// Check whether all verification zeros are correct.
-	type newPublicKey struct {
-		publicKey      platformQueuePublicKey
-		insertionIndex int
-	}
 	var newPublicKeys []newPublicKey
 	insertionIndex := 0
 	curvesSeen := make(map[int]struct{}, len(publicKeys))
@@ -674,7 +709,8 @@ func (bq *InMemoryBuildQueue) Synchronize(ctx context.Context, request *remotewo
 			// Platform queue does not use this public key
 			// yet, but we already know that this call won't
 			// be adding them. At least ensure that a
-			// verification key exists.
+			// verification key for this kind of curve
+			// exists.
 			var err error
 			_, curveIndex, err = bq.parsePKIXPublicKeyAndGetCurveIndex(requestPublicKey.PkixPublicKey)
 			if err != nil {
@@ -685,19 +721,14 @@ func (bq *InMemoryBuildQueue) Synchronize(ctx context.Context, request *remotewo
 			// yet. Compute the verification zeros on the
 			// fly and allow the public key to be added if
 			// the client provided value matches.
-			var expectedVerificationZeros [aes.BlockSize]byte
-			var err error
-			expectedVerificationZeros, curveIndex, err = bq.computeVerificationZeros(requestPublicKey.PkixPublicKey)
+			publicKey, err := bq.getPlatformQueuePublicKey(requestPublicKey.PkixPublicKey)
 			if err != nil {
-				return nil, util.StatusWrapfWithCode(err, codes.InvalidArgument, "Failed to compute verification zeros for PKIX public key at index %d", index)
+				return nil, util.StatusWrapfWithCode(err, codes.InvalidArgument, "Invalid PKIX public key at index %d", index)
 			}
-			if subtle.ConstantTimeCompare(requestPublicKey.VerificationZeros, expectedVerificationZeros[:]) == 1 {
+			curveIndex = publicKey.curveIndex
+			if subtle.ConstantTimeCompare(requestPublicKey.VerificationZeros, publicKey.verificationZeros[:]) == 1 {
 				newPublicKeys = append(newPublicKeys, newPublicKey{
-					publicKey: platformQueuePublicKey{
-						pkixPublicKey:     requestPublicKey.PkixPublicKey,
-						verificationZeros: expectedVerificationZeros,
-						curveIndex:        curveIndex,
-					},
+					publicKey:      publicKey,
 					insertionIndex: insertionIndex,
 				})
 			} else {
@@ -759,27 +790,9 @@ func (bq *InMemoryBuildQueue) Synchronize(ctx context.Context, request *remotewo
 		}
 	}
 
-	if len(newPublicKeys) > 0 {
-		// Add one or more new public keys to the platform.
-		// Because we want public keys to be sorted, the code
-		// above computed the indices at which the public keys
-		// need to be inserted.
-		mergedPublicKeys := make([]platformQueuePublicKey, 0, len(pq.publicKeys)+len(newPublicKeys))
-		previousInsertionIndex := 0
-		for _, newPublicKey := range newPublicKeys {
-			mergedPublicKeys = append(mergedPublicKeys, existingPublicKeys[previousInsertionIndex:newPublicKey.insertionIndex]...)
-			previousInsertionIndex = newPublicKey.insertionIndex
-			mergedPublicKeys = append(mergedPublicKeys, newPublicKey.publicKey)
-			bq.platformQueues[string(newPublicKey.publicKey.pkixPublicKey)] = pq
-		}
-		mergedPublicKeys = append(mergedPublicKeys, existingPublicKeys[previousInsertionIndex:]...)
-		pq.publicKeys = mergedPublicKeys
-
-		// TODO: Add a per worker bitmap that stores which
-		// workers announce which public keys, and grow those
-		// here.
-	}
-
+	// Platform queue has been created. Attach any new public keys
+	// and size classes.
+	pq.addNewPublicKeys(bq, newPublicKeys)
 	if scq == nil {
 		scq = pq.addSizeClassQueue(bq, request.SizeClass, true)
 	}
@@ -1452,15 +1465,6 @@ func (h platformQueueList) Swap(i, j int) {
 	h[i], h[j] = h[j], h[i]
 }
 
-// platformQueuePublicKey is a public key that is associated with a
-// platform queue. This public key is provided by the worker and can be
-// used by clients to sign actions.
-type platformQueuePublicKey struct {
-	pkixPublicKey     []byte
-	verificationZeros [aes.BlockSize]byte
-	curveIndex        int
-}
-
 // platformQueue is an actual build operations queue that contains a
 // list of associated workers and operations that are queued to be
 // executed. An InMemoryBuildQueue contains a platformQueue for every
@@ -1490,6 +1494,37 @@ func newPlatformQueue(workerInvocationStickinessLimits []time.Duration, maximumQ
 		backgroundLearningOperationPriority:       backgroundLearningOperationPriority,
 	}
 	return pq
+}
+
+// newPublicKey keeps track of a platform public key that has been
+// observed, but has not yet been added to the scheduler's bookkeeping.
+type newPublicKey struct {
+	publicKey      platformQueuePublicKey
+	insertionIndex int
+}
+
+// addNewPublicKeys adds new public keys to the platform. New public
+// keys can be observed if a platform queue is first created, or if a
+// worker starts to announce a public key that has not been observed
+// before. Because we want public keys to be sorted, the caller computed
+// the indices at which the public keys need to be inserted.
+func (pq *platformQueue) addNewPublicKeys(bq *InMemoryBuildQueue, newPublicKeys []newPublicKey) {
+	if len(newPublicKeys) > 0 {
+		mergedPublicKeys := make([]platformQueuePublicKey, 0, len(pq.publicKeys)+len(newPublicKeys))
+		previousInsertionIndex := 0
+		for _, newPublicKey := range newPublicKeys {
+			mergedPublicKeys = append(mergedPublicKeys, pq.publicKeys[previousInsertionIndex:newPublicKey.insertionIndex]...)
+			previousInsertionIndex = newPublicKey.insertionIndex
+			mergedPublicKeys = append(mergedPublicKeys, newPublicKey.publicKey)
+			bq.platformQueues[string(newPublicKey.publicKey.pkixPublicKey)] = pq
+		}
+		mergedPublicKeys = append(mergedPublicKeys, pq.publicKeys[previousInsertionIndex:]...)
+		pq.publicKeys = mergedPublicKeys
+
+		// TODO: Add a per worker bitmap that stores which
+		// workers announce which public keys, and grow those
+		// here.
+	}
 }
 
 func (pq *platformQueue) addSizeClassQueue(bq *InMemoryBuildQueue, sizeClass uint32, mayBeRemoved bool) *sizeClassQueue {

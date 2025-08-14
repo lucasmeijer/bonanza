@@ -76,9 +76,9 @@ message ApplicationConfiguration {
 }
 
 message PredeclaredPlatformQueueConfiguration {
-  // Non-empty list of elliptic-curve public keys in PKIX, ASN.1 DER
-  // form that clients can use to obtain a shared secret for encrypting
-  // actions.
+  // Sorted non-empty list of elliptic-curve public keys in PKIX, ASN.1
+  // DER form that clients can use to obtain a shared secret for
+  // encrypting actions.
   repeated bytes pkix_public_keys = 1;
 
   // Size classes for which predeclared size class queues are created.

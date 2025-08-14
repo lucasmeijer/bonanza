@@ -2,11 +2,9 @@ package main
 
 import (
 	"context"
-	"crypto/ecdh"
 	"os"
 	"time"
 
-	"bonanza.build/pkg/crypto"
 	buildqueuestate_pb "bonanza.build/pkg/proto/buildqueuestate"
 	"bonanza.build/pkg/proto/configuration/bonanza_scheduler"
 	remoteexecution_pb "bonanza.build/pkg/proto/remoteexecution"
@@ -80,15 +78,6 @@ func main() {
 
 		// Create predeclared platform queues.
 		for platformQueueIndex, platformQueue := range configuration.PredeclaredPlatformQueues {
-			publicKeys := make([]*ecdh.PublicKey, 0, len(platformQueue.PkixPublicKeys))
-			for publicKeyIndex, pkixPublicKey := range platformQueue.PkixPublicKeys {
-				ecdhPublicKey, err := crypto.ParsePKIXECDHPublicKey(pkixPublicKey)
-				if err != nil {
-					return util.StatusWrapfWithCode(err, codes.InvalidArgument, "Invalid PKIX public key at index %d of platform at index %d: %s", publicKeyIndex, platformQueueIndex)
-				}
-				publicKeys = append(publicKeys, ecdhPublicKey)
-			}
-
 			workerInvocationStickinessLimits := make([]time.Duration, 0, len(platformQueue.WorkerInvocationStickinessLimits))
 			for i, d := range platformQueue.WorkerInvocationStickinessLimits {
 				if err := d.CheckValid(); err != nil {
@@ -98,7 +87,7 @@ func main() {
 			}
 
 			if err := buildQueue.RegisterPredeclaredPlatformQueue(
-				publicKeys,
+				platformQueue.PkixPublicKeys,
 				workerInvocationStickinessLimits,
 				int(platformQueue.MaximumQueuedBackgroundLearningOperations),
 				platformQueue.BackgroundLearningOperationPriority,
