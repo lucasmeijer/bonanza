@@ -116,6 +116,7 @@ func (s *BrowserService) RegisterHandlers(mux *http.ServeMux) {
 	// Scheduler related endpoints.
 	mux.HandleFunc("/{$}", wrapHandler(s.doPlatformQueues))
 	mux.HandleFunc("/operation/{operation_name}", wrapHandler(s.doOperation))
+	mux.HandleFunc("/operations/{filter_stage}", wrapHandler(s.doOperations))
 	mux.HandleFunc("/workers/{filter}", wrapHandler(s.doWorkers))
 }
 
@@ -1558,6 +1559,161 @@ func (s *BrowserService) doOperation(w http.ResponseWriter, r *http.Request) (g.
 }
 
 const pageSize = 1000
+
+func (s *BrowserService) doOperations(w http.ResponseWriter, r *http.Request) (g.Node, error) {
+	query := r.URL.Query()
+	var filterInvocationID *anypb.Any
+	if filterInvocationIDString := query.Get("filter_invocation_id"); filterInvocationIDString != "" {
+		var invocationID anypb.Any
+		if err := protojson.Unmarshal([]byte(filterInvocationIDString), &invocationID); err != nil {
+			return nil, fmt.Errorf("invalid filter invocation ID: %w", err)
+		}
+		filterInvocationID = &invocationID
+	}
+	filterStageValue, ok := buildqueuestate_pb.ListOperationsRequest_ExecutionStage_value[r.PathValue("filter_stage")]
+	if !ok {
+		return nil, errors.New("invalid filter stage")
+	}
+	filterStage := buildqueuestate_pb.ListOperationsRequest_ExecutionStage(filterStageValue)
+
+	var startAfter *buildqueuestate_pb.ListOperationsRequest_StartAfter
+	if startAfterParameter := query.Get("start_after"); startAfterParameter != "" {
+		var startAfterMessage buildqueuestate_pb.ListOperationsRequest_StartAfter
+		if err := protojson.Unmarshal([]byte(startAfterParameter), &startAfterMessage); err != nil {
+			return nil, fmt.Errorf("failed to parse start after message: %w", err)
+		}
+		startAfter = &startAfterMessage
+	}
+
+	ctx := r.Context()
+	response, err := s.buildQueueStateClient.ListOperations(ctx, &buildqueuestate_pb.ListOperationsRequest{
+		FilterInvocationId: filterInvocationID,
+		FilterStage:        filterStage,
+		PageSize:           pageSize,
+		StartAfter:         startAfter,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list operations: %w", err)
+	}
+
+	// Pagination bar for filtering operations by stage.
+	filterStageNodes := []g.Node{
+		h.Class("join"),
+	}
+	for _, stage := range []struct {
+		value buildqueuestate_pb.ListOperationsRequest_ExecutionStage
+		label string
+	}{
+		{buildqueuestate_pb.ListOperationsRequest_ALL, "All"},
+		{buildqueuestate_pb.ListOperationsRequest_QUEUED, "Queued"},
+		{buildqueuestate_pb.ListOperationsRequest_EXECUTING, "Executing"},
+		{buildqueuestate_pb.ListOperationsRequest_COMPLETED, "Completed"},
+	} {
+		if filterStage == stage.value {
+			filterStageNodes = append(filterStageNodes, h.Span(
+				h.Role("button"),
+				h.Class("join-item btn btn-active btn-primary"),
+				g.Text(stage.label),
+			))
+		} else {
+			filterStageNodes = append(filterStageNodes, h.A(
+				h.Role("button"),
+				h.Class("join-item btn"),
+				h.Href(stage.value.String()),
+				g.Text(stage.label),
+			))
+		}
+	}
+
+	paginationNodes := []g.Node{
+		h.Class("join"),
+	}
+	paginationInfo := response.PaginationInfo
+	startIndex := paginationInfo.GetStartIndex()
+	if startIndex > 0 {
+		paginationNodes = append(paginationNodes, h.A(
+			h.Role("button"),
+			h.Class("join-item btn"),
+			h.Href(filterStage.String()),
+			g.Text("◀◀"),
+		))
+	} else {
+		paginationNodes = append(paginationNodes, h.Span(
+			h.Role("button"),
+			h.Class("join-item btn btn-disabled"),
+			g.Text("◀◀"),
+		))
+	}
+	paginationNodes = append(paginationNodes, h.Span(
+		h.Role("button"),
+		h.Class("join-item btn btn-active btn-primary"),
+		g.Textf("Showing operations [%d, %d) of %d in total", startIndex, startIndex+uint32(len(response.Operations)), paginationInfo.GetTotalEntries()),
+	))
+	if l := len(response.Operations); l > 0 {
+		paginationNodes = append(paginationNodes, h.A(
+			h.Role("button"),
+			h.Class("join-item btn"),
+			h.Href("TODO"),
+			g.Text("▶"),
+		))
+	} else {
+		paginationNodes = append(paginationNodes, h.Span(
+			h.Role("button"),
+			h.Class("join-item btn btn-disabled"),
+			g.Text("▶"),
+		))
+	}
+
+	tableRows := make([]g.Node, 0, len(response.Operations))
+	now := time.Now()
+	for _, operation := range response.Operations {
+		tableRows = append(
+			tableRows,
+			h.Tr(
+				h.Td(
+					h.Class("font-mono"),
+					h.A(
+						h.Class("link link-primary"),
+						h.Href("../../operation/"+operation.Name),
+						g.Text(operation.Name),
+					),
+				),
+				h.Td(h.Class("text-right"), g.Text(timeoutToText(operation.Timeout, now))),
+			),
+		)
+	}
+
+	return renderPage("Operations", []g.Node{
+		h.Div(
+			h.Class("card bg-base-200 m-4 p-4 shadow"),
+			h.H1(
+				h.Class("card-title text-2xl mb-4"),
+				g.Text("Operations"),
+			),
+			h.Div(
+				h.Class("flex justify-between"),
+				h.Div(filterStageNodes...),
+				h.Div(paginationNodes...),
+			),
+
+			h.Table(
+				h.Class("table"),
+				h.THead(
+					h.Class("text-center"),
+					h.Tr(
+						h.Th(
+							h.Class("font-mono"),
+						),
+						h.Th(
+							g.Text("Operation timeout"),
+						),
+					),
+				),
+				h.TBody(tableRows...),
+			),
+		),
+	}), nil
+}
 
 func (s *BrowserService) doWorkers(w http.ResponseWriter, r *http.Request) (g.Node, error) {
 	filterData, err := base64.RawURLEncoding.DecodeString(r.PathValue("filter"))
