@@ -134,24 +134,29 @@ func NewLocalExecutor(
 	maximumExecutionTimeoutCompensation time.Duration,
 ) remoteworker.Executor[*model_executewithstorage.Action[object.GlobalReference], model_core.Decodable[object.LocalReference], model_core.Decodable[object.LocalReference]] {
 	return &localExecutor{
-		objectDownloader:                    objectDownloader,
-		parsedObjectPool:                    parsedObjectPool,
-		dagUploaderClient:                   dagUploaderClient,
-		objectContentsWalkerSemaphore:       objectContentsWalkerSemaphore,
-		topLevelDirectory:                   topLevelDirectory,
-		handleAllocator:                     handleAllocator,
-		filePool:                            filePool,
-		symlinkFactory:                      symlinkFactory,
-		initialContentsSorter:               initialContentsSorter,
-		hiddenFilesMatcher:                  hiddenFilesMatcher,
-		runner:                              runner,
-		clock:                               clock,
-		uuidGenerator:                       uuidGenerator,
-		maximumWritableFileUploadDelay:      maximumWritableFileUploadDelay,
-		environmentVariables:                environmentVariables,
-		buildDirectoryOwnerUserID:           buildDirectoryOwnerUserID,
-		buildDirectoryOwnerGroupID:          buildDirectoryOwnerGroupID,
-		readinessCheckingDirectory:          handleAllocator.New().AsStatelessDirectory(virtual.NewStaticDirectory(nil)),
+		objectDownloader:               objectDownloader,
+		parsedObjectPool:               parsedObjectPool,
+		dagUploaderClient:              dagUploaderClient,
+		objectContentsWalkerSemaphore:  objectContentsWalkerSemaphore,
+		topLevelDirectory:              topLevelDirectory,
+		handleAllocator:                handleAllocator,
+		filePool:                       filePool,
+		symlinkFactory:                 symlinkFactory,
+		initialContentsSorter:          initialContentsSorter,
+		hiddenFilesMatcher:             hiddenFilesMatcher,
+		runner:                         runner,
+		clock:                          clock,
+		uuidGenerator:                  uuidGenerator,
+		maximumWritableFileUploadDelay: maximumWritableFileUploadDelay,
+		environmentVariables:           environmentVariables,
+		buildDirectoryOwnerUserID:      buildDirectoryOwnerUserID,
+		buildDirectoryOwnerGroupID:     buildDirectoryOwnerGroupID,
+		readinessCheckingDirectory: handleAllocator.New().AsStatelessDirectory(
+			virtual.NewStaticDirectory(
+				virtual.CaseSensitiveComponentNormalizer,
+				nil,
+			),
+		),
 		maximumExecutionTimeoutCompensation: maximumExecutionTimeoutCompensation,
 	}
 }
@@ -369,6 +374,7 @@ func (e *localExecutor) Execute(ctx context.Context, action *model_executewithst
 			e.initialContentsSorter,
 			e.hiddenFilesMatcher,
 			e.clock,
+			virtual.CaseSensitiveComponentNormalizer,
 			/* defaultAttributesSetter = */ func(requested virtual.AttributesMask, attributes *virtual.Attributes) {
 				attributes.SetOwnerUserID(e.buildDirectoryOwnerUserID)
 				attributes.SetOwnerGroupID(e.buildDirectoryOwnerGroupID)

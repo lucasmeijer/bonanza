@@ -94,7 +94,9 @@ func main() {
 				"bonanza_worker",
 				/* rootDirectory = */ virtual_configuration.NoAttributeCaching,
 				/* childDirectories = */ virtual_configuration.LongAttributeCaching,
-				/* leaves = */ virtual_configuration.LongAttributeCaching)
+				/* leaves = */ virtual_configuration.LongAttributeCaching,
+				/* caseSensitive = */ true,
+			)
 			if err != nil {
 				return util.StatusWrap(err, "Failed to create build directory mount")
 			}
