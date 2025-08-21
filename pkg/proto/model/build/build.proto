@@ -48,9 +48,8 @@ message BuildSpecification {
   // belonging to the root module are ignored.
   string root_module_name = 2;
 
-  // Patterns of targets that should be built.
-  //
-  // TODO: Must target names be provided in canonical form?
+  // Apparent patterns of targets that should be built. Repo names are
+  // resolved from the perspective of the root module.
   repeated string target_patterns = 3;
 
   // Parameters that the client used to create objects containing

@@ -323,12 +323,25 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 		logger.Fatal(formatted.Textf("Failed to base64 decode --remote_executor_fetcher_pkix_public_key: %s", err))
 	}
 
+	// TODO: Take the current working directory into account, so
+	// that any relative target patterns are resolved correctly.
+	currentPackage := rootModuleName.ToModuleInstance(nil).GetBareCanonicalRepo().GetRootPackage()
+
+	targetPatterns := make([]string, 0, len(args.Arguments))
+	for _, targetPattern := range args.Arguments {
+		apparentTargetPattern, err := currentPackage.AppendTargetPattern(targetPattern)
+		if err != nil {
+			logger.Fatal(formatted.Textf("Invalid target pattern %#v: %s", targetPattern, err))
+		}
+		targetPatterns = append(targetPatterns, apparentTargetPattern.String())
+	}
+
 	// Construct a BuildSpecification message that lists all the
 	// modules and contains all of the flags to instruct what needs
 	// to be built.
 	buildSpecification := model_build_pb.BuildSpecification{
 		RootModuleName:                         rootModuleName.String(),
-		TargetPatterns:                         args.Arguments,
+		TargetPatterns:                         targetPatterns,
 		DirectoryCreationParameters:            directoryParametersMessage,
 		FileCreationParameters:                 fileParametersMessage,
 		IgnoreRootModuleDevDependencies:        args.CommonFlags.IgnoreDevDependency,

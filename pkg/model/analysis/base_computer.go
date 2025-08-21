@@ -306,7 +306,7 @@ func (c *baseComputer[TReference, TMetadata]) ComputeBuildResultValue(ctx contex
 		)
 
 		for _, targetPattern := range buildSpecification.TargetPatterns {
-			apparentTargetPattern, err := rootPackage.AppendTargetPattern(targetPattern)
+			apparentTargetPattern, err := label.NewApparentTargetPattern(targetPattern)
 			if err != nil {
 				return PatchedBuildResultValue{}, fmt.Errorf("invalid target pattern %#v: %w", targetPattern, err)
 			}
