@@ -121,6 +121,21 @@ message BuildSpecification {
   // sources, and through repository_ctx.download() in PKIX, ASN.1 DER
   // form.
   bytes fetch_platform_pkix_public_key = 15;
+
+  message BuildSettingOverride {
+    // The apparent label of the build setting target.
+    string label = 1;
+
+    // The value to assign to the build setting.
+    string value = 2;
+  }
+
+  // Build settings for which overrides are provided on the command
+  // line. The client SHOULD NOT attempt to perform any normalization
+  // (e.g., sorting or collapsing overrides using the same label), as
+  // labels may be aliases and build settings may accept lists of
+  // values.
+  repeated BuildSettingOverride build_setting_overrides = 16;
 }
 
 message Action {

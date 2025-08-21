@@ -1,5 +1,10 @@
 package arguments
 
+type BuildSettingOverride struct {
+	Label string
+	Value string
+}
+
 type Command interface {
 	Reset()
 }

@@ -184,6 +184,11 @@ var commonFlags = []flag{
 		description: "Name of the Starlark function to invoke to wrap the execution of subrule implementation functions. This can be used to decorate ctx to contain fields that are either deprecated, or trivially implementable in pure Starlark.",
 		flagType:    stringFlagType{},
 	},
+	{
+		longName:    "xcode_version",
+		description: "If specified, uses Xcode of the given version for relevant build actions. If unspecified, uses the executor default version of Xcode.",
+		flagType:    buildSettingFlagType{},
+	},
 }
 
 var commands = map[string]command{

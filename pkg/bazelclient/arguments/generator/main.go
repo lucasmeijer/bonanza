@@ -114,6 +114,7 @@ func main() {
 		fmt.Printf("  get%sFlags() *%sFlags\n", flagSetSymbolName, flagSetSymbolName)
 	}
 	fmt.Printf("  appendArgument(argument string) error\n")
+	fmt.Printf("  appendBuildSettingOverride(override BuildSettingOverride)\n")
 	fmt.Printf("}\n")
 
 	for _, commandName := range slices.Sorted(maps.Keys(commands)) {
@@ -135,6 +136,7 @@ func main() {
 		if command.takesArguments {
 			fmt.Printf("Arguments []string\n")
 		}
+		fmt.Printf("BuildSettingOverrides []BuildSettingOverride\n")
 		fmt.Printf("}\n")
 
 		fmt.Printf("func (c *%sCommand) Reset() {\n", commandSymbolName)
@@ -161,6 +163,10 @@ func main() {
 		} else {
 			fmt.Printf("  return CommandDoesNotTakeArgumentsError{Command: %#v}\n", commandName)
 		}
+		fmt.Printf("}\n")
+
+		fmt.Printf("func (c *%sCommand) appendBuildSettingOverride(override BuildSettingOverride) {\n", commandSymbolName)
+		fmt.Printf("  c.BuildSettingOverrides = append(c.BuildSettingOverrides, override)\n")
 		fmt.Printf("}\n")
 	}
 

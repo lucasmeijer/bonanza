@@ -88,6 +88,43 @@ func (ft boolFlagType) emitStartupParser(longName string) {
 	fmt.Printf("  flags.%s = false\n", longSymbolName)
 }
 
+type buildSettingFlagType struct{}
+
+func (ft buildSettingFlagType) emitStructField(longName string) {}
+
+func (ft buildSettingFlagType) emitDefaultInitializer(longName string) {}
+
+func (ft buildSettingFlagType) emitLongNameParser(flagSetName, longName string) {
+	fmt.Printf("case %#v:\n", "--"+longName)
+	fmt.Printf("  shouldApply := false\n")
+	fmt.Printf("  if cmd.get%sFlags() != nil {\n", toSymbolName(flagSetName, true))
+	fmt.Printf("    shouldApply = true\n")
+	fmt.Printf("  } else if mustApply {\n")
+	fmt.Printf("    return FlagNotApplicableError{Flag: longOptionName}\n")
+	fmt.Printf("  }\n")
+	fmt.Printf("  if assignmentIndex < 0 {\n")
+	fmt.Printf("    if len(*currentArgs) == 0 {\n")
+	fmt.Printf("      return FlagMissingValueError{Flag: longOptionName}\n")
+	fmt.Printf("    }\n")
+	fmt.Printf("    optionValue = (*currentArgs)[0]\n")
+	fmt.Printf("    (*currentArgs) = (*currentArgs)[1:]\n")
+	fmt.Printf("  }\n")
+	fmt.Printf("  if shouldApply {\n")
+	fmt.Printf("    cmd.appendBuildSettingOverride(BuildSettingOverride{\n")
+	fmt.Printf("      Label: %#v,\n", "@bazel_tools//command_line_option:"+longName)
+	fmt.Printf("      Value: optionValue,\n")
+	fmt.Printf("    })\n")
+	fmt.Printf("  }\n")
+}
+
+func (ft buildSettingFlagType) emitShortNameParser(flagSetName, longName, shortName string) {
+	panic("build setting flags cannot be used with short names")
+}
+
+func (ft buildSettingFlagType) emitStartupParser(longName string) {
+	panic("build setting flags cannot be used for startup flags")
+}
+
 type enumFlagType struct {
 	enumType     string
 	defaultValue string

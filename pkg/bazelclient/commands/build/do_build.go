@@ -336,6 +336,21 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 		targetPatterns = append(targetPatterns, apparentTargetPattern.String())
 	}
 
+	buildSettingOverrides := make([]*model_build_pb.BuildSpecification_BuildSettingOverride, 0, len(args.BuildSettingOverrides))
+	for _, override := range args.BuildSettingOverrides {
+		apparentLabel, err := currentPackage.AppendTargetPattern(override.Label)
+		if err != nil {
+			logger.Fatal(formatted.Textf("Invalid build setting override --%s=%#v: %s", override.Label, override.Value, err))
+		}
+		buildSettingOverrides = append(
+			buildSettingOverrides,
+			&model_build_pb.BuildSpecification_BuildSettingOverride{
+				Label: apparentLabel.String(),
+				Value: override.Value,
+			},
+		)
+	}
+
 	// Construct a BuildSpecification message that lists all the
 	// modules and contains all of the flags to instruct what needs
 	// to be built.
@@ -352,6 +367,7 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 		TargetPlatforms:                        targetPlatforms,
 		RuleImplementationWrapperIdentifier:    args.CommonFlags.RuleImplementationWrapperIdentifier,
 		SubruleImplementationWrapperIdentifier: args.CommonFlags.SubruleImplementationWrapperIdentifier,
+		BuildSettingOverrides:                  buildSettingOverrides,
 	}
 	switch args.CommonFlags.LockfileMode {
 	case arguments.LockfileMode_Off:
