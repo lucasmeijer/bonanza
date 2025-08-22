@@ -291,11 +291,11 @@ func (c *baseComputer[TReference, TMetadata]) ComputeBuildResultValue(ctx contex
 	thread := c.newStarlarkThread(ctx, e, buildSpecification.BuiltinsModuleNames)
 	missingDependencies := false
 	labelResolver := newLabelResolver(e)
-	for _, targetPlatform := range buildSpecification.TargetPlatforms {
-		targetPlatformConfigurationReference, err := c.createInitialConfiguration(ctx, e, thread, rootPackage, targetPlatform)
+	for i, configuration := range buildSpecification.Configurations {
+		targetPlatformConfigurationReference, err := c.createInitialConfiguration(ctx, e, thread, rootPackage, configuration)
 		if err != nil {
 			if !errors.Is(err, evaluation.ErrMissingDependency) {
-				return PatchedBuildResultValue{}, fmt.Errorf("failed to transition to target platform %#v: %w", targetPlatform, err)
+				return PatchedBuildResultValue{}, fmt.Errorf("failed to create initial configuration for configuration at index %d: %w", i, err)
 			}
 			missingDependencies = true
 			continue

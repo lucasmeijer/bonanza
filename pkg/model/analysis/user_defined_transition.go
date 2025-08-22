@@ -32,11 +32,14 @@ import (
 
 var commandLineOptionRepoRootPackage = util.Must(label.NewCanonicalPackage("@@bazel_tools+"))
 
+// expectedTransitionOutput contains information about a declared output
+// of a transition for which the implementation function of the
+// transition is expected to yield a value.
 type expectedTransitionOutput[TReference any] struct {
 	label         string
-	key           string
-	canonicalizer unpack.Canonicalizer
+	canonicalizer model_starlark.BuildSettingCanonicalizer
 	defaultValue  model_core.Message[*model_starlark_pb.Value, TReference]
+	isFlag        bool
 }
 
 type getExpectedTransitionOutputEnvironment[TReference any] interface {
@@ -68,18 +71,10 @@ func stringToStarlarkLabelOrNone(v string) *model_starlark_pb.Value {
 	}
 }
 
-func getExpectedTransitionOutput[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](e getExpectedTransitionOutputEnvironment[TReference], transitionPackage label.CanonicalPackage, output string) (expectedTransitionOutput[TReference], error) {
+func getExpectedTransitionOutput[TReference object.BasicReference, TMetadata model_core.CloneableReferenceMetadata](e getExpectedTransitionOutputEnvironment[TReference], transitionPackage label.CanonicalPackage, apparentBuildSettingLabel label.ApparentLabel) (expectedTransitionOutput[TReference], error) {
 	// Resolve the actual build setting target corresponding
 	// to the string value provided as part of the
 	// transition definition.
-	pkg := transitionPackage
-	if strings.HasPrefix(output, "//command_line_option:") {
-		pkg = commandLineOptionRepoRootPackage
-	}
-	apparentBuildSettingLabel, err := pkg.AppendLabel(output)
-	if err != nil {
-		return expectedTransitionOutput[TReference]{}, fmt.Errorf("invalid build setting label %#v: %w", output, err)
-	}
 	canonicalBuildSettingLabel, err := label.Canonicalize(newLabelResolver(e), transitionPackage.GetCanonicalRepo(), apparentBuildSettingLabel)
 	if err != nil {
 		return expectedTransitionOutput[TReference]{}, err
@@ -106,28 +101,20 @@ func getExpectedTransitionOutput[TReference object.BasicReference, TMetadata mod
 	if !targetValue.IsSet() {
 		return expectedTransitionOutput[TReference]{}, evaluation.ErrMissingDependency
 	}
-	var canonicalizer unpack.Canonicalizer
-	var defaultValue model_core.Message[*model_starlark_pb.Value, TReference]
 	switch targetKind := targetValue.Message.Definition.GetKind().(type) {
 	case *model_starlark_pb.Target_Definition_LabelSetting:
 		// Build setting is a label_setting() or label_flag().
-		labelSettingUnpackerInto := model_starlark.NewLabelOrStringUnpackerInto[TReference, TMetadata](transitionPackage)
-		if targetKind.LabelSetting.SingletonList {
-			canonicalizer = unpack.Or([]unpack.UnpackerInto[[]label.ResolvedLabel]{
-				unpack.Singleton(labelSettingUnpackerInto),
-				// This allows us to set this
-				// build setting to a list with
-				// multiple values, which is not
-				// what we want. Add a custom
-				// unpacker to forbid this.
-				unpack.List(labelSettingUnpackerInto),
-			})
-		} else {
-			canonicalizer = unpack.IfNotNone(labelSettingUnpackerInto)
-		}
-		defaultValue = model_core.NewSimpleMessage[TReference](
-			stringToStarlarkLabelOrNone(targetKind.LabelSetting.BuildSettingDefault),
-		)
+		return expectedTransitionOutput[TReference]{
+			label: visibleBuildSettingLabel,
+			canonicalizer: model_starlark.NewLabelBuildSettingCanonicalizer[TReference, TMetadata](
+				transitionPackage,
+				targetKind.LabelSetting.SingletonList,
+			),
+			defaultValue: model_core.NewSimpleMessage[TReference](
+				stringToStarlarkLabelOrNone(targetKind.LabelSetting.BuildSettingDefault),
+			),
+			isFlag: targetKind.LabelSetting.Flag,
+		}, nil
 	case *model_starlark_pb.Target_Definition_RuleTarget:
 		// Build setting is written in Starlark.
 		if targetKind.RuleTarget.BuildSettingDefault == nil {
@@ -147,25 +134,36 @@ func getExpectedTransitionOutput[TReference object.BasicReference, TMetadata mod
 		if !ok {
 			return expectedTransitionOutput[TReference]{}, fmt.Errorf("rule %#v used by build setting %#v does not have a definition", targetKind.RuleTarget.RuleIdentifier, visibleBuildSettingLabel)
 		}
-		if ruleDefinition.Definition.BuildSetting == nil {
+		buildSetting := ruleDefinition.Definition.BuildSetting
+		if buildSetting == nil {
 			return expectedTransitionOutput[TReference]{}, fmt.Errorf("rule %#v used by build setting %#v does not have \"build_setting\" set", targetKind.RuleTarget.RuleIdentifier, visibleBuildSettingLabel)
 		}
-		buildSettingType, err := model_starlark.DecodeBuildSettingType[TReference, TMetadata](ruleDefinition.Definition.BuildSetting)
+		buildSettingType, err := model_starlark.DecodeBuildSettingType[TReference, TMetadata](buildSetting)
 		if err != nil {
 			return expectedTransitionOutput[TReference]{}, fmt.Errorf("failed to decode build setting type for rule %#v used by build setting %#v: %w", targetKind.RuleTarget.RuleIdentifier, visibleBuildSettingLabel, err)
 		}
-		canonicalizer = buildSettingType.GetCanonicalizer(transitionPackage)
-		defaultValue = model_core.Nested(targetValue, targetKind.RuleTarget.BuildSettingDefault)
+		return expectedTransitionOutput[TReference]{
+			label:         visibleBuildSettingLabel,
+			canonicalizer: buildSettingType.GetCanonicalizer(transitionPackage),
+			defaultValue:  model_core.Nested(targetValue, targetKind.RuleTarget.BuildSettingDefault),
+			isFlag:        buildSetting.Flag,
+		}, nil
 	default:
 		return expectedTransitionOutput[TReference]{}, fmt.Errorf("target %#v is not a label setting or rule target", visibleBuildSettingLabel)
 	}
+}
 
-	return expectedTransitionOutput[TReference]{
-		label:         visibleBuildSettingLabel,
-		key:           output,
-		canonicalizer: canonicalizer,
-		defaultValue:  defaultValue,
-	}, nil
+// getApparentBuildSettingLabel converts a string containing a build
+// setting label to an apparent label. Bazel provides a fictive
+// //command_line_option package to refer to refer to integrated command
+// line options. We map it to a package under @bazel_tools containing
+// regular user defined build settings.
+func getApparentBuildSettingLabel(transitionPackage label.CanonicalPackage, buildSettingLabel string) (label.ApparentLabel, error) {
+	pkg := transitionPackage
+	if strings.HasPrefix(buildSettingLabel, "//command_line_option:") {
+		pkg = commandLineOptionRepoRootPackage
+	}
+	return pkg.AppendLabel(buildSettingLabel)
 }
 
 func getBuildSettingOverridesFromReference[TReference any](configurationReference model_core.Message[*model_core_pb.DecodableReference, TReference]) model_core.Message[[]*model_analysis_pb.BuildSettingOverride, TReference] {
@@ -181,19 +179,58 @@ func getBuildSettingOverridesFromReference[TReference any](configurationReferenc
 	}})
 }
 
+// namedExpectedTransitionOutput contains information about a declared
+// output of a transition for which the implementation function of the
+// transition is expected to yield a value. It also includes the key at
+// which the value is stored in the dictionary returned by the
+// implementation function.
+type namedExpectedTransitionOutput[TReference any] struct {
+	dictKey        string
+	expectedOutput expectedTransitionOutput[TReference]
+}
+
+func getCanonicalTransitionOutputValuesFromDict[TReference any](thread *starlark.Thread, namedExpectedOutputs []namedExpectedTransitionOutput[TReference], outputs map[string]starlark.Value) ([]buildSettingValueToApply[TReference], error) {
+	if len(outputs) != len(namedExpectedOutputs) {
+		return nil, fmt.Errorf("output dictionary contains %d keys, while the transition's definition only has %d outputs", len(outputs), len(namedExpectedOutputs))
+	}
+
+	values := make([]buildSettingValueToApply[TReference], 0, len(namedExpectedOutputs))
+	for _, namedExpectedOutput := range namedExpectedOutputs {
+		label := namedExpectedOutput.expectedOutput.label
+		literalValue, ok := outputs[namedExpectedOutput.dictKey]
+		if !ok {
+			return nil, fmt.Errorf("no value for output %#v has been provided", label)
+		}
+		canonicalizedValue, err := namedExpectedOutput.expectedOutput.canonicalizer.Canonicalize(thread, literalValue)
+		if err != nil {
+			return nil, fmt.Errorf("failed to canonicalize output %#v: %w", label, err)
+		}
+		values = append(values, buildSettingValueToApply[TReference]{
+			label:              label,
+			canonicalizedValue: canonicalizedValue,
+			defaultValue:       namedExpectedOutput.expectedOutput.defaultValue,
+		})
+	}
+	return values, nil
+}
+
+// buildSettingValueToApply contains the value of a build setting that
+// has to be inserted into the configuration. The default value of the
+// build setting is also included, so that the override can be
+// suppressed in case the desired value is equal to the default.
+type buildSettingValueToApply[TReference any] struct {
+	label              string
+	canonicalizedValue starlark.Value
+	defaultValue       model_core.Message[*model_starlark_pb.Value, TReference]
+}
+
 func (c *baseComputer[TReference, TMetadata]) applyTransition(
 	ctx context.Context,
 	e model_core.ObjectCapturer[TReference, TMetadata],
 	configurationReference model_core.Message[*model_core_pb.DecodableReference, TReference],
-	expectedOutputs []expectedTransitionOutput[TReference],
-	thread *starlark.Thread,
-	outputs map[string]starlark.Value,
+	buildSettingValuesToApply []buildSettingValueToApply[TReference],
 	valueEncodingOptions *model_starlark.ValueEncodingOptions[TReference, TMetadata],
 ) (model_core.PatchedMessage[*model_core_pb.DecodableReference, TMetadata], error) {
-	if len(outputs) != len(expectedOutputs) {
-		return model_core.PatchedMessage[*model_core_pb.DecodableReference, TMetadata]{}, fmt.Errorf("output dictionary contains %d keys, while the transition's definition only has %d outputs", len(outputs), len(expectedOutputs))
-	}
-
 	var errIter error
 	existingIter, existingIterStop := iter.Pull(btree.AllLeaves(
 		ctx,
@@ -236,18 +273,18 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 	)
 
 	existingOverride, existingOverrideOK := existingIter()
-	for existingOverrideOK || len(expectedOutputs) > 0 {
+	for existingOverrideOK || len(buildSettingValuesToApply) > 0 {
 		var cmp int
 		if !existingOverrideOK {
 			cmp = 1
-		} else if len(expectedOutputs) == 0 {
+		} else if len(buildSettingValuesToApply) == 0 {
 			cmp = -1
 		} else {
 			level, ok := existingOverride.Message.Level.(*model_analysis_pb.BuildSettingOverride_Leaf_)
 			if !ok {
 				return model_core.PatchedMessage[*model_core_pb.DecodableReference, TMetadata]{}, errors.New("build setting override is not a valid leaf")
 			}
-			cmp = strings.Compare(level.Leaf.Label, expectedOutputs[0].label)
+			cmp = strings.Compare(level.Leaf.Label, buildSettingValuesToApply[0].label)
 		}
 		if cmp < 0 {
 			// Preserve existing build setting.
@@ -255,18 +292,10 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 		} else {
 			// Either replace or remove an existing build
 			// setting override, or inject a new one.
-			expectedOutput := expectedOutputs[0]
-			expectedOutputs = expectedOutputs[1:]
-			literalValue, ok := outputs[expectedOutput.key]
-			if !ok {
-				return model_core.PatchedMessage[*model_core_pb.DecodableReference, TMetadata]{}, fmt.Errorf("no value for output %#v has been provided", expectedOutput.label)
-			}
-			canonicalizedValue, err := expectedOutput.canonicalizer.Canonicalize(thread, literalValue)
-			if err != nil {
-				return model_core.PatchedMessage[*model_core_pb.DecodableReference, TMetadata]{}, fmt.Errorf("failed to canonicalize output %#v: %w", expectedOutput.label, err)
-			}
+			buildSettingValueToApply := buildSettingValuesToApply[0]
+			buildSettingValuesToApply = buildSettingValuesToApply[1:]
 			encodedValue, _, err := model_starlark.EncodeValue(
-				canonicalizedValue,
+				buildSettingValueToApply.canonicalizedValue,
 				/* path = */ map[starlark.Value]struct{}{},
 				/* identifier = */ nil,
 				valueEncodingOptions,
@@ -282,7 +311,7 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 			sortedEncodedValue, _ := encodedValue.SortAndSetReferences()
 			sortedDefaultValue, _ := model_core.Patch(
 				c.discardingObjectCapturer,
-				expectedOutput.defaultValue,
+				buildSettingValueToApply.defaultValue,
 			).SortAndSetReferences()
 			if !model_core.TopLevelMessagesEqual(sortedEncodedValue, sortedDefaultValue) {
 				treeBuilder.PushChild(
@@ -290,7 +319,7 @@ func (c *baseComputer[TReference, TMetadata]) applyTransition(
 						&model_analysis_pb.BuildSettingOverride{
 							Level: &model_analysis_pb.BuildSettingOverride_Leaf_{
 								Leaf: &model_analysis_pb.BuildSettingOverride_Leaf{
-									Label: expectedOutput.label,
+									Label: buildSettingValueToApply.label,
 									Value: encodedValue.Message,
 								},
 							},
@@ -466,7 +495,7 @@ type performUserDefinedTransitionEnvironment[TReference, TMetadata any] interfac
 	GetCompiledBzlFileGlobalValue(*model_analysis_pb.CompiledBzlFileGlobal_Key) model_core.Message[*model_analysis_pb.CompiledBzlFileGlobal_Value, TReference]
 }
 
-func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx context.Context, e performUserDefinedTransitionEnvironment[TReference, TMetadata], thread *starlark.Thread, transitionIdentifierStr string, configurationReference model_core.Message[*model_core_pb.DecodableReference, TReference], attrParameter starlark.Value) ([]expectedTransitionOutput[TReference], map[string]map[string]starlark.Value, error) {
+func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx context.Context, e performUserDefinedTransitionEnvironment[TReference, TMetadata], thread *starlark.Thread, transitionIdentifierStr string, configurationReference model_core.Message[*model_core_pb.DecodableReference, TReference], attrParameter starlark.Value) ([]namedExpectedTransitionOutput[TReference], map[string]map[string]starlark.Value, error) {
 	transitionIdentifier, err := label.NewCanonicalStarlarkIdentifier(transitionIdentifierStr)
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid transition identifier: %w", err)
@@ -500,11 +529,7 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx c
 		// Resolve the actual build setting target corresponding
 		// to the string value provided as part of the
 		// transition definition.
-		pkg := transitionPackage
-		if strings.HasPrefix(input, "//command_line_option:") {
-			pkg = commandLineOptionRepoRootPackage
-		}
-		apparentBuildSettingLabel, err := pkg.AppendLabel(input)
+		apparentBuildSettingLabel, err := getApparentBuildSettingLabel(transitionPackage, input)
 		if err != nil {
 			return nil, nil, fmt.Errorf("invalid build setting label %#v: %w", input, err)
 		}
@@ -552,10 +577,18 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx c
 	inputs.Freeze()
 
 	// Preprocess the outputs that we expect to see.
-	expectedOutputs := make([]expectedTransitionOutput[TReference], 0, len(transitionDefinition.Message.Outputs))
+	expectedOutputs := make([]namedExpectedTransitionOutput[TReference], 0, len(transitionDefinition.Message.Outputs))
 	expectedOutputLabels := make(map[string]string, len(transitionDefinition.Message.Outputs))
 	for _, output := range transitionDefinition.Message.Outputs {
-		expectedOutput, err := getExpectedTransitionOutput[TReference, TMetadata](e, transitionPackage, output)
+		apparentBuildSettingLabel, err := getApparentBuildSettingLabel(transitionPackage, output)
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid build setting label %#v: %w", output, err)
+		}
+		expectedOutput, err := getExpectedTransitionOutput[TReference, TMetadata](
+			e,
+			transitionPackage,
+			apparentBuildSettingLabel,
+		)
 		if err != nil {
 			if errors.Is(err, evaluation.ErrMissingDependency) {
 				missingDependencies = true
@@ -566,10 +599,13 @@ func (c *baseComputer[TReference, TMetadata]) performUserDefinedTransition(ctx c
 			return nil, nil, fmt.Errorf("outputs %#v and %#v both refer to build setting %#v", existing, output, expectedOutput.label)
 		}
 		expectedOutputLabels[expectedOutput.label] = output
-		expectedOutputs = append(expectedOutputs, expectedOutput)
+		expectedOutputs = append(expectedOutputs, namedExpectedTransitionOutput[TReference]{
+			dictKey:        output,
+			expectedOutput: expectedOutput,
+		})
 	}
-	slices.SortFunc(expectedOutputs, func(a, b expectedTransitionOutput[TReference]) int {
-		return strings.Compare(a.label, b.label)
+	slices.SortFunc(expectedOutputs, func(a, b namedExpectedTransitionOutput[TReference]) int {
+		return strings.Compare(a.expectedOutput.label, b.expectedOutput.label)
 	})
 
 	if missingDependencies {
@@ -666,13 +702,15 @@ func (c *baseComputer[TReference, TMetadata]) performAndApplyUserDefinedTransiti
 	patcher := model_core.NewReferenceMessagePatcher[TMetadata]()
 	entries := make([]*model_analysis_pb.UserDefinedTransition_Value_Success_Entry, 0, len(outputsDict))
 	for i, key := range slices.Sorted(maps.Keys(outputsDict)) {
+		buildSettingValuesToApply, err := getCanonicalTransitionOutputValuesFromDict(thread, expectedOutputs, outputsDict[key])
+		if err != nil {
+			return performAndApplyUserDefinedTransitionResult[TMetadata]{}, fmt.Errorf("key %#v: %w", i, err)
+		}
 		outputConfigurationReference, err := c.applyTransition(
 			ctx,
 			e,
 			configurationReference,
-			expectedOutputs,
-			thread,
-			outputsDict[key],
+			buildSettingValuesToApply,
 			c.getValueEncodingOptions(e, nil),
 		)
 		if err != nil {

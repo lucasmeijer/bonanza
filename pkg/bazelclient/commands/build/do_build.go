@@ -313,11 +313,6 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 		logger.Fatal(formatted.Text(err.Error()))
 	}
 
-	targetPlatforms := strings.FieldsFunc(args.BuildFlags.Platforms, func(r rune) bool { return r == ',' })
-	if len(targetPlatforms) == 0 {
-		targetPlatforms = []string{"@platforms//host"}
-	}
-
 	fetcherPKIXPublicKey, err := base64.StdEncoding.DecodeString(args.CommonFlags.RemoteExecutorFetcherPkixPublicKey)
 	if err != nil {
 		logger.Fatal(formatted.Textf("Failed to base64 decode --remote_executor_fetcher_pkix_public_key: %s", err))
@@ -336,19 +331,39 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 		targetPatterns = append(targetPatterns, apparentTargetPattern.String())
 	}
 
-	buildSettingOverrides := make([]*model_build_pb.BuildSpecification_BuildSettingOverride, 0, len(args.BuildSettingOverrides))
+	// Determine the configurations for which to build. The Bazel
+	// CLI only supports specifying build setting overrides and a
+	// single list of platforms. However, there is no way to pick
+	// different build setting overrides depending on the platform.
+	commonBuildSettingOverrides := make([]*model_build_pb.BuildSettingOverride, 0, len(args.BuildSettingOverrides))
 	for _, override := range args.BuildSettingOverrides {
 		apparentLabel, err := currentPackage.AppendTargetPattern(override.Label)
 		if err != nil {
 			logger.Fatal(formatted.Textf("Invalid build setting override --%s=%#v: %s", override.Label, override.Value, err))
 		}
-		buildSettingOverrides = append(
-			buildSettingOverrides,
-			&model_build_pb.BuildSpecification_BuildSettingOverride{
+		commonBuildSettingOverrides = append(
+			commonBuildSettingOverrides,
+			&model_build_pb.BuildSettingOverride{
 				Label: apparentLabel.String(),
 				Value: override.Value,
 			},
 		)
+	}
+	targetPlatforms := strings.FieldsFunc(args.BuildFlags.Platforms, func(r rune) bool { return r == ',' })
+	if len(targetPlatforms) == 0 {
+		targetPlatforms = []string{"@platforms//host"}
+	}
+	configurations := make([]*model_build_pb.Configuration, 0, len(targetPlatforms))
+	for _, targetPlatform := range targetPlatforms {
+		configurations = append(configurations, &model_build_pb.Configuration{
+			BuildSettingOverrides: append(
+				[]*model_build_pb.BuildSettingOverride{{
+					Label: "@bazel_tools//command_line_option:platforms",
+					Value: targetPlatform,
+				}},
+				commonBuildSettingOverrides...,
+			),
+		})
 	}
 
 	// Construct a BuildSpecification message that lists all the
@@ -364,10 +379,9 @@ func DoBuild(args *arguments.BuildCommand, workspacePath path.Parser) {
 		RepoPlatform:                           args.CommonFlags.RepoPlatform,
 		FetchPlatformPkixPublicKey:             fetcherPKIXPublicKey,
 		ActionEncoders:                         defaultEncoders,
-		TargetPlatforms:                        targetPlatforms,
+		Configurations:                         configurations,
 		RuleImplementationWrapperIdentifier:    args.CommonFlags.RuleImplementationWrapperIdentifier,
 		SubruleImplementationWrapperIdentifier: args.CommonFlags.SubruleImplementationWrapperIdentifier,
-		BuildSettingOverrides:                  buildSettingOverrides,
 	}
 	switch args.CommonFlags.LockfileMode {
 	case arguments.LockfileMode_Off:

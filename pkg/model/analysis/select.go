@@ -156,15 +156,11 @@ CheckConditions:
 func (c *baseComputer[TReference, TMetadata]) compareBuildSettingValue(labelResolver label.Resolver, expectedValue string, actualValue model_core.Message[*model_starlark_pb.Value, TReference], fromPackage label.CanonicalPackage) (bool, error) {
 	switch typedValue := actualValue.Message.GetKind().(type) {
 	case *model_starlark_pb.Value_Bool:
-		switch expectedValue {
-		case "0", "false", "False":
-			return !typedValue.Bool, nil
-		case "1", "true", "True":
-			return typedValue.Bool, nil
-		default:
-			return false, fmt.Errorf("boolean values can only be compared against \"0\", \"1\", \"false\", \"true\", \"False\" and \"True\", not %#v", expectedValue)
+		expectedBooleanValue, err := model_starlark.ParseBoolBuildSettingString(expectedValue)
+		if err != nil {
+			return false, err
 		}
-		return false, nil
+		return expectedBooleanValue == typedValue.Bool, nil
 	case *model_starlark_pb.Value_Label:
 		// Parse label to obtain a canonical representation.
 		apparentLabel, err := fromPackage.AppendLabel(expectedValue)

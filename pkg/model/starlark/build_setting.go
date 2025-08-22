@@ -1,7 +1,9 @@
 package starlark
 
 import (
+	"errors"
 	"fmt"
+	"strconv"
 
 	pg_label "bonanza.build/pkg/label"
 	model_core "bonanza.build/pkg/model/core"
@@ -56,7 +58,20 @@ func (bs *BuildSetting) Encode() *model_starlark_pb.BuildSetting {
 type BuildSettingType interface {
 	Type() string
 	Encode(out *model_starlark_pb.BuildSetting)
-	GetCanonicalizer(currentPackage pg_label.CanonicalPackage) unpack.Canonicalizer
+	GetCanonicalizer(currentPackage pg_label.CanonicalPackage) BuildSettingCanonicalizer
+}
+
+// BuildSettingCanonicalizer can be used to convert Starlark values to a
+// canonical representation for assignment to a build setting.
+//
+// This interface also provides a method for converting lists of strings
+// to a canonical Starlark value. This is used to process build setting
+// overrides that are provided on the command line (e.g.,
+// --@rules_go//go/config:gc_goopts=-e).
+type BuildSettingCanonicalizer interface {
+	unpack.Canonicalizer
+
+	CanonicalizeStringList(values []string, labelResolver pg_label.Resolver) (starlark.Value, error)
 }
 
 type boolBuildSettingType struct{}
@@ -73,8 +88,33 @@ func (boolBuildSettingType) Encode(out *model_starlark_pb.BuildSetting) {
 	}
 }
 
-func (boolBuildSettingType) GetCanonicalizer(currentPackage pg_label.CanonicalPackage) unpack.Canonicalizer {
-	return unpack.Bool
+func (boolBuildSettingType) GetCanonicalizer(currentPackage pg_label.CanonicalPackage) BuildSettingCanonicalizer {
+	return &boolBuildSettingCanonicalizer{
+		Canonicalizer: unpack.Bool,
+	}
+}
+
+type boolBuildSettingCanonicalizer struct {
+	unpack.Canonicalizer
+}
+
+func ParseBoolBuildSettingString(s string) (bool, error) {
+	switch s {
+	case "0", "false", "False":
+		return false, nil
+	case "1", "true", "True":
+		return true, nil
+	default:
+		return false, fmt.Errorf("booleans can only have values \"0\", \"1\", \"false\", \"true\", \"False\" and \"True\", not %#v", s)
+	}
+}
+
+func (boolBuildSettingCanonicalizer) CanonicalizeStringList(values []string, labelResolver pg_label.Resolver) (starlark.Value, error) {
+	v, err := ParseBoolBuildSettingString(values[len(values)-1])
+	if err != nil {
+		return nil, err
+	}
+	return starlark.Bool(v), nil
 }
 
 type intBuildSettingType struct{}
@@ -91,8 +131,75 @@ func (intBuildSettingType) Encode(out *model_starlark_pb.BuildSetting) {
 	}
 }
 
-func (intBuildSettingType) GetCanonicalizer(currentPackage pg_label.CanonicalPackage) unpack.Canonicalizer {
-	return unpack.Int[int32]()
+func (intBuildSettingType) GetCanonicalizer(currentPackage pg_label.CanonicalPackage) BuildSettingCanonicalizer {
+	return &intBuildSettingCanonicalizer{
+		Canonicalizer: unpack.Int[int32](),
+	}
+}
+
+type intBuildSettingCanonicalizer struct {
+	unpack.Canonicalizer
+}
+
+func (intBuildSettingCanonicalizer) CanonicalizeStringList(values []string, labelResolver pg_label.Resolver) (starlark.Value, error) {
+	v, err := strconv.ParseInt(values[len(values)-1], 10, 32)
+	if err != nil {
+		return nil, err
+	}
+	return starlark.MakeInt64(v), nil
+}
+
+type labelBuildSettingCanonicalizer[TReference any, TMetadata model_core.CloneableReferenceMetadata] struct {
+	unpack.Canonicalizer
+	currentPackage pg_label.CanonicalPackage
+	singletonList  bool
+}
+
+// NewLabelBuildSettingCanonicalizer creates a BuildSettingCanonicalizer
+// that is capable of canonicalizing values assigned to label_setting()s
+// and label_flag()s.
+//
+// As label_setting()s and label_flag()s are implemented as a kind of
+// alias() and not as a rule target, this type does not have an
+// associated BuildSettingType. This is why this
+// BuildSettingCanonicalizer can be constructed independently.
+func NewLabelBuildSettingCanonicalizer[TReference any, TMetadata model_core.CloneableReferenceMetadata](currentPackage pg_label.CanonicalPackage, singletonList bool) BuildSettingCanonicalizer {
+	labelSettingUnpackerInto := NewLabelOrStringUnpackerInto[TReference, TMetadata](currentPackage)
+	var canonicalizer unpack.Canonicalizer
+	if singletonList {
+		canonicalizer = unpack.Or([]unpack.UnpackerInto[[]pg_label.ResolvedLabel]{
+			unpack.Singleton(labelSettingUnpackerInto),
+			// This allows us to set this build setting to a
+			// list with multiple values, which is not what
+			// we want.
+			// TODO: Add a custom unpacker to forbid this.
+			unpack.List(labelSettingUnpackerInto),
+		})
+	} else {
+		canonicalizer = unpack.IfNotNone(labelSettingUnpackerInto)
+	}
+	return &labelBuildSettingCanonicalizer[TReference, TMetadata]{
+		Canonicalizer:  canonicalizer,
+		currentPackage: currentPackage,
+		singletonList:  singletonList,
+	}
+}
+
+func (bsc *labelBuildSettingCanonicalizer[TReference, TMetadata]) CanonicalizeStringList(values []string, labelResolver pg_label.Resolver) (starlark.Value, error) {
+	apparentLabel, err := bsc.currentPackage.AppendLabel(values[len(values)-1])
+	if err != nil {
+		return nil, err
+	}
+	resolvedLabel, err := pg_label.Resolve(labelResolver, bsc.currentPackage.GetCanonicalRepo(), apparentLabel)
+	if err != nil {
+		return nil, err
+	}
+
+	var value starlark.Value = NewLabel[TReference, TMetadata](resolvedLabel)
+	if bsc.singletonList {
+		value = starlark.NewList([]starlark.Value{value})
+	}
+	return value, nil
 }
 
 type labelListBuildSettingType[TReference any, TMetadata model_core.CloneableReferenceMetadata] struct {
@@ -117,8 +224,23 @@ func (bst labelListBuildSettingType[TReference, TMetadata]) Encode(out *model_st
 	}
 }
 
-func (labelListBuildSettingType[TReference, TMetadata]) GetCanonicalizer(currentPackage pg_label.CanonicalPackage) unpack.Canonicalizer {
-	return unpack.List(NewLabelOrStringUnpackerInto[TReference, TMetadata](currentPackage))
+func (bst labelListBuildSettingType[TReference, TMetadata]) GetCanonicalizer(currentPackage pg_label.CanonicalPackage) BuildSettingCanonicalizer {
+	return &labelListBuildSettingCanonicalizer[TReference, TMetadata]{
+		Canonicalizer:  unpack.List(NewLabelOrStringUnpackerInto[TReference, TMetadata](currentPackage)),
+		currentPackage: currentPackage,
+		repeatable:     bst.repeatable,
+	}
+}
+
+type labelListBuildSettingCanonicalizer[TReference any, TMetadata model_core.CloneableReferenceMetadata] struct {
+	unpack.Canonicalizer
+
+	currentPackage pg_label.CanonicalPackage
+	repeatable     bool
+}
+
+func (labelListBuildSettingCanonicalizer[TReference, TMetadata]) CanonicalizeStringList(values []string, labelResolver pg_label.Resolver) (starlark.Value, error) {
+	return nil, errors.New("TODO: Implement canonicalization of config.label_list")
 }
 
 type stringBuildSettingType struct{}
@@ -135,8 +257,18 @@ func (stringBuildSettingType) Encode(out *model_starlark_pb.BuildSetting) {
 	}
 }
 
-func (stringBuildSettingType) GetCanonicalizer(currentPackage pg_label.CanonicalPackage) unpack.Canonicalizer {
-	return unpack.String
+func (stringBuildSettingType) GetCanonicalizer(currentPackage pg_label.CanonicalPackage) BuildSettingCanonicalizer {
+	return &stringBuildSettingCanonicalizer{
+		Canonicalizer: unpack.String,
+	}
+}
+
+type stringBuildSettingCanonicalizer struct {
+	unpack.Canonicalizer
+}
+
+func (stringBuildSettingCanonicalizer) CanonicalizeStringList(values []string, labelResolver pg_label.Resolver) (starlark.Value, error) {
+	return starlark.String(values[len(values)-1]), nil
 }
 
 type stringListBuildSettingType struct {
@@ -161,6 +293,18 @@ func (bst stringListBuildSettingType) Encode(out *model_starlark_pb.BuildSetting
 	}
 }
 
-func (stringListBuildSettingType) GetCanonicalizer(currentPackage pg_label.CanonicalPackage) unpack.Canonicalizer {
-	return unpack.List(unpack.String)
+func (bst stringListBuildSettingType) GetCanonicalizer(currentPackage pg_label.CanonicalPackage) BuildSettingCanonicalizer {
+	return &stringListBuildSettingCanonicalizer{
+		Canonicalizer: unpack.List(unpack.String),
+		repeatable:    bst.repeatable,
+	}
+}
+
+type stringListBuildSettingCanonicalizer struct {
+	unpack.Canonicalizer
+	repeatable bool
+}
+
+func (stringListBuildSettingCanonicalizer) CanonicalizeStringList(values []string, labelResolver pg_label.Resolver) (starlark.Value, error) {
+	return nil, errors.New("TODO: Implement canonicalization of config.string_list")
 }
