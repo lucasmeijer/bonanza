@@ -204,7 +204,7 @@ func (ui *labelOrStringUnpackerInto[TReference, TMetadata]) Canonicalize(thread 
 	if err := ui.UnpackInto(thread, v, &l); err != nil {
 		return nil, err
 	}
-	return Label[TReference, TMetadata]{value: l}, nil
+	return NewLabel[TReference, TMetadata](l), nil
 }
 
 func (labelOrStringUnpackerInto[TReference, TMetadata]) GetConcatenationOperator() syntax.Token {
@@ -231,7 +231,7 @@ func (ui labelUnpackerInto[TReference, TMetadata]) Canonicalize(thread *starlark
 	if err := ui.UnpackInto(thread, v, &l); err != nil {
 		return nil, err
 	}
-	return Label[TReference, TMetadata]{value: l}, nil
+	return NewLabel[TReference, TMetadata](l), nil
 }
 
 func (labelUnpackerInto[TReference, TMetadata]) GetConcatenationOperator() syntax.Token {
