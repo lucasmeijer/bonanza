@@ -1655,9 +1655,16 @@ func (s *BrowserService) doOperation(w http.ResponseWriter, r *http.Request) (g.
 						h.Tr(
 							h.Th(
 								h.Class("whitespace-nowrap"),
-								g.Text("Timeout:"),
+								g.Text("Operation timeout:"),
 							),
 							h.Td(g.Text(timeoutToText(operation.Timeout, now))),
+						),
+						h.Tr(
+							h.Th(
+								h.Class("whitespace-nowrap"),
+								g.Text("Effective execution timeout:"),
+							),
+							h.Td(g.Text(operation.GetEffectiveExecutionTimeout().AsDuration().String())),
 						),
 						h.Tr(
 							h.Th(
@@ -1898,6 +1905,7 @@ func (s *BrowserService) doWorkers(w http.ResponseWriter, r *http.Request) (g.No
 					),
 				),
 				h.Td(h.Class("text-right"), g.Text(timeoutToText(operation.Timeout, now))),
+				h.Td(h.Class("text-right"), g.Text(operation.GetEffectiveExecutionTimeout().AsDuration().String())),
 			)
 		} else {
 			cellText := "idle"
@@ -1906,7 +1914,7 @@ func (s *BrowserService) doWorkers(w http.ResponseWriter, r *http.Request) (g.No
 			}
 			cells = append(cells, h.Td(
 				h.Class("text-center"),
-				h.ColSpan("2"),
+				h.ColSpan("3"),
 				g.Text(cellText),
 			))
 		}
@@ -1939,6 +1947,9 @@ func (s *BrowserService) doWorkers(w http.ResponseWriter, r *http.Request) (g.No
 							),
 							h.Th(
 								g.Text("Operation timeout"),
+							),
+							h.Th(
+								g.Text("Effective execution timeout"),
 							),
 						),
 					),

@@ -168,6 +168,11 @@ message OperationState {
   // The priority of the operation, as provided by the client through
   // ExecutionPolicy.
   int32 priority = 10;
+
+  // The effective execution timeout that the scheduler passes to the
+  // worker when dispatching this operation. This may differ from the
+  // client provided timeout.
+  google.protobuf.Duration effective_execution_timeout = 11;
 }
 
 message SizeClassQueueState {

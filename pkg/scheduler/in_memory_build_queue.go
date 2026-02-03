@@ -2405,6 +2405,7 @@ func (o *operation) getOperationState(bq *InMemoryBuildQueue) *buildqueuestate_p
 		QueuedTimestamp:  t.desiredState.QueuedTimestamp,
 		Action:           t.desiredState.Action,
 		Timeout:          bq.cleanupQueue.getTimestamp(o.cleanupKey),
+		EffectiveExecutionTimeout: t.desiredState.EffectiveExecutionTimeout,
 		Priority:         o.priority,
 	}
 	if t.initialSizeClassLearner == nil {
